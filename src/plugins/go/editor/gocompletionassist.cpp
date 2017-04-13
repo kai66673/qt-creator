@@ -1,0 +1,271 @@
+/****************************************************************************
+**
+** Copyright (C) 2016 Alexander Kudryavtsev.
+** Contact: https://www.qt.io/licensing/
+**
+** This file is part of Qt Creator.
+**
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and The Qt Company. For licensing terms
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
+**
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
+**
+****************************************************************************/
+#include "gocompletionassist.h"
+#include "goeditorconstants.h"
+#include "goconstants.h"
+#include "gocompletionassistvisitor.h"
+#include "goiconprovider.h"
+#include "golexer.h"
+#include "gocodemodelmanager.h"
+
+#include <coreplugin/id.h>
+#include <texteditor/codeassist/assistproposalitem.h>
+#include <texteditor/codeassist/genericproposal.h>
+#include <texteditor/codeassist/genericproposalmodel.h>
+
+namespace GoEditor {
+namespace Internal {
+
+class GoWithImportAssistProposalItem final: public TextEditor::AssistProposalItem
+{
+public:
+    GoWithImportAssistProposalItem(const QString &text, const QString &detail, const QIcon &icon, const QString &importText)
+        : m_importText(importText)
+    {
+        setText(text);
+        setDetail(detail);
+        setIcon(icon);
+    }
+
+    void applyContextualContent(TextEditor::TextDocumentManipulatorInterface &manipulator, int basePosition) const override
+    {
+        QString searchImportText = manipulator.textAt(0, basePosition);
+        TextEditor::AssistProposalItem::applyContextualContent(manipulator, basePosition);
+
+        const QList<GoToken> tokens = GoLexer::instance()->tokenize(searchImportText, -1);
+
+        TokenKind prevKind = T_INVALID;
+        int packageKeywordEnd = -1;
+        int prevKeywordEnd = -1;
+        for (const GoToken &tk : tokens) {
+            TokenKind kind = tk.kind();
+            if (kind == T_PACKAGE) {
+                packageKeywordEnd = tk.end();
+            } else if (prevKind == T_IMPORT && kind == T_LPAREN) {
+                manipulator.replace(tk.end(), 0, QStringLiteral("\n\t\"") + m_importText + QLatin1Char('\"'));
+                return;
+            } else if (prevKind == T_IMPORT && kind == T_STRING) {
+                QString singleImportText = searchImportText.mid(tk.start(), tk.count());
+                manipulator.replace(tk.start(), tk.count(), QStringLiteral("(\n\t\"") + m_importText + QStringLiteral("\"\n\t") + singleImportText + QStringLiteral("\n)\n"));
+                return;
+            } else if (prevKind == T_IMPORT) {
+                manipulator.replace(prevKeywordEnd, 0, QStringLiteral(" (\n\t\"") + m_importText + QStringLiteral("\"\n)\n"));
+                return;
+            }
+            prevKind = kind;
+            prevKeywordEnd = tk.end();
+        }
+
+        // No import keyword found
+        if (packageKeywordEnd == -1) {
+            manipulator.replace(0, 0, QStringLiteral("import (\n\t\"") + m_importText + "\"\n)\n");
+        } else {
+            QChar ch = searchImportText[++packageKeywordEnd];
+            while (packageKeywordEnd < searchImportText.length() && ch != QLatin1Char('\n'))
+                ch = searchImportText[++packageKeywordEnd];
+            manipulator.replace(packageKeywordEnd, 0, QStringLiteral("\n\nimport (\n\t\"") + m_importText + "\"\n)\n");
+        }
+    }
+
+private:
+    QString m_importText;
+};
+
+class GoAssistProposalModel : public TextEditor::GenericProposalModel
+{
+public:
+    GoAssistProposalModel(const QList<TextEditor::AssistProposalItemInterface *> &items)
+        : TextEditor::GenericProposalModel()
+    { loadContent(items); }
+
+    bool keepPerfectMatch(TextEditor::AssistReason reason) const override
+    { return reason != TextEditor::IdleEditor; }
+};
+
+GoCompletionAssistProvider::GoCompletionAssistProvider(QObject *parent)
+    : TextEditor::CompletionAssistProvider(parent)
+{ }
+
+bool GoCompletionAssistProvider::supportsEditor(Core::Id editorId) const
+{ return editorId == Constants::GOEDITOR_ID; }
+
+TextEditor::IAssistProcessor *GoCompletionAssistProvider::createProcessor() const
+{ return new GoCompletionAssistProcessor; }
+
+int GoCompletionAssistProvider::activationCharSequenceLength() const
+{ return 1; }
+
+bool GoCompletionAssistProvider::isActivationCharSequence(const QString &sequence) const
+{
+    QChar ch = sequence.at(0);
+    return ch == QLatin1Char('.');
+}
+
+GoCompletionAssistProcessor::GoCompletionAssistProcessor()
+    : TextEditor::IAssistProcessor()
+    , m_snippetCollector(Go::Constants::GO_SNIPPETS_GROUP_ID,
+                         QIcon(QLatin1String(":/texteditor/images/snippet.png")))
+{ }
+
+GoCompletionAssistProcessor::~GoCompletionAssistProcessor()
+{ }
+
+TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEditor::AssistInterface *interface)
+{
+    m_interface.reset(static_cast<const GoCompletionAssistInterface *>(interface));
+
+    if (m_interface->reason() != TextEditor::ExplicitlyInvoked) {
+        QTextCursor cursor(m_interface->textDocument());
+        cursor.setPosition(m_interface->position());
+        if (GoLexer::tokenUnderCursorIsLiteralOrComment(cursor))
+            return 0;
+    }
+
+    if (!m_interface->source().isNull()) {
+        QChar triggerChar = m_interface->characterAt(m_interface->position() - 1);
+        bool isDotTrigger = triggerChar == QChar('.');
+        if (!isDotTrigger && !(triggerChar.isLetterOrNumber() || triggerChar == QChar('_') || triggerChar == QChar('$')))
+            return 0;
+        bool isGlobalCompletion = !isDotTrigger;
+        int startOfName = m_interface->position();
+        int pos = startOfName;
+        if (!isDotTrigger) {
+            startOfName--;
+            while (m_interface->characterAt(startOfName).isLetterOrNumber())
+                startOfName--;
+            pos = startOfName;
+            startOfName++;
+            while (pos > 0) {
+                QChar tst = m_interface->characterAt(pos--);
+                if (tst.isSpace())
+                    continue;
+                if (tst == QLatin1Char('.')) {
+                    isGlobalCompletion = false;
+                    while (pos > 0) {
+                        tst = m_interface->characterAt(pos);
+                        if (tst.isSpace()) {
+                            pos--;
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+        } else {
+            pos -= 2;
+            while (pos > 0) {
+                QChar tst = m_interface->characterAt(pos);
+                if (tst.isSpace()) {
+                    pos--;
+                    continue;
+                }
+                break;
+            }
+        }
+        GoTools::GoCompletionAssistVisitor visitor(isGlobalCompletion
+                                                   ? m_interface->source()
+                                                   : m_interface->actualSource(),
+                                                   m_completions);
+        visitor.fillCompletions(isGlobalCompletion, isGlobalCompletion
+                                                    ? startOfName
+                                                    : pos);
+        if (isGlobalCompletion && !visitor.inImportSection()) {
+            // add packages with proposed imports
+            addImports();
+            // add snippets
+            m_completions.append(m_snippetCollector.collect());
+            // add keywords and other builtins
+            Go::GoIconProvider *iconProvider = Go::GoIconProvider::instance();
+            for (const QString &builting: GoLexer::instance()->builtins()) {
+                TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem();
+                item->setText(builting);
+                item->setIcon(iconProvider->icon(Go::GoIconProvider::Keyword));
+                m_completions.append(item);
+            }
+
+        }
+        if (!m_completions.isEmpty()) {
+            GoAssistProposalModel *model = new GoAssistProposalModel(m_completions);
+            TextEditor::IAssistProposal *proposal = new TextEditor::GenericProposal(startOfName, model);
+            return proposal;
+        }
+    }
+
+    return 0;
+}
+
+QString C_UNDERSCORE(QStringLiteral("_"));
+
+void GoCompletionAssistProcessor::addImports()
+{
+    Go::GoIconProvider *iconProvider = Go::GoIconProvider::instance();
+
+    QSet <QString> importedAliases;
+    for (const GoTools::GoSource::Import &import: m_interface->source()->imports()) {
+        if (import.alias != C_UNDERSCORE) {
+            TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
+            item->setText(import.alias);
+            item->setIcon(iconProvider->icon(Go::GoIconProvider::Package));
+            m_completions.append(item);
+            importedAliases.insert(import.alias);
+        }
+    }
+
+    for (const GoTools::GoPackageKey &pk: GoTools::GoCodeModelManager::instance()->indexedPackageDirs()) {
+        if (!importedAliases.contains(pk.second)) {
+            QString candidatePkg;
+            if (pk.first.isEmpty())
+                candidatePkg = pk.second;
+            else
+                candidatePkg = pk.first + QLatin1Char('/') + pk.second;
+            GoWithImportAssistProposalItem *item = new GoWithImportAssistProposalItem(pk.second,
+                                                                                      QStringLiteral("Package: ") + candidatePkg,
+                                                                                      iconProvider->icon(Go::GoIconProvider::PackageImport),
+                                                                                      candidatePkg);
+            m_completions.append(item);
+        }
+    }
+}
+
+GoCompletionAssistInterface::GoCompletionAssistInterface(const QString &filePath,
+                                                         QTextDocument *textDocument,
+                                                         int position,
+                                                         TextEditor::AssistReason reason,
+                                                         GoDocument *doc)
+    : TextEditor::AssistInterface(textDocument, position, filePath, reason)
+    , m_doc(doc)
+    , m_revision(textDocument->revision())
+    , m_source(doc->source())
+{ }
+
+GoTools::GoSource::Ptr GoCompletionAssistInterface::source() const
+{ return m_source; }
+
+GoTools::GoSource::Ptr GoCompletionAssistInterface::actualSource() const
+{ return m_doc->actualSource(m_revision); }
+
+}   // namespace Internal
+}   // namespace GoEditor

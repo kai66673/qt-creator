@@ -55,7 +55,8 @@ SUBDIRS   = \
     updateinfo \
     scxmleditor \
     welcome \
-    silversearcher
+    silversearcher \
+    go
 
 qtHaveModule(quick) {
     SUBDIRS += qmlprofiler

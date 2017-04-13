@@ -146,12 +146,12 @@ DiffFilesController::~DiffFilesController()
 void DiffFilesController::reload()
 {
     cancelReload();
-    m_futureWatcher.setFuture(Utils::map(reloadInputList(),
-                                         DiffFile(ignoreWhitespace(),
-                                                  contextLineCount())));
+//    m_futureWatcher.setFuture(Utils::map(reloadInputList(),
+//                                         DiffFile(ignoreWhitespace(),
+//                                                  contextLineCount())));
 
-    Core::ProgressManager::addTask(m_futureWatcher.future(),
-                                   tr("Calculating diff"), "DiffEditor");
+//    Core::ProgressManager::addTask(m_futureWatcher.future(),
+//                                   tr("Calculating diff"), "DiffEditor");
 }
 
 void DiffFilesController::reloaded()
