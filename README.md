@@ -2,6 +2,26 @@
 
 Qt Creator is a cross-platform IDE for development with the Qt framework.
 
+## Fork reason
+
+The goal of the fork is to support GoLang programming language.
+
+Features:
+* Go-project
+* Go-toolchain (run, build and issues are supported)
+* Editor for Go-sources
+    * Semantic Highlighting
+    * Autocompletion
+    * Go to definition
+    * Type tooltips on overhandling
+
+Some screenshots:
+![How it looks like](goscreenshots/img_ed_look_tt.png)
+![ToolCHain Settings](goscreenshots/img_tc.png)
+![Autocompletion](goscreenshots/img_ed_autocomplete.png)
+![Building Go-project](goscreenshots/img_build.png)
+![Building errors](goscreenshots/img_issues.png)
+
 ## Supported Platforms
 
 The standalone binary packages support the following platforms:
