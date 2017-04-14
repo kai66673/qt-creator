@@ -25,12 +25,12 @@
 #include "gocodemodelmanager.h"
 #include "goeditordocumentprocessor.h"
 #include "gochecksymbols.h"
+#include "gosettings.h"
 #include "symbolundercursor.h"
 
 #include <texteditor/textdocument.h>
 #include <utils/runextensions.h>
 #include <utils/fileutils.h>
-#include <gosettings.h>
 
 namespace GoTools {
 
