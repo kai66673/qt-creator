@@ -95,7 +95,7 @@ CrashHandlerSetup::CrashHandlerSetup(const QString &appName,
                                      const QString &executableDirPath)
 {
 #ifdef BUILD_CRASH_HANDLER
-    if (qgetenv("QTC_USE_CRASH_HANDLER").isEmpty())
+    if (qEnvironmentVariableIsEmpty("QTC_USE_CRASH_HANDLER"))
         return;
 
     appNameC = qstrdup(qPrintable(appName));
@@ -104,7 +104,7 @@ CrashHandlerSetup::CrashHandlerSetup(const QString &appName,
         disableRestartOptionC = "--disable-restart";
 
     const QString execDirPath = executableDirPath.isEmpty()
-            ? qApp->applicationDirPath()
+            ? QCoreApplication::applicationDirPath()
             : executableDirPath;
     const QString crashHandlerPath = execDirPath + QLatin1String("/qtcreator_crash_handler");
     crashHandlerPathC = qstrdup(qPrintable(crashHandlerPath));

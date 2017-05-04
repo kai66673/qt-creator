@@ -42,6 +42,7 @@
 #include <qmljs/qmljsmodelmanagerinterface.h>
 #include <qmljs/qmljsutils.h>
 
+#include <qmljstools/qmljsindenter.h>
 #include <qmljstools/qmljstoolsconstants.h>
 #include <projectexplorer/projectexplorerconstants.h>
 
@@ -105,10 +106,7 @@ namespace Internal {
 
 QmlJSEditorWidget::QmlJSEditorWidget()
 {
-    m_outlineCombo = 0;
-    m_contextPane = 0;
     m_findReferences = new FindReferences(this);
-
     setLanguageSettingsId(QmlJSTools::Constants::QML_JS_SETTINGS_ID);
 }
 
@@ -142,7 +140,6 @@ void QmlJSEditorWidget::finalizeInitialization()
                 &m_contextPaneTimer, static_cast<void (QTimer::*)()>(&QTimer::start));
         connect(m_contextPane, &IContextPane::closed, this, &QmlJSEditorWidget::showTextMarker);
     }
-    m_oldCursorPosition = -1;
 
     connect(this->document(), &QTextDocument::modificationChanged,
             this, &QmlJSEditorWidget::modificationChanged);
@@ -161,7 +158,6 @@ QModelIndex QmlJSEditorWidget::outlineModelIndex()
 {
     if (!m_outlineModelIndex.isValid()) {
         m_outlineModelIndex = indexForPosition(position());
-        emit outlineModelIndexChanged(m_outlineModelIndex);
     }
     return m_outlineModelIndex;
 }
@@ -223,6 +219,11 @@ void QmlJSEditorWidget::modificationChanged(bool changed)
         m_modelManager->fileChangedOnDisk(textDocument()->filePath().toString());
 }
 
+bool QmlJSEditorWidget::isOutlineCursorChangesBlocked()
+{
+    return hasFocus() || m_blockOutLineCursorChanges;
+}
+
 void QmlJSEditorWidget::jumpToOutlineElement(int /*index*/)
 {
     QModelIndex index = m_outlineCombo->view()->currentIndex();
@@ -253,6 +254,7 @@ void QmlJSEditorWidget::updateOutlineIndexNow()
 
     m_outlineModelIndex = QModelIndex(); // invalidate
     QModelIndex comboIndex = outlineModelIndex();
+    emit outlineModelIndexChanged(m_outlineModelIndex);
 
     if (comboIndex.isValid()) {
         bool blocked = m_outlineCombo->blockSignals(true);
@@ -504,18 +506,6 @@ QString QmlJSEditorWidget::wordUnderCursor() const
     return word;
 }
 
-bool QmlJSEditorWidget::isClosingBrace(const QList<Token> &tokens) const
-{
-
-    if (tokens.size() == 1) {
-        const Token firstToken = tokens.first();
-
-        return firstToken.is(Token::RightBrace) || firstToken.is(Token::RightBracket);
-    }
-
-    return false;
-}
-
 void QmlJSEditorWidget::createToolBar()
 {
     m_outlineCombo = new QComboBox;
@@ -546,8 +536,6 @@ void QmlJSEditorWidget::createToolBar()
             this, &QmlJSEditorWidget::jumpToOutlineElement);
     connect(m_qmlJsEditorDocument->outlineModel(), &QmlOutlineModel::updated,
             static_cast<QTreeView *>(m_outlineCombo->view()), &QTreeView::expandAll);
-    connect(m_qmlJsEditorDocument->outlineModel(), &QmlOutlineModel::updated,
-            this, &QmlJSEditorWidget::updateOutlineIndexNow);
 
     connect(this, &QmlJSEditorWidget::cursorPositionChanged,
             &m_updateOutlineIndexTimer, static_cast<void (QTimer::*)()>(&QTimer::start));
@@ -826,6 +814,7 @@ void QmlJSEditorWidget::showContextPane()
 
 void QmlJSEditorWidget::contextMenuEvent(QContextMenuEvent *e)
 {
+    m_blockOutLineCursorChanges = true;
     QPointer<QMenu> menu(new QMenu(this));
 
     QMenu *refactoringMenu = new QMenu(tr("Refactoring"), menu);
@@ -870,6 +859,7 @@ void QmlJSEditorWidget::contextMenuEvent(QContextMenuEvent *e)
 
     menu->exec(e->globalPos());
     delete menu;
+    m_blockOutLineCursorChanges = false;
 }
 
 bool QmlJSEditorWidget::event(QEvent *e)
@@ -1041,7 +1031,7 @@ bool QmlJSEditor::isDesignModePreferred() const
 QmlJSEditorFactory::QmlJSEditorFactory()
 {
     setId(Constants::C_QMLJSEDITOR_ID);
-    setDisplayName(qApp->translate("OpenWith::Editors", Constants::C_QMLJSEDITOR_DISPLAY_NAME));
+    setDisplayName(QCoreApplication::translate("OpenWith::Editors", Constants::C_QMLJSEDITOR_DISPLAY_NAME));
 
     addMimeType(QmlJSTools::Constants::QML_MIMETYPE);
     addMimeType(QmlJSTools::Constants::QMLPROJECT_MIMETYPE);
@@ -1054,7 +1044,7 @@ QmlJSEditorFactory::QmlJSEditorFactory()
     setEditorWidgetCreator([]() { return new QmlJSEditorWidget; });
     setEditorCreator([]() { return new QmlJSEditor; });
     setAutoCompleterCreator([]() { return new AutoCompleter; });
-    setCommentStyle(Utils::CommentDefinition::CppStyle);
+    setCommentDefinition(Utils::CommentDefinition::CppStyle);
     setParenthesesMatchingEnabled(true);
     setMarksVisible(true);
     setCodeFoldingSupported(true);
@@ -1065,7 +1055,14 @@ QmlJSEditorFactory::QmlJSEditorFactory()
     setEditorActionHandlers(TextEditorActionHandler::Format
         | TextEditorActionHandler::UnCommentSelection
         | TextEditorActionHandler::UnCollapseAll
-        | TextEditorActionHandler::FollowSymbolUnderCursor);
+                            | TextEditorActionHandler::FollowSymbolUnderCursor);
+}
+
+void QmlJSEditorFactory::decorateEditor(TextEditorWidget *editor)
+{
+    editor->textDocument()->setSyntaxHighlighter(new QmlJSHighlighter);
+    editor->textDocument()->setIndenter(new Indenter);
+    editor->setAutoCompleter(new AutoCompleter);
 }
 
 } // namespace Internal

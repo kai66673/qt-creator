@@ -264,7 +264,10 @@ class Dumper(DumperBase):
             y = nativeValue.cast(chars.array(0, int(nativeType.sizeof - 1)))
             buf = bytearray(struct.pack('x' * size))
             for i in range(size):
-                buf[i] = int(y[i])
+                try:
+                    buf[i] = int(y[i])
+                except:
+                    pass
             val.ldata = bytes(buf)
 
         val.type = self.fromNativeType(nativeType)
@@ -315,7 +318,8 @@ class Dumper(DumperBase):
             while nativeTargetType.code == gdb.TYPE_CODE_TYPEDEF:
                 nativeTargetType = nativeTargetType.strip_typedefs().unqualified()
             targetType = self.fromNativeType(nativeTargetType)
-            return self.createTypedefedType(targetType, str(nativeType))
+            return self.createTypedefedType(targetType, str(nativeType),
+                                            self.nativeTypeId(nativeType))
 
         if code == gdb.TYPE_CODE_ERROR:
             warn('Type error: %s' % nativeType)
@@ -378,7 +382,8 @@ class Dumper(DumperBase):
             else:
                 error('UNKNOWN TEMPLATE PARAMETER')
             pos += 1
-        return targs
+        targs2 = self.listTemplateParametersManually(str(nativeType))
+        return targs if len(targs) >= len(targs2) else targs2
 
     def nativeTypeEnumDisplay(self, nativeType, intval):
         try:
@@ -408,6 +413,8 @@ class Dumper(DumperBase):
         return '%d' % intval
 
     def nativeTypeId(self, nativeType):
+        if nativeType.code == gdb.TYPE_CODE_TYPEDEF:
+            return '%s{%s}' % (nativeType, nativeType.strip_typedefs())
         name = str(nativeType)
         if len(name) == 0:
             c = '0'
@@ -445,6 +452,12 @@ class Dumper(DumperBase):
 
     def memberFromNativeFieldAndValue(self, nativeField, nativeValue, fieldName, value):
         nativeMember = self.nativeMemberFromField(nativeValue, nativeField)
+        if nativeMember is None:
+            val = self.Value(self)
+            val.name = fieldName
+            val.type = self.fromNativeType(nativeField.type)
+            val.lIsInScope = False
+            return val
         val = self.fromNativeValue(nativeMember)
         nativeFieldType = nativeField.type.unqualified()
         if nativeField.bitsize:

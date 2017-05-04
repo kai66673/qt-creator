@@ -124,13 +124,16 @@ RunControl *QnxRunControlFactory::create(RunConfiguration *runConfig, Core::Id m
     auto rc = qobject_cast<QnxRunConfiguration *>(runConfig);
     QTC_ASSERT(rc, return 0);
 
-    if (mode == ProjectExplorer::Constants::NORMAL_RUN_MODE)
-        return new QnxRunControl(rc);
+    if (mode == ProjectExplorer::Constants::NORMAL_RUN_MODE) {
+        auto runControl = new QnxRunControl(rc);
+        (void) new SimpleTargetRunner(runControl);
+        return runControl;
+    }
 
     if (mode == ProjectExplorer::Constants::DEBUG_RUN_MODE) {
         const DebuggerStartParameters params = createDebuggerStartParameters(rc);
-        DebuggerRunControl *runControl = createDebuggerRunControl(params, runConfig, errorMessage);
-        QTC_ASSERT(runControl, return 0);
+        auto runControl = new RunControl(runConfig, mode);
+        // (void) new DebuggerRunTool(runControl, params, errorMessage);  FIXME
         (void) new QnxDebugSupport(runControl);
         return runControl;
     }

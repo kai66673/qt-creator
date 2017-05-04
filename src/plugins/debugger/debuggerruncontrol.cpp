@@ -81,8 +81,6 @@ DebuggerEngine *createQmlEngine(const DebuggerRunParameters &rp);
 DebuggerEngine *createQmlCppEngine(const DebuggerRunParameters &rp, QStringList *error);
 DebuggerEngine *createLldbEngine(const DebuggerRunParameters &rp);
 
-static DebuggerEngine *engine(const DebuggerRunControl *runControl);
-
 } // namespace Internal
 
 
@@ -109,38 +107,19 @@ static QLatin1String engineTypeName(DebuggerEngineType et)
     return QLatin1String("No engine");
 }
 
-
-/// DebuggerRunControl
-
-DebuggerRunControl::DebuggerRunControl(RunConfiguration *runConfig, Core::Id runMode)
-    : RunControl(runConfig, runMode)
-{
-    setIcon(ProjectExplorer::Icons::DEBUG_START_SMALL_TOOLBAR);
-    setPromptToStop([&](bool *optionalPrompt) {
-        const QString question = tr("A debugging session is still in progress. "
-                                    "Terminating the session in the current"
-                                    " state can leave the target in an inconsistent state."
-                                    " Would you still like to terminate it?");
-        bool result = showPromptToStopDialog(tr("Close Debugging Session"), question,
-                                             QString(), QString(), optionalPrompt);
-        if (result)
-            disconnect(this);
-        return result;
-    });
-}
-
-DebuggerRunControl::~DebuggerRunControl()
-{
-}
-
-void DebuggerRunControl::start()
+void DebuggerRunTool::prepare()
 {
     Debugger::Internal::saveModeToRestore();
     Debugger::selectPerspective(Debugger::Constants::CppPerspectiveId);
     TaskHub::clearTasks(Debugger::Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
     TaskHub::clearTasks(Debugger::Constants::TASK_CATEGORY_DEBUGGER_RUNTIME);
 
-    DebuggerEngine *engine = Internal::engine(this);
+    m_engine->prepare();
+}
+
+void DebuggerRunTool::start()
+{
+    DebuggerEngine *engine = m_engine;
     QTC_ASSERT(engine, return);
     const DebuggerRunParameters &rp = engine->runParameters();
     // User canceled input dialog asking for executable when working on library project.
@@ -148,8 +127,8 @@ void DebuggerRunControl::start()
             && rp.inferior.executable.isEmpty()
             && rp.interpreter.isEmpty()) {
         appendMessage(tr("No executable specified.") + QLatin1Char('\n'), ErrorMessageFormat);
-        reportApplicationStart();
-        reportApplicationStop();
+        runControl()->reportApplicationStart();
+        runControl()->reportApplicationStop();
         return;
     }
 
@@ -178,78 +157,69 @@ void DebuggerRunControl::start()
         }
     }
 
-    Internal::runControlStarted(engine);
-
-    // We might get a synchronous startFailed() notification on Windows,
-    // when launching the process fails. Emit a proper finished() sequence.
-    reportApplicationStart();
-
-    engine->startDebugger(this);
-
-    if (isRunning())
-        appendMessage(tr("Debugging starts") + QLatin1Char('\n'), NormalMessageFormat);
+    appendMessage(tr("Debugging starts") + QLatin1Char('\n'), NormalMessageFormat);
+    engine->start();
 }
 
-void DebuggerRunControl::startFailed()
+void DebuggerRunTool::startFailed()
 {
     appendMessage(tr("Debugging has failed") + QLatin1Char('\n'), NormalMessageFormat);
-    engine(this)->handleStartFailed();
+    m_engine->handleStartFailed();
 }
 
-void DebuggerRunControl::notifyEngineRemoteServerRunning(const QByteArray &msg, int pid)
+void DebuggerRunTool::notifyEngineRemoteServerRunning(const QByteArray &msg, int pid)
 {
-    engine(this)->notifyEngineRemoteServerRunning(QString::fromUtf8(msg), pid);
+    m_engine->notifyEngineRemoteServerRunning(QString::fromUtf8(msg), pid);
 }
 
-void DebuggerRunControl::notifyEngineRemoteSetupFinished(const RemoteSetupResult &result)
+void DebuggerRunTool::notifyEngineRemoteSetupFinished(const RemoteSetupResult &result)
 {
-    engine(this)->notifyEngineRemoteSetupFinished(result);
+    m_engine->notifyEngineRemoteSetupFinished(result);
 }
 
-void DebuggerRunControl::stop()
+void DebuggerRunTool::stop()
 {
-    QTC_ASSERT(engine(this), return);
-    engine(this)->quitDebugger();
+    m_engine->quitDebugger();
 }
 
-void DebuggerRunControl::debuggingFinished()
+void DebuggerRunTool::onTargetFailure()
 {
-    reportApplicationStop();
+    if (m_engine->state() == EngineSetupRequested) {
+        RemoteSetupResult result;
+        result.success = false;
+        result.reason = tr("Initial setup failed.");
+        m_engine->notifyEngineRemoteSetupFinished(result);
+    }
 }
 
-void DebuggerRunControl::showMessage(const QString &msg, int channel)
+void DebuggerRunTool::debuggingFinished()
 {
-    QTC_ASSERT(engine(this), return);
-    engine(this)->runTool()->showMessage(msg, channel);
+    runControl()->reportApplicationStop();
 }
 
-DebuggerStartParameters &DebuggerRunControl::startParameters()
+DebuggerStartParameters &DebuggerRunTool::startParameters()
 {
-    return engine(this)->runParameters();
+    return m_engine->runParameters();
 }
 
-void DebuggerRunControl::notifyInferiorIll()
+void DebuggerRunTool::notifyInferiorIll()
 {
-    QTC_ASSERT(engine(this), return);
-    engine(this)->notifyInferiorIll();
+    m_engine->notifyInferiorIll();
 }
 
-void DebuggerRunControl::notifyInferiorExited()
+void DebuggerRunTool::notifyInferiorExited()
 {
-    QTC_ASSERT(engine(this), return);
-    engine(this)->notifyInferiorExited();
+    m_engine->notifyInferiorExited();
 }
 
-void DebuggerRunControl::quitDebugger()
+void DebuggerRunTool::quitDebugger()
 {
-    QTC_ASSERT(engine(this), return);
-    engine(this)->quitDebugger();
+    m_engine->quitDebugger();
 }
 
-void DebuggerRunControl::abortDebugger()
+void DebuggerRunTool::abortDebugger()
 {
-    QTC_ASSERT(engine(this), return);
-    engine(this)->abortDebugger();
+    m_engine->abortDebugger();
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -293,11 +263,10 @@ DebuggerEngine *createEngine(DebuggerEngineType et, const DebuggerRunParameters 
     return engine;
 }
 
-bool DebuggerRunTool::fixup()
+static bool fixupParameters(DebuggerRunParameters &rp, RunControl *runControl, QStringList &m_errors)
 {
-    DebuggerRunParameters &rp = m_rp;
-    RunConfiguration *const runConfig = runControl()->runConfiguration();
-    Core::Id runMode = runControl()->runMode();
+    RunConfiguration *runConfig = runControl->runConfiguration();
+    Core::Id runMode = runControl->runMode();
 
     const Kit *kit = runConfig->target()->kit();
     QTC_ASSERT(kit, return false);
@@ -494,6 +463,8 @@ bool DebuggerRunTool::fixup()
     return true;
 }
 
+} // Internal
+
 ////////////////////////////////////////////////////////////////////////
 //
 // DebuggerRunControlFactory
@@ -506,16 +477,57 @@ static bool isDebuggableScript(RunConfiguration *runConfig)
     return mainScript.endsWith(".py"); // Only Python for now.
 }
 
+static DebuggerRunConfigurationAspect *debuggerAspect(const RunControl *runControl)
+{
+    return runControl->runConfiguration()->extraAspect<DebuggerRunConfigurationAspect>();
+}
+
 /// DebuggerRunTool
 
-DebuggerRunTool::DebuggerRunTool(RunControl *runControl, const DebuggerRunParameters &rp, QString *errorMessage)
-    : ToolRunner(runControl), m_rp(rp)
+DebuggerRunTool::DebuggerRunTool(RunControl *runControl)
+    : ToolRunner(runControl),
+      m_isCppDebugging(debuggerAspect(runControl)->useCppDebugger()),
+      m_isQmlDebugging(debuggerAspect(runControl)->useQmlDebugger())
 {
-    runControl->setDisplayName(m_rp.displayName);
-    // QML and/or mixed are not prepared for it.
-    runControl->setSupportsReRunning(!(m_rp.languages & QmlLanguage));
+}
 
-    if (fixup()) {
+DebuggerRunTool::DebuggerRunTool(RunControl *runControl, const DebuggerStartParameters &sp, QString *errorMessage)
+    : DebuggerRunTool(runControl)
+{
+    setStartParameters(sp, errorMessage);
+}
+
+DebuggerRunTool::DebuggerRunTool(RunControl *runControl, const DebuggerRunParameters &rp, QString *errorMessage)
+    : DebuggerRunTool(runControl)
+{
+    setRunParameters(rp, errorMessage);
+}
+
+void DebuggerRunTool::setStartParameters(const DebuggerStartParameters &sp, QString *errorMessage)
+{
+    setRunParameters(sp, errorMessage);
+}
+
+void DebuggerRunTool::setRunParameters(const DebuggerRunParameters &rp, QString *errorMessage)
+{
+    DebuggerRunParameters m_rp = rp;
+
+    runControl()->setDisplayName(m_rp.displayName);
+    // QML and/or mixed are not prepared for it.
+    runControl()->setSupportsReRunning(!(m_rp.languages & QmlLanguage));
+
+    runControl()->setIcon(ProjectExplorer::Icons::DEBUG_START_SMALL_TOOLBAR);
+    runControl()->setPromptToStop([](bool *optionalPrompt) {
+        return RunControl::showPromptToStopDialog(
+            DebuggerRunTool::tr("Close Debugging Session"),
+            DebuggerRunTool::tr("A debugging session is still in progress. "
+                                "Terminating the session in the current"
+                                " state can leave the target in an inconsistent state."
+                                " Would you still like to terminate it?"),
+                QString(), QString(), optionalPrompt);
+    });
+
+    if (Internal::fixupParameters(m_rp, runControl(), m_errors)) {
         m_engine = createEngine(m_rp.masterEngineType, m_rp, &m_errors);
         if (!m_engine) {
             QString msg = m_errors.join('\n');
@@ -525,14 +537,7 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, const DebuggerRunParame
         }
     }
 
-    connect(runControl, &RunControl::finished,
-            this, &DebuggerRunTool::handleFinished);
-    connect(m_engine, &DebuggerEngine::requestRemoteSetup,
-            this->runControl(), &DebuggerRunControl::requestRemoteSetup);
-    connect(m_engine, &DebuggerEngine::stateChanged,
-            this->runControl(), &DebuggerRunControl::stateChanged);
-    connect(m_engine, &DebuggerEngine::aboutToNotifyInferiorSetupOk,
-            this->runControl(), &DebuggerRunControl::aboutToNotifyInferiorSetupOk);
+    m_engine->setRunTool(this);
 }
 
 DebuggerRunTool::~DebuggerRunTool()
@@ -546,17 +551,10 @@ DebuggerRunTool::~DebuggerRunTool()
     }
 }
 
-void DebuggerRunTool::handleFinished()
+void DebuggerRunTool::onFinished()
 {
     appendMessage(tr("Debugging has finished") + '\n', NormalMessageFormat);
-    if (m_engine)
-        m_engine->handleFinished();
     runControlFinished(m_engine);
-}
-
-DebuggerRunControl *DebuggerRunTool::runControl() const
-{
-    return static_cast<DebuggerRunControl *>(ToolRunner::runControl());
 }
 
 void DebuggerRunTool::showMessage(const QString &msg, int channel, int timeout)
@@ -580,11 +578,7 @@ void DebuggerRunTool::showMessage(const QString &msg, int channel, int timeout)
     }
 }
 
-DebuggerEngine *engine(const DebuggerRunControl *runControl)
-{
-    return static_cast<DebuggerRunTool *>(runControl->toolRunner())->engine();
-}
-
+namespace Internal {
 
 /// DebuggerRunControlFactory
 
@@ -601,7 +595,7 @@ public:
         QTC_ASSERT(runConfig, return 0);
         QTC_ASSERT(mode == DebugRunMode || mode == DebugRunModeWithBreakOnMain, return 0);
 
-        auto runControl = new DebuggerRunControl(runConfig, mode);
+        auto runControl = new RunControl(runConfig, mode);
         (void) new DebuggerRunTool(runControl, DebuggerStartParameters(), errorMessage);
         return runControl;
     }
@@ -648,7 +642,6 @@ class DummyProject : public Project
 {
 public:
     DummyProject() : Project(QString(""), FileName::fromString("")) {}
-    QString displayName() const final { return QString(); }
 };
 
 RunConfiguration *dummyRunConfigForKit(ProjectExplorer::Kit *kit)
@@ -671,7 +664,7 @@ RunControl *createAndScheduleRun(const DebuggerRunParameters &rp, Kit *kit)
 {
     RunConfiguration *runConfig = dummyRunConfigForKit(kit);
     QTC_ASSERT(runConfig, return nullptr);
-    auto runControl = new DebuggerRunControl(runConfig, DebugRunMode);
+    auto runControl = new RunControl(runConfig, DebugRunMode);
     (void) new DebuggerRunTool(runControl, rp);
     QTC_ASSERT(runControl, return nullptr);
     ProjectExplorerPlugin::startRunControl(runControl);
@@ -679,20 +672,4 @@ RunControl *createAndScheduleRun(const DebuggerRunParameters &rp, Kit *kit)
 }
 
 } // Internal
-
-
-/**
- * Main entry point for target plugins.
- */
-DebuggerRunControl *createDebuggerRunControl(const DebuggerStartParameters &sp,
-                                             RunConfiguration *runConfig,
-                                             QString *errorMessage,
-                                             Core::Id runMode)
-{
-    QTC_ASSERT(runConfig, return nullptr);
-    auto runControl = new DebuggerRunControl(runConfig, runMode);
-    (void) new Internal::DebuggerRunTool(runControl, sp, errorMessage);
-    return runControl;
-}
-
 } // namespace Debugger

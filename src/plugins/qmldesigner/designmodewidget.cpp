@@ -347,7 +347,7 @@ void DesignModeWidget::setup()
 
     // Finishing touches:
     m_mainSplitter->setStretchFactor(1, 1);
-    m_mainSplitter->setSizes(QList<int>() << 150 << 300 << 150);
+    m_mainSplitter->setSizes({150, 300, 150});
 
     QLayout *mainLayout = new QBoxLayout(QBoxLayout::RightToLeft, this);
     mainLayout->setMargin(0);
@@ -453,10 +453,6 @@ static Core::MiniSplitter *createCentralSplitter(const QList<WidgetInfo> &widget
     outputPlaceholderSplitter->setOrientation(Qt::Vertical);
 
     SwitchSplitTabWidget *switchSplitTabWidget = new SwitchSplitTabWidget();
-
-    QString sheet = QString::fromUtf8(Utils::FileReader::fetchQrc(":/qmldesigner/centerwidget.css"));
-    switchSplitTabWidget->setStyleSheet(Theme::replaceCssColors(sheet));
-
 
     foreach (const WidgetInfo &widgetInfo, widgetInfos) {
         if (widgetInfo.placementHint == widgetInfo.CentralPane)

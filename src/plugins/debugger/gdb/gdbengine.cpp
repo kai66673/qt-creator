@@ -147,6 +147,11 @@ static bool isMostlyHarmlessMessage(const QStringRef &msg)
                   "Invalid argument\\n";
 }
 
+static QString mainFunction(const DebuggerRunParameters &rp)
+{
+    return QLatin1String(rp.toolChainAbi.os() == Abi::WindowsOS && !rp.useTerminal ? "qMain" : "main");
+}
+
 ///////////////////////////////////////////////////////////////////////
 //
 // Debuginfo Taskhandler
@@ -1182,7 +1187,7 @@ void GdbEngine::executeDebuggerCommand(const QString &command, DebuggerLanguages
     if (!(languages & CppLanguage))
         return;
     QTC_CHECK(acceptsDebuggerCommands());
-    runCommand({command});
+    runCommand({command, NativeCommand});
 }
 
 // This is triggered when switching snapshots.
@@ -2372,10 +2377,8 @@ QString GdbEngine::breakpointLocation(const BreakpointParameters &data)
         return QLatin1String("__cxa_throw");
     if (data.type == BreakpointAtCatch)
         return QLatin1String("__cxa_begin_catch");
-    if (data.type == BreakpointAtMain) {
-        const Abi abi = runParameters().toolChainAbi;
-        return QLatin1String(abi.os() == Abi::WindowsOS ? "qMain" : "main");
-    }
+    if (data.type == BreakpointAtMain)
+        return mainFunction(runParameters());
     if (data.type == BreakpointByFunction)
         return '"' + data.functionName + '"';
     if (data.type == BreakpointByAddress)
@@ -3328,7 +3331,7 @@ void GdbEngine::handleMakeSnapshot(const DebuggerResponse &response, const QStri
         }
         rp.displayName = function + ": " + QDateTime::currentDateTime().toString();
         rp.isSnapshot = true;
-        auto rc = new DebuggerRunControl(runControl()->runConfiguration(), ProjectExplorer::Constants::DEBUG_RUN_MODE);
+        auto rc = new RunControl(runControl()->runConfiguration(), ProjectExplorer::Constants::DEBUG_RUN_MODE);
         (void) new DebuggerRunTool(rc, rp);
         ProjectExplorerPlugin::startRunControl(rc);
     } else {
@@ -3864,7 +3867,7 @@ void GdbEngine::startGdb(const QStringList &args)
         QString msg;
         QString wd = m_gdbProc.workingDirectory();
         if (!QFileInfo(wd).isDir())
-            msg = failedToStartMessage() + ' ' + tr("The working directory \"%s\" is not usable.").arg(wd);
+            msg = failedToStartMessage() + ' ' + tr("The working directory \"%1\" is not usable.").arg(wd);
         else
             msg = errorMessage(QProcess::FailedToStart);
         handleAdapterStartFailed(msg);
@@ -4153,11 +4156,8 @@ void GdbEngine::handleInferiorPrepared()
     }
 
     //runCommand("set follow-exec-mode new");
-    if (rp.breakOnMain) {
-        QString cmd = "tbreak ";
-        cmd += QLatin1String(rp.toolChainAbi.os() == Abi::WindowsOS ? "qMain" : "main");
-        runCommand({cmd});
-    }
+    if (rp.breakOnMain)
+        runCommand({"tbreak " + mainFunction(rp)});
 
     // Initial attempt to set breakpoints.
     if (rp.startMode != AttachCore) {
@@ -4300,26 +4300,6 @@ void GdbEngine::requestDebugInformation(const DebugInfoTask &task)
     QProcess::startDetached(task.command);
 }
 
-bool GdbEngine::prepareCommand()
-{
-    if (HostOsInfo::isWindowsHost()) {
-        DebuggerRunParameters &rp = runParameters();
-        QtcProcess::SplitError perr;
-        rp.inferior.commandLineArguments =
-                QtcProcess::prepareArgs(rp.inferior.commandLineArguments, &perr,
-                                        HostOsInfo::hostOs(), nullptr,
-                                        &rp.inferior.workingDirectory).toWindowsArgs();
-        if (perr != QtcProcess::SplitOk) {
-            // perr == BadQuoting is never returned on Windows
-            // FIXME? QTCREATORBUG-2809
-            handleAdapterStartFailed(QCoreApplication::translate("DebuggerEngine", // Same message in CdbEngine
-                                                                 "Debugging complex command lines is currently not supported on Windows."), Id());
-            return false;
-        }
-    }
-    return true;
-}
-
 QString GdbEngine::msgGdbStopFailed(const QString &why)
 {
     return tr("The gdb process could not be stopped:\n%1").arg(why);
@@ -4402,7 +4382,7 @@ void GdbEngine::doUpdateLocals(const UpdateParameters &params)
     watchHandler()->appendFormatRequests(&cmd);
     watchHandler()->appendWatchersAndTooltipRequests(&cmd);
 
-    const static bool alwaysVerbose = !qgetenv("QTC_DEBUGGER_PYTHON_VERBOSE").isEmpty();
+    const static bool alwaysVerbose = qEnvironmentVariableIsSet("QTC_DEBUGGER_PYTHON_VERBOSE");
     cmd.arg("passexceptions", alwaysVerbose);
     cmd.arg("fancy", boolSetting(UseDebuggingHelpers));
     cmd.arg("autoderef", boolSetting(AutoDerefPointers));

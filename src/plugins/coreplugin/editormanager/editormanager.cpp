@@ -822,10 +822,10 @@ void EditorManagerPrivate::doEscapeKeyFocusMoveMagic()
     //        otherwise (i.e. mode is edit mode)
     //          hide extra views (find, help, output)
 
-    QWidget *activeWindow = qApp->activeWindow();
+    QWidget *activeWindow = QApplication::activeWindow();
     if (!activeWindow)
         return;
-    QWidget *focus = qApp->focusWidget();
+    QWidget *focus = QApplication::focusWidget();
     EditorView *editorView = currentEditorView();
     bool editorViewActive = (focus && focus == editorView->focusWidget());
     bool editorViewVisible = editorView->isVisible();
@@ -886,7 +886,7 @@ void EditorManagerPrivate::showPopupOrSelectDocument()
     if (QApplication::keyboardModifiers() == Qt::NoModifier) {
         windowPopup()->selectAndHide();
     } else {
-        QWidget *activeWindow = qApp->activeWindow();
+        QWidget *activeWindow = QApplication::activeWindow();
         // decide where to show the popup
         // if the active window has editors, we want that editor area as a reference
         // TODO: this does not work correctly with multiple editor areas in the same window
@@ -931,6 +931,7 @@ Id EditorManagerPrivate::getOpenWithEditorId(const QString &fileName, bool *isEx
     // Built-in
     const EditorManager::EditorFactoryList editors = EditorManager::editorFactories(mt, false);
     const int size = editors.size();
+    allEditorDisplayNames.reserve(size);
     for (int i = 0; i < size; i++) {
         allEditorIds.push_back(editors.at(i)->id());
         allEditorDisplayNames.push_back(editors.at(i)->displayName());
@@ -1387,7 +1388,7 @@ bool EditorManagerPrivate::closeEditors(const QList<IEditor*> &editors, CloseFla
 
         removeEditor(editor, flag != CloseFlag::Suspend);
         if (EditorView *view = viewForEditor(editor)) {
-            if (qApp->focusWidget() && qApp->focusWidget() == editor->widget()->focusWidget())
+            if (QApplication::focusWidget() && QApplication::focusWidget() == editor->widget()->focusWidget())
                 focusView = view;
             if (editor == view->currentEditor())
                 closedViews += view;
@@ -1929,7 +1930,7 @@ void EditorManagerPrivate::handleDocumentStateChange()
 
 void EditorManagerPrivate::editorAreaDestroyed(QObject *area)
 {
-    QWidget *activeWin = qApp->activeWindow();
+    QWidget *activeWin = QApplication::activeWindow();
     EditorArea *newActiveArea = 0;
     for (int i = 0; i < d->m_editorAreas.size(); ++i) {
         EditorArea *r = d->m_editorAreas.at(i);

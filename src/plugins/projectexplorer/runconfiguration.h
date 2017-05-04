@@ -415,6 +415,17 @@ public:
     virtual void notifyRemoteSetupFailed(const QString &) {} // Same.
     virtual void notifyRemoteFinished() {} // Same.
 
+    void reportApplicationStart(); // Call this when the application starts to run
+    void reportApplicationStop(); // Call this when the application has stopped for any reason
+
+    static bool showPromptToStopDialog(const QString &title, const QString &text,
+                                       const QString &stopButtonText = QString(),
+                                       const QString &cancelButtonText = QString(),
+                                       bool *prompt = nullptr);
+
+    virtual void start();
+    virtual void stop();
+
 signals:
     void appendMessageRequested(ProjectExplorer::RunControl *runControl,
                                 const QString &msg, Utils::OutputFormat format);
@@ -423,18 +434,6 @@ signals:
     void started(); // Use reportApplicationStart!
     void finished(); // Use reportApplicationStop!
     void applicationProcessHandleChanged(QPrivateSignal); // Use setApplicationProcessHandle
-
-protected:
-    virtual void start();
-    virtual void stop();
-
-    void reportApplicationStart(); // Call this when the application starts to run
-    void reportApplicationStop(); // Call this when the application has stopped for any reason
-
-    bool showPromptToStopDialog(const QString &title, const QString &text,
-                                const QString &stopButtonText = QString(),
-                                const QString &cancelButtonText = QString(),
-                                bool *prompt = nullptr) const;
 
 private:
     friend class Internal::RunControlPrivate;
@@ -458,16 +457,31 @@ public:
 
     RunControl *runControl() const;
     void appendMessage(const QString &msg, Utils::OutputFormat format);
+    IDevice::ConstPtr device() const;
 
-    virtual void prepare() { emit prepared(); }
-    virtual void start() { emit started(); }
-    virtual void stop() { emit stopped(); }
+    // Preparation phase.
+    virtual void prepare(); // Initiate setup. Needs to report result.
+    void reportPrepareFailed(const QString &msg = QString());
+    void reportPrepared();
 
-signals:
-    void prepared();
-    void started();
-    void stopped();
-    void failed(const QString &msg = QString());
+    // Startup phase.
+    virtual void start(); // Initiates start. Needs to report result.
+    void reportStartFailed(const QString &msg = QString());
+    void reportStarted();
+
+    // Stopping phase.
+    virtual void stop(); // Initiates stop. Needs to report result.
+    void reportStopFailed(const QString &msg = QString());
+    void reportStopped();
+
+    // Generic error in uncertain state.
+    void reportFailure(const QString &msg = QString());
+
+    // Customization points. No reporting required nor wanted.
+    virtual void onStop() {}
+    virtual void onToolFailure() {}
+    virtual void onTargetFailure() {}
+    virtual void onFinished() {}
 
 private:
     QPointer<RunControl> m_runControl;
@@ -485,18 +499,36 @@ public:
     explicit ToolRunner(RunControl *runControl);
 
     RunControl *runControl() const;
+
+    // Part of read-only interface of RunControl for convenience.
     void appendMessage(const QString &msg, Utils::OutputFormat format);
     IDevice::ConstPtr device() const;
+    const Runnable &runnable() const;
+    const Connection &connection() const;
 
-    virtual void prepare() { emit prepared(); }
-    virtual void start() { emit started(); }
-    virtual void stop() { emit stopped(); }
+    // Preparation phase.
+    virtual void prepare(); // Initiates preparation, needs to report success or failure.
+    void reportPrepareFailed(const QString &msg = QString());
+    void reportPrepared();
 
-signals:
-    void prepared();
-    void started();
-    void stopped();
-    void failed(const QString &msg = QString());
+    // Start phase.
+    virtual void start();
+    void reportStartFailed(const QString &msg = QString());
+    void reportStarted();
+
+    // Stop phase.
+    virtual void stop();
+    void reportStopFailed(const QString &msg = QString());
+    void reportStopped();
+
+    // Generic error in uncertain state.
+    void reportFailure(const QString &msg = QString());
+
+    // Customization points. No reporting required nor wanted.
+    virtual void onStop() {}
+    virtual void onToolFailure() {}
+    virtual void onTargetFailure() {}
+    virtual void onFinished() {}
 
 private:
     QPointer<RunControl> m_runControl;
@@ -512,6 +544,8 @@ class PROJECTEXPLORER_EXPORT SimpleTargetRunner : public TargetRunner
 public:
     explicit SimpleTargetRunner(RunControl *runControl);
 
+    ApplicationLauncher *applicationLauncher() { return &m_launcher; }
+
 private:
     void start() override;
     void stop() override;
@@ -520,14 +554,6 @@ private:
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
 
     ApplicationLauncher m_launcher;
-};
-
-// A RunControl with a SimpleTargetRunner and no Tool.
-// FIXME: Do not use. Will be dissolved.
-class PROJECTEXPLORER_EXPORT SimpleRunControl : public RunControl
-{
-public:
-    SimpleRunControl(RunConfiguration *runConfiguration, Core::Id mode);
 };
 
 } // namespace ProjectExplorer

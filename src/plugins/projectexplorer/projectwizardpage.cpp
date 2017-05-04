@@ -240,8 +240,7 @@ static inline AddNewTree *buildAddProjectTree(ProjectNode *root, const QString &
         }
     }
 
-    const QList<ProjectAction> &list = root->supportedActions(root);
-    if (list.contains(AddSubProject) && !list.contains(InheritedFromParent)) {
+    if (root->supportsAction(AddSubProject, root) && !root->supportsAction(InheritedFromParent, root)) {
         if (projectPath.isEmpty() || root->canAddSubProject(projectPath)) {
             FolderNode::AddNewInformation info = root->addNewInformation(QStringList() << projectPath, contextNode);
             auto item = new AddNewTree(root, children, info);
@@ -265,8 +264,7 @@ static inline AddNewTree *buildAddFilesTree(FolderNode *root, const QStringList 
             children.append(child);
     }
 
-    const QList<ProjectAction> &list = root->supportedActions(root);
-    if (list.contains(AddNewFile) && !list.contains(InheritedFromParent)) {
+    if (root->supportsAction(AddNewFile, root) && !root->supportsAction(InheritedFromParent, root)) {
         FolderNode::AddNewInformation info = root->addNewInformation(files, contextNode);
         auto item = new AddNewTree(root, children, info);
         selector->inspect(item, root == contextNode);
@@ -295,6 +293,8 @@ ProjectWizardPage::ProjectWizardPage(QWidget *parent) : WizardPage(parent),
 
     connect(VcsManager::instance(), &VcsManager::configurationChanged,
             this, &ProjectExplorer::Internal::ProjectWizardPage::initializeVersionControls);
+
+    m_ui->projectComboBox->setModel(&m_model);
 }
 
 ProjectWizardPage::~ProjectWizardPage()
@@ -302,16 +302,6 @@ ProjectWizardPage::~ProjectWizardPage()
     disconnect(m_ui->projectComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
                this, &ProjectWizardPage::projectChanged);
     delete m_ui;
-}
-
-void ProjectWizardPage::setModel(Utils::TreeModel<> *model)
-{
-    // TODO see OverViewCombo and OverView for click event filter
-    m_ui->projectComboBox->setModel(model);
-    bool enabled = m_model.rowCount(QModelIndex()) > 1;
-    m_ui->projectComboBox->setEnabled(enabled);
-
-    expandTree(QModelIndex());
 }
 
 bool ProjectWizardPage::expandTree(const QModelIndex &root)
@@ -469,6 +459,8 @@ void ProjectWizardPage::initializeProjectTree(Node *context, const QStringList &
     setAdditionalInfo(selector.deployingProjects());
     setBestNode(selector.bestChoice());
     setAddingSubProject(action == AddSubProject);
+
+    m_ui->projectComboBox->setEnabled(m_model.rowCount(QModelIndex()) > 1);
 }
 
 void ProjectWizardPage::setNoneLabel(const QString &label)

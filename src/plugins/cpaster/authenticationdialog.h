@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2017 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of Qt Creator.
@@ -23,37 +23,29 @@
 **
 ****************************************************************************/
 
-#include "qmljssnippetprovider.h"
-#include "qmljshighlighter.h"
-#include "qmljseditor.h"
-#include "qmljsautocompleter.h"
-#include "qmljseditorconstants.h"
+#pragma once
 
-#include <texteditor/texteditorsettings.h>
-#include <texteditor/texteditorconstants.h>
-#include <texteditor/snippets/snippeteditor.h>
+#include <QDialog>
 
-#include <qmljstools/qmljsindenter.h>
+QT_BEGIN_NAMESPACE
+class QLineEdit;
+QT_END_NAMESPACE
 
-#include <QLatin1String>
-#include <QCoreApplication>
+namespace CodePaster {
 
-using namespace QmlJSEditor;
-using namespace Internal;
-
-QString QmlJSSnippetProvider::groupId() const
+class AuthenticationDialog : public QDialog
 {
-    return QLatin1String(Constants::QML_SNIPPETS_GROUP_ID);
-}
+public:
+    AuthenticationDialog(const QString &details, QWidget *parent = nullptr);
 
-QString QmlJSSnippetProvider::displayName() const
-{
-    return QCoreApplication::translate("QmlJSEditor::Internal::QmlJSSnippetProvider", "QML");
-}
+    bool authenticated() const { return m_authenticated; }
+    QString userName() const;
+    QString password() const;
 
-void QmlJSSnippetProvider::decorateEditor(TextEditor::SnippetEditorWidget *editor) const
-{
-    editor->textDocument()->setSyntaxHighlighter(new QmlJSHighlighter);
-    editor->textDocument()->setIndenter(new Indenter);
-    editor->setAutoCompleter(new AutoCompleter);
-}
+private:
+    bool m_authenticated = false;
+    QLineEdit *m_user = nullptr;
+    QLineEdit *m_pass = nullptr;
+};
+
+} // namespace CodePaster

@@ -52,6 +52,7 @@
 #include <cpptools/cppcompletionassistprovider.h>
 #include <cpptools/cppeditoroutline.h>
 #include <cpptools/cppmodelmanager.h>
+#include <cpptools/cppqtstyleindenter.h>
 #include <cpptools/cppselectionchanger.h>
 #include <cpptools/cppsemanticinfo.h>
 #include <cpptools/cpptoolsconstants.h>
@@ -105,6 +106,13 @@ namespace Internal {
 CppEditor::CppEditor()
 {
     addContext(ProjectExplorer::Constants::CXX_LANGUAGE_ID);
+}
+
+void CppEditor::decorateEditor(TextEditorWidget *editor)
+{
+    editor->textDocument()->setSyntaxHighlighter(new CppHighlighter);
+    editor->textDocument()->setIndenter(new CppTools::CppQtStyleIndenter);
+    editor->setAutoCompleter(new CppAutoCompleter);
 }
 
 class CppEditorWidgetPrivate
@@ -542,7 +550,8 @@ void CppEditorWidget::renameSymbolUnderCursorClang()
 {
     using ClangBackEnd::SourceLocationsContainer;
 
-    if (refactoringEngine()->isUsable()) {
+    ProjectPart *theProjectPart = projectPart();
+    if (refactoringEngine()->isUsable() && theProjectPart) {
         d->m_useSelectionsUpdater.abortSchedule();
 
         QPointer<CppEditorWidget> cppEditorWidget = this;
@@ -569,7 +578,7 @@ void CppEditorWidget::renameSymbolUnderCursorClang()
         refactoringEngine()->startLocalRenaming(textCursor(),
                                                 textDocument()->filePath(),
                                                 document()->revision(),
-                                                projectPart(),
+                                                theProjectPart,
                                                 std::move(renameSymbols));
 
         viewport()->setCursor(Qt::BusyCursor);

@@ -61,7 +61,7 @@ QnxDebugSupport::QnxDebugSupport(RunControl *runControl)
     connect(runner, &ApplicationLauncher::remoteStdout, this, &QnxDebugSupport::handleRemoteOutput);
     connect(runner, &ApplicationLauncher::remoteStderr, this, &QnxDebugSupport::handleRemoteOutput);
 
-    connect(this->runControl(), &Debugger::DebuggerRunControl::requestRemoteSetup,
+    connect(toolRunner(), &Debugger::DebuggerRunTool::requestRemoteSetup,
             this, &QnxDebugSupport::handleAdapterSetupRequested);
     connect(runControl, &RunControl::finished,
             this, &QnxDebugSupport::handleDebuggingFinished);
@@ -82,7 +82,7 @@ void QnxDebugSupport::handleAdapterSetupRequested()
 {
     QTC_ASSERT(state() == Inactive, return);
 
-    runControl()->showMessage(tr("Preparing remote side...") + QLatin1Char('\n'), Debugger::AppStuff);
+    toolRunner()->showMessage(tr("Preparing remote side...") + '\n', Debugger::AppStuff);
     QnxAbstractRunSupport::handleAdapterSetupRequested();
 }
 
@@ -124,7 +124,7 @@ void QnxDebugSupport::handleRemoteProcessStarted()
     result.success = true;
     result.gdbServerPort = m_pdebugPort;
     result.qmlServerPort = m_qmlPort;
-    runControl()->notifyEngineRemoteSetupFinished(result);
+    toolRunner()->notifyEngineRemoteSetupFinished(result);
 }
 
 void QnxDebugSupport::handleRemoteProcessFinished(bool success)
@@ -134,13 +134,13 @@ void QnxDebugSupport::handleRemoteProcessFinished(bool success)
 
     if (state() == Running) {
         if (!success)
-            runControl()->notifyInferiorIll();
+            toolRunner()->notifyInferiorIll();
 
     } else {
         Debugger::RemoteSetupResult result;
         result.success = false;
         result.reason = tr("The %1 process closed unexpectedly.").arg(processExecutable());
-        runControl()->notifyEngineRemoteSetupFinished(result);
+        toolRunner()->notifyEngineRemoteSetupFinished(result);
     }
 }
 
@@ -166,43 +166,44 @@ void QnxDebugSupport::killInferiorProcess()
 
 void QnxDebugSupport::handleProgressReport(const QString &progressOutput)
 {
-    runControl()->showMessage(progressOutput + QLatin1Char('\n'), Debugger::AppStuff);
+    toolRunner()->showMessage(progressOutput + QLatin1Char('\n'), Debugger::AppStuff);
 }
 
 void QnxDebugSupport::handleRemoteOutput(const QByteArray &output)
 {
     QTC_ASSERT(state() == Inactive || state() == Running, return);
-    runControl()->showMessage(QString::fromUtf8(output), Debugger::AppOutput);
+    toolRunner()->showMessage(QString::fromUtf8(output), Debugger::AppOutput);
 }
 
 void QnxDebugSupport::handleError(const QString &error)
 {
     if (state() == Running) {
-        runControl()->showMessage(error, Debugger::AppError);
-        runControl()->notifyInferiorIll();
+        toolRunner()->showMessage(error, Debugger::AppError);
+        toolRunner()->notifyInferiorIll();
     } else if (state() != Inactive) {
         setFinished();
         Debugger::RemoteSetupResult result;
         result.success = false;
         result.reason = tr("Initial setup failed: %1").arg(error);
-        runControl()->notifyEngineRemoteSetupFinished(result);
+        toolRunner()->notifyEngineRemoteSetupFinished(result);
     }
 }
 
 void QnxDebugSupport::printMissingWarning()
 {
-    runControl()->showMessage(tr("Warning: \"slog2info\" is not found on the device, debug output not available."), Debugger::AppError);
+    toolRunner()->showMessage(tr("Warning: \"slog2info\" is not found "
+       "on the device, debug output not available."), Debugger::AppError);
 }
 
 void QnxDebugSupport::handleApplicationOutput(const QString &msg, Utils::OutputFormat outputFormat)
 {
     Q_UNUSED(outputFormat);
-    runControl()->showMessage(msg, Debugger::AppOutput);
+    toolRunner()->showMessage(msg, Debugger::AppOutput);
 }
 
-Debugger::DebuggerRunControl *QnxDebugSupport::runControl()
+Debugger::DebuggerRunTool *QnxDebugSupport::toolRunner()
 {
-    return qobject_cast<Debugger::DebuggerRunControl *>(QnxAbstractRunSupport::runControl());
+    return qobject_cast<Debugger::DebuggerRunTool *>(runControl()->toolRunner());
 }
 
 } // namespace Internal

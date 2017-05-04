@@ -22,25 +22,45 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-
 #pragma once
 
-#include <texteditor/snippets/isnippetprovider.h>
+#include "androidconfigurations.h"
 
-namespace CppEditor {
+#include <memory>
+
+namespace Android {
 namespace Internal {
 
-class CppSnippetProvider : public TextEditor::ISnippetProvider
+class AndroidToolManager;
+class AvdManagerOutputParser;
+
+class AndroidAvdManager
 {
-    Q_OBJECT
-
 public:
-    ~CppSnippetProvider() final = default;
+    AndroidAvdManager(const AndroidConfig& config = AndroidConfigurations::currentConfig());
+    ~AndroidAvdManager();
 
-    QString groupId() const final;
-    QString displayName() const final;
-    void decorateEditor(TextEditor::SnippetEditorWidget *editor) const final;
+    bool avdManagerUiToolAvailable() const;
+    void launchAvdManagerUiTool() const;
+    QFuture<AndroidConfig::CreateAvdInfo> createAvd(AndroidConfig::CreateAvdInfo info) const;
+    bool removeAvd(const QString &name) const;
+    QFuture<AndroidDeviceInfoList> avdList() const;
+
+    QString startAvd(const QString &name) const;
+    bool startAvdAsync(const QString &avdName) const;
+    QString findAvd(const QString &avdName) const;
+    QString waitForAvd(const QString &avdName,
+                       const QFutureInterface<bool> &fi = QFutureInterface<bool>()) const;
+    bool isAvdBooted(const QString &device) const;
+
+private:
+    bool waitForBooted(const QString &serialNumber, const QFutureInterface<bool> &fi) const;
+
+private:
+    const AndroidConfig &m_config;
+    std::unique_ptr<AndroidToolManager> m_androidTool;
+    std::unique_ptr<AvdManagerOutputParser> m_parser;
 };
 
-} // Internal
-} // CppEditor
+} // namespace Internal
+} // namespace Android

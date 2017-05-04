@@ -27,6 +27,7 @@
 
 #include "debugger_global.h"
 #include "debuggerconstants.h"
+#include "debuggerengine.h"
 
 #include <projectexplorer/runconfiguration.h>
 
@@ -34,24 +35,36 @@ namespace Debugger {
 
 class RemoteSetupResult;
 class DebuggerStartParameters;
-class DebuggerRunControl;
 
-DEBUGGER_EXPORT DebuggerRunControl *createDebuggerRunControl(const DebuggerStartParameters &sp,
-                                                             ProjectExplorer::RunConfiguration *runConfig,
-                                                             QString *errorMessage,
-                                                             Core::Id runMode = ProjectExplorer::Constants::DEBUG_RUN_MODE);
-
-class DEBUGGER_EXPORT DebuggerRunControl : public ProjectExplorer::RunControl
+class DEBUGGER_EXPORT DebuggerRunTool : public ProjectExplorer::ToolRunner
 {
     Q_OBJECT
 
 public:
-    DebuggerRunControl(ProjectExplorer::RunConfiguration *runConfig, Core::Id runMode);
-    ~DebuggerRunControl() override;
+    DebuggerRunTool(ProjectExplorer::RunControl *runControl); // Use.
 
-    // ProjectExplorer::RunControl
+    DebuggerRunTool(ProjectExplorer::RunControl *runControl,
+                    const DebuggerStartParameters &sp,
+                    QString *errorMessage = nullptr); // Use rarely.
+    DebuggerRunTool(ProjectExplorer::RunControl *runControl,
+                    const Internal::DebuggerRunParameters &rp,
+                    QString *errorMessage = nullptr); // FIXME: Don't use.
+    ~DebuggerRunTool();
+
+    void setStartParameters(const DebuggerStartParameters &sp,
+                            QString *errorMessage = nullptr); // Use rarely.
+    void setRunParameters(const Internal::DebuggerRunParameters &rp,
+                          QString *errorMessage = nullptr); // FIXME: Don't use.
+
+    Internal::DebuggerEngine *engine() const { return m_engine; }
+
+    void showMessage(const QString &msg, int channel = LogDebug, int timeout = -1);
+
+    void prepare() override;
     void start() override;
-    void stop() override; // Called from SnapshotWindow.
+    void stop() override;
+    void onTargetFailure() override;
+    void onFinished() override;
 
     void startFailed();
     void notifyEngineRemoteServerRunning(const QByteArray &msg, int pid);
@@ -62,14 +75,21 @@ public:
     void abortDebugger();
     void debuggingFinished();
 
-    void showMessage(const QString &msg, int channel = LogDebug);
-
     DebuggerStartParameters &startParameters(); // Used in Boot2Qt.
 
+    bool isCppDebugging() const { return m_isCppDebugging; }
+    bool isQmlDebugging() const { return m_isQmlDebugging; }
+
 signals:
-    void requestRemoteSetup();
-    void aboutToNotifyInferiorSetupOk();
     void stateChanged(Debugger::DebuggerState state);
+    void aboutToNotifyInferiorSetupOk();
+    void requestRemoteSetup();
+
+private:
+    Internal::DebuggerEngine *m_engine = nullptr; // Master engine
+    QStringList m_errors;
+    const bool m_isCppDebugging;
+    const bool m_isQmlDebugging;
 };
 
 } // namespace Debugger

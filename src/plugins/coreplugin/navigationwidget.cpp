@@ -85,35 +85,33 @@ NavigationWidgetPlaceHolder::~NavigationWidgetPlaceHolder()
     }
 }
 
-void NavigationWidgetPlaceHolder::applyStoredSize(int width)
+void NavigationWidgetPlaceHolder::applyStoredSize()
 {
-    if (width) {
-        QSplitter *splitter = qobject_cast<QSplitter *>(parentWidget());
-        if (splitter) {
-            // A splitter we need to resize the splitter sizes
-            QList<int> sizes = splitter->sizes();
-            int index = splitter->indexOf(this);
-            int diff = width - sizes.at(index);
-
-            int count = sizes.count();
-            for (int i = 0; i < sizes.count(); ++i) {
-                if (qobject_cast<NavigationWidgetPlaceHolder *>(splitter->widget(i)))
-                    --count;
+    QSplitter *splitter = qobject_cast<QSplitter *>(parentWidget());
+    if (splitter) {
+        // A splitter we need to resize the splitter sizes
+        QList<int> sizes = splitter->sizes();
+        int diff = 0;
+        int count = sizes.count();
+        for (int i = 0; i < sizes.count(); ++i) {
+            if (auto ph = qobject_cast<NavigationWidgetPlaceHolder *>(splitter->widget(i))) {
+                --count;
+                int width = ph->storedWidth();
+                diff += width - sizes.at(i);
+                sizes[i] = width;
             }
-
-            int adjust = count > 1 ? (diff / (count - 1)) : 0;
-            for (int i = 0; i < sizes.count(); ++i) {
-                if (!qobject_cast<NavigationWidgetPlaceHolder *>(splitter->widget(i)))
-                    sizes[i] += adjust;
-            }
-
-            sizes[index] = width;
-            splitter->setSizes(sizes);
-        } else {
-            QSize s = size();
-            s.setWidth(width);
-            resize(s);
         }
+        int adjust = count > 1 ? (diff / (count - 1)) : 0;
+        for (int i = 0; i < sizes.count(); ++i) {
+            if (!qobject_cast<NavigationWidgetPlaceHolder *>(splitter->widget(i)))
+                sizes[i] += adjust;
+        }
+
+        splitter->setSizes(sizes);
+    } else {
+        QSize s = size();
+        s.setWidth(storedWidth());
+        resize(s);
     }
 }
 
@@ -138,15 +136,18 @@ void NavigationWidgetPlaceHolder::currentModeAboutToChange(Id mode)
     if (m_mode == mode) {
         setCurrent(m_side, this);
 
-        int width = navigationWidget->storedWidth();
-
         layout()->addWidget(navigationWidget);
         navigationWidget->show();
 
-        applyStoredSize(width);
+        applyStoredSize();
         setVisible(navigationWidget->isShown());
         navigationWidget->placeHolderChanged(this);
     }
+}
+
+int NavigationWidgetPlaceHolder::storedWidth() const
+{
+    return NavigationWidget::instance(m_side)->storedWidth();
 }
 
 struct ActivationInfo {
@@ -166,7 +167,6 @@ struct NavigationWidgetPrivate
     QStandardItemModel *m_factoryModel;
 
     bool m_shown;
-    bool m_suppressed;
     int m_width;
     QAction *m_toggleSideBarAction; // does not take ownership
     Side m_side;
@@ -183,7 +183,6 @@ struct NavigationWidgetPrivate
 NavigationWidgetPrivate::NavigationWidgetPrivate(QAction *toggleSideBarAction, Side side) :
     m_factoryModel(new QStandardItemModel),
     m_shown(true),
-    m_suppressed(false),
     m_width(0),
     m_toggleSideBarAction(toggleSideBarAction),
     m_side(side)
@@ -474,7 +473,7 @@ void NavigationWidget::restoreSettings(QSettings *settings)
 
     // Apply
     if (NavigationWidgetPlaceHolder::current(d->m_side))
-        NavigationWidgetPlaceHolder::current(d->m_side)->applyStoredSize(d->m_width);
+        NavigationWidgetPlaceHolder::current(d->m_side)->applyStoredSize();
 
     // Restore last activation positions
     settings->beginGroup(settingsGroup());
@@ -508,7 +507,7 @@ void NavigationWidget::setShown(bool b)
     d->m_shown = b;
     NavigationWidgetPlaceHolder *current = NavigationWidgetPlaceHolder::current(d->m_side);
     if (current) {
-        bool visible = d->m_shown && !d->m_suppressed && haveData;
+        bool visible = d->m_shown && haveData;
         current->setVisible(visible);
         d->m_toggleSideBarAction->setChecked(visible);
     } else {
@@ -520,20 +519,6 @@ void NavigationWidget::setShown(bool b)
 bool NavigationWidget::isShown() const
 {
     return d->m_shown;
-}
-
-bool NavigationWidget::isSuppressed() const
-{
-    return d->m_suppressed;
-}
-
-void NavigationWidget::setSuppressed(bool b)
-{
-    if (d->m_suppressed == b)
-        return;
-    d->m_suppressed = b;
-    if (NavigationWidgetPlaceHolder::current(d->m_side))
-        NavigationWidgetPlaceHolder::current(d->m_side)->setVisible(d->m_shown && !d->m_suppressed);
 }
 
 int NavigationWidget::factoryIndex(Id id)

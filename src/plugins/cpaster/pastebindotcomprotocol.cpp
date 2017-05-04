@@ -37,7 +37,7 @@
 
 enum { debug = 0 };
 
-static const char PASTEBIN_BASE[]="http://pastebin.com/";
+static const char PASTEBIN_BASE[]="https://pastebin.com/";
 static const char PASTEBIN_API[]="api/api_post.php";
 static const char PASTEBIN_RAW[]="raw/";
 static const char PASTEBIN_ARCHIVE[]="archive";
@@ -144,7 +144,7 @@ void PasteBinDotComProtocol::fetch(const QString &id)
     QString link = QLatin1String(PASTEBIN_BASE) + QLatin1String(PASTEBIN_RAW);
 
     if (id.startsWith(QLatin1String("http://")))
-        link.append(id.mid(id.lastIndexOf(QLatin1Char('/')) + 1));
+        link.append(id.midRef(id.lastIndexOf(QLatin1Char('/')) + 1));
     else
         link.append(id);
 

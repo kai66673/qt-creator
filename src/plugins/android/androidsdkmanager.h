@@ -22,37 +22,30 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
+#pragma once
 
-#include "cppsnippetprovider.h"
+#include "utils/fileutils.h"
+#include "androidconfigurations.h"
 
-#include "cpphighlighter.h"
-#include "cppautocompleter.h"
-#include "cppeditorconstants.h"
+#include <memory>
 
-#include <cpptools/cppqtstyleindenter.h>
+namespace Android {
+namespace Internal {
 
-#include <texteditor/snippets/snippeteditor.h>
-#include <texteditor/textdocument.h>
+class SdkManagerOutputParser;
 
-#include <QLatin1String>
-#include <QCoreApplication>
-
-using namespace CppEditor;
-using namespace CppEditor::Internal;
-
-QString CppSnippetProvider::groupId() const
+class AndroidSdkManager
 {
-    return QLatin1String(Constants::CPP_SNIPPETS_GROUP_ID);
-}
+public:
+    AndroidSdkManager(const AndroidConfig &config);
+    ~AndroidSdkManager();
 
-QString CppSnippetProvider::displayName() const
-{
-    return QCoreApplication::translate("CppEditor::Internal::CppSnippetProvider", "C++");
-}
+    SdkPlatformList availableSdkPlatforms();
 
-void CppSnippetProvider::decorateEditor(TextEditor::SnippetEditorWidget *editor) const
-{
-    editor->textDocument()->setSyntaxHighlighter(new CppHighlighter);
-    editor->textDocument()->setIndenter(new CppTools::CppQtStyleIndenter);
-    editor->setAutoCompleter(new CppAutoCompleter);
-}
+private:
+    const AndroidConfig &m_config;
+    std::unique_ptr<SdkManagerOutputParser> m_parser;
+};
+
+} // namespace Internal
+} // namespace Android

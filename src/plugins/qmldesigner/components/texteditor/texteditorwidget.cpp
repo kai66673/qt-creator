@@ -40,6 +40,7 @@
 #include <coreplugin/editormanager/editormanager.h>
 
 #include <QEvent>
+#include <QScrollBar>
 #include <QVBoxLayout>
 
 #include <vector>
@@ -61,7 +62,6 @@ TextEditorWidget::TextEditorWidget(TextEditorView *textEditorView)
     m_updateSelectionTimer.setInterval(200);
 
     connect(&m_updateSelectionTimer, &QTimer::timeout, this, &TextEditorWidget::updateSelectionByCursorPosition);
-    setStyleSheet(Theme::replaceCssColors(QString::fromUtf8(Utils::FileReader::fetchQrc(QLatin1String(":/qmldesigner/scrollbar.css")))));
 }
 
 void TextEditorWidget::setTextEditor(TextEditor::BaseTextEditor *textEditor)
@@ -85,6 +85,9 @@ void TextEditorWidget::setTextEditor(TextEditor::BaseTextEditor *textEditor)
         });
 
         textEditor->editorWidget()->installEventFilter(this);
+        static QString styleSheet = Theme::replaceCssColors(QString::fromUtf8(Utils::FileReader::fetchQrc(QLatin1String(":/qmldesigner/scrollbar.css"))));
+        textEditor->editorWidget()->verticalScrollBar()->setStyleSheet(styleSheet);
+        textEditor->editorWidget()->horizontalScrollBar()->setStyleSheet(styleSheet);
     }
 
     if (oldEditor)
@@ -174,7 +177,7 @@ bool TextEditorWidget::eventFilter( QObject *, QEvent *event)
 {
     static std::vector<int> overrideKeys = { Qt::Key_Delete, Qt::Key_Backspace, Qt::Key_Left,
                                              Qt::Key_Right, Qt::Key_Up, Qt::Key_Down, Qt::Key_Insert,
-                                             Qt::Key_Escape, Qt::Key_Home, Qt::Key_End };
+                                             Qt::Key_Escape };
 
     static std::vector<QKeySequence> overrideSequences = { QKeySequence::SelectAll, QKeySequence::Cut,
                                                           QKeySequence::Copy, QKeySequence::Delete,

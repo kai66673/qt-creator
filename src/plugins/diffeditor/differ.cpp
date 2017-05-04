@@ -89,6 +89,7 @@ static QList<Diff> decode(const QList<Diff> &diffList,
                                   const QStringList &lines)
 {
     QList<Diff> newDiffList;
+    newDiffList.reserve(diffList.count());
     for (int i = 0; i < diffList.count(); i++) {
         Diff diff = diffList.at(i);
         QString text;
@@ -305,7 +306,7 @@ QList<Diff> Differ::moveWhitespaceIntoEqualities(const QList<Diff> &input)
                     }
                     if (j > 0) {
                         // diff starts with j whitespaces, move them to the previous diff
-                        previousDiff.text.append(diff.text.left(j));
+                        previousDiff.text.append(diff.text.leftRef(j));
                         diff.text = diff.text.mid(j);
                     }
                 }

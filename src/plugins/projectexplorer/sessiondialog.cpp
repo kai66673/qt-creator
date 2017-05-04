@@ -38,14 +38,14 @@ namespace Internal {
 class SessionValidator : public QValidator
 {
 public:
-    SessionValidator(QObject *parent, QStringList sessions);
+    SessionValidator(QObject *parent, const QStringList &sessions);
     void fixup(QString & input) const;
     QValidator::State validate(QString & input, int & pos) const;
 private:
     QStringList m_sessions;
 };
 
-SessionValidator::SessionValidator(QObject *parent, QStringList sessions)
+SessionValidator::SessionValidator(QObject *parent, const QStringList &sessions)
     : QValidator(parent), m_sessions(sessions)
 {
 }
@@ -121,6 +121,7 @@ bool SessionNameInputDialog::isSwitchToRequested() const
 SessionDialog::SessionDialog(QWidget *parent) : QDialog(parent)
 {
     m_ui.setupUi(this);
+    m_ui.sessionView->setActivationMode(Utils::DoubleClickActivation);
 
     connect(m_ui.btCreateNew, &QAbstractButton::clicked,
         m_ui.sessionView, &SessionView::createNewSession);

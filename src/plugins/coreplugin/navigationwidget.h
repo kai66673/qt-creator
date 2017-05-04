@@ -58,10 +58,11 @@ public:
     virtual ~NavigationWidgetPlaceHolder();
     static NavigationWidgetPlaceHolder *current(Side side);
     static void setCurrent(Side side, NavigationWidgetPlaceHolder *navWidget);
-    void applyStoredSize(int width);
+    void applyStoredSize();
 
 private:
     void currentModeAboutToChange(Id mode);
+    int storedWidth() const;
 
     Id m_mode;
     Side m_side;
@@ -94,9 +95,6 @@ public:
 
     bool isShown() const;
     void setShown(bool b);
-
-    bool isSuppressed() const;
-    void setSuppressed(bool b);
 
     static NavigationWidget *instance(Side side);
     static QWidget *activateSubWidget(Id factoryId, Side fallbackSide);

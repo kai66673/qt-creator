@@ -133,6 +133,8 @@ QbsProject::QbsProject(const FileName &fileName) :
     setProjectContext(Context(Constants::PROJECT_ID));
     setProjectLanguages(Context(ProjectExplorer::Constants::CXX_LANGUAGE_ID));
 
+    rebuildProjectTree();
+
     connect(this, &Project::activeTargetChanged, this, &QbsProject::changeActiveTarget);
     connect(this, &Project::addedTarget, this, &QbsProject::targetWasAdded);
     connect(this, &Project::removedTarget, this, &QbsProject::targetWasRemoved);
@@ -157,11 +159,6 @@ QbsProject::~QbsProject()
         m_qbsUpdateFutureInterface = 0;
     }
     qDeleteAll(m_extraCompilers);
-}
-
-QString QbsProject::displayName() const
-{
-    return projectFilePath().toFileInfo().completeBaseName();
 }
 
 QbsRootProjectNode *QbsProject::rootProjectNode() const
@@ -258,7 +255,7 @@ bool QbsProject::addFilesToProduct(const QStringList &filePaths,
     }
     if (notAdded->count() != filePaths.count()) {
         m_projectData = m_qbsProject.projectData();
-        setRootProjectNode(Internal::QbsNodeTreeBuilder::buildTree(this));
+        rebuildProjectTree();
     }
     return notAdded->isEmpty();
 }
@@ -285,7 +282,7 @@ bool QbsProject::removeFilesFromProduct(const QStringList &filePaths,
     }
     if (notRemoved->count() != filePaths.count()) {
         m_projectData = m_qbsProject.projectData();
-        setRootProjectNode(Internal::QbsNodeTreeBuilder::buildTree(this));
+        rebuildProjectTree();
         emit fileListChanged();
     }
     return notRemoved->isEmpty();
@@ -434,12 +431,20 @@ bool QbsProject::checkCancelStatus()
     return true;
 }
 
+static QSet<QString> toQStringSet(const std::set<QString> &src)
+{
+    QSet<QString> result;
+    result.reserve(int(src.size()));
+    std::copy(src.begin(), src.end(), Utils::inserter(result));
+    return result;
+}
+
 void QbsProject::updateAfterParse()
 {
     qCDebug(qbsPmLog) << "Updating data after parse";
     OpTimer opTimer("updateAfterParse");
     updateProjectNodes();
-    updateDocuments(m_qbsProject.buildSystemFiles());
+    updateDocuments(toQStringSet(m_qbsProject.buildSystemFiles()));
     updateBuildTargetData();
     updateCppCodeModel();
     updateQmlJsCodeModel();
@@ -449,7 +454,7 @@ void QbsProject::updateAfterParse()
 void QbsProject::updateProjectNodes()
 {
     OpTimer opTimer("updateProjectNodes");
-    setRootProjectNode(Internal::QbsNodeTreeBuilder::buildTree(this));
+    rebuildProjectTree();
 }
 
 void QbsProject::handleQbsParsingDone(bool success)
@@ -488,6 +493,13 @@ void QbsProject::handleQbsParsingDone(bool success)
         updateAfterParse();
     emit projectParsingDone(success);
     emit parsingFinished();
+}
+
+void QbsProject::rebuildProjectTree()
+{
+    QbsProjectNode *newRoot = Internal::QbsNodeTreeBuilder::buildTree(this);
+    setDisplayName(newRoot ? newRoot->displayName() : projectFilePath().toFileInfo().completeBaseName());
+    setRootProjectNode(newRoot);
 }
 
 void QbsProject::handleRuleExecutionDone()

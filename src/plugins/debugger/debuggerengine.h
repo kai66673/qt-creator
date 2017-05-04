@@ -53,8 +53,8 @@ class ProcessHandle;
 
 namespace Debugger {
 
-class DebuggerRunControl;
 class RemoteSetupResult;
+class DebuggerRunTool;
 
 DEBUGGER_EXPORT QDebug operator<<(QDebug str, DebuggerState state);
 
@@ -62,7 +62,6 @@ namespace Internal {
 
 class DebuggerEnginePrivate;
 class DebuggerPluginPrivate;
-class DebuggerRunTool;
 class DisassemblerAgent;
 class MemoryAgent;
 class WatchItem;
@@ -200,7 +199,13 @@ public:
 
     const DebuggerRunParameters &runParameters() const;
     DebuggerRunParameters &runParameters();
+    virtual void setRunTool(DebuggerRunTool *runTool);
     DebuggerRunTool *runTool() const;
+
+    void prepare();
+    void start();
+
+    void startDebugger();
 
     enum {
         // Remove need to qualify each use.
@@ -224,7 +229,6 @@ public:
     void updateWatchData(const QString &iname); // FIXME: Merge with above.
     virtual void selectWatchData(const QString &iname);
 
-    virtual void startDebugger(DebuggerRunControl *runControl);
     virtual void prepareForRestart() {}
 
     virtual void watchPoint(const QPoint &pnt);
@@ -338,18 +342,7 @@ public:
     QString expand(const QString &string) const;
     QString nativeStartupCommands() const;
 
-signals:
-    void stateChanged(Debugger::DebuggerState state);
-    /*
-     * For "external" clients of a debugger run control that needs to do
-     * further setup before the debugger is started (e.g. RemoteLinux).
-     * Afterwards, notifyEngineRemoteSetupFinished
-     * must be called to continue or abort debugging.
-     * This signal is only emitted if the start parameters indicate that
-     * a server start script should be used, but none is given.
-     */
-    void requestRemoteSetup();
-    void aboutToNotifyInferiorSetupOk();
+    bool prepareCommand();
 
 protected:
     // The base notify*() function implementation should be sufficient
@@ -430,7 +423,7 @@ protected:
     void setTargetState(DebuggerState state);
     void setMasterEngine(DebuggerEngine *masterEngine);
 
-    DebuggerRunControl *runControl() const;
+    ProjectExplorer::RunControl *runControl() const;
     Terminal *terminal() const;
 
     static QString msgStopped(const QString &reason = QString());
@@ -471,29 +464,6 @@ private:
     friend class DebuggerEnginePrivate;
     friend class LocationMark;
     DebuggerEnginePrivate *d;
-};
-
-class DebuggerRunTool : public ProjectExplorer::ToolRunner
-{
-public:
-    DebuggerRunTool(ProjectExplorer::RunControl *runControl,
-                    const DebuggerRunParameters &rp,
-                    QString *errorMessage = nullptr);
-    ~DebuggerRunTool();
-
-    DebuggerEngine *engine() const { return m_engine; }
-    DebuggerRunControl *runControl() const;
-
-    void showMessage(const QString &msg, int channel, int timeout = -1);
-
-    void handleFinished();
-
-private:
-    bool fixup();
-
-    DebuggerRunParameters m_rp;
-    DebuggerEngine *m_engine = nullptr; // Master engine
-    QStringList m_errors;
 };
 
 class LocationMark : public TextEditor::TextMark

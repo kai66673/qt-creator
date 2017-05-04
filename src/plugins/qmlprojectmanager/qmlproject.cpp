@@ -61,6 +61,7 @@ QmlProject::QmlProject(const Utils::FileName &fileName) :
     setId("QmlProjectManager.QmlProject");
     setProjectContext(Context(QmlProjectManager::Constants::PROJECTCONTEXT));
     setProjectLanguages(Context(ProjectExplorer::Constants::QMLJS_LANGUAGE_ID));
+    setDisplayName(fileName.toFileInfo().completeBaseName());
 }
 
 QmlProject::~QmlProject()
@@ -239,11 +240,6 @@ void QmlProject::refreshFiles(const QSet<QString> &/*added*/, const QSet<QString
     }
 }
 
-QString QmlProject::displayName() const
-{
-    return projectFilePath().toFileInfo().completeBaseName();
-}
-
 bool QmlProject::supportsKit(Kit *k, QString *errorMessage) const
 {
     Id deviceType = DeviceTypeKitInformation::deviceTypeId(k);
@@ -361,6 +357,7 @@ void QmlProject::generateProjectTree()
             fileType = FileType::Project;
         newRoot->addNestedNode(new FileNode(Utils::FileName::fromString(f), fileType, false));
     }
+    newRoot->addNestedNode(new FileNode(projectFilePath(), FileType::Project, false));
 
     setRootProjectNode(newRoot);
 }
