@@ -285,23 +285,21 @@ ParserTreeItem::ConstPtr Parser::parse()
 
     // check all projects
     for (const Project *prj : SessionManager::projects()) {
-        if (auto projectNode = prj->rootProjectNode()) {
-            ParserTreeItem::Ptr item;
-            QString prjName(prj->displayName());
-            QString prjType(prjName);
-            if (prj->document())
-                prjType = prj->projectFilePath().toString();
-            SymbolInformation inf(prjName, prjType);
-            item = ParserTreeItem::Ptr(new ParserTreeItem());
+        ParserTreeItem::Ptr item;
+        QString prjName(prj->displayName());
+        QString prjType(prjName);
+        if (prj->document())
+            prjType = prj->projectFilePath().toString();
+        SymbolInformation inf(prjName, prjType);
+        item = ParserTreeItem::Ptr(new ParserTreeItem());
 
-            if (d->flatMode)
-                addFlatTree(item, projectNode);
-            else
-                addProjectNode(item, projectNode);
+        if (d->flatMode)
+            addFlatTree(item, prj->rootProjectNode());
+        else
+            addProjectNode(item, prj->rootProjectNode());
 
-            item->setIcon(projectNode->icon());
-            rootItem->appendChild(item, inf);
-        }
+        item->setIcon(prj->rootProjectNode()->icon());
+        rootItem->appendChild(item, inf);
     }
 
     if (debug)
