@@ -33,6 +33,8 @@
 #include "gohoverhandler.h"
 #include "gocompletionassist.h"
 #include "goeditoroutline.h"
+#include "gohighlighter.h"
+#include "goindenter.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -113,6 +115,13 @@ GoEditor::GoEditor()
     addContext(Constants::GOEDITOR_ID);
 }
 
+void GoEditor::decorateEditor(TextEditorWidget *editor)
+{
+    editor->textDocument()->setSyntaxHighlighter(new GoHighlighter);
+    editor->textDocument()->setIndenter(new GoIndenter);
+    editor->setAutoCompleter(new GoAutoCompleter);
+}
+
 /*****************************************************************************
  * GoEditorFactory
  *****************************************************************************/
@@ -128,7 +137,7 @@ GoEditorFactory::GoEditorFactory()
     setEditorCreator([]() { return new GoEditor; });
     setAutoCompleterCreator([]() { return new GoAutoCompleter; });
 
-    setCommentStyle(Utils::CommentDefinition::CppStyle);
+    setCommentDefinition(Utils::CommentDefinition::CppStyle);
     setCodeFoldingSupported(true);
     setMarksVisible(true);
     setParenthesesMatchingEnabled(true);

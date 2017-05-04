@@ -59,11 +59,6 @@ GoProject::GoProject(const Utils::FileName &fileName)
     collectProjectFiles();
 }
 
-QString GoProject::displayName() const
-{
-    return projectFilePath().toFileInfo().completeBaseName();
-}
-
 bool GoProject::needsConfiguration() const
 {
     return targets().empty();

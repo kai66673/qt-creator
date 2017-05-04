@@ -41,6 +41,8 @@ class GoEditor : public TextEditor::BaseTextEditor
 
 public:
     GoEditor();
+
+    static void decorateEditor(TextEditor::TextEditorWidget *editor);
 };
 
 class GoEditorFactory : public TextEditor::TextEditorFactory

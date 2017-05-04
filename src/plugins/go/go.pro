@@ -18,7 +18,6 @@ HEADERS += \
     editor/golexer.h \
     editor/gotoken.h \
     goconstants.h \
-    editor/gosnippetprovider.h \
     editor/goeditorconstants.h \
     editor/gohighlighter.h \
     editor/goindenter.h \
@@ -95,7 +94,6 @@ SOURCES += \
     goiconprovider.cpp \
     editor/golexer.cpp \
     editor/gotoken.cpp \
-    editor/gosnippetprovider.cpp \
     editor/gohighlighter.cpp \
     editor/goindenter.cpp \
     editor/gocodeformatter.cpp \

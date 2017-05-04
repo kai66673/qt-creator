@@ -49,7 +49,6 @@ class GoProject : public ProjectExplorer::Project
 public:
     GoProject(const Utils::FileName &fileName);
 
-    QString displayName() const override;
     bool needsConfiguration() const override;
     bool supportsKit(ProjectExplorer::Kit *k, QString *errorMessage) const override;
     Utils::FileNameList goFiles() const;

@@ -27,7 +27,6 @@
 #include "golexer.h"
 #include "goconstants.h"
 #include "golangconstants.h"
-#include "gosnippetprovider.h"
 #include "goeditor.h"
 #include "gotoolchain.h"
 #include "gobuildconfigurationfactory.h"
@@ -49,6 +48,7 @@
 #include <coreplugin/iwizardfactory.h>
 #include <projectexplorer/projectmanager.h>
 #include <projectexplorer/toolchainmanager.h>
+#include <texteditor/snippets/snippetprovider.h>
 #include <utils/mimetypes/mimedatabase.h>
 
 namespace GoLang {
@@ -109,13 +109,15 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     ProjectExplorer::ToolChainManager::registerLanguage(GoLang::Constants::C_GOLANGUAGE_ID,
                                                         GoLang::Constants::C_GOLANGUAGE_NAME);
+    TextEditor::SnippetProvider::registerGroup(Go::Constants::GO_SNIPPETS_GROUP_ID,
+                                               tr("Go", "GoEditor::GoSnippetProvider"),
+                                               &::GoEditor::Internal::GoEditor::decorateEditor);
 
     d->lexer = new GoLexer;
     d->iconProvider = new GoIconProvider;
 
     addAutoReleasedObject(new GoEditorFactory);
 //    addAutoReleasedObject(new GoOutlineWidgetFactory);
-    addAutoReleasedObject(new GoSnippetProvider);
 
     addAutoReleasedObject(new GoLang::GoToolChainFactory);
     addAutoReleasedObject(new GoLang::GoBuildConfigurationFactory);

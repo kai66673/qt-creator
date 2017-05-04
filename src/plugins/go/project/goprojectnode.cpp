@@ -33,23 +33,19 @@ GoProjectNode::GoProjectNode(GoProject &project, const Utils::FileName &projectF
     , m_project(project)
 { }
 
-QList<ProjectExplorer::ProjectAction> GoProjectNode::supportedActions(ProjectExplorer::Node *node) const
+bool GoProjectNode::supportsAction(ProjectExplorer::ProjectAction action, ProjectExplorer::Node *node) const
 {
-    static const QList<ProjectExplorer::ProjectAction> fileActions = { ProjectExplorer::ProjectAction::Rename,
-                                                                       ProjectExplorer::ProjectAction::RemoveFile
-                                                                     };
-    static const QList<ProjectExplorer::ProjectAction> folderActions = { ProjectExplorer::ProjectAction::AddNewFile,
-                                                                         ProjectExplorer::ProjectAction::RemoveFile,
-                                                                         ProjectExplorer::ProjectAction::AddExistingFile
-                                                                       };
     switch (node->nodeType()) {
     case ProjectExplorer::NodeType::File:
-        return fileActions;
+        return action == ProjectExplorer::ProjectAction::Rename
+            || action == ProjectExplorer::ProjectAction::RemoveFile;
     case ProjectExplorer::NodeType::Folder:
     case ProjectExplorer::NodeType::Project:
-        return folderActions;
+        return action == ProjectExplorer::ProjectAction::AddNewFile
+            || action == ProjectExplorer::ProjectAction::RemoveFile
+            || action == ProjectExplorer::ProjectAction::AddExistingFile;
     default:
-        return ProjectNode::supportedActions(node);
+        return ProjectNode::supportsAction(action, node);
     }
 }
 
