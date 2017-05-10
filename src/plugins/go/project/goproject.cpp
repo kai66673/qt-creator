@@ -50,6 +50,7 @@ GoProject::GoProject(const Utils::FileName &fileName)
     , m_packageProcessor(new GoPackageProcessor(this))
 {
     setId(Constants::C_GOPROJECT_ID);
+    setDisplayName(fileName.toFileInfo().completeBaseName());
 
     m_projectScanTimer.setSingleShot(true);
     connect(&m_projectScanTimer, &QTimer::timeout, this, &GoProject::collectProjectFiles);
