@@ -42,6 +42,7 @@
 #include "gosource.h"
 #include "gocodemodelmanager.h"
 #include "goproject.h"
+#include "gooutlinewidgetfactory.h"
 
 #include <coreplugin/icore.h>
 #include <coreplugin/jsexpander.h>
@@ -117,7 +118,7 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     d->iconProvider = new GoIconProvider;
 
     addAutoReleasedObject(new GoEditorFactory);
-//    addAutoReleasedObject(new GoOutlineWidgetFactory);
+    addAutoReleasedObject(new GoOutlineWidgetFactory);
 
     addAutoReleasedObject(new GoLang::GoToolChainFactory);
     addAutoReleasedObject(new GoLang::GoBuildConfigurationFactory);

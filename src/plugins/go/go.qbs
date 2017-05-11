@@ -26,18 +26,29 @@ QtcPlugin {
         name: "Editor"
         prefix: "editor/"
         files: [
-            "goautocompleter.cpp", "goautocompleter.h",
-            "gocodeformatter.cpp", "gocodeformatter.h",
-            "gocompletionassist.cpp", "gocompletionassist.h",
-            "godocument.cpp", "godocument.h",
-            "goeditor.cpp", "goeditor.h",
+            "goautocompleter.cpp",
+            "goautocompleter.h",
+            "gocodeformatter.cpp",
+            "gocodeformatter.h",
+            "gocompletionassist.cpp",
+            "gocompletionassist.h",
+            "godocument.cpp",
+            "godocument.h",
+            "goeditor.cpp",
+            "goeditor.h",
             "goeditorconstants.h",
-            "gohighlighter.cpp", "gohighlighter.h",
-            "gohoverhandler.cpp", "gohoverhandler.h",
-            "goindenter.cpp", "goindenter.h",
-            "golexer.cpp", "golexer.h",
-            "gosnippetprovider.cpp", "gosnippetprovider.h",
-            "gotoken.cpp", "gotoken.h"
+            "gohighlighter.cpp",
+            "gohighlighter.h",
+            "gohoverhandler.cpp",
+            "gohoverhandler.h",
+            "goindenter.cpp",
+            "goindenter.h",
+            "golexer.cpp",
+            "golexer.h",
+            "gooutlinewidgetfactory.cpp",
+            "gooutlinewidgetfactory.h",
+            "gotoken.cpp",
+            "gotoken.h",
         ]
     }
 

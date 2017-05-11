@@ -87,7 +87,8 @@ HEADERS += \
     editor/gocompletionassist.h \
     tools/gocompletionassistvisitor.h \
     tools/gopackagedirindexer.h \
-    tools/symbolundercursor.h
+    tools/symbolundercursor.h \
+    editor/gooutlinewidgetfactory.h
 
 SOURCES += \
     goplugin.cpp \
@@ -158,7 +159,8 @@ SOURCES += \
     editor/gocompletionassist.cpp \
     tools/gocompletionassistvisitor.cpp \
     tools/gopackagedirindexer.cpp \
-    tools/symbolundercursor.cpp
+    tools/symbolundercursor.cpp \
+    editor/gooutlinewidgetfactory.cpp
 
 FORMS += \
     project/gocompilerbuildstepconfigwidget.ui \
