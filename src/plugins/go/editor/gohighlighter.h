@@ -48,7 +48,6 @@ private:
     void init();
     void onBlockBegin();
     void onBlockEnd();
-    int styleCategory(TextEditor::TextStyle style);
     int tokenCategory(const GoToken &tk);
 };
 

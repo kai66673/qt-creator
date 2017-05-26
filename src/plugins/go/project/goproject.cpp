@@ -83,7 +83,7 @@ bool GoProject::supportsKit(ProjectExplorer::Kit *k, QString *errorMessage) cons
 
 Utils::FileNameList GoProject::goFiles() const
 {
-    const QStringList nim = files(AllFiles, [](const ProjectExplorer::FileNode *fn) {
+    const QStringList nim = files(AllFiles, [](const ProjectExplorer::Node *fn) {
         return fn->filePath().endsWith(".go");
     });
     return Utils::transform(nim, [](const QString &fp) { return Utils::FileName::fromString(fp); });

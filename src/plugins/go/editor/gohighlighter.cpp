@@ -27,28 +27,44 @@
 #include "golexer.h"
 #include "gotoken.h"
 
-static const TextEditor::TextStyle TEXT_STYLES[] = {
-    TextEditor::C_TEXT,
-    TextEditor::C_NUMBER,
-    TextEditor::C_STRING,
-    TextEditor::C_TYPE,
-    TextEditor::C_FIELD,
-    TextEditor::C_VIRTUAL_METHOD,
-    TextEditor::C_FUNCTION,
-    TextEditor::C_KEYWORD,
-    TextEditor::C_PRIMITIVE_TYPE,
-    TextEditor::C_OPERATOR,
-    TextEditor::C_COMMENT,
-    TextEditor::C_DOXYGEN_COMMENT,
-    TextEditor::C_DOXYGEN_TAG,
-    TextEditor::C_VISUAL_WHITESPACE,
-};
-
+#include <utils/qtcassert.h>
 
 using namespace TextEditor;
 
 namespace GoEditor {
 namespace Internal {
+
+enum Format {
+    Format_Number,
+    Format_String,
+    Format_Keyword,
+    Format_PrimitiveType,
+    Format_Operator,
+    Format_Comment,
+    Format_VisualWhitespace,
+    Format_Count
+};
+
+static TextEditor::TextStyle styleForFormat(int format)
+{
+    using namespace TextEditor;
+    const auto f = Format(format);
+    switch (f) {
+        case Format_Number: return C_NUMBER;
+        case Format_String: return C_STRING;
+        case Format_Keyword: return C_KEYWORD;
+        case Format_PrimitiveType: return C_PRIMITIVE_TYPE;
+        case Format_Operator: return C_OPERATOR;
+        case Format_Comment: return C_COMMENT;
+        case Format_VisualWhitespace: return C_VISUAL_WHITESPACE;
+        case Format_Count:
+            QTC_CHECK(false); // should never get here
+            return C_TEXT;
+    }
+
+    QTC_CHECK(false); // should never get here
+    return C_TEXT;
+}
 
 GoHighlighter::GoHighlighter(QTextDocument *parent) :
     SyntaxHighlighter(parent)
@@ -136,7 +152,7 @@ void GoHighlighter::highlightBlock(const QString &text)
     }
 
     // Visualize white space, if enabled
-    const QTextCharFormat whiteSpaceFormat = formatForCategory(styleCategory(TextEditor::C_VISUAL_WHITESPACE));
+    const QTextCharFormat whiteSpaceFormat = formatForCategory(Format_VisualWhitespace);
     int previousTokenEnd = 0;
     for (int i = 0; i < tokens.count(); ++i) {
         const GoToken &tk = tokens.at(i);
@@ -180,36 +196,23 @@ void GoHighlighter::highlightBlock(const QString &text)
 
 void GoHighlighter::init()
 {
-    QVector<TextEditor::TextStyle> categories;
-    for (size_t i = 0; i < sizeof(TEXT_STYLES)/sizeof(TextEditor::TextStyle); ++i)
-        categories << TEXT_STYLES[i];
-    setTextFormatCategories(categories);
-}
-
-int GoHighlighter::styleCategory(TextEditor::TextStyle style)
-{
-    static QHash<TextEditor::TextStyle, int> categories; // static for better performance
-    if (categories.isEmpty())
-        for (size_t i = 0; i < sizeof(TEXT_STYLES)/sizeof(TextEditor::TextStyle); ++i)
-            categories[TEXT_STYLES[i]] = i;
-
-    return categories[style];
+    setTextFormatCategories(Format_Count, styleForFormat);
 }
 
 int GoHighlighter::tokenCategory(const GoToken &tk)
 {
     if (tk.isKeyword())
-        return styleCategory(TextEditor::C_KEYWORD);
+        return Format_Keyword;
     else if (tk.isPrimitive())
-        return styleCategory(TextEditor::C_PRIMITIVE_TYPE);
+        return Format_PrimitiveType;
     else if (tk.isOperator())
-        return styleCategory(TextEditor::C_OPERATOR);
+        return Format_Operator;
     else if (tk.is(T_STRING) || tk.is(T_RUNE))
-        return styleCategory(TextEditor::C_STRING);
+        return Format_String;
     else if (tk.is(T_COMMENT))
-        return styleCategory(TextEditor::C_COMMENT);
+        return Format_Comment;
     else if (tk.is(T_NUMBER))
-        return styleCategory(TextEditor::C_NUMBER);
+        return Format_Number;
 
     return -1;
 }
