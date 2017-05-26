@@ -1,3 +1,4 @@
+
 /****************************************************************************
 **
 ** Copyright (C) 2016 The Qt Company Ltd.
@@ -25,31 +26,24 @@
 
 #pragma once
 
-#include <cpptools/cppmodelmanager.h>
-#include <cpptools/projectpart.h>
+#include <modelnode.h>
 
-#include <QString>
+QT_BEGIN_NAMESPACE
+class QItemSelection;
+class QModelIndex;
+QT_END_NAMESPACE
 
-namespace Autotest {
-namespace Internal {
+namespace QmlDesigner {
 
-class TestUtils
+class NavigatorModelInterface
 {
 public:
-    static QString getCMakeDisplayNameIfNecessary(const QString &filePath, const QString &proFile)
-    {
-        static const QString CMAKE_LISTS("CMakeLists.txt");
-        if (!proFile.endsWith(CMAKE_LISTS))
-            return QString();
-
-        const QList<CppTools::ProjectPart::Ptr> &projectParts
-                = CppTools::CppModelManager::instance()->projectPart(filePath);
-        if (projectParts.size())
-            return projectParts.first()->displayName;
-
-        return QString();
-    }
+    virtual QModelIndex indexForModelNode(const ModelNode &modelNode) const = 0;
+    virtual void notifyDataChanged(const ModelNode &modelNode) = 0;
+    virtual void notifyModelNodesRemoved(const QList<ModelNode> &modelNodes) = 0;
+    virtual void notifyModelNodesInserted(const QList<ModelNode> &modelNodes) = 0;
+    virtual void notifyModelNodesMoved(const QList<ModelNode> &modelNodes) = 0;
 };
 
-} // namespace Internal
-} // namespace Autotest
+} //QmlDesigner
+

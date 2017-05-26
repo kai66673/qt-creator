@@ -52,8 +52,10 @@
 
 #include <utils/checkablemessagebox.h>
 #include <utils/fileutils.h>
+#include <utils/portlist.h>
 #include <utils/qtcassert.h>
 #include <utils/qtcprocess.h>
+
 #include <coreplugin/icore.h>
 #include <coreplugin/coreconstants.h>
 #include <qmldebug/qmldebugcommandlinearguments.h>
@@ -71,15 +73,15 @@ enum { debug = 0 };
 namespace Debugger {
 namespace Internal {
 
-DebuggerEngine *createCdbEngine(const DebuggerRunParameters &rp, QStringList *error);
 const auto DebugRunMode = ProjectExplorer::Constants::DEBUG_RUN_MODE;
 const auto DebugRunModeWithBreakOnMain = ProjectExplorer::Constants::DEBUG_RUN_MODE_WITH_BREAK_ON_MAIN;
 
-DebuggerEngine *createGdbEngine(const DebuggerRunParameters &rp);
-DebuggerEngine *createPdbEngine(const DebuggerRunParameters &rp);
-DebuggerEngine *createQmlEngine(const DebuggerRunParameters &rp);
-DebuggerEngine *createQmlCppEngine(const DebuggerRunParameters &rp, QStringList *error);
-DebuggerEngine *createLldbEngine(const DebuggerRunParameters &rp);
+DebuggerEngine *createCdbEngine(QStringList *error, DebuggerStartMode sm);
+DebuggerEngine *createGdbEngine(bool useTerminal, DebuggerStartMode sm);
+DebuggerEngine *createPdbEngine();
+DebuggerEngine *createQmlEngine(bool useTerminal);
+DebuggerEngine *createQmlCppEngine(DebuggerEngine *cppEngine, bool useTerminal);
+DebuggerEngine *createLldbEngine();
 
 } // namespace Internal
 
@@ -107,28 +109,22 @@ static QLatin1String engineTypeName(DebuggerEngineType et)
     return QLatin1String("No engine");
 }
 
-void DebuggerRunTool::prepare()
+void DebuggerRunTool::start()
 {
     Debugger::Internal::saveModeToRestore();
     Debugger::selectPerspective(Debugger::Constants::CppPerspectiveId);
     TaskHub::clearTasks(Debugger::Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
     TaskHub::clearTasks(Debugger::Constants::TASK_CATEGORY_DEBUGGER_RUNTIME);
 
-    m_engine->prepare();
-}
-
-void DebuggerRunTool::start()
-{
     DebuggerEngine *engine = m_engine;
+
     QTC_ASSERT(engine, return);
     const DebuggerRunParameters &rp = engine->runParameters();
     // User canceled input dialog asking for executable when working on library project.
     if (rp.startMode == StartInternal
             && rp.inferior.executable.isEmpty()
             && rp.interpreter.isEmpty()) {
-        appendMessage(tr("No executable specified.") + QLatin1Char('\n'), ErrorMessageFormat);
-        runControl()->reportApplicationStart();
-        runControl()->reportApplicationStop();
+        reportFailure(tr("No executable specified.") + '\n');
         return;
     }
 
@@ -158,6 +154,7 @@ void DebuggerRunTool::start()
     }
 
     appendMessage(tr("Debugging starts") + QLatin1Char('\n'), NormalMessageFormat);
+    Internal::runControlStarted(this);
     engine->start();
 }
 
@@ -179,6 +176,7 @@ void DebuggerRunTool::notifyEngineRemoteSetupFinished(const RemoteSetupResult &r
 
 void DebuggerRunTool::stop()
 {
+    m_isDying = true;
     m_engine->quitDebugger();
 }
 
@@ -194,12 +192,24 @@ void DebuggerRunTool::onTargetFailure()
 
 void DebuggerRunTool::debuggingFinished()
 {
-    runControl()->reportApplicationStop();
+    Internal::runControlFinished(this);
+    appendMessage(tr("Debugging has finished"), NormalMessageFormat);
+    reportStopped();
 }
 
-DebuggerStartParameters &DebuggerRunTool::startParameters()
+DebuggerRunParameters &DebuggerRunTool::runParameters()
 {
-    return m_engine->runParameters();
+    return m_runParameters;
+}
+
+const DebuggerRunParameters &DebuggerRunTool::runParameters() const
+{
+    return m_runParameters;
+}
+
+int DebuggerRunTool::portsUsedByDebugger() const
+{
+    return isCppDebugging() + isQmlDebugging();
 }
 
 void DebuggerRunTool::notifyInferiorIll()
@@ -214,6 +224,7 @@ void DebuggerRunTool::notifyInferiorExited()
 
 void DebuggerRunTool::quitDebugger()
 {
+    m_isDying = true;
     m_engine->quitDebugger();
 }
 
@@ -231,35 +242,46 @@ void DebuggerRunTool::abortDebugger()
 namespace Internal {
 
 // Re-used for Combined C++/QML engine.
-DebuggerEngine *createEngine(DebuggerEngineType et, const DebuggerRunParameters &rp, QStringList *errors)
+DebuggerEngine *createEngine(DebuggerEngineType cppEngineType,
+                             DebuggerEngineType et,
+                             DebuggerStartMode sm,
+                             bool useTerminal,
+                             QStringList *errors)
 {
     DebuggerEngine *engine = nullptr;
     switch (et) {
     case GdbEngineType:
-        engine = createGdbEngine(rp);
+        engine = createGdbEngine(useTerminal, sm);
         break;
     case CdbEngineType:
-        engine = createCdbEngine(rp, errors);
+        engine = createCdbEngine(errors, sm);
         break;
     case PdbEngineType:
-        engine = createPdbEngine(rp);
+        engine = createPdbEngine();
         break;
     case QmlEngineType:
-        engine = createQmlEngine(rp);
+        engine = createQmlEngine(useTerminal);
         break;
     case LldbEngineType:
-        engine = createLldbEngine(rp);
+        engine = createLldbEngine();
         break;
-    case QmlCppEngineType:
-        engine = createQmlCppEngine(rp, errors);
+    case QmlCppEngineType: {
+        DebuggerEngine *cppEngine = createEngine(cppEngineType, cppEngineType, sm, useTerminal, errors);
+        if (cppEngine) {
+            engine = createQmlCppEngine(cppEngine, useTerminal);
+        } else {
+            errors->append(DebuggerPlugin::tr("The slave debugging engine required for combined "
+                              "QML/C++-Debugging could not be created: %1"));
+        }
         break;
+    }
     default:
         errors->append(DebuggerPlugin::tr("Unknown debugger type \"%1\"")
                        .arg(engineTypeName(et)));
     }
     if (!engine)
         errors->append(DebuggerPlugin::tr("Unable to create a debugger engine of the type \"%1\"").
-                       arg(engineTypeName(rp.masterEngineType)));
+                       arg(engineTypeName(et)));
     return engine;
 }
 
@@ -485,10 +507,11 @@ static DebuggerRunConfigurationAspect *debuggerAspect(const RunControl *runContr
 /// DebuggerRunTool
 
 DebuggerRunTool::DebuggerRunTool(RunControl *runControl)
-    : ToolRunner(runControl),
+    : RunWorker(runControl),
       m_isCppDebugging(debuggerAspect(runControl)->useCppDebugger()),
       m_isQmlDebugging(debuggerAspect(runControl)->useQmlDebugger())
 {
+    setDisplayName("DebuggerRunTool");
 }
 
 DebuggerRunTool::DebuggerRunTool(RunControl *runControl, const DebuggerStartParameters &sp, QString *errorMessage)
@@ -510,11 +533,17 @@ void DebuggerRunTool::setStartParameters(const DebuggerStartParameters &sp, QStr
 
 void DebuggerRunTool::setRunParameters(const DebuggerRunParameters &rp, QString *errorMessage)
 {
-    DebuggerRunParameters m_rp = rp;
+    int portsUsed = portsUsedByDebugger();
+    if (portsUsed > device()->freePorts().count()) {
+        if (errorMessage)
+            *errorMessage = tr("Cannot debug: Not enough free ports available.");
+        return;
+    }
 
-    runControl()->setDisplayName(m_rp.displayName);
+    m_runParameters = rp;
+
     // QML and/or mixed are not prepared for it.
-    runControl()->setSupportsReRunning(!(m_rp.languages & QmlLanguage));
+    runControl()->setSupportsReRunning(!(rp.languages & QmlLanguage));
 
     runControl()->setIcon(ProjectExplorer::Icons::DEBUG_START_SMALL_TOOLBAR);
     runControl()->setPromptToStop([](bool *optionalPrompt) {
@@ -527,17 +556,40 @@ void DebuggerRunTool::setRunParameters(const DebuggerRunParameters &rp, QString 
                 QString(), QString(), optionalPrompt);
     });
 
-    if (Internal::fixupParameters(m_rp, runControl(), m_errors)) {
-        m_engine = createEngine(m_rp.masterEngineType, m_rp, &m_errors);
+    if (Internal::fixupParameters(m_runParameters, runControl(), m_errors)) {
+        m_engine = createEngine(m_runParameters.cppEngineType,
+                                m_runParameters.masterEngineType,
+                                m_runParameters.startMode,
+                                m_runParameters.useTerminal,
+                                &m_errors);
         if (!m_engine) {
             QString msg = m_errors.join('\n');
             if (errorMessage)
                 *errorMessage = msg;
             return;
         }
+
+        Utils::globalMacroExpander()->registerFileVariables(
+            "DebuggedExecutable", tr("Debugged executable"),
+            [this] { return m_runParameters.inferior.executable; }
+        );
     }
 
+    runControl()->setDisplayName(m_runParameters.displayName);
+
     m_engine->setRunTool(this);
+}
+
+DebuggerEngine *DebuggerRunTool::activeEngine() const
+{
+    return m_engine ? m_engine->activeEngine() : nullptr;
+}
+
+void DebuggerRunTool::appendSolibSearchPath(const QString &str)
+{
+    QString path = str;
+    path.replace("%{sysroot}", m_runParameters.sysRoot);
+    m_runParameters.solibSearchPath.append(path);
 }
 
 DebuggerRunTool::~DebuggerRunTool()
@@ -549,12 +601,6 @@ DebuggerRunTool::~DebuggerRunTool()
         engine->disconnect();
         delete engine;
     }
-}
-
-void DebuggerRunTool::onFinished()
-{
-    appendMessage(tr("Debugging has finished") + '\n', NormalMessageFormat);
-    runControlFinished(m_engine);
 }
 
 void DebuggerRunTool::showMessage(const QString &msg, int channel, int timeout)
@@ -595,8 +641,9 @@ public:
         QTC_ASSERT(runConfig, return 0);
         QTC_ASSERT(mode == DebugRunMode || mode == DebugRunModeWithBreakOnMain, return 0);
 
+        DebuggerStartParameters sp;
         auto runControl = new RunControl(runConfig, mode);
-        (void) new DebuggerRunTool(runControl, DebuggerStartParameters(), errorMessage);
+        (void) new DebuggerRunTool(runControl, sp, errorMessage);
         return runControl;
     }
 
@@ -666,10 +713,109 @@ RunControl *createAndScheduleRun(const DebuggerRunParameters &rp, Kit *kit)
     QTC_ASSERT(runConfig, return nullptr);
     auto runControl = new RunControl(runConfig, DebugRunMode);
     (void) new DebuggerRunTool(runControl, rp);
-    QTC_ASSERT(runControl, return nullptr);
     ProjectExplorerPlugin::startRunControl(runControl);
     return runControl;
 }
 
 } // Internal
+
+// GdbServerPortGatherer
+
+GdbServerPortsGatherer::GdbServerPortsGatherer(RunControl *runControl)
+    : RunWorker(runControl)
+{
+}
+
+GdbServerPortsGatherer::~GdbServerPortsGatherer()
+{
+}
+
+void GdbServerPortsGatherer::start()
+{
+    appendMessage(tr("Checking available ports..."), NormalMessageFormat);
+    connect(&m_portsGatherer, &DeviceUsedPortsGatherer::error, this, [this](const QString &msg) {
+        reportFailure(msg);
+    });
+    connect(&m_portsGatherer, &DeviceUsedPortsGatherer::portListReady, this, [this] {
+        Utils::PortList portList = device()->freePorts();
+        appendMessage(tr("Found %1 free ports").arg(portList.count()), NormalMessageFormat);
+        if (m_useGdbServer) {
+            m_gdbServerPort = m_portsGatherer.getNextFreePort(&portList);
+            if (!m_gdbServerPort.isValid()) {
+                reportFailure(tr("Not enough free ports on device for C++ debugging."));
+                return;
+            }
+        }
+        if (m_useQmlServer) {
+            m_qmlServerPort = m_portsGatherer.getNextFreePort(&portList);
+            if (!m_qmlServerPort.isValid()) {
+                reportFailure(tr("Not enough free ports on device for QML debugging."));
+                return;
+            }
+        }
+        reportStarted();
+    });
+    m_portsGatherer.start(device());
+}
+
+
+// GdbServerRunner
+
+GdbServerRunner::GdbServerRunner(RunControl *runControl)
+   : RunWorker(runControl)
+{
+    setDisplayName("GdbServerRunner");
+}
+
+GdbServerRunner::~GdbServerRunner()
+{
+}
+
+void GdbServerRunner::start()
+{
+    auto portsGatherer = runControl()->worker<GdbServerPortsGatherer>();
+    QTC_ASSERT(portsGatherer, reportFailure(); return);
+
+    StandardRunnable r = runnable().as<StandardRunnable>();
+    QStringList args = QtcProcess::splitArgs(r.commandLineArguments, OsTypeLinux);
+    QString command;
+
+    const bool isQmlDebugging = portsGatherer->useQmlServer();
+    const bool isCppDebugging = portsGatherer->useGdbServer();
+
+    if (isQmlDebugging) {
+        args.prepend(QmlDebug::qmlDebugTcpArguments(QmlDebug::QmlDebuggerServices,
+                                                    portsGatherer->qmlServerPort()));
+    }
+
+    if (isQmlDebugging && !isCppDebugging) {
+        command = r.executable;
+    } else {
+        command = device()->debugServerPath();
+        if (command.isEmpty())
+            command = "gdbserver";
+        args.clear();
+        args.append(QString("--multi"));
+        args.append(QString(":%1").arg(portsGatherer->gdbServerPort().number()));
+    }
+    r.executable = command;
+    r.commandLineArguments = QtcProcess::joinArgs(args, OsTypeLinux);
+
+    connect(&m_gdbServer, &ApplicationLauncher::error, this, [this] {
+        reportFailure(tr("GDBserver start failed"));
+    });
+    connect(&m_gdbServer, &ApplicationLauncher::remoteProcessStarted, this, [this] {
+        appendMessage(tr("GDBserver started") + '\n', NormalMessageFormat);
+        reportStarted();
+    });
+
+    appendMessage(tr("Starting GDBserver...") + '\n', NormalMessageFormat);
+    m_gdbServer.start(r, device());
+}
+
+void GdbServerRunner::stop()
+{
+    m_gdbServer.stop();
+}
+
 } // namespace Debugger

@@ -1,7 +1,7 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 BlackBerry Limited. All rights reserved.
-** Contact: KDAB (info@kdab.com)
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of Qt Creator.
 **
@@ -23,28 +23,12 @@
 **
 ****************************************************************************/
 
-#pragma once
+import QtQuick 2.6
+import QtQuick.Layouts 1.3
 
-#include <projectexplorer/runconfiguration.h>
-
-namespace Qnx {
-namespace Internal {
-
-class Slog2InfoRunner;
-
-class QnxRunControl : public ProjectExplorer::RunControl
-{
-    Q_OBJECT
-public:
-    explicit QnxRunControl(ProjectExplorer::RunConfiguration *runConfig);
-
-    void stop() override;
-
-private:
-    void printMissingWarning();
-
-    Slog2InfoRunner *m_slog2Info;
-};
-
-} // namespace Internal
-} // namespace Qnx
+StackLayout {
+    id: root
+    //property alias index: root.currentIndex
+    property bool interactive: true
+    default property alias contentData: root.data
+}

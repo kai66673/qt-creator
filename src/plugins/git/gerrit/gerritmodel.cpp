@@ -230,6 +230,7 @@ public:
 
     ~QueryContext();
     void start();
+    void terminate();
 
 signals:
     void resultRetrieved(const QByteArray &);
@@ -242,7 +243,6 @@ private:
     void timeout();
 
     void errorTermination(const QString &msg);
-    void terminate();
 
     QProcess m_process;
     QTimer m_timer;
@@ -498,10 +498,8 @@ QStandardItem *GerritModel::itemForNumber(int number) const
 
 void GerritModel::refresh(const QSharedPointer<GerritServer> &server, const QString &query)
 {
-    if (m_query) {
-        qWarning("%s: Another query is still running", Q_FUNC_INFO);
-        return;
-    }
+    if (m_query)
+        m_query->terminate();
     clearData();
     m_server = server;
 
@@ -655,7 +653,7 @@ static GerritChangePtr parseSshOutput(const QJsonObject &object)
           {
             "value": 0,
             "_account_id": 1000528,
-            "name": "André Hartmann",
+            "name": "Andre Hartmann",
             "email": "aha_1980@gmx.de"
           },
           {
@@ -684,7 +682,7 @@ static GerritChangePtr parseSshOutput(const QJsonObject &object)
           {
             "value": 0,
             "_account_id": 1000528,
-            "name": "André Hartmann",
+            "name": "Andre Hartmann",
             "email": "aha_1980@gmx.de"
           },
           {
@@ -799,7 +797,8 @@ static bool parseOutput(const QSharedPointer<GerritParameters> &parameters,
     } else {
         adaptedOutput = output;
         // Strip first line, which is )]}'
-        adaptedOutput.remove(0, adaptedOutput.indexOf("\n"));
+        if (adaptedOutput.startsWith(')'))
+            adaptedOutput.remove(0, adaptedOutput.indexOf("\n"));
     }
     bool res = true;
 

@@ -81,11 +81,9 @@ static int &currentToken()
 //
 ///////////////////////////////////////////////////////////////////////
 
-LldbEngine::LldbEngine(const DebuggerRunParameters &startParameters)
-    : DebuggerEngine(startParameters), m_continueAtNextSpontaneousStop(false)
+LldbEngine::LldbEngine()
 {
-    m_lastAgentId = 0;
-    setObjectName(QLatin1String("LldbEngine"));
+    setObjectName("LldbEngine");
 
     connect(action(AutoDerefPointers), &SavedAction::valueChanged,
             this, &LldbEngine::updateLocals);
@@ -165,7 +163,7 @@ void LldbEngine::shutdownEngine()
 
 void LldbEngine::abortDebugger()
 {
-    if (targetState() == DebuggerFinished) {
+    if (isDying()) {
         // We already tried. Try harder.
         showMessage("ABORTING DEBUGGER. SECOND TIME.");
         m_lldbProc.kill();
@@ -1116,9 +1114,9 @@ bool LldbEngine::hasCapability(unsigned cap) const
     return false;
 }
 
-DebuggerEngine *createLldbEngine(const DebuggerRunParameters &startParameters)
+DebuggerEngine *createLldbEngine()
 {
-    return new LldbEngine(startParameters);
+    return new LldbEngine;
 }
 
 void LldbEngine::notifyEngineRemoteSetupFinished(const RemoteSetupResult &result)

@@ -54,6 +54,7 @@ class TextEditorActionHandlerPrivate : public QObject
     Q_DECLARE_TR_FUNCTIONS(TextEditor::Internal::TextEditorActionHandler)
 public:
     TextEditorActionHandlerPrivate(TextEditorActionHandler *parent,
+                                   Core::Id editorId,
                                    Core::Id contextId,
                                    uint optionalActions);
 
@@ -121,6 +122,7 @@ public:
 
 public:
     TextEditorActionHandler *q = nullptr;
+    TextEditorActionHandler::TextEditorWidgetResolver m_findTextWidget;
     QAction *m_undoAction = nullptr;
     QAction *m_redoAction = nullptr;
     QAction *m_copyAction = nullptr;
@@ -184,13 +186,21 @@ public:
 
     uint m_optionalActions = TextEditorActionHandler::None;
     QPointer<TextEditorWidget> m_currentEditorWidget;
+    Core::Id m_editorId;
     Core::Id m_contextId;
 };
 
+static TextEditorWidget *castWidgetToTextEditorWidget(Core::IEditor *editor)
+{
+    return qobject_cast<TextEditorWidget *>(editor->widget());
+}
+
 TextEditorActionHandlerPrivate::TextEditorActionHandlerPrivate
-    (TextEditorActionHandler *parent, Core::Id contextId, uint optionalActions)
+    (TextEditorActionHandler *parent, Core::Id editorId, Core::Id contextId, uint optionalActions)
   : q(parent)
+  , m_findTextWidget(castWidgetToTextEditorWidget)
   , m_optionalActions(optionalActions)
+  , m_editorId(editorId)
   , m_contextId(contextId)
 {
     createActions();
@@ -462,32 +472,34 @@ void TextEditorActionHandlerPrivate::createActions()
 
     // Collect all modifying actions so we can check for them inside a readonly file
     // and disable them
-    m_modifyingActions << m_pasteAction;
-    m_modifyingActions << m_formatAction;
-    m_modifyingActions << m_rewrapParagraphAction;
+    m_modifyingActions << m_circularPasteAction;
     m_modifyingActions << m_cleanWhitespaceAction;
-    m_modifyingActions << m_unCommentSelectionAction;
+    m_modifyingActions << m_copyLineDownAction;
+    m_modifyingActions << m_copyLineUpAction;
     m_modifyingActions << m_cutLineAction;
-    m_modifyingActions << m_deleteLineAction;
     m_modifyingActions << m_deleteEndOfLineAction;
     m_modifyingActions << m_deleteEndOfWordAction;
     m_modifyingActions << m_deleteEndOfWordCamelCaseAction;
+    m_modifyingActions << m_deleteLineAction;
     m_modifyingActions << m_deleteStartOfLineAction;
     m_modifyingActions << m_deleteStartOfWordAction;
     m_modifyingActions << m_deleteStartOfWordCamelCaseAction;
-    m_modifyingActions << m_moveLineUpAction;
-    m_modifyingActions << m_moveLineDownAction;
-    m_modifyingActions << m_copyLineUpAction;
-    m_modifyingActions << m_copyLineDownAction;
-    m_modifyingActions << m_joinLinesAction;
+    m_modifyingActions << m_duplicateSelectionAction;
+    m_modifyingActions << m_duplicateSelectionAndCommentAction;
+    m_modifyingActions << m_formatAction;
+    m_modifyingActions << m_indentAction;
     m_modifyingActions << m_insertLineAboveAction;
     m_modifyingActions << m_insertLineBelowAction;
-    m_modifyingActions << m_upperCaseSelectionAction;
+    m_modifyingActions << m_joinLinesAction;
     m_modifyingActions << m_lowerCaseSelectionAction;
-    m_modifyingActions << m_circularPasteAction;
+    m_modifyingActions << m_moveLineDownAction;
+    m_modifyingActions << m_moveLineUpAction;
+    m_modifyingActions << m_pasteAction;
+    m_modifyingActions << m_rewrapParagraphAction;
     m_modifyingActions << m_switchUtf8bomAction;
-    m_modifyingActions << m_indentAction;
+    m_modifyingActions << m_unCommentSelectionAction;
     m_modifyingActions << m_unindentAction;
+    m_modifyingActions << m_upperCaseSelectionAction;
 
     // set enabled state of optional actions
     m_followSymbolAction->setEnabled(m_optionalActions & TextEditorActionHandler::FollowSymbolUnderCursor);
@@ -499,18 +511,22 @@ void TextEditorActionHandlerPrivate::createActions()
 
 void TextEditorActionHandlerPrivate::updateActions()
 {
-    QTC_ASSERT(m_currentEditorWidget, return);
-    bool isWritable = !m_currentEditorWidget->isReadOnly();
+    bool isWritable = m_currentEditorWidget && !m_currentEditorWidget->isReadOnly();
     foreach (QAction *a, m_modifyingActions)
         a->setEnabled(isWritable);
     m_formatAction->setEnabled((m_optionalActions & TextEditorActionHandler::Format) && isWritable);
     m_unCommentSelectionAction->setEnabled((m_optionalActions & TextEditorActionHandler::UnCommentSelection) && isWritable);
-    m_visualizeWhitespaceAction->setChecked(m_currentEditorWidget->displaySettings().m_visualizeWhitespace);
-    m_textWrappingAction->setChecked(m_currentEditorWidget->displaySettings().m_textWrapping);
+    m_visualizeWhitespaceAction->setEnabled(m_currentEditorWidget);
+    m_textWrappingAction->setEnabled(m_currentEditorWidget);
+    if (m_currentEditorWidget) {
+        m_visualizeWhitespaceAction->setChecked(
+                    m_currentEditorWidget->displaySettings().m_visualizeWhitespace);
+        m_textWrappingAction->setChecked(m_currentEditorWidget->displaySettings().m_textWrapping);
+    }
 
-    updateRedoAction(m_currentEditorWidget->document()->isRedoAvailable());
-    updateUndoAction(m_currentEditorWidget->document()->isUndoAvailable());
-    updateCopyAction(m_currentEditorWidget->textCursor().hasSelection());
+    updateRedoAction(m_currentEditorWidget && m_currentEditorWidget->document()->isRedoAvailable());
+    updateUndoAction(m_currentEditorWidget && m_currentEditorWidget->document()->isUndoAvailable());
+    updateCopyAction(m_currentEditorWidget && m_currentEditorWidget->textCursor().hasSelection());
 }
 
 void TextEditorActionHandlerPrivate::updateRedoAction(bool on)
@@ -525,9 +541,9 @@ void TextEditorActionHandlerPrivate::updateUndoAction(bool on)
 
 void TextEditorActionHandlerPrivate::updateCopyAction(bool hasCopyableText)
 {
-    QTC_ASSERT(m_currentEditorWidget, return);
     if (m_cutAction)
-        m_cutAction->setEnabled(hasCopyableText && !m_currentEditorWidget->isReadOnly());
+        m_cutAction->setEnabled(hasCopyableText && m_currentEditorWidget
+                                && !m_currentEditorWidget->isReadOnly());
     if (m_copyAction)
         m_copyAction->setEnabled(hasCopyableText);
 }
@@ -538,29 +554,28 @@ void TextEditorActionHandlerPrivate::updateCurrentEditor(Core::IEditor *editor)
         m_currentEditorWidget->disconnect(this);
     m_currentEditorWidget = 0;
 
-    // don't need to do anything if the editor's context doesn't match
-    // (our actions will be disabled because our context will not be active)
-    if (!editor || !editor->context().contains(m_contextId))
-        return;
-
-    TextEditorWidget *editorWidget = q->resolveTextEditorWidget(editor);
-    QTC_ASSERT(editorWidget, return); // editor has our context id, so shouldn't happen
-    m_currentEditorWidget = editorWidget;
-    connect(editorWidget, &QPlainTextEdit::undoAvailable,
-            this, &TextEditorActionHandlerPrivate::updateUndoAction);
-    connect(editorWidget, &QPlainTextEdit::redoAvailable,
-            this, &TextEditorActionHandlerPrivate::updateRedoAction);
-    connect(editorWidget, &QPlainTextEdit::copyAvailable,
-            this, &TextEditorActionHandlerPrivate::updateCopyAction);
-    connect(editorWidget, &TextEditorWidget::readOnlyChanged,
-            this, &TextEditorActionHandlerPrivate::updateActions);
+    if (editor && editor->document()->id() == m_editorId) {
+        TextEditorWidget *editorWidget = m_findTextWidget(editor);
+        QTC_ASSERT(editorWidget, return); // editor has our id, so shouldn't happen
+        m_currentEditorWidget = editorWidget;
+        connect(editorWidget, &QPlainTextEdit::undoAvailable,
+                this, &TextEditorActionHandlerPrivate::updateUndoAction);
+        connect(editorWidget, &QPlainTextEdit::redoAvailable,
+                this, &TextEditorActionHandlerPrivate::updateRedoAction);
+        connect(editorWidget, &QPlainTextEdit::copyAvailable,
+                this, &TextEditorActionHandlerPrivate::updateCopyAction);
+        connect(editorWidget, &TextEditorWidget::readOnlyChanged,
+                this, &TextEditorActionHandlerPrivate::updateActions);
+    }
     updateActions();
 }
 
 } // namespace Internal
 
-TextEditorActionHandler::TextEditorActionHandler(QObject *parent, Core::Id contextId, uint optionalActions)
-    : QObject(parent), d(new Internal::TextEditorActionHandlerPrivate(this, contextId, optionalActions))
+TextEditorActionHandler::TextEditorActionHandler(QObject *parent, Core::Id editorId,
+                                                 Core::Id contextId, uint optionalActions)
+    : QObject(parent), d(new Internal::TextEditorActionHandlerPrivate(this, editorId, contextId,
+                                                                      optionalActions))
 {
 }
 
@@ -569,9 +584,9 @@ TextEditorActionHandler::~TextEditorActionHandler()
     delete d;
 }
 
-TextEditorWidget *TextEditorActionHandler::resolveTextEditorWidget(Core::IEditor *editor) const
+void TextEditorActionHandler::setTextEditorWidgetResolver(const TextEditorWidgetResolver &resolver)
 {
-    return qobject_cast<TextEditorWidget *>(editor->widget());
+    d->m_findTextWidget = resolver;
 }
 
 } // namespace TextEditor

@@ -204,8 +204,7 @@ private:
 //
 ///////////////////////////////////////////////////////////////////////
 
-GdbEngine::GdbEngine(const DebuggerRunParameters &startParameters)
-  : DebuggerEngine(startParameters)
+GdbEngine::GdbEngine(bool useTerminal)
 {
     setObjectName("GdbEngine");
 
@@ -222,7 +221,7 @@ GdbEngine::GdbEngine(const DebuggerRunParameters &startParameters)
     m_pendingBreakpointRequests = 0;
     m_commandsDoneCallback = 0;
     m_stackNeeded = false;
-    m_terminalTrap = startParameters.useTerminal;
+    m_terminalTrap = useTerminal;
     m_systemDumpersLoaded = false;
     m_rerunPending = false;
     m_inUpdateLocals = false;
@@ -273,7 +272,7 @@ QString GdbEngine::errorMessage(QProcess::ProcessError error)
                 "permissions to invoke the program.\n%2")
                 .arg(runParameters().debugger.executable, m_gdbProc.errorString());
         case QProcess::Crashed:
-            if (targetState() == DebuggerFinished)
+            if (isDying())
                 return tr("The gdb process crashed some time after starting "
                     "successfully.");
             else
@@ -4086,7 +4085,7 @@ void GdbEngine::handleGdbFinished(int exitCode, QProcess::ExitStatus exitStatus)
 
 void GdbEngine::abortDebugger()
 {
-    if (targetState() == DebuggerFinished) {
+    if (isDying()) {
         // We already tried. Try harder.
         showMessage("ABORTING DEBUGGER. SECOND TIME.");
         m_gdbProc.kill();
@@ -4355,20 +4354,20 @@ void GdbEngine::debugLastCommand()
 // Factory
 //
 
-DebuggerEngine *createGdbEngine(const DebuggerRunParameters &rp)
+DebuggerEngine *createGdbEngine(bool useTerminal, DebuggerStartMode sm)
 {
-    switch (rp.startMode) {
+    switch (sm) {
     case AttachCore:
-        return new GdbCoreEngine(rp);
+        return new GdbCoreEngine(useTerminal);
     case StartRemoteProcess:
     case AttachToRemoteServer:
-        return new GdbRemoteServerEngine(rp);
+        return new GdbRemoteServerEngine(useTerminal);
     case AttachExternal:
-        return new GdbAttachEngine(rp);
+        return new GdbAttachEngine(useTerminal);
     default:
-        if (rp.useTerminal)
-            return new GdbTermEngine(rp);
-        return new GdbPlainEngine(rp);
+        if (useTerminal)
+            return new GdbTermEngine(useTerminal);
+        return new GdbPlainEngine(useTerminal);
     }
 }
 

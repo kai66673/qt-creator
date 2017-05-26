@@ -54,7 +54,7 @@ namespace Valgrind {
 namespace Internal {
 
 ValgrindToolRunner::ValgrindToolRunner(RunControl *runControl)
-    : ToolRunner(runControl)
+    : RunWorker(runControl)
 {
     runControl->setIcon(ProjectExplorer::Icons::ANALYZER_START_SMALL_TOOLBAR);
     runControl->setSupportsReRunning(false);

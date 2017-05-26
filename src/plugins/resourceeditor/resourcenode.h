@@ -34,7 +34,8 @@ namespace Internal { class ResourceFileWatcher; }
 class RESOURCE_EXPORT ResourceTopLevelNode : public ProjectExplorer::FolderNode
 {
 public:
-    ResourceTopLevelNode(const Utils::FileName &filePath, const QString &contents, FolderNode *parent);
+    ResourceTopLevelNode(const Utils::FileName &filePath, bool generated,
+                         const QString &contents, FolderNode *parent);
     ~ResourceTopLevelNode() override;
 
     void addInternalNodes();
@@ -55,7 +56,7 @@ public:
     QString contents() const { return m_contents; }
 
 private:
-    Internal::ResourceFileWatcher *m_document;
+    Internal::ResourceFileWatcher *m_document = nullptr;
     QString m_contents;
 };
 

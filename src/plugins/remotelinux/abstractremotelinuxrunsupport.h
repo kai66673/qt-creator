@@ -27,55 +27,28 @@
 
 #include "remotelinux_export.h"
 
-#include <projectexplorer/devicesupport/idevice.h>
 #include <projectexplorer/runconfiguration.h>
-
-#include <utils/port.h>
 
 namespace RemoteLinux {
 
-namespace Internal { class AbstractRemoteLinuxRunSupportPrivate; }
-
-class REMOTELINUX_EXPORT AbstractRemoteLinuxRunSupport : public ProjectExplorer::TargetRunner
+class REMOTELINUX_EXPORT FifoGatherer : public ProjectExplorer::RunWorker
 {
     Q_OBJECT
 
 public:
-    enum State
-    {
-        Inactive,
-        GatheringResources,
-        StartingRunner,
-        Running
-    };
+    explicit FifoGatherer(ProjectExplorer::RunControl *runControl);
+    ~FifoGatherer();
 
-    explicit AbstractRemoteLinuxRunSupport(ProjectExplorer::RunControl *runControl);
-    ~AbstractRemoteLinuxRunSupport();
-
-    ProjectExplorer::ApplicationLauncher *applicationLauncher();
-
-    void setState(State state);
-    State state() const;
-
-    void setFinished();
-
-    void startPortsGathering();
-    Utils::Port findPort() const;
-
-    void createRemoteFifo();
-    QString fifo() const;
-
-    void reset();
-
-signals:
-    void adapterSetupFailed(const QString &error);
-    void executionStartRequested();
+    QString fifo() const { return m_fifo; }
 
 private:
-    void handleResourcesError(const QString &message);
-    void handleResourcesAvailable();
+    void start() override;
+    void onFinished() override;
 
-    Internal::AbstractRemoteLinuxRunSupportPrivate * const d;
+    void createRemoteFifo();
+
+    ProjectExplorer::ApplicationLauncher m_fifoCreator;
+    QString m_fifo;
 };
 
 } // namespace RemoteLinux

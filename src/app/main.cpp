@@ -161,7 +161,7 @@ static const char *setHighDpiEnvironmentVariable()
 {
     const char* envVarName = 0;
     static const char ENV_VAR_QT_DEVICE_PIXEL_RATIO[] = "QT_DEVICE_PIXEL_RATIO";
-    if (Utils::HostOsInfo().isWindowsHost()
+    if (!Utils::HostOsInfo().isMacHost()
             && !qEnvironmentVariableIsSet(ENV_VAR_QT_DEVICE_PIXEL_RATIO) // legacy in 5.6, but still functional
             && !qEnvironmentVariableIsSet("QT_AUTO_SCREEN_SCALE_FACTOR")
             && !qEnvironmentVariableIsSet("QT_SCALE_FACTOR")
@@ -218,6 +218,25 @@ static inline QStringList getPluginPaths()
     pluginPath += QLatin1String(Core::Constants::IDE_VERSION_LONG);
     rc.push_back(pluginPath);
     return rc;
+}
+
+static void setupInstallSettings()
+{
+    // Check if the default install settings contain a setting for the actual install settings.
+    // This can be an absolute path, or a path relative to applicationDirPath().
+    // The result is interpreted like -settingspath, but for SystemScope
+    static const char kInstallSettingsKey[] = "Settings/InstallSettings";
+    QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope,
+                       QCoreApplication::applicationDirPath() + '/' + RELATIVE_DATA_PATH);
+    QSettings installSettings(QSettings::IniFormat, QSettings::UserScope,
+                              QLatin1String(Core::Constants::IDE_SETTINGSVARIANT_STR),
+                              QLatin1String("QtCreator"));
+    if (installSettings.contains(kInstallSettingsKey)) {
+        QString installSettingsPath = installSettings.value(kInstallSettingsKey).toString();
+        if (QDir::isRelativePath(installSettingsPath))
+            installSettingsPath = QCoreApplication::applicationDirPath() + '/' + installSettingsPath;
+        QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, installSettingsPath);
+    }
 }
 
 static QSettings *createUserSettings()
@@ -280,6 +299,9 @@ void loadFonts()
 
 int main(int argc, char **argv)
 {
+    if (Utils::HostOsInfo::isLinuxHost())
+        QApplication::setAttribute(Qt::AA_DontUseNativeMenuBar);
+
     Utils::TemporaryDirectory::setMasterTemporaryDirectory(QDir::tempPath() + "/QtCreator-XXXXXX");
 
     const char *highDpiEnvironmentVariable = setHighDpiEnvironmentVariable();
@@ -360,9 +382,8 @@ int main(int argc, char **argv)
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsPath);
 
     // Must be done before any QSettings class is created
-    QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope,
-                       QCoreApplication::applicationDirPath() + '/' + RELATIVE_DATA_PATH);
     QSettings::setDefaultFormat(QSettings::IniFormat);
+    setupInstallSettings();
     // plugin manager takes control of this settings object
     QSettings *settings = userSettings();
 

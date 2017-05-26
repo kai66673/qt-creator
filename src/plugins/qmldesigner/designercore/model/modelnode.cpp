@@ -313,6 +313,13 @@ QString ModelNode::simplifiedTypeName() const
     return QString::fromUtf8(type().split('.').last());
 }
 
+QString ModelNode::displayName() const
+{
+    if (hasId())
+        return id();
+    return simplifiedTypeName();
+}
+
 /*! \brief Returns whether the node is valid
 
 A node is valid if its model still exists, and contains this node.
@@ -1169,6 +1176,22 @@ bool ModelNode::isSubclassOf(const TypeName &typeName, int majorVersion, int min
         return metaInfo().isSubclassOf(typeName, majorVersion, minorVersion);
 
     return false;
+}
+
+QIcon ModelNode::typeIcon() const
+{
+    if (isValid()) {
+        // if node has no own icon, search for it in the itemlibrary
+        const ItemLibraryInfo *libraryInfo = model()->metaInfo().itemLibraryInfo();
+        QList <ItemLibraryEntry> itemLibraryEntryList = libraryInfo->entriesForType(
+                    type(), majorVersion(), minorVersion());
+        if (!itemLibraryEntryList.isEmpty())
+            return itemLibraryEntryList.first().typeIcon();
+        else if (metaInfo().isValid())
+            return QIcon(QStringLiteral(":/ItemLibrary/images/item-default-icon.png"));
+    }
+
+    return QIcon(QStringLiteral(":/ItemLibrary/images/item-invalid-icon.png"));
 }
 
 }

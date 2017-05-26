@@ -222,7 +222,8 @@ void ResourceEditorPlugin::extensionsInitialized()
             FolderNode *const pn = file->parentFolderNode();
             QTC_ASSERT(pn, continue);
             const Utils::FileName path = file->filePath();
-            pn->replaceSubtree(file, new ResourceTopLevelNode(path, QString(), pn));
+            pn->replaceSubtree(file, new ResourceTopLevelNode(path, file->isGenerated(),
+                                                              QString(), pn));
         }
     });
 }
@@ -286,6 +287,7 @@ void ResourceEditorPlugin::removeFileContextMenu()
     QTC_ASSERT(rfn, return);
     QString path = rfn->filePath().toString();
     FolderNode *parent = rfn->parentFolderNode();
+    QTC_ASSERT(parent, return);
     if (!parent->removeFiles(QStringList() << path))
         QMessageBox::warning(Core::ICore::mainWindow(),
                              tr("File Removal Failed"),

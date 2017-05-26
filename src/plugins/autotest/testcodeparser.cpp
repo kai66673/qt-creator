@@ -24,7 +24,6 @@
 ****************************************************************************/
 
 #include "autotestconstants.h"
-#include "autotest_utils.h"
 #include "autotestplugin.h"
 #include "testcodeparser.h"
 #include "testframeworkmanager.h"
@@ -55,9 +54,12 @@ static Q_LOGGING_CATEGORY(LOG, "qtc.autotest.testcodeparser")
 namespace Autotest {
 namespace Internal {
 
+using namespace ProjectExplorer;
+
 TestCodeParser::TestCodeParser(TestTreeModel *parent)
     : QObject(parent),
-      m_model(parent)
+      m_model(parent),
+      m_threadPool(new QThreadPool(this))
 {
     // connect to ProgressManager to postpone test parsing when CppModelManager is parsing
     auto progressManager = qobject_cast<Core::ProgressManager *>(Core::ProgressManager::instance());
@@ -76,6 +78,7 @@ TestCodeParser::TestCodeParser(TestTreeModel *parent)
     connect(this, &TestCodeParser::parsingFinished, this, &TestCodeParser::releaseParserInternals);
     m_reparseTimer.setSingleShot(true);
     connect(&m_reparseTimer, &QTimer::timeout, this, &TestCodeParser::parsePostponedFiles);
+    m_threadPool->setMaxThreadCount(std::max(QThread::idealThreadCount()/4, 1));
 }
 
 TestCodeParser::~TestCodeParser()
@@ -100,7 +103,7 @@ void TestCodeParser::setState(State state)
     }
     m_parserState = state;
 
-    if (m_parserState == Idle && ProjectExplorer::SessionManager::startupProject()) {
+    if (m_parserState == Idle && SessionManager::startupProject()) {
         if (m_fullUpdatePostponed || m_dirty) {
             emitUpdateTestTree();
         } else if (m_partialUpdatePostponed) {
@@ -160,7 +163,7 @@ void TestCodeParser::updateTestTree(ITestParser *parser)
         return;
     }
 
-    if (!ProjectExplorer::SessionManager::startupProject())
+    if (!SessionManager::startupProject())
         return;
 
     m_fullUpdatePostponed = false;
@@ -201,10 +204,10 @@ void TestCodeParser::onDocumentUpdated(const QString &fileName)
     if (m_codeModelParsing || m_fullUpdatePostponed)
         return;
 
-    ProjectExplorer::Project *project = ProjectExplorer::SessionManager::startupProject();
+    Project *project = SessionManager::startupProject();
     if (!project)
         return;
-    if (!project->files(ProjectExplorer::Project::SourceFiles).contains(fileName))
+    if (!SessionManager::projectContainsFile(project, Utils::FileName::fromString(fileName)))
         return;
 
     scanForTests(QStringList(fileName));
@@ -222,7 +225,7 @@ void TestCodeParser::onQmlDocumentUpdated(const QmlJS::Document::Ptr &document)
         onDocumentUpdated(fileName);
 }
 
-void TestCodeParser::onStartupProjectChanged(ProjectExplorer::Project *project)
+void TestCodeParser::onStartupProjectChanged(Project *project)
 {
     if (m_parserState == FullParse || m_parserState == PartialParse) {
         qCDebug(LOG) << "Canceling scanForTest (startup project changed)";
@@ -233,9 +236,9 @@ void TestCodeParser::onStartupProjectChanged(ProjectExplorer::Project *project)
         emitUpdateTestTree();
 }
 
-void TestCodeParser::onProjectPartsUpdated(ProjectExplorer::Project *project)
+void TestCodeParser::onProjectPartsUpdated(Project *project)
 {
-    if (project != ProjectExplorer::SessionManager::startupProject())
+    if (project != SessionManager::startupProject())
         return;
     if (m_codeModelParsing)
         m_fullUpdatePostponed = true;
@@ -334,12 +337,12 @@ void TestCodeParser::scanForTests(const QStringList &fileList, ITestParser *pars
     m_reparseTimerTimedOut = false;
     m_postponedFiles.clear();
     bool isFullParse = fileList.isEmpty();
-    ProjectExplorer::Project *project = ProjectExplorer::SessionManager::startupProject();
+    Project *project = SessionManager::startupProject();
     if (!project)
         return;
     QStringList list;
     if (isFullParse) {
-        list = project->files(ProjectExplorer::Project::SourceFiles);
+        list = project->files(Project::SourceFiles);
         if (list.isEmpty()) {
             // at least project file should be there, but might happen if parsing current project
             // takes too long, especially when opening sessions holding multiple projects
@@ -402,6 +405,7 @@ void TestCodeParser::scanForTests(const QStringList &fileList, ITestParser *pars
             parseFileForTests(codeParsers, fi, file);
         },
         Utils::MapReduceOption::Unordered,
+        m_threadPool,
         QThread::LowestPriority);
     m_futureWatcher.setFuture(future);
     if (list.size() > 5) {

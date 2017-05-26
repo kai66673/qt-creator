@@ -358,14 +358,15 @@ void QmakeProject::updateQmlJSCodeModel()
         projectInfo.activeResourceFiles.append(exactResources);
         projectInfo.allResourceFiles.append(exactResources);
         projectInfo.allResourceFiles.append(cumulativeResources);
+        QString errorMessage;
         foreach (const QString &rc, exactResources) {
             QString contents;
-            if (m_qmakeVfs->readVirtualFile(rc, QMakeVfs::VfsExact, &contents))
+            if (m_qmakeVfs->readFile(rc, QMakeVfs::VfsExact, &contents, &errorMessage) == QMakeVfs::ReadOk)
                 projectInfo.resourceFileContents[rc] = contents;
         }
         foreach (const QString &rc, cumulativeResources) {
             QString contents;
-            if (m_qmakeVfs->readVirtualFile(rc, QMakeVfs::VfsCumulative, &contents))
+            if (m_qmakeVfs->readFile(rc, QMakeVfs::VfsCumulative, &contents, &errorMessage) == QMakeVfs::ReadOk)
                 projectInfo.resourceFileContents[rc] = contents;
         }
         if (!hasQmlLib) {
@@ -610,6 +611,7 @@ QStringList QmakeProject::filesGeneratedFrom(const QString &input) const
 
     if (const FileNode *file = fileNodeOf(rootProjectNode(), FileName::fromString(input))) {
         const QmakeProFileNode *pro = static_cast<QmakeProFileNode *>(file->parentFolderNode());
+        QTC_ASSERT(pro, return {});
         if (const QmakeProFile *proFile = pro->proFile())
             return Utils::transform(proFile->generatedFiles(FileName::fromString(pro->buildDir()),
                                                             file->filePath(), file->fileType()),
@@ -1279,12 +1281,18 @@ void QmakeProject::testToolChain(ToolChain *tc, const Utils::FileName &path) con
     if (!env.isSameExecutable(path.toString(), expected.toString())) {
         const QPair<Utils::FileName, Utils::FileName> pair = qMakePair(expected, path);
         if (!m_toolChainWarnings.contains(pair)) {
-            TaskHub::addTask(Task(Task::Warning,
-                                  QCoreApplication::translate("QmakeProjectManager", "\"%1\" is used by qmake, but \"%2\" is configured in the kit.\n"
-                                                              "Please update your kit or choose a mkspec for qmake that matches your target environment better.").
-                                  arg(path.toUserOutput()).arg(expected.toUserOutput()),
-                                  Utils::FileName(), -1, ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
-            m_toolChainWarnings.insert(pair);
+            // Suppress warnings on Apple machines where compilers in /usr/bin point into Xcode.
+            // This will suppress some valid warnings, but avoids annoying Apple users with
+            // spurious warnings all the time!
+            if (!pair.first.toString().startsWith("/usr/bin/")
+                    || !pair.second.toString().contains("/Contents/Developer/Toolchains/")) {
+                TaskHub::addTask(Task(Task::Warning,
+                                      QCoreApplication::translate("QmakeProjectManager", "\"%1\" is used by qmake, but \"%2\" is configured in the kit.\n"
+                                                                                         "Please update your kit or choose a mkspec for qmake that matches your target environment better.").
+                                      arg(path.toUserOutput()).arg(expected.toUserOutput()),
+                                      Utils::FileName(), -1, ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
+                m_toolChainWarnings.insert(pair);
+            }
         }
     }
 }

@@ -70,8 +70,9 @@ public:
     {
         if (type == TypePermissions)
             return true;
-        auto newNode = new ResourceTopLevelNode(m_node->filePath(), m_node->contents(),
-                                                m_node->parentFolderNode());
+        FolderNode *parent = m_node->parentFolderNode();
+        QTC_ASSERT(parent, return false);
+        auto newNode = new ResourceTopLevelNode(m_node->filePath(), false, m_node->contents(), parent);
         m_node->parentFolderNode()->replaceSubtree(m_node, newNode);
         return true;
     }
@@ -145,7 +146,6 @@ static bool addFilesToResource(const FileName &resourceFile,
         }
     }
 
-    FileChangeBlocker changeGuard(resourceFile.toString());
     file.save();
 
     return true;
@@ -263,17 +263,21 @@ bool SimpleResourceFolderNode::renameFile(const QString &filePath, const QString
 
 } // Internal
 
-ResourceTopLevelNode::ResourceTopLevelNode(const FileName &filePath, const QString &contents,
-                                           FolderNode *parent)
+ResourceTopLevelNode::ResourceTopLevelNode(const FileName &filePath, bool generated,
+                                           const QString &contents, FolderNode *parent)
     : FolderNode(filePath)
 {
+    setIsGenerated(generated);
     setIcon(FileIconProvider::icon(filePath.toString()));
-    if (contents.isEmpty()) {
-        m_document = new ResourceFileWatcher(this);
-        DocumentManager::addDocument(m_document);
+    setPriority(Node::DefaultFilePriority);
+    if (!filePath.isEmpty()) {
+        QFileInfo fi = filePath.toFileInfo();
+        if (fi.isFile() && fi.isReadable()) {
+            m_document = new ResourceFileWatcher(this);
+            DocumentManager::addDocument(m_document);
+        }
     } else {
         m_contents = contents;
-        m_document = nullptr;
     }
 
     FileName base = parent->filePath();
@@ -414,7 +418,6 @@ bool ResourceTopLevelNode::addPrefix(const QString &prefix, const QString &lang)
     int index = file.addPrefix(prefix, lang);
     if (index == -1)
         return false;
-    FileChangeBlocker changeGuard(filePath().toString());
     file.save();
 
     return true;
@@ -429,7 +432,6 @@ bool ResourceTopLevelNode::removePrefix(const QString &prefix, const QString &la
         if (file.prefix(i) == prefix
                 && file.lang(i) == lang) {
             file.removePrefix(i);
-            FileChangeBlocker changeGuard(filePath().toString());
             file.save();
             return true;
         }
@@ -454,7 +456,6 @@ bool ResourceTopLevelNode::removeNonExistingFiles()
         }
     }
 
-    FileChangeBlocker changeGuard(filePath().toString());
     file.save();
     return true;
 }
@@ -549,7 +550,6 @@ bool ResourceFolderNode::removeFiles(const QStringList &filePaths, QStringList *
         file.removeFile(index, j);
         --j;
     }
-    FileChangeBlocker changeGuard(m_topLevelNode->filePath().toString());
     file.save();
 
     return true;
@@ -588,7 +588,6 @@ bool ResourceFolderNode::renameFile(const QString &filePath, const QString &newF
     for (int j = 0; j < file.fileCount(index); ++j) {
         if (file.file(index, j) == filePath) {
             file.replaceFile(index, j, newFilePath);
-            FileChangeBlocker changeGuard(m_topLevelNode->filePath().toString());
             file.save();
             return true;
         }
@@ -609,7 +608,6 @@ bool ResourceFolderNode::renamePrefix(const QString &prefix, const QString &lang
     if (!file.replacePrefixAndLang(index, prefix, lang))
         return false;
 
-    FileChangeBlocker changeGuard(m_topLevelNode->filePath().toString());
     file.save();
     return true;
 }

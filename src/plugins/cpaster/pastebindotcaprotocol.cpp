@@ -34,8 +34,8 @@
 #include <QJsonValue>
 #include <QJsonObject>
 
-static const char urlC[] = "http://pastebin.ca/";
-static const char internalUrlC[] = "http://pbin.ca/";
+static const char urlC[] = "https://pastebin.ca/";
+static const char internalUrlC[] = "https://pbin.ca/";
 static const char protocolNameC[] = "Pastebin.Ca";
 
 static inline QByteArray expiryValue(int expiryDays)
@@ -74,9 +74,9 @@ unsigned PasteBinDotCaProtocol::capabilities() const
 void PasteBinDotCaProtocol::fetch(const QString &id)
 {
     QTC_ASSERT(!m_fetchReply, return);
-    const QString url = QLatin1String(urlC);
+    const QString url = QLatin1String(internalUrlC);
     const QString rawPostFix = QLatin1String("raw/");
-    // Create link as ""http://pastebin.ca/raw/[id]"
+    // Create link as ""http://pbin.ca/raw/[id]"
     // If we get a complete URL, just insert 'raw', else build URL.
     QString link = id;
     if (link.startsWith(url)) {

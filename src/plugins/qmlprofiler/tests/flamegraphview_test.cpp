@@ -40,6 +40,8 @@ FlameGraphViewTest::FlameGraphViewTest(QObject *parent) : QObject(parent), view(
 
 void FlameGraphViewTest::initTestCase()
 {
+    connect(&view, &QmlProfilerEventsView::showFullRange,
+            this, [this](){ manager.restrictToRange(-1, -1); });
     FlameGraphModelTest::generateData(&manager);
     QCOMPARE(manager.state(), QmlProfilerModelManager::Done);
     view.resize(500, 500);
@@ -120,7 +122,7 @@ void FlameGraphViewTest::testContextMenu()
     QSignalSpy spy(&view, SIGNAL(showFullRange()));
 
     QTimer timer;
-    timer.setInterval(50);
+    timer.setInterval(500);
     int menuClicks = 0;
 
     connect(&timer, &QTimer::timeout, this, [&]() {
@@ -151,6 +153,7 @@ void FlameGraphViewTest::testContextMenu()
     QVERIFY(manager.isRestrictedToRange());
     QTRY_COMPARE(spy.count(), 1);
     QVERIFY(menuClicks > 1);
+    QVERIFY(!manager.isRestrictedToRange());
     timer.stop();
 }
 

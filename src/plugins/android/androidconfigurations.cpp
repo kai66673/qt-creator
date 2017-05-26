@@ -61,7 +61,9 @@
 #include <QDirIterator>
 #include <QFileInfo>
 #include <QHostAddress>
+#include <QLoggingCategory>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStringList>
 #include <QTcpSocket>
@@ -71,6 +73,10 @@
 
 using namespace ProjectExplorer;
 using namespace Utils;
+
+namespace {
+Q_LOGGING_CATEGORY(avdConfigLog, "qtc.android.androidconfig")
+}
 
 namespace Android {
 using namespace Internal;
@@ -114,6 +120,7 @@ namespace {
     const QLatin1String changeTimeStamp("ChangeTimeStamp");
 
     const QLatin1String sdkToolsVersionKey("Pkg.Revision");
+    const QLatin1String ndkRevisionKey("Pkg.Revision");
 
     static QString sdkSettingsFileName()
     {
@@ -758,6 +765,53 @@ FileName AndroidConfig::ndkLocation() const
     return m_ndkLocation;
 }
 
+QVersionNumber AndroidConfig::ndkVersion() const
+{
+    QVersionNumber version;
+    if (!m_ndkLocation.exists()) {
+        qCDebug(avdConfigLog) << "Can not find ndk version. Check NDK path."
+                              << m_ndkLocation.toString();
+        return version;
+    }
+
+    Utils::FileName ndkPropertiesPath(m_ndkLocation);
+    ndkPropertiesPath.appendPath("source.properties");
+    if (ndkPropertiesPath.exists()) {
+        // source.properties files exists in NDK version > 11
+        QSettings settings(ndkPropertiesPath.toString(), QSettings::IniFormat);
+        auto versionStr = settings.value(ndkRevisionKey).toString();
+        version = QVersionNumber::fromString(versionStr);
+    } else {
+        // No source.properties. There should be a file named RELEASE.TXT
+        Utils::FileName ndkReleaseTxtPath(m_ndkLocation);
+        ndkReleaseTxtPath.appendPath("RELEASE.TXT");
+        Utils::FileReader reader;
+        QString errorString;
+        if (reader.fetch(ndkReleaseTxtPath.toString(), &errorString)) {
+            // RELEASE.TXT contains the ndk version in either of the following formats:
+            // r6a
+            // r10e (64 bit)
+            QString content = QString::fromUtf8(reader.data());
+            QRegularExpression re("(r)(?<major>[0-9]{1,2})(?<minor>[a-z]{1,1})");
+            QRegularExpressionMatch match = re.match(content);
+            if (match.hasMatch()) {
+                QString major = match.captured("major");
+                QString minor = match.captured("minor");
+                // Minor version: a = 0, b = 1, c = 2 and so on.
+                // Int equivalent = minorVersionChar - 'a'. i.e. minorVersionChar - 97.
+                version = QVersionNumber::fromString(QString("%1.%2.0").arg(major)
+                                                     .arg((int)minor[0].toLatin1() - 97));
+            } else {
+                qCDebug(avdConfigLog) << "Can not find ndk version. Can not parse RELEASE.TXT."
+                                      << content;
+            }
+        } else {
+            qCDebug(avdConfigLog) << "Can not find ndk version." << errorString;
+        }
+    }
+    return version;
+}
+
 void AndroidConfig::setNdkLocation(const FileName &ndkLocation)
 {
     m_ndkLocation = ndkLocation;
@@ -947,9 +1001,16 @@ void AndroidConfigurations::removeOldToolChains()
 
 void AndroidConfigurations::updateAutomaticKitList()
 {
-    const QList<Kit *> existingKits = Utils::filtered(KitManager::kits(), [](const Kit *k) {
-        return k->isAutoDetected() && !k->isSdkProvided()
-                && DeviceTypeKitInformation::deviceTypeId(k) == Core::Id(Constants::ANDROID_DEVICE_TYPE);
+    const QList<Kit *> existingKits = Utils::filtered(KitManager::kits(), [](Kit *k) {
+        Core::Id deviceTypeId = DeviceTypeKitInformation::deviceTypeId(k);
+        if (k->isAutoDetected() && !k->isSdkProvided()
+                && deviceTypeId == Core::Id(Constants::ANDROID_DEVICE_TYPE)) {
+            if (!QtSupport::QtKitInformation::qtVersion(k))
+                KitManager::deregisterKit(k); // Remove autoDetected kits without Qt.
+            else
+                return true;
+        }
+        return false;
     });
 
     // Update code for 3.0 beta, which shipped with a bug for the debugger settings
@@ -990,7 +1051,6 @@ void AndroidConfigurations::updateAutomaticKitList()
     }
 
     // register new kits
-    QList<Kit *> newKits;
     const QList<ToolChain *> tmp = ToolChainManager::toolChains([](const ToolChain *tc) {
         return tc->isAutoDetected()
             && tc->isValid()
@@ -1007,19 +1067,27 @@ void AndroidConfigurations::updateAutomaticKitList()
                                                                        [tc](AndroidToolChain *otherTc) {
             return tc->targetAbi() == otherTc->targetAbi();
         });
+
+        auto initBasicKitData = [allLanguages, device](Kit *k, const QtSupport::BaseQtVersion *qt) {
+            k->setAutoDetected(true);
+            k->setAutoDetectionSource("AndroidConfiguration");
+            DeviceTypeKitInformation::setDeviceTypeId(k, Core::Id(Constants::ANDROID_DEVICE_TYPE));
+            for (AndroidToolChain *tc : allLanguages)
+                ToolChainKitInformation::setToolChain(k, tc);
+            QtSupport::QtKitInformation::setQtVersion(k, qt);
+            DeviceKitInformation::setDevice(k, device);
+        };
+
         for (const QtSupport::BaseQtVersion *qt : qtVersionsForArch.value(tc->targetAbi())) {
             Kit *newKit = new Kit;
-            newKit->setAutoDetected(true);
-            newKit->setAutoDetectionSource("AndroidConfiguration");
-            DeviceTypeKitInformation::setDeviceTypeId(newKit, Core::Id(Constants::ANDROID_DEVICE_TYPE));
-            for (AndroidToolChain *tc : allLanguages)
-                ToolChainKitInformation::setToolChain(newKit, tc);
-            QtSupport::QtKitInformation::setQtVersion(newKit, qt);
-            DeviceKitInformation::setDevice(newKit, device);
-
-            auto findExistingKit = [newKit](const Kit *k) { return matchKits(newKit, k); };
-            Kit *existingKit = Utils::findOrDefault(existingKits, findExistingKit);
+            initBasicKitData(newKit, qt);
+            Kit *existingKit = Utils::findOrDefault(existingKits, [newKit](const Kit *k) {
+                return matchKits(newKit, k);
+            });
             if (existingKit) {
+                // Existing kit found.
+                // Update the existing kit with new data.
+                initBasicKitData(existingKit, qt);
                 KitManager::deleteKit(newKit);
                 newKit = existingKit;
             }

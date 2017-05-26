@@ -418,6 +418,10 @@ void AppOutputPane::createNewOutputWindow(RunControl *rc)
         delete tab.runControl;
         handleOldOutput(tab.window);
         tab.runControl = rc;
+
+        // Update the title.
+        m_tabWidget->setTabText(tabIndex, rc->displayName());
+
         tab.window->setFormatter(nullptr);
         tab.window->scrollToBottom();
         if (debug)
@@ -521,11 +525,16 @@ void AppOutputPane::attachToRunControl()
 void AppOutputPane::stopRunControl()
 {
     const int index = currentIndex();
-    QTC_ASSERT(index != -1 && m_runControlTabs.at(index).runControl->isRunning(), return);
-
+    QTC_ASSERT(index != -1, return);
     RunControl *rc = m_runControlTabs.at(index).runControl;
+    QTC_ASSERT(rc, return);
+
     if (rc->isRunning() && optionallyPromptToStop(rc))
         rc->initiateStop();
+    else if (rc->isStarting()) {
+        QTC_CHECK(false);
+        rc->initiateStop();
+    }
 
     if (debug)
         qDebug() << "OutputPane::stopRunControl " << rc;

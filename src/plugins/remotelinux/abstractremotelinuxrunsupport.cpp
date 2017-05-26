@@ -25,111 +25,36 @@
 
 #include "abstractremotelinuxrunsupport.h"
 
-#include <projectexplorer/devicesupport/deviceusedportsgatherer.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/runnables.h>
 #include <projectexplorer/target.h>
 
 #include <utils/environment.h>
 #include <utils/portlist.h>
+#include <utils/qtcprocess.h>
+
+#include <qmldebug/qmldebugcommandlinearguments.h>
 
 using namespace ProjectExplorer;
+using namespace Utils;
 
 namespace RemoteLinux {
-namespace Internal {
 
-class AbstractRemoteLinuxRunSupportPrivate
+// FifoGatherer
+
+FifoGatherer::FifoGatherer(RunControl *runControl)
+    : RunWorker(runControl)
 {
-public:
-    ApplicationLauncher launcher;
-    AbstractRemoteLinuxRunSupport::State state = AbstractRemoteLinuxRunSupport::Inactive;
-    DeviceUsedPortsGatherer portsGatherer;
-    ApplicationLauncher fifoCreator;
-    Utils::PortList portList;
-    QString fifo;
-};
+    setDisplayName("FifoGatherer");
+}
 
-} // namespace Internal
-
-using namespace Internal;
-
-AbstractRemoteLinuxRunSupport::AbstractRemoteLinuxRunSupport(RunControl *runControl)
-    : TargetRunner(runControl),
-      d(new AbstractRemoteLinuxRunSupportPrivate)
+FifoGatherer::~FifoGatherer()
 {
 }
 
-AbstractRemoteLinuxRunSupport::~AbstractRemoteLinuxRunSupport()
+void FifoGatherer::start()
 {
-    setFinished();
-    delete d;
-}
-
-ApplicationLauncher *AbstractRemoteLinuxRunSupport::applicationLauncher()
-{
-    return &d->launcher;
-}
-
-void AbstractRemoteLinuxRunSupport::setState(AbstractRemoteLinuxRunSupport::State state)
-{
-    d->state = state;
-}
-
-AbstractRemoteLinuxRunSupport::State AbstractRemoteLinuxRunSupport::state() const
-{
-    return d->state;
-}
-
-void AbstractRemoteLinuxRunSupport::handleResourcesError(const QString &message)
-{
-    QTC_ASSERT(d->state == GatheringResources, return);
-    setFinished();
-    reset();
-    emit adapterSetupFailed(message);
-}
-
-void AbstractRemoteLinuxRunSupport::handleResourcesAvailable()
-{
-    QTC_ASSERT(d->state == GatheringResources, return);
-
-    d->portList = device()->freePorts();
-    emit executionStartRequested();
-}
-
-void AbstractRemoteLinuxRunSupport::setFinished()
-{
-    if (d->state == Inactive)
-        return;
-    if (d->state == Running)
-        applicationLauncher()->stop();
-    d->state = Inactive;
-}
-
-Utils::Port AbstractRemoteLinuxRunSupport::findPort() const
-{
-    return d->portsGatherer.getNextFreePort(&d->portList);
-}
-
-QString AbstractRemoteLinuxRunSupport::fifo() const
-{
-    return d->fifo;
-}
-
-void AbstractRemoteLinuxRunSupport::startPortsGathering()
-{
-    QTC_ASSERT(d->state == Inactive, return);
-    d->state = GatheringResources;
-    connect(&d->portsGatherer, &DeviceUsedPortsGatherer::error,
-            this, &AbstractRemoteLinuxRunSupport::handleResourcesError);
-    connect(&d->portsGatherer, &DeviceUsedPortsGatherer::portListReady,
-            this, &AbstractRemoteLinuxRunSupport::handleResourcesAvailable);
-    d->portsGatherer.start(device());
-}
-
-void AbstractRemoteLinuxRunSupport::createRemoteFifo()
-{
-    QTC_ASSERT(d->state == Inactive, return);
-    d->state = GatheringResources;
+    appendMessage(tr("Creating remote socket...") + '\n', NormalMessageFormat);
 
     StandardRunnable r;
     r.executable = QLatin1String("/bin/sh");
@@ -140,34 +65,35 @@ void AbstractRemoteLinuxRunSupport::createRemoteFifo()
     QSharedPointer<QByteArray> output(new QByteArray);
     QSharedPointer<QByteArray> errors(new QByteArray);
 
-    connect(&d->fifoCreator, &ApplicationLauncher::finished,
+    connect(&m_fifoCreator, &ApplicationLauncher::finished,
             this, [this, output, errors](bool success) {
         if (!success) {
-            handleResourcesError(QString("Failed to create fifo: %1").arg(QLatin1String(*errors)));
+            reportFailure(QString("Failed to create fifo: %1").arg(QLatin1String(*errors)));
         } else {
-            d->fifo = QString::fromLatin1(*output);
-            handleResourcesAvailable();
+            m_fifo = QString::fromLatin1(*output);
+            appendMessage(tr("Created fifo: %1").arg(m_fifo), NormalMessageFormat);
+            reportStarted();
         }
     });
 
-    connect(&d->fifoCreator, &ApplicationLauncher::remoteStdout,
+    connect(&m_fifoCreator, &ApplicationLauncher::remoteStdout,
             this, [output](const QByteArray &data) {
         output->append(data);
     });
 
-    connect(&d->fifoCreator, &ApplicationLauncher::remoteStderr,
-            this, [errors](const QByteArray &data) {
-        errors->append(data);
+    connect(&m_fifoCreator, &ApplicationLauncher::remoteStderr,
+            this, [this, errors](const QByteArray &) {
+            reportFailure();
+//        errors->append(data);
     });
 
-    d->fifoCreator.start(r, device());
+    m_fifoCreator.start(r, device());
 }
 
-void AbstractRemoteLinuxRunSupport::reset()
+void FifoGatherer::onFinished()
 {
-    d->portsGatherer.disconnect(this);
-    applicationLauncher()->disconnect(this);
-    d->state = Inactive;
+    m_fifoCreator.stop();
 }
+
 
 } // namespace RemoteLinux

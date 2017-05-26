@@ -152,27 +152,18 @@ class ReportItem:
 
 
 def warn(message):
-    print('bridgemessage={msg="%s"},' % message.replace('"', '$').encode('latin1'))
+    DumperBase.warn(message)
 
 def xwarn(message):
-    print('bridgemessage={msg="%s"},' % message.replace('"', '$').encode('latin1'))
+    warn(message)
     import traceback
     traceback.print_stack()
-
 
 def error(message):
     raise RuntimeError(message)
 
-
 def showException(msg, exType, exValue, exTraceback):
-    warn('**** CAUGHT EXCEPTION: %s ****' % msg)
-    try:
-        import traceback
-        for line in traceback.format_exception(exType, exValue, exTraceback):
-            warn('%s' % line)
-    except:
-        pass
-
+    DumperBase.showException(msg, exType, exValue, exTraceback)
 
 class Children:
     def __init__(self, d, numChild = 1, childType = None, childNumChild = None,
@@ -248,6 +239,20 @@ class UnnamedSubItem(SubItem):
         self.name = None
 
 class DumperBase:
+    @staticmethod
+    def warn(message):
+        print('bridgemessage={msg="%s"},' % message.replace('"', '$').encode('latin1'))
+
+    @staticmethod
+    def showException(msg, exType, exValue, exTraceback):
+        warn('**** CAUGHT EXCEPTION: %s ****' % msg)
+        try:
+            import traceback
+            for line in traceback.format_exception(exType, exValue, exTraceback):
+                warn('%s' % line)
+        except:
+            pass
+
     def __init__(self):
         self.isCdb = False
         self.isGdb = False
@@ -1320,11 +1325,12 @@ class DumperBase:
         derefValue.name = '*'
         self.putItem(derefValue)
         self.currentChildType = savedCurrentChildType
-        self.putOriginalAddress(value.pointer())
 
     def putFormattedPointerX(self, value):
+        self.putOriginalAddress(value.address())
         #warn("PUT FORMATTED: %s" % value)
         pointer = value.pointer()
+        self.putAddress(pointer)
         #warn('POINTER: 0x%x' % pointer)
         if pointer == 0:
             #warn('NULL POINTER')
@@ -1384,7 +1390,7 @@ class DumperBase:
             n = (10, 100, 1000, 10000)[displayFormat - Array10Format]
             self.putType(typeName)
             self.putItemCount(n)
-            self.putArrayData(value.address(), n, innerType)
+            self.putArrayData(value.pointer(), n, innerType)
             return
 
         if innerType.code == TypeCodeFunction:
@@ -2671,7 +2677,6 @@ class DumperBase:
         typeName = typeobj.name
 
         self.addToCache(typeobj) # Fill type cache
-        self.putAddress(value.address())
 
         if not value.lIsInScope:
             self.putSpecialValue('optimizedout')
@@ -2685,6 +2690,10 @@ class DumperBase:
 
         # Try on possibly typedefed type first.
         if self.tryPutPrettyItem(typeName, value):
+            if typeobj.code == TypeCodePointer:
+                self.putOriginalAddress(value.address())
+            else:
+                self.putAddress(value.address())
             return
 
         if typeobj.code == TypeCodeTypedef:
@@ -2696,6 +2705,8 @@ class DumperBase:
         if typeobj.code == TypeCodePointer:
             self.putFormattedPointer(value)
             return
+
+        self.putAddress(value.address())
 
         if typeobj.code == TypeCodeFunction:
             #warn('FUNCTION VALUE: %s' % value)
@@ -3142,7 +3153,7 @@ class DumperBase:
             if self.dumper.isInt(other):
                 stripped = self.type.stripTypedefs()
                 if stripped.code == TypeCodePointer:
-                    address = self.pointer() + stripped.dereference().size()
+                    address = self.pointer() + stripped.dereference().size() * other
                     val = self.dumper.Value(self.dumper)
                     val.laddress = None
                     val.ldata = bytes(struct.pack(self.dumper.packCode + 'Q', address))

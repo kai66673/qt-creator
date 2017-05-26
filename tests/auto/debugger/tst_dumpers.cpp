@@ -473,6 +473,13 @@ struct RequiredMessage
     QString message;
 };
 
+struct DumperOptions
+{
+    DumperOptions(const QString &opts = QString()) : options(opts) {}
+
+    QString options;
+};
+
 struct Check
 {
     Check() {}
@@ -699,6 +706,12 @@ public:
         return *this;
     }
 
+    const Data &operator+(const DumperOptions &options) const
+    {
+        dumperOptions += options.options;
+        return *this;
+    }
+
     const Data &operator+(const Profile &profile) const
     {
         profileExtra += profile.contents;
@@ -921,6 +934,7 @@ public:
     mutable QString mainFile = "main.cpp";
     mutable QString projectFile = "doit.pro";
 
+    mutable QString dumperOptions;
     mutable QString profileExtra;
     mutable QString includes;
     mutable QString code;
@@ -1442,6 +1456,10 @@ void tst_Dumpers::dumper()
     QStringList args;
     QString cmds;
 
+    QString dumperOptions = data.dumperOptions;
+    if (!dumperOptions.isEmpty() && !dumperOptions.endsWith(','))
+        dumperOptions += ',';
+
     if (m_debuggerEngine == GdbEngine) {
         const QFileInfo gdbBinaryFile(exe);
         const QString uninstalledData = gdbBinaryFile.absolutePath()
@@ -1465,7 +1483,7 @@ void tst_Dumpers::dumper()
                 "python theDumper.setupDumpers()\n"
                 "run " + nograb + "\n"
                 "up " + QString::number(data.skipLevels) + "\n"
-                "python theDumper.fetchVariables({"
+                "python theDumper.fetchVariables({" + dumperOptions +
                     "'token':2,'fancy':1,'forcens':1,"
                     "'autoderef':1,'dyntype':1,'passexceptions':1,"
                     "'testing':1,'qobjectnames':1,"
@@ -5320,6 +5338,18 @@ void tst_Dumpers::dumper_data()
                + Check("a2.3", "[3]", "100", "char");
 
 
+    QTest::newRow("Array10Format")
+            << Data("",
+                    "int arr[4] = { 1, 2, 3, 4};\n"
+                    "int *nums = new int[4] { 1, 2, 3, 4};\n")
+
+                + NoLldbEngine // FIXME: DumperOptions not handled yet.
+                + DumperOptions("'formats':{'local.nums':12}") // Array10Format
+
+                + Check("arr.1", "[1]", "2", "int")
+                + Check("nums.1", "[1]", "2", "int");
+
+
     QTest::newRow("ArrayQt")
             << Data("#include <QByteArray>\n"
                     "#include <QString>\n" + fooData,
@@ -6746,6 +6776,32 @@ void tst_Dumpers::dumper_data()
             + Check("tc.1.bar", "15", "int")
             + Check("tc.2.bar", "15", "int")
             + Check("tc.3.bar", "15", "int");
+
+
+    QTest::newRow("BufArray")
+            << Data("#include <new>\n"
+                    "static int c = 0;\n"
+                    "struct Foo { int bar = c++; int baz = c++; };\n"
+                    "template<class T>\n"
+                    "struct QtcDumperTest_BufArray {\n"
+                    "   const int objSize = int(sizeof(T));\n"
+                    "   const int count = 10;\n"
+                    "   char *buffer;\n"
+                    "   QtcDumperTest_BufArray() {\n"
+                    "      buffer = new char[count * objSize];\n"
+                    "      for (int i = 0; i < count; ++i)\n"
+                    "         new(buffer + i * objSize) T;\n"
+                    "   }\n"
+                    "   ~QtcDumperTest_BufArray() { delete[] buffer; }\n"
+                    "};\n\n",
+                    "QtcDumperTest_BufArray<Foo> arr; unused(&arr);\n")
+               + Cxx11Profile()
+               + Check("arr.0.bar", "0", "int")
+               + Check("arr.0.baz", "1", "int")
+               + Check("arr.1.bar", "2", "int")
+               + Check("arr.1.baz", "3", "int")
+               + Check("arr.2.bar", "4", "int")
+               + Check("arr.2.baz", "5", "int");
 
 
     QTest::newRow("UndefinedStaticMembers")
