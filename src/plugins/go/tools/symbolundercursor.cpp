@@ -57,15 +57,22 @@ TextEditor::TextEditorWidget::Link SymbolUnderCursor::link(unsigned pos)
 QString SymbolUnderCursor::typeDescription(unsigned pos)
 {
     m_pos = pos;
-    defineSymbolUnderCursor(true);
+    defineSymbolUnderCursor(DescribeType);
     return m_symbolTypeDescription;
 }
 
-void SymbolUnderCursor::defineSymbolUnderCursor(bool describeType)
+SymbolUnderCursor::FunctionArgs SymbolUnderCursor::functionArguments(unsigned pos)
+{
+    m_pos = pos;
+    defineSymbolUnderCursor(DescribeFunctionArgs);
+    return m_functionArgs;
+}
+
+void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
 {
     m_symbol = 0;
     m_token = 0;
-    m_describeType = describeType;
+    m_describeType = reason;
     m_symbolTypeDescription.clear();
 
     if (m_doc->translationUnit() && m_snapshot) {
@@ -94,9 +101,37 @@ void SymbolUnderCursor::defineSymbolUnderCursor(bool describeType)
                             }
                         }
 
-                        if (m_symbol && m_describeType) {
-                            switchScope(m_symbol->owner());
-                            m_symbolTypeDescription = m_symbol->describeType(this);
+                        if (m_symbol) {
+                            switch (m_describeType) {
+                                case Link:
+                                    break;
+                                case DescribeType:
+                                    switchScope(m_symbol->owner());
+                                    m_symbolTypeDescription = m_symbol->describeType(this);
+                                    break;
+                                case DescribeFunctionArgs:
+                                    m_functionArgs.clear();
+                                    if (m_symbol) {
+                                        if (m_symbol->kind() == Symbol::Fun) {
+                                            if (FuncTypeAST *type = dynamic_cast<FuncTypeAST *>(m_symbol->type(this))) {
+                                                if (type->params) {
+                                                    for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
+                                                        if (FieldAST *field = field_it->value) {
+                                                            QString typeDescr = field->type ? field->type->describe() : "";
+                                                            for (DeclIdentListAST *name_it = field->names; name_it; name_it = name_it->next) {
+                                                                QString argName;
+                                                                if (DeclIdentAST *name = name_it->value)
+                                                                    argName = name->ident->toLatin1();
+                                                                m_functionArgs.push_back(qMakePair(argName, typeDescr));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    break;
+                            }
                         }
 
                         eraseResolvedTypes();

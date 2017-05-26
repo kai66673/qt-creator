@@ -37,11 +37,16 @@ namespace GoTools {
 
 class SymbolUnderCursor: protected ASTVisitor, public ExprTypeResolver
 {
+    enum UseReason { Link, DescribeType, DescribeFunctionArgs };
+
 public:
     SymbolUnderCursor(GoSource::Ptr doc);
 
     TextEditor::TextEditorWidget::Link link(unsigned pos);
     QString typeDescription(unsigned pos);
+
+    typedef QList<QPair<QString, QString> > FunctionArgs;
+    FunctionArgs functionArguments(unsigned pos);
 
 protected:
     virtual bool preVisit(AST *);
@@ -63,7 +68,7 @@ protected:
     virtual bool visit(KeyValueExprAST *ast);
 
 private:
-    void defineSymbolUnderCursor(bool describeType = false);
+    void defineSymbolUnderCursor(UseReason reason = Link);
 
     GoSource::Ptr m_doc;
     unsigned m_pos;
@@ -74,8 +79,9 @@ private:
     FileScope *m_fileScope;
     Symbol *m_symbol;
     const Token *m_token;
-    bool m_describeType;
+    UseReason m_describeType;
     QString m_symbolTypeDescription;
+    FunctionArgs m_functionArgs;
     bool m_ended;
 };
 
