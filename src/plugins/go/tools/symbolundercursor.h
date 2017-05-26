@@ -79,7 +79,7 @@ private:
     FileScope *m_fileScope;
     Symbol *m_symbol;
     const Token *m_token;
-    UseReason m_describeType;
+    UseReason m_useReason;
     QString m_symbolTypeDescription;
     FunctionArgs m_functionArgs;
     bool m_ended;

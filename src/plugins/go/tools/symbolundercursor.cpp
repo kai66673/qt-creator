@@ -72,7 +72,7 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
 {
     m_symbol = 0;
     m_token = 0;
-    m_describeType = reason;
+    m_useReason = reason;
     m_symbolTypeDescription.clear();
 
     if (m_doc->translationUnit() && m_snapshot) {
@@ -102,7 +102,7 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
                         }
 
                         if (m_symbol) {
-                            switch (m_describeType) {
+                            switch (m_useReason) {
                                 case Link:
                                     break;
                                 case DescribeType:
