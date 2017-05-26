@@ -268,7 +268,8 @@ bool GoCompletionAssistVisitor::visit(DeclIdentAST *ast)
             if (ast->isLookable()) {
                 int derefLevel = 0;
                 if (Type *type = resolveExpr(ast, derefLevel)) {
-                    if (type->refLevel() + derefLevel == 0 || type->refLevel() + derefLevel == -1) {
+                    derefLevel += type->refLevel();
+                    if (derefLevel == 0 || derefLevel == -1) {
                         if (Type *baseTyp = type->baseType()) {
                             baseTyp->fillMemberCompletions(m_completions, this);
                         }
@@ -294,7 +295,8 @@ bool GoCompletionAssistVisitor::visit(IdentAST *ast)
             if (ast->isLookable()) {
                 int derefLevel = 0;
                 if (Type *type = resolveExpr(ast, derefLevel)) {
-                    if (type->refLevel() + derefLevel == 0 || type->refLevel() + derefLevel == -1) {
+                    derefLevel += type->refLevel();
+                    if (derefLevel == 0 || derefLevel == -1) {
                         if (Type *baseTyp = type->baseType()) {
                             baseTyp->fillMemberCompletions(m_completions, this);
                         }
@@ -337,7 +339,8 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
             m_ended = true;
             int derefLevel = 0;
             if (Type *type = resolveExpr(ast->x, derefLevel)) {
-                if (type->refLevel() + derefLevel == 0 || type->refLevel() + derefLevel == -1) {
+                derefLevel += type->refLevel();
+                if (derefLevel == 0 || derefLevel == -1) {
                     if (Type *baseTyp = type->baseType()) {
                         baseTyp->fillMemberCompletions(m_completions, this);
                     }
@@ -350,7 +353,8 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
                 m_ended = true;
                 int derefLevel = 0;
                 if (Type *type = resolveExpr(ast, derefLevel)) {
-                    if (type->refLevel() + derefLevel == 0 || type->refLevel() + derefLevel == -1) {
+                    derefLevel += type->refLevel();
+                    if (derefLevel == 0 || derefLevel == -1) {
                         if (Type *baseTyp = type->baseType()) {
                             baseTyp->fillMemberCompletions(m_completions, this);
                         }

@@ -354,7 +354,8 @@ bool GoCheckSymbols::visit(SelectorExprAST *ast)
     int derefLevel = 0;
     Type *context = resolveSelectorExpr(ast->x, isFieldOrMethod, derefLevel);
     if (context && ast->sel && ast->sel->isLookable()) {
-        if (context->refLevel() + derefLevel == 0 || context->refLevel() + derefLevel == -1) {
+        derefLevel += context->refLevel();
+        if (derefLevel == 0 || derefLevel == -1) {
             if (Type *baseTyp = context->baseType()) {
                 if (Symbol *s = baseTyp->lookupMember(ast->sel, this)) {
                     addUse(ast->sel, isFieldOrMethod
@@ -474,7 +475,8 @@ Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMethod, int
         Type *context = resolveSelectorExpr(selAst->x, isFieldOrMethod, derefLevel);
         if (IdentAST *ident = selAst->sel) {
             if (context && ident->isLookable()) {
-                if (context->refLevel() + derefLevel == 0 || context->refLevel() + derefLevel == -1) {
+                int testDerefLevel = derefLevel + context->refLevel();
+                if (testDerefLevel == 0 || testDerefLevel == -1) {
                     if (Type *baseTyp = context->baseType()) {
                         if (Symbol *s = baseTyp->lookupMember(ident, this)) {
                             addUse(ident, isFieldOrMethod

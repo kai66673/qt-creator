@@ -178,7 +178,8 @@ Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)
         Type *context = resolveExpr(selAst->x, derefLevel);
         if (IdentAST *ident = selAst->sel) {
             if (context && ident->isLookable()) {
-                if (context->refLevel() + derefLevel == 0 || context->refLevel() + derefLevel == -1) {
+                int testDerefLevel = context->refLevel() + derefLevel;
+                if (testDerefLevel == 0 || testDerefLevel == -1) {
                     if (Type *baseTyp = context->baseType()) {
                         if (Symbol *s = baseTyp->lookupMember(ident, this)) {
                             derefLevel = 0;

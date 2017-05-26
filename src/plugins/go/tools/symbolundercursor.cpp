@@ -199,7 +199,8 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
         if (ast->sel->isLookable()) {
             int derefLevel = 0;
             if (Type *type = resolveExpr(ast->x, derefLevel)) {
-                if (type->refLevel() + derefLevel == 0 || type->refLevel() + derefLevel == -1) {
+                derefLevel += type->refLevel();
+                if (derefLevel == 0 || derefLevel == -1) {
                     if (Type *baseTyp = type->baseType()) {
                         m_symbol = baseTyp->lookupMember(ast->sel, this);
                     }

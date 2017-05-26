@@ -120,7 +120,14 @@ int GoCompletionAssistProvider::activationCharSequenceLength() const
 bool GoCompletionAssistProvider::isActivationCharSequence(const QString &sequence) const
 {
     QChar ch = sequence.at(0);
-    return ch == QLatin1Char('.');
+    switch (ch.toLatin1()) {
+        case '.':
+        case ',':
+        case '(':
+            return true;
+    }
+
+    return false;
 }
 
 GoCompletionAssistProcessor::GoCompletionAssistProcessor()
