@@ -27,57 +27,38 @@
 
 #include "astvisitor.h"
 #include "exprtyperesolver.h"
-#include "gosnapshot.h"
-
-#include <texteditor/texteditor.h>
-
-#include <stack>
 
 namespace GoTools {
 
-class SymbolUnderCursor: protected ASTVisitor, public ExprTypeResolver
+class GoFunctionHintAssistVisitor: protected ASTVisitor, public ExprTypeResolver
 {
-    enum UseReason { Link, DescribeType };
-
 public:
-    SymbolUnderCursor(GoSource::Ptr doc);
+    GoFunctionHintAssistVisitor(GoSource::Ptr doc);
 
-    TextEditor::TextEditorWidget::Link link(unsigned pos);
-    QString typeDescription(unsigned pos);
+    QStringList functionArguments(unsigned pos);
 
 protected:
-    virtual bool preVisit(AST *);
+    virtual bool preVisit(AST *) override;
 
-    virtual bool visit(DeclIdentAST *ast);
-    virtual bool visit(IdentAST *ast);
-    virtual bool visit(TypeIdentAST *ast);
-    virtual bool visit(PackageTypeAST *ast);
-    virtual bool visit(SelectorExprAST *ast);
-    virtual bool visit(FuncDeclAST *ast);
-    virtual bool visit(BlockStmtAST *ast);
-    virtual bool visit(IfStmtAST *ast);
-    virtual bool visit(RangeStmtAST *ast);
-    virtual bool visit(ForStmtAST *ast);
-    virtual bool visit(TypeSwitchStmtAST *ast);
-    virtual bool visit(SwitchStmtAST *ast);
-    virtual bool visit(CaseClauseAST *ast);
-    virtual bool visit(CompositeLitAST *ast);
-    virtual bool visit(KeyValueExprAST *ast);
+    virtual bool visit(FuncDeclAST *ast) override;
+    virtual bool visit(BlockStmtAST *ast) override;
+    virtual bool visit(IfStmtAST *ast) override;
+    virtual bool visit(RangeStmtAST *ast) override;
+    virtual bool visit(ForStmtAST *ast) override;
+    virtual bool visit(TypeSwitchStmtAST *ast) override;
+    virtual bool visit(SwitchStmtAST *ast) override;
+    virtual bool visit(CaseClauseAST *ast) override;
+
+    virtual bool visit(CallExprAST *ast) override;
 
 private:
-    void defineSymbolUnderCursor(UseReason reason = Link);
+    std::vector<Token> *_tokens;
 
     GoSource::Ptr m_doc;
-    unsigned m_pos;
-
-    std::vector<Token> *_tokens;
-    std::stack<Type *> m_nestedCimpositLitType;
-
-    Symbol *m_symbol;
-    const Token *m_token;
-    UseReason m_useReason;
-    QString m_symbolTypeDescription;
     bool m_ended;
+    Type *m_type;
+    QStringList m_functionArgs;
+    unsigned m_pos;
 };
 
 }   // namespace GoTools

@@ -29,14 +29,74 @@
 #include "goiconprovider.h"
 #include "golexer.h"
 #include "gocodemodelmanager.h"
+#include "gofunctionhintassistvisitor.h"
 
 #include <coreplugin/id.h>
 #include <texteditor/codeassist/assistproposalitem.h>
+#include <texteditor/codeassist/functionhintproposal.h>
 #include <texteditor/codeassist/genericproposal.h>
 #include <texteditor/codeassist/genericproposalmodel.h>
+#include <texteditor/codeassist/ifunctionhintproposalmodel.h>
 
 namespace GoEditor {
 namespace Internal {
+
+class GoFunctionHintModel: public TextEditor::IFunctionHintProposalModel {
+public:
+    GoFunctionHintModel(const QStringList &functionArgs)
+        : m_functionArgs(functionArgs)
+        , m_currentArg(-1)
+    { }
+
+    void reset() override { }
+    int size() const override { return 1; }
+
+    QString text(int) const override {
+        int currArg = m_currentArg == -1 ? 0 : m_currentArg;
+        QString hintText = QLatin1String("(");
+        int index = 0;
+        for (const QString &arg: m_functionArgs) {
+            if (currArg == index)
+                hintText += QLatin1String("<b>");
+            hintText += arg.toHtmlEscaped();
+            if (currArg == index)
+                hintText += QLatin1String("</b>");
+            hintText += QLatin1String(", ");
+            index++;
+        }
+        hintText.chop(2);
+        hintText += QLatin1String(")");
+
+        return hintText;
+    }
+
+    int activeArgument(const QString &prefix) const override {
+        int argnr = 0;
+        int parcount = 0;
+        const QList<GoToken> tokens = GoLexer::instance()->tokenize(prefix, -1);
+        for (int i = 0; i < tokens.count(); ++i) {
+            const GoToken &tk = tokens.at(i);
+            if (tk.is(T_LPAREN))
+                ++parcount;
+            else if (tk.is(T_RPAREN))
+                --parcount;
+            else if (!parcount && tk.is(T_COMMA))
+                ++argnr;
+        }
+
+        if (parcount < 0)
+            return -1;
+
+        if (argnr != m_currentArg)
+            m_currentArg = argnr;
+
+        return argnr;
+    }
+
+private:
+    QStringList m_functionArgs;
+    mutable int m_currentArg;
+};
 
 class GoWithImportAssistProposalItem final: public TextEditor::AssistProposalItem
 {
@@ -152,6 +212,16 @@ TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEdit
 
     if (!m_interface->source().isNull()) {
         QChar triggerChar = m_interface->characterAt(m_interface->position() - 1);
+        if (triggerChar == QChar('(')) {
+            GoTools::GoFunctionHintAssistVisitor functionHint(m_interface->actualSource());
+            QStringList functionArgs = functionHint.functionArguments(m_interface->position() - 1);
+            if (functionArgs.isEmpty())
+                return 0;
+            TextEditor::IFunctionHintProposalModel *model = new GoFunctionHintModel(functionArgs);
+            TextEditor::IAssistProposal *proposal = new TextEditor::FunctionHintProposal(m_interface->position() - 1, model);
+            return proposal;
+        }
+        /// TODO: triggerChar == QChar(',') ... some BacwardScanner sould be implemented...
         bool isDotTrigger = triggerChar == QChar('.');
         if (!isDotTrigger && !(triggerChar.isLetterOrNumber() || triggerChar == QChar('_') || triggerChar == QChar('$')))
             return 0;

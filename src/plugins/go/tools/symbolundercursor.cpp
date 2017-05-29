@@ -31,7 +31,6 @@ SymbolUnderCursor::SymbolUnderCursor(GoSource::Ptr doc)
     : ASTVisitor(doc->translationUnit())
     , ExprTypeResolver()
     , m_doc(doc)
-    , m_fileScope(0)
     , m_symbol(0)
     , m_token(0)
 {
@@ -61,13 +60,6 @@ QString SymbolUnderCursor::typeDescription(unsigned pos)
     return m_symbolTypeDescription;
 }
 
-SymbolUnderCursor::FunctionArgs SymbolUnderCursor::functionArguments(unsigned pos)
-{
-    m_pos = pos;
-    defineSymbolUnderCursor(DescribeFunctionArgs);
-    return m_functionArgs;
-}
-
 void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
 {
     m_symbol = 0;
@@ -79,13 +71,9 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
         m_snapshot->runProtectedTask(
             [this]() -> void {
                 if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
-                    m_fileScope = fileAst->scope;
-
-                    m_currentIndex = m_fileScope->indexInSnapshot();
+                    m_currentScope = fileAst->scope;
+                    m_currentIndex = fileAst->scope->indexInSnapshot();
                     if (m_currentIndex != -1) {
-                        m_fileScope = m_snapshot->fileScopeAt(m_currentIndex);
-                        m_currentScope = m_fileScope;
-
                         m_ended = false;
 
                         for (DeclListAST *it = fileAst->decls; it; it = it->next) {
@@ -108,28 +96,6 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
                                 case DescribeType:
                                     switchScope(m_symbol->owner());
                                     m_symbolTypeDescription = m_symbol->describeType(this);
-                                    break;
-                                case DescribeFunctionArgs:
-                                    m_functionArgs.clear();
-                                    if (m_symbol) {
-                                        if (m_symbol->kind() == Symbol::Fun) {
-                                            if (FuncTypeAST *type = dynamic_cast<FuncTypeAST *>(m_symbol->type(this))) {
-                                                if (type->params) {
-                                                    for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
-                                                        if (FieldAST *field = field_it->value) {
-                                                            QString typeDescr = field->type ? field->type->describe() : "";
-                                                            for (DeclIdentListAST *name_it = field->names; name_it; name_it = name_it->next) {
-                                                                QString argName;
-                                                                if (DeclIdentAST *name = name_it->value)
-                                                                    argName = name->ident->toLatin1();
-                                                                m_functionArgs.push_back(qMakePair(argName, typeDescr));
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
                                     break;
                             }
                         }

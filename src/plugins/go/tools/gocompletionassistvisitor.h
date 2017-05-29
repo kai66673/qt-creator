@@ -68,7 +68,6 @@ private:
     std::stack<Type *> m_nestedCimpositLitType;
 
     QList<TextEditor::AssistProposalItemInterface *> &m_completions;
-    FileScope *m_fileScope;
     bool m_ended;
     bool m_inImportSection;
     bool m_isGlobalCompletion;

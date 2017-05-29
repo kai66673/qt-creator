@@ -68,9 +68,9 @@ void GoCheckSymbols::run()
             m_snapshot->runProtectedTask(
                 [this]() -> void {
                     if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
+                        m_currentScope = fileAst->scope;
                         m_currentIndex = fileAst->scope->indexInSnapshot();
                         if (m_currentIndex != -1) {
-                            m_currentScope = m_snapshot->fileScopeAt(m_currentIndex);
                             if (IdentAST *packageName = fileAst->packageName)
                             addUseCheckFirstLine(packageName, GoSemanticHighlighter::Package);
                             accept(fileAst->importDecls);

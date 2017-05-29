@@ -46,13 +46,9 @@ void GoCompletionAssistVisitor::fillCompletions(bool isGlobalCompletion, unsigne
         m_snapshot->runProtectedTask(
             [this]() -> void {
                 if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
-                    m_fileScope = fileAst->scope;
-
-                    m_currentIndex = m_fileScope->indexInSnapshot();
+                    m_currentScope = fileAst->scope;
+                    m_currentIndex = fileAst->scope->indexInSnapshot();
                     if (m_currentIndex != -1) {
-                        m_fileScope = m_snapshot->fileScopeAt(m_currentIndex);
-                        m_currentScope = m_fileScope;
-
                         m_ended = false;
 
                         /// TODO: imports autocompletions
