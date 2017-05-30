@@ -74,7 +74,7 @@ class GoSnapshot
         GoSource::Ptr source;
         FileScope *scope;
         PackageType *lookupcontext;
-        QHash<QLatin1String, PackageType *> aliasToLookupContext;
+        QHash<QString, PackageType *> aliasToLookupContext;
     };
 
     typedef QList<ScopeRecord *> ScopeTable;
@@ -89,7 +89,7 @@ public:
 
     PackageType *packageTypetAt(int index) const;
     FileScope *fileScopeAt(int index) const;
-    PackageType *packageTypeForAlias(int index, const QLatin1String &alias);
+    PackageType *packageTypeForAlias(int index, const QString &alias);
 
 private:
     void bindScopes();

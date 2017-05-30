@@ -83,7 +83,7 @@ void Scope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface 
         Symbol *symbol = memberAt(i);
         if (!predicate || predicate(symbol)) {
             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-            item->setText(symbol->identifier()->toLatin1());
+            item->setText(symbol->identifier()->toString());
             item->setIcon(Symbol::icon(symbol->kind()));
             completions.append(item);
         }
@@ -97,7 +97,7 @@ void Scope::dump() const
 {
     for (unsigned i = 0; i < memberCount(); i++) {
         Symbol *s = memberAt(i);
-        qDebug() << " ===" << s->identifier()->toLatin1() << "kind:" << s->kind();
+        qDebug() << " ===" << s->identifier()->toString() << "kind:" << s->kind();
     }
 }
 
@@ -126,7 +126,7 @@ void FileScope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterf
         for (unsigned i = 0; i < memberCount(); i++) {
             Symbol *symbol = memberAt(i);
             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-            item->setText(symbol->identifier()->toLatin1());
+            item->setText(symbol->identifier()->toString());
             item->setIcon(Symbol::icon(symbol->kind()));
             completions.append(item);
         }

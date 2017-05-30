@@ -798,7 +798,7 @@ QString FieldAST::describe() const
                 isFirst = false;
             else
                 result += QStringLiteral(",");
-            result += decl->ident->toLatin1();
+            result += decl->ident->toString();
         }
     }
     if (type) {
@@ -931,7 +931,7 @@ void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemIn
                 for (DeclIdentListAST *ident_it = field->names; ident_it; ident_it = ident_it->next) {
                     if (DeclIdentAST *ident = ident_it->value) {
                         TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-                        item->setText(ident->ident->toLatin1());
+                        item->setText(ident->ident->toString());
                         item->setIcon(Symbol::icon(Symbol::Var));
                         completions.append(item);
                     }
@@ -942,7 +942,7 @@ void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemIn
                         // self embed type
                         if (Symbol *declSymbol = typ->declaration(resolver)) {
                             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-                            item->setText(declSymbol->identifier()->toLatin1());
+                            item->setText(declSymbol->identifier()->toString());
                             item->setIcon(Symbol::icon(Symbol::Typ));
                             completions.append(item);
                         }
@@ -1097,7 +1097,7 @@ void InterfaceTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalIte
                 for (DeclIdentListAST *ident_it = field->names; ident_it; ident_it = ident_it->next) {
                     if (DeclIdentAST *ident = ident_it->value) {
                         TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-                        item->setText(ident->ident->toLatin1());
+                        item->setText(ident->ident->toString());
                         item->setIcon(Symbol::icon(Symbol::Var));
                         completions.append(item);
                     }
@@ -1894,7 +1894,7 @@ Type *TypeSpecAST::chanValueType() const
 { return type ? type->chanValueType() : 0; }
 
 QString TypeSpecAST::describe() const
-{ return name ? name->ident->toLatin1() : QString(); }
+{ return name ? name->ident->toString() : QString(); }
 
 void TypeSpecAST::accept0(ASTVisitor *visitor)
 {
@@ -1973,7 +1973,7 @@ Symbol *PackageTypeAST::lookupMember(const IdentAST *ast, ExprTypeResolver *reso
 {
     if (fileScope && fileScope->indexInSnapshot() != -1) {
         if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
-                                                                                          packageAlias->ident->toLatin1())) {
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     Type *resolvedType = symbol->type(resolver);
@@ -1992,7 +1992,7 @@ void PackageTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemI
 {
     if (fileScope && fileScope->indexInSnapshot() != -1) {
         if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
-                                                                                          packageAlias->ident->toLatin1())) {
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     if (Type *resolvedType = symbol->type(resolver))
@@ -2007,7 +2007,7 @@ Type *PackageTypeAST::elementsType(ExprTypeResolver *resolver)
 {
     if (fileScope && fileScope->indexInSnapshot() != -1) {
         if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
-                                                                                          packageAlias->ident->toLatin1())) {
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     Type *resolvedType = symbol->type(resolver);
@@ -2024,7 +2024,7 @@ Type *PackageTypeAST::indexType(ExprTypeResolver *resolver)
 {
     if (fileScope && fileScope->indexInSnapshot() != -1) {
         if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
-                                                                              packageAlias->ident->toLatin1())) {
+                                                                              packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     Type *resolvedType = symbol->type(resolver);
@@ -2038,13 +2038,13 @@ Type *PackageTypeAST::indexType(ExprTypeResolver *resolver)
 }
 
 QString PackageTypeAST::describe() const
-{ return packageAlias->ident->toLatin1() + QStringLiteral(".") + (typeName ? typeName->ident->toLatin1() : QString()); }
+{ return packageAlias->ident->toString() + QStringLiteral(".") + (typeName ? typeName->ident->toString() : QString()); }
 
 Symbol *PackageTypeAST::declaration(ExprTypeResolver *resolver)
 {
     if (fileScope && fileScope->indexInSnapshot() != -1) {
         if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
-                                                                                          packageAlias->ident->toLatin1())) {
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ)
                     return symbol;
@@ -2135,7 +2135,7 @@ void TypeIdentAST::fillTurple(TurpleType *turple, ExprTypeResolver *resolver) co
 }
 
 QString TypeIdentAST::describe() const
-{ return ident->ident->toLatin1(); }
+{ return ident->ident->toString(); }
 
 Symbol *TypeIdentAST::declaration(ExprTypeResolver *resolver)
 {

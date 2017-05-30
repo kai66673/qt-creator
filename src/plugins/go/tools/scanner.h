@@ -90,8 +90,8 @@ private:
     }
 
 private:
-    bool isLetterOrDigit();
-    void scanIdentifier(Token *tok);
+    bool isLetterOrDigit(unsigned &utf8bytesCount);
+    void scanIdentifier(Token *tok, unsigned utf8bytesCount);
     TokenKind scanNumber(bool seenDecimalPoint);
     unsigned scanMantissa(unsigned base);
     unsigned digitVal(char ch);

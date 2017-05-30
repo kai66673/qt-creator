@@ -104,7 +104,7 @@ bool TranslationUnit::parse(GoSource *source, TranslationUnit::ParseMode mode)
 bool TranslationUnit::parsePackageFile(GoSource *source, const QString &packageName)
 {
     if (isParsed())
-        return _ast ? packageName == _ast->packageName->ident->toLatin1() : false;
+        return _ast ? packageName == _ast->packageName->ident->toString() : false;
 
     f._parsed = true;
     f._skipFunctionBody = true;

@@ -315,7 +315,7 @@ bool GoCompletionAssistVisitor::visit(PackageTypeAST *ast)
 
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             m_ended = true;
-            QLatin1String packageAlias(ast->packageAlias->ident->toLatin1());
+            QString packageAlias(ast->packageAlias->ident->toString());
             if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
                 context->fillMemberCompletions(m_completions, this);
         }

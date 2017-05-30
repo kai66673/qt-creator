@@ -98,6 +98,32 @@ void Scanner::scan_helper(Token *tok)
         return;
     }
 
+    if (isByteOfMultiByteCodePoint(_yychar)) {
+        unsigned utf8bytesCount = 2;
+        for (unsigned char c = _yychar << 2; isByteOfMultiByteCodePoint(c); c <<= 1)
+            ++utf8bytesCount;
+
+        if (QString::fromUtf8(_currentChar, utf8bytesCount)[0].isLetter()) {
+            scanIdentifier(tok, utf8bytesCount);
+            switch (tok->kindAndPos.kind) {
+                case IDENT:
+                case BREAK:
+                case CONTINUE:
+                case FALLTHROUGH:
+                case RETURN:
+                    insertSemi = true;
+                    break;
+            }
+        } else {
+            yyinp();
+            tok->kindAndPos.kind = ILLEGAL;
+        }
+
+        _insertSemi = insertSemi;;
+        return;
+    }
+
+
     char ch = _yychar;
     switch (ch) {
         case '_': case '$':
@@ -105,7 +131,7 @@ void Scanner::scan_helper(Token *tok)
         case 'n': case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x': case 'y': case 'z':
         case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I': case 'J': case 'K': case 'L': case 'M':
         case 'N': case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
-            scanIdentifier(tok);
+            scanIdentifier(tok, 1);
             switch (tok->kindAndPos.kind) {
                 case IDENT:
                 case BREAK:
@@ -378,8 +404,17 @@ void Scanner::skipWhitespace()
     }
 }
 
-bool Scanner::isLetterOrDigit()
+bool Scanner::isLetterOrDigit(unsigned &utf8bytesCount)
 {
+    utf8bytesCount = 1;
+
+    if (isByteOfMultiByteCodePoint(_yychar)) {
+        ++utf8bytesCount;
+        for (unsigned char c = _yychar << 2; isByteOfMultiByteCodePoint(c); c <<= 1)
+            ++utf8bytesCount;
+        return QString::fromUtf8(_currentChar, utf8bytesCount)[0].isLetter();
+    }
+
     switch (_yychar) {
         case '_': case '$':
         case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': case 'i': case 'j': case 'k': case 'l': case 'm':
@@ -395,15 +430,27 @@ bool Scanner::isLetterOrDigit()
     return false;
 }
 
-void Scanner::scanIdentifier(Token *tok)
+void Scanner::scanIdentifier(Token *tok, unsigned utf8bytesCount)
 {
-    unsigned tokenLength = 0;
-    while (isLetterOrDigit()) {
+    // skip first letter
+    unsigned tokenLength = utf8bytesCount;
+    bool isLatin1 = utf8bytesCount == 1;
+    yyinp();
+
+    while (isLetterOrDigit(utf8bytesCount)) {
+        tokenLength += utf8bytesCount;
+        if (utf8bytesCount != 1)
+            isLatin1 = false;
         yyinp();
-        tokenLength++;
     }
 
-    Token::classify(tok, _control, _tokenStart, tokenLength);
+
+    if (isLatin1) {
+        Token::classify(tok, _control, _tokenStart, tokenLength);
+    } else {
+        tok->kindAndPos.kind = IDENT;
+        tok->identifier = _control->identifier(_tokenStart, tokenLength);
+    }
 }
 
 TokenKind Scanner::scanNumber(bool seenDecimalPoint)

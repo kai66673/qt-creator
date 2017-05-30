@@ -122,8 +122,8 @@ Identifier::Identifier(const char *chars, unsigned size)
     : HashedLiteral(chars, size)
 { }
 
-QLatin1String Identifier::toLatin1() const
-{ return _chars[0] == '!' ? QLatin1String(_chars + 1, _size - 1) : QLatin1String(_chars, _size); }
+QString Identifier::toString() const
+{ return _chars[0] == '!' ? QString::fromUtf8(_chars + 1, _size - 1) : QString::fromUtf8(_chars, _size); }
 
 bool Identifier::isBuiltinTypeIdentifier() const
 { return _chars[0] == '!'; }

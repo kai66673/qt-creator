@@ -76,7 +76,7 @@ void PackageType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInte
         for (unsigned i = 0; i < scope->memberCount(); i++) {
             Symbol *symbol = scope->memberAt(i);
             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-            item->setText(symbol->identifier()->toLatin1());
+            item->setText(symbol->identifier()->toString());
             item->setIcon(Symbol::icon(symbol->kind()));
             completions.append(item);
         }
@@ -149,7 +149,7 @@ PackageType *GoSnapshot::packageTypetAt(int index) const
 FileScope *GoSnapshot::fileScopeAt(int index) const
 { return m_scopeTable.at(index)->scope; }
 
-PackageType *GoSnapshot::packageTypeForAlias(int index, const QLatin1String &alias)
+PackageType *GoSnapshot::packageTypeForAlias(int index, const QString &alias)
 {
     ScopeRecord *record = m_scopeTable.at(index);
 

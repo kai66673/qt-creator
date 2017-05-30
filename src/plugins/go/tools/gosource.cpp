@@ -179,7 +179,7 @@ void GoSource::resolveImportsAndPackageName(const QString &goRoot, const QString
 
     if (FileAST *ast = _translationUnit->fileAst()) {
         if (ast->packageName)
-            _packageName = ast->packageName->ident->toLatin1();
+            _packageName = ast->packageName->ident->toString();
         ImportDeclarationsVisitor visitor(_translationUnit, [&](ImportSpecAST *importSpec) {
             GoSource::Import import;
             if (importSpec->t_path) {
@@ -190,7 +190,7 @@ void GoSource::resolveImportsAndPackageName(const QString &goRoot, const QString
                     import.packageName = import.dir.right(import.dir.length() - pos);
                     import.aliasSpecified = false;
                     if (importSpec->name) {
-                        import.alias = importSpec->name->ident->toLatin1();
+                        import.alias = importSpec->name->ident->toString();
                         if (import.alias != C_UNDERSCORE)
                             import.aliasSpecified = true;
                     } else {

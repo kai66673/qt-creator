@@ -128,7 +128,7 @@ Type *TypeDecl::type(ExprTypeResolver *)
 { return _decl; }
 
 QString TypeDecl::describeType(ExprTypeResolver *) const
-{ return _decl->name->ident->toLatin1() + QStringLiteral(": ") + (_decl->type ? _decl->type->describe() : QString()); }
+{ return _decl->name->ident->toString() + QStringLiteral(": ") + (_decl->type ? _decl->type->describe() : QString()); }
 
 Symbol::Kind TypeDecl::kind() const
 { return Typ; }

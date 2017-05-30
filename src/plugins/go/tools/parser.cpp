@@ -111,7 +111,7 @@ FileAST *Parser::parsePackageFile(const QString &wantedPackageName)
     if (!t_package_name)
         return 0;
     IdentAST *packageName = new (_pool) IdentAST(t_package_name, _tokens->at(t_package_name).identifier);
-    if (wantedPackageName != packageName->ident->toLatin1())
+    if (wantedPackageName != packageName->ident->toString())
         return 0;
     expectSemi();
 

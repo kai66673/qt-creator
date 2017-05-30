@@ -166,7 +166,7 @@ Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)
         QTC_ASSERT(!derefLevel, return 0);
         if (!ident->isLookable())
             return 0;
-        QLatin1String idStr(ident->ident->toLatin1());
+        QString idStr(ident->ident->toString());
         if (Symbol *s = m_currentScope->lookupMember(ident, this)) {
             return s->type(this);
         }
@@ -281,7 +281,7 @@ Type *ExprTypeResolver::tryResolveNamedType(ExprAST *x)
         } else if (SelectorExprAST *selExpr = x->asSelectorExpr()) {
             if (selExpr->sel->isLookable()) {
                 if (IdentAST *packageIdent = selExpr->x->asIdent()) {
-                    QLatin1String packageAlias(packageIdent->ident->toLatin1());
+                    QString packageAlias(packageIdent->ident->toString());
                     if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias)) {
                         if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
                             if (s->kind() == Symbol::Typ) {

@@ -74,7 +74,7 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
                                             for (; name_it; name_it = name_it->next) {
                                                 QString argName;
                                                 if (DeclIdentAST *name = name_it->value)
-                                                    argName = name->ident->toLatin1();
+                                                    argName = name->ident->toString();
                                                 QString argDescr(argName + QLatin1String(" ") + typeDescr);
                                                 m_functionArgs << argDescr.trimmed();
                                             }

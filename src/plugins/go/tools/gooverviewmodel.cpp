@@ -51,7 +51,7 @@ protected:
             QString descr = "";
             for(DeclIdentListAST *it = ast->names; it; it = it->next) {
                 if (DeclIdentAST *ident = it->value) {
-                    descr += ident->ident->toLatin1() + ",";
+                    descr += ident->ident->toString() + ",";
                 }
             }
             descr.chop(1);
@@ -68,7 +68,7 @@ protected:
             QString descr = "";
             for(DeclIdentListAST *it = ast->names; it; it = it->next) {
                 if (DeclIdentAST *ident = it->value) {
-                    descr += ident->ident->toLatin1() + ",";
+                    descr += ident->ident->toString() + ",";
                 }
             }
             descr.chop(1);
@@ -86,7 +86,7 @@ protected:
             QString descr = "";
             for(DeclIdentListAST *it = ast->names; it; it = it->next) {
                 if (DeclIdentAST *ident = it->value) {
-                    descr += ident->ident->toLatin1() + ",";
+                    descr += ident->ident->toString() + ",";
                 }
             }
             descr.chop(1);
@@ -100,7 +100,7 @@ protected:
         if (ast->name) {
             int startTokenIndex = ast->name->t_identifier;
             const Token &tk = translationUnit()->tokenAt(startTokenIndex);
-            QString descr = ast->name->ident->toLatin1();
+            QString descr = ast->name->ident->toString();
             type(ast->type, descr, ast->comment ? ast->comment : ast->doc, tk.begin(), GoOverviewTreeItem::TypeDeclaration);
         }
 
@@ -114,7 +114,7 @@ protected:
             QString descr = "";
             for(DeclIdentListAST *it = ast->names; it; it = it->next) {
                 if (DeclIdentAST *ident = it->value) {
-                    descr += ident->ident->toLatin1() + ",";
+                    descr += ident->ident->toString() + ",";
                 }
             }
             descr.chop(1);
@@ -133,7 +133,7 @@ protected:
                     descr += methodRecv(ast->recv->fields->value->type);
                 descr += ")";
             }
-            descr += ast->name->ident->toLatin1();
+            descr += ast->name->ident->toString();
             const Token &tk = translationUnit()->tokenAt(startTokenIndex);
             if (ast->type) {
                 descr += ast->type->params ? ast->type->params->describe() : QStringLiteral("()");
@@ -188,7 +188,7 @@ private:
             if (StarTypeAST *s = type->asStarType())
                 return QStringLiteral("*") + methodRecv(s->typ);
             if (IdentAST *ident = type->asIdent())
-                return ident->ident->toLatin1();
+                return ident->ident->toString();
         }
 
         return QString();

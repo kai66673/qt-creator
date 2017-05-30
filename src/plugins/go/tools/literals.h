@@ -94,7 +94,7 @@ class Identifier: public HashedLiteral
 public:
     Identifier(const char *chars, unsigned size);
 
-    QLatin1String toLatin1() const;
+    QString toString() const;
 
     bool isBuiltinTypeIdentifier() const;
 };

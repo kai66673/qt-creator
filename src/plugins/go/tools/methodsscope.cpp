@@ -59,7 +59,7 @@ QStringList TypeSymbol::typeMethods()
     for (unsigned i = 0; i < m_methods.symbolCount(); i++) {
         if (FuncDeclAST *func = m_methods.symbolAt(i)->funcDecl()) {
             if (DeclIdentAST *funcIdent = func->name)
-                result << funcIdent->ident->toLatin1();
+                result << funcIdent->ident->toString();
         }
     }
     return result;

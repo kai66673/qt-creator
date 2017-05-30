@@ -170,7 +170,7 @@ bool SymbolUnderCursor::visit(PackageTypeAST *ast)
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
         m_ended = true;
         if (ast->typeName->isLookable()) {
-            QLatin1String packageAlias(ast->packageAlias->ident->toLatin1());
+            QString packageAlias(ast->packageAlias->ident->toString());
             if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
                 m_symbol = context->lookupMember(ast->typeName, this);
         }
