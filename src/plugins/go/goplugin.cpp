@@ -24,7 +24,6 @@
 ****************************************************************************/
 #include "goplugin.h"
 #include "goiconprovider.h"
-#include "golexer.h"
 #include "goconstants.h"
 #include "golangconstants.h"
 #include "goeditor.h"
@@ -74,12 +73,8 @@ using namespace GoEditor::Internal;
 class GoPluginPrivate
 {
 public:
-    GoPluginPrivate()
-        : lexer(0)
-        , iconProvider(0)
-    { }
+    GoPluginPrivate() : iconProvider(0) { }
 
-    GoLexer *lexer;
     GoIconProvider *iconProvider;
     GoLang::GoSettings *settings;
 };
@@ -94,7 +89,6 @@ GoPlugin::GoPlugin()
 
 GoPlugin::~GoPlugin()
 {
-    delete d->lexer;
     delete d->iconProvider;
     delete d;
 
@@ -114,7 +108,6 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
                                                tr("Go", "GoEditor::GoSnippetProvider"),
                                                &::GoEditor::Internal::GoEditor::decorateEditor);
 
-    d->lexer = new GoLexer;
     d->iconProvider = new GoIconProvider;
 
     addAutoReleasedObject(new GoEditorFactory);

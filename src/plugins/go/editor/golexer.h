@@ -67,7 +67,6 @@ class GoLexer
 {
 public:
     GoLexer();
-    static GoLexer *instance();
 
     QList<GoToken> tokenize(const QString &text, int prevBlockState);
     QList<GoToken> tokenize(const QTextBlock &block);
@@ -77,7 +76,7 @@ public:
     static bool tokenUnderCursorIsLiteralOrComment(const QTextCursor &cursor);
     static bool tokenUnderCursorIsComment(const QTextCursor &cursor);
 
-    const QStringList &builtins() const { return m_builtins; }
+    static QStringList &builtins();
 
 private:
     QChar ch(int offset = 0); // returns current char
@@ -93,17 +92,11 @@ private:
     GoToken parseNumber(QChar first);
 
 private:
-    static GoLexer *m_instance;
-
     LexerState m_lexerState;
     const QChar *m_text;
     int m_length;
     int m_tokenPosition;
     int m_position;
-    QSet<QString> m_keywords;
-    QSet<QString> m_types;
-    QSet<QString> m_operators;
-    QStringList m_builtins;
 };
 
 } // namespace Internal

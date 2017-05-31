@@ -29,7 +29,74 @@
 #include <QString>
 #include <QtAlgorithms>
 
-const char * const GO_KEYWORDS[] {
+static QStringList s_builtings {
+    "append",
+    "bool",
+    "break",
+    "byte",
+    "cap",
+    "case",
+    "chan",
+    "close",
+    "complex",
+    "complex128",
+    "complex64",
+    "const",
+    "continue",
+    "copy",
+    "default",
+    "defer",
+    "delete",
+    "else",
+    "error",
+    "fallthrough",
+    "false",
+    "float32",
+    "float64",
+    "for",
+    "func",
+    "go",
+    "goto",
+    "if",
+    "imag",
+    "import",
+    "int",
+    "int16",
+    "int32",
+    "int64",
+    "int8",
+    "interface",
+    "iota",
+    "len",
+    "make",
+    "map",
+    "new",
+    "nil",
+    "package",
+    "panic",
+    "print",
+    "println",
+    "range",
+    "real",
+    "recover",
+    "return",
+    "rune",
+    "select",
+    "string",
+    "struct",
+    "switch",
+    "true",
+    "type",
+    "uint",
+    "uint16",
+    "uint32",
+    "uint64",
+    "uint8",
+    "uintptr",
+    "var",
+};
+
+static QSet<QString> s_keywords {
     "break",
     "case",
     "chan",
@@ -61,7 +128,7 @@ const char * const GO_KEYWORDS[] {
     "var",
 };
 
-const char * const GO_TYPES[] {
+static QSet<QString> s_types {
     "bool",
     "byte",
     "complex64",
@@ -84,7 +151,7 @@ const char * const GO_TYPES[] {
     "uint64",
 };
 
-const char * const GO_OPERATORS[] {
+static QSet<QString> s_operators {
     "append",
     "cap",
     "close",
@@ -105,31 +172,12 @@ const char * const GO_OPERATORS[] {
 namespace GoEditor {
 namespace Internal {
 
-GoLexer *GoLexer::m_instance = 0;
-
 GoLexer::GoLexer() :
     m_lexerState(0),
     m_text(0),
     m_length(0),
     m_position(0)
-{
-    m_instance = this;
-    for (size_t i = 0; i < sizeof(GO_KEYWORDS)/sizeof(char *); ++i) {
-        m_keywords.insert(QLatin1String(GO_KEYWORDS[i]));
-        m_builtins.append(QLatin1String(GO_KEYWORDS[i]));
-    }
-
-    for (size_t i = 0; i < sizeof(GO_TYPES)/sizeof(char *); ++i) {
-        m_types.insert(QLatin1String(GO_TYPES[i]));
-        m_builtins.append(QLatin1String(GO_TYPES[i]));
-    }
-
-    for (size_t i = 0; i < sizeof(GO_OPERATORS)/sizeof(char *); ++i) {
-        m_operators.insert(QLatin1String(GO_OPERATORS[i]));
-        m_builtins.append(QLatin1String(GO_OPERATORS[i]));
-    }
-    std::sort(m_builtins.begin(), m_builtins.end());
-}
+{ }
 
 QChar GoLexer::ch(int offset)
 {
@@ -143,11 +191,6 @@ QChar GoLexer::chpp()
     if (m_position < m_length)
         return m_text[m_position++];
     return QLatin1Char('\0');
-}
-
-GoLexer *GoLexer::instance()
-{
-    return m_instance;
 }
 
 GoToken GoLexer::parseDefault()
@@ -294,12 +337,22 @@ GoToken GoLexer::parseDefault()
             token = GoToken(m_tokenPosition, 1, T_SEMICOLON);
             break;
         case '{':
+            token = GoToken(m_tokenPosition, 1, T_LBRACE, m_text);
+            break;
         case '}':
+            token = GoToken(m_tokenPosition, 1, T_RBRACE, m_text);
+            break;
         case '[':
+            token = GoToken(m_tokenPosition, 1, T_LBRACKET, m_text);
+            break;
         case ']':
+            token = GoToken(m_tokenPosition, 1, T_RBRACKET, m_text);
+            break;
         case '(':
+            token = GoToken(m_tokenPosition, 1, T_LPAREN, m_text);
+            break;
         case ')':
-            token = GoToken(m_tokenPosition, 1, T_PARENTHESIS, m_text);
+            token = GoToken(m_tokenPosition, 1, T_RPAREN, m_text);
             break;
         default:
             break;
@@ -324,11 +377,11 @@ GoToken GoLexer::parseIdentifier()
     QString identifier(&m_text[tokenStart], tokenCount);
 
     TokenKind kind = T_IDENTIFIER;
-    if (m_keywords.contains(identifier))
+    if (s_keywords.contains(identifier))
         kind = T_KEYWORD;
-    else if (m_types.contains(identifier))
+    else if (s_types.contains(identifier))
         kind = T_PRIMITIVE;
-    else if (m_operators.contains(identifier))
+    else if (s_operators.contains(identifier))
         kind = T_OPERATOR;
 
     return GoToken(tokenStart, tokenCount, kind, m_text);
@@ -509,7 +562,9 @@ int GoLexer::tokenBefore(const QList<GoToken> &tokens, int offset)
 
 TokenKind GoLexer::tokenKindUnderCursor(const QTextCursor &cursor)
 {
-    const QList<GoToken> tokens = m_instance->tokenize(cursor.block());
+    GoLexer lexer;
+
+    const QList<GoToken> tokens = lexer.tokenize(cursor.block());
     const int tokenIdx = GoLexer::tokenBefore(tokens, qMax(0, cursor.positionInBlock() - 1));
     const GoToken &tk = (tokenIdx == -1) ? GoToken() : tokens.at(tokenIdx);
 
@@ -531,6 +586,9 @@ bool GoLexer::tokenUnderCursorIsLiteralOrComment(const QTextCursor &cursor)
 
 bool GoLexer::tokenUnderCursorIsComment(const QTextCursor &cursor)
 { return tokenKindUnderCursor(cursor) == T_COMMENT; }
+
+QStringList &GoLexer::builtins()
+{ return s_builtings; }
 
 } // namespace Internal
 } // namespace GoEditor

@@ -36,129 +36,94 @@ GoToken::GoToken(int start, int count, TokenKind kind, const QChar *text) :
     m_count(count),
     m_kind(kind)
 {
-    if (text) {
-        m_text = QString(&text[m_start], m_count);
-        switch (kind) {
-        case T_KEYWORD:
-            parseKeyword();
-            break;
-        case T_PARENTHESIS:
-            parseParenthesis();
-            break;
-        default:
-            break;
-        }
-    }
+    /// TODO: prevent compare duplication
+    if (text && kind == T_KEYWORD)
+        parseKeyword(text);
 }
 
-void GoToken::parseKeyword()
+void GoToken::parseKeyword(const QChar *text)
 {
-    switch (m_text.length()) {
-    case 2:
-        switch (m_text.at(0).toLatin1()) {
-        case 'i':
-            if (m_text == QLatin1String("if"))
+    const ushort *t = (const ushort *)text;
+    switch (m_count) {
+        case 2:
+            if (t[0] == 'i' && t[1] == 'f')
                 m_kind = T_IF;
             break;
-        }
-        break;
-    case 3:
-        switch (m_text.at(0).toLatin1()) {
-        case 'f':
-            if (m_text == QLatin1String("for"))
-                m_kind = T_FOR;
-            break;
-        case 'v':
 
-            if (m_text == QLatin1String("var"))
-                m_kind = T_VAR;
+        case 3:
+            switch (t[0]) {
+                case 'f':
+                    if (t[1] == 'o' && t[2] == 'r')
+                        m_kind = T_FOR;
+                    break;
+                case 'v':
+                    if (t[1] == 'a' && t[2] == 'r')
+                        m_kind = T_VAR;
+                    break;
+            }
             break;
-        }
-        break;
-    case 4:
-        switch (m_text.at(0).toLatin1()) {
-        case 'c':
-            if (m_text == QLatin1String("case"))
-                m_kind = T_CASE;
+
+        case 4:
+            switch (t[0]) {
+                case 'c':
+                    if (t[1] == 'a' && t[2] == 's' && t[3] == 'e')
+                        m_kind = T_CASE;
+                    break;
+                case 'f':
+                    if (t[1] == 'u' && t[2] == 'n' && t[3] == 'c')
+                        m_kind = T_FUNC;
+                    break;
+                case 't':
+                    if (t[1] == 'y' && t[2] == 'p' && t[3] == 'e')
+                        m_kind = T_TYPE;
+                    break;
+            }
             break;
-        case 'f':
-            if (m_text == QLatin1String("func"))
-                m_kind = T_FUNC;
-            break;
-        case 't':
-            if (m_text == QLatin1String("type"))
-                m_kind = T_TYPE;
-            break;
-        }
-        break;
-    case 5:
-        switch (m_text.at(0).toLatin1()) {
-        case 'c':
-            if (m_text == QLatin1String("const"))
+
+        case 5:
+            if (t[0] == 'c' && t[1] == 'o' && t[2] == 'n' && t[3] == 's' && t[4] == 't')
                 m_kind = T_CONST;
             break;
-        }
-        break;
-    case 6:
-        switch (m_text.at(0).toLatin1()) {
-        case 'i':
-            if (m_text == QLatin1String("import"))
-                m_kind = T_IMPORT;
+
+        case 6:
+            switch (t[0]) {
+                case 'i':
+                    if (t[1] == 'm' && t[2] == 'p' && t[3] == 'o' && t[4] == 'r' && t[5] == 't')
+                        m_kind = T_IMPORT;
+                    break;
+                case 's':
+                    if (t[1] == 'e') {
+                        if (t[2] == 'l' && t[3] == 'e' && t[4] == 'c' && t[5] == 't')
+                            m_kind = T_SELECT;
+                    } else if (t[1] == 't') {
+                        if (t[2] == 'r' && t[3] == 'u' && t[4] == 'c' && t[5] == 't')
+                            m_kind = T_STRUCT;
+                    } else if (t[1] == 'w') {
+                        if (t[2] == 'i' && t[3] == 't' && t[4] == 'c' && t[5] == 'h')
+                            m_kind = T_SWITCH;
+                    }
+                    break;
+            }
             break;
-        case 's':
-            if (m_text == QLatin1String("select"))
-                m_kind = T_SELECT;
-            else if (m_text == QLatin1String("struct"))
-                m_kind = T_STRUCT;
-            else if (m_text == QLatin1String("switch"))
-                m_kind = T_SWITCH;
+
+        case 7:
+            switch (t[0]) {
+                case 'd':
+                    if (t[1] == 'e' && t[2] == 'f' && t[3] == 'a' && t[4] == 'u' && t[5] == 'l' && t[6] == 't')
+                        m_kind = T_DEFAULT;
+                    break;
+                case 'p':
+                    if (t[1] == 'a' && t[2] == 'c' && t[3] == 'k' && t[4] == 'a' && t[5] == 'g' && t[6] == 'e')
+                        m_kind = T_PACKAGE;
+                    break;
+            }
             break;
-        }
-        break;
-    case 7:
-        switch (m_text.at(0).toLatin1()) {
-        case 'd':
-            if (m_text == QLatin1String("default"))
-                m_kind = T_DEFAULT;
-            break;
-        case 'p':
-            if (m_text == QLatin1String("package"))
-                m_kind = T_PACKAGE;
-            break;
-        }
-        break;
-    case 9:
-        switch (m_text.at(0).toLatin1()) {
-        case 'i':
-            if (m_text == QLatin1String("interface"))
+
+        case 9:
+            if (t[0] == 'i' && t[1] == 'n' && t[2] == 't' && t[3] == 'e' && t[4] == 'r' &&
+                t[5] == 'f' && t[6] == 'a' && t[7] == 'c' && t[8] == 'e')
                 m_kind = T_INTERFACE;
             break;
-        }
-        break;
-    }
-}
-
-void GoToken::parseParenthesis()
-{
-    switch (m_text.at(0).toLatin1()) {
-    case '{':
-        m_kind = T_LBRACE;
-        break;
-    case '}':
-        m_kind = T_RBRACE;
-        break;
-    case '[':
-        m_kind = T_LBRACKET;
-        break;
-    case ']':
-        m_kind = T_RBRACKET;
-        break;
-    case '(':
-        m_kind = T_LPAREN;
-        break;
-    case ')':
-        m_kind = T_RPAREN;
-        break;
     }
 }
 

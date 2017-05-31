@@ -77,6 +77,20 @@ GoHighlighter::GoHighlighter(TextDocument *parent) :
 GoHighlighter::~GoHighlighter()
 { }
 
+static QLatin1Char parenthesisChar(TokenKind kind)
+{
+    switch (kind) {
+        case T_LBRACE: return QLatin1Char('{');
+        case T_LBRACKET: return QLatin1Char('[');
+        case T_LPAREN: return QLatin1Char('(');
+        case T_RBRACE: return QLatin1Char('}');
+        case T_RBRACKET: return QLatin1Char(']');
+        case T_RPAREN: return QLatin1Char(')');
+        default: return QLatin1Char('\0');
+    }
+    return QLatin1Char('\0');
+}
+
 void GoHighlighter::highlightBlock(const QString &text)
 {
     // Reset to defaults
@@ -96,23 +110,24 @@ void GoHighlighter::highlightBlock(const QString &text)
     bool inMultiLineComment = previousState.multiLine() == LexerState::MultiLineComment;
 
     // Parse current text line
-    GoLexer *lexer = GoLexer::instance();
-    QList<GoToken> tokens = lexer->tokenize(text, previousBlockState());
-    LexerState currentState = lexer->lexerState();
+    GoLexer lexer;
+    QList<GoToken> tokens = lexer.tokenize(text, previousBlockState());
+    LexerState currentState = lexer.lexerState();
 
     // Set format for tokens
     for (int i = 0; i < tokens.count(); ++i) {
         const GoToken &tk = tokens.at(i);
         const bool isFirst = (i == 0);
         const bool isLast = (i == tokens.count() - 1);
-        switch (tk.kind()) {
+        const TokenKind kind = tk.kind();
+        switch (kind) {
         case T_LBRACE:
         case T_LBRACKET:
         case T_LPAREN:
             ++braceDepth;
             if (isFirst)
                 TextDocumentLayout::userData(currentBlock())->setFoldingStartIncluded(true);
-            parentheses.push_back(Parenthesis(Parenthesis::Opened, tk.ch(), tk.start()));
+            parentheses.push_back(Parenthesis(Parenthesis::Opened, parenthesisChar(kind), tk.start()));
             break;
         case T_RBRACE:
         case T_RBRACKET:
@@ -122,7 +137,7 @@ void GoHighlighter::highlightBlock(const QString &text)
                 TextDocumentLayout::userData(currentBlock())->setFoldingEndIncluded(true);
             else
                 foldingIndent = qMin(braceDepth, foldingIndent);
-            parentheses.push_back(Parenthesis(Parenthesis::Closed, tk.ch(), tk.start()));
+            parentheses.push_back(Parenthesis(Parenthesis::Closed, parenthesisChar(kind), tk.start()));
             break;
         case T_COMMENT:
             if (inMultiLineComment && text.midRef(tk.end() - 2, 2) == QLatin1String("*/")) {

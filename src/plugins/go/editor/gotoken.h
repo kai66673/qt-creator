@@ -144,18 +144,14 @@ public:
     int end() const { return (m_start + m_count); }
 
     TokenKind kind() const { return m_kind; }
-    const QString &text() const { return m_text; }
-    QChar ch() const { return m_text.length() ? m_text.at(0) : QLatin1Char('\0'); }
 
 private:
-    void parseKeyword();
-    void parseParenthesis();
+    void parseKeyword(const QChar *text);
 
 private:
     int m_start;
     int m_count;
     TokenKind m_kind;
-    QString m_text;
 };
 
 } // namespace Internal

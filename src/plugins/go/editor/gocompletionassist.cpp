@@ -73,7 +73,8 @@ public:
     int activeArgument(const QString &prefix) const override {
         int argnr = 0;
         int parcount = 0;
-        const QList<GoToken> tokens = GoLexer::instance()->tokenize(prefix, -1);
+        GoLexer lexer;
+        const QList<GoToken> tokens = lexer.tokenize(prefix, -1);
         for (int i = 0; i < tokens.count(); ++i) {
             const GoToken &tk = tokens.at(i);
             if (tk.is(T_LPAREN))
@@ -114,7 +115,8 @@ public:
         QString searchImportText = manipulator.textAt(0, basePosition);
         TextEditor::AssistProposalItem::applyContextualContent(manipulator, basePosition);
 
-        const QList<GoToken> tokens = GoLexer::instance()->tokenize(searchImportText, -1);
+        GoLexer lexer;
+        const QList<GoToken> tokens = lexer.tokenize(searchImportText, -1);
 
         TokenKind prevKind = T_INVALID;
         int packageKeywordEnd = -1;
@@ -276,7 +278,7 @@ TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEdit
             m_completions.append(m_snippetCollector.collect());
             // add keywords and other builtins
             Go::GoIconProvider *iconProvider = Go::GoIconProvider::instance();
-            for (const QString &builting: GoLexer::instance()->builtins()) {
+            for (const QString &builting: GoLexer::builtins()) {
                 TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem();
                 item->setText(builting);
                 item->setIcon(iconProvider->icon(Go::GoIconProvider::Keyword));

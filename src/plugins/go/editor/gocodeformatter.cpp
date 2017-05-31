@@ -557,9 +557,9 @@ int GoCodeFormatter::tokenizeBlock(const QTextBlock &block)
         previousState = 0;
 
     m_line = block.text();
-    GoLexer *lexer = GoLexer::instance();
-    m_tokens = lexer->tokenize(m_line, previousState);
-    int currentState = lexer->lexerState().state();
+    GoLexer lexer;
+    m_tokens = lexer.tokenize(m_line, previousState);
+    int currentState = lexer.lexerState().state();
 
     TextEditor::TextDocumentLayout::setLexerState(block, currentState);
     return currentState;
