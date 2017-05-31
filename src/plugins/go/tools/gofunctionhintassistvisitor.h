@@ -37,6 +37,9 @@ public:
 
     QStringList functionArguments(unsigned pos);
 
+    unsigned lparenPosition() const
+    { return m_lparenPosition; }
+
 protected:
     virtual bool preVisit(AST *) override;
 
@@ -56,7 +59,8 @@ private:
 
     GoSource::Ptr m_doc;
     bool m_ended;
-    Type *m_type;
+    ExprAST *m_funcExpr;
+    unsigned m_lparenPosition;
     QStringList m_functionArgs;
     unsigned m_pos;
 };

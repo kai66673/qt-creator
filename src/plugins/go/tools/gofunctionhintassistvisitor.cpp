@@ -37,9 +37,10 @@ GoFunctionHintAssistVisitor::GoFunctionHintAssistVisitor(GoSource::Ptr doc)
 
 QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
 {
-    m_type = 0;
+    m_funcExpr = 0;
     m_pos = pos;
     m_functionArgs.clear();
+    m_lparenPosition = -1;
 
     if (m_doc->translationUnit() && m_snapshot) {
         m_snapshot->runProtectedTask(
@@ -63,28 +64,31 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
                             }
                         }
 
-                        eraseResolvedTypes();
-
-                        if (FuncTypeAST *type = dynamic_cast<FuncTypeAST *>(m_type)) {
-                            if (type->params) {
-                                for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
-                                    if (FieldAST *field = field_it->value) {
-                                        QString typeDescr = field->type ? field->type->describe() : "";
-                                        if (DeclIdentListAST *name_it = field->names) {
-                                            for (; name_it; name_it = name_it->next) {
-                                                QString argName;
-                                                if (DeclIdentAST *name = name_it->value)
-                                                    argName = name->ident->toString();
-                                                QString argDescr(argName + QLatin1String(" ") + typeDescr);
-                                                m_functionArgs << argDescr.trimmed();
+                        if (m_funcExpr) {
+                            int derefLevel = 0;
+                            if (FuncTypeAST *type = dynamic_cast<FuncTypeAST *>(resolveExpr(m_funcExpr, derefLevel))) {
+                                if (type->params) {
+                                    for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
+                                        if (FieldAST *field = field_it->value) {
+                                            QString typeDescr = field->type ? field->type->describe() : "";
+                                            if (DeclIdentListAST *name_it = field->names) {
+                                                for (; name_it; name_it = name_it->next) {
+                                                    QString argName;
+                                                    if (DeclIdentAST *name = name_it->value)
+                                                        argName = name->ident->toString();
+                                                    QString argDescr(argName + QLatin1String(" ") + typeDescr);
+                                                    m_functionArgs << argDescr.trimmed();
+                                                }
+                                            } else if (!typeDescr.isEmpty()) {
+                                                m_functionArgs << typeDescr;
                                             }
-                                        } else if (!typeDescr.isEmpty()) {
-                                            m_functionArgs << typeDescr;
                                         }
                                     }
                                 }
                             }
                         }
+
+                        eraseResolvedTypes();
                     }
                 }
             }
@@ -223,16 +227,25 @@ bool GoFunctionHintAssistVisitor::visit(CaseClauseAST *ast)
 bool GoFunctionHintAssistVisitor::visit(CallExprAST *ast)
 {
     unsigned lparen = ast->t_lparen;
-    if (lparen) {
-        const Token &tk = _tokens->at(lparen);
-        if (m_pos == tk.begin()) {
-            m_ended = true;
-            int derefLevel = 0;
-            m_type = resolveExpr(ast->fun, derefLevel);
+    unsigned rparen = ast->t_rparen;
+    if (lparen && rparen) {
+        const Token &ltk = _tokens->at(lparen);
+        const Token &rtk = _tokens->at(rparen);
+        unsigned lparenPosition = ltk.begin();
+        if (m_pos >= lparenPosition && m_pos < rtk.begin()) {
+            m_funcExpr = ast->fun;
+            m_lparenPosition = lparenPosition;
+            if (m_pos == lparenPosition) {
+                m_ended = true;
+                return false;
+            }
+            accept(ast->args);
         }
     }
 
     return false;
 }
+
+
 
 }   // namespace GoTools

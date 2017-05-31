@@ -46,7 +46,11 @@ public:
     GoFunctionHintModel(const QStringList &functionArgs)
         : m_functionArgs(functionArgs)
         , m_currentArg(-1)
-    { }
+        , m_lastArgIsEllipsis(false)
+    {
+        if (m_functionArgs.last().contains(QLatin1String("...")))
+            m_lastArgIsEllipsis = true;
+    }
 
     void reset() override { }
     int size() const override { return 1; }
@@ -56,10 +60,11 @@ public:
         QString hintText = QLatin1String("(");
         int index = 0;
         for (const QString &arg: m_functionArgs) {
-            if (currArg == index)
+            bool markArg = currArg == index || (index == m_functionArgs.size() - 1 && m_lastArgIsEllipsis && currArg > index);
+            if (markArg)
                 hintText += QLatin1String("<b>");
             hintText += arg.toHtmlEscaped();
-            if (currArg == index)
+            if (markArg)
                 hintText += QLatin1String("</b>");
             hintText += QLatin1String(", ");
             index++;
@@ -97,6 +102,7 @@ public:
 private:
     QStringList m_functionArgs;
     mutable int m_currentArg;
+    mutable bool m_lastArgIsEllipsis;
 };
 
 class GoWithImportAssistProposalItem final: public TextEditor::AssistProposalItem
@@ -214,16 +220,15 @@ TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEdit
 
     if (!m_interface->source().isNull()) {
         QChar triggerChar = m_interface->characterAt(m_interface->position() - 1);
-        if (triggerChar == QChar('(')) {
+        if (triggerChar == QLatin1Char('(') || triggerChar == QLatin1Char(',')) {
             GoTools::GoFunctionHintAssistVisitor functionHint(m_interface->actualSource());
             QStringList functionArgs = functionHint.functionArguments(m_interface->position() - 1);
             if (functionArgs.isEmpty())
                 return 0;
             TextEditor::IFunctionHintProposalModel *model = new GoFunctionHintModel(functionArgs);
-            TextEditor::IAssistProposal *proposal = new TextEditor::FunctionHintProposal(m_interface->position() - 1, model);
+            TextEditor::IAssistProposal *proposal = new TextEditor::FunctionHintProposal(functionHint.lparenPosition() + 1, model);
             return proposal;
         }
-        /// TODO: triggerChar == QChar(',') ... some BacwardScanner sould be implemented...
         bool isDotTrigger = triggerChar == QChar('.');
         if (!isDotTrigger && !(triggerChar.isLetterOrNumber() || triggerChar == QChar('_') || triggerChar == QChar('$')))
             return 0;
