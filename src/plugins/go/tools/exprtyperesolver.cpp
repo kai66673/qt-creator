@@ -138,6 +138,9 @@ void ExprTypeResolver::resolveExpr(TurpleType *turple, ExprAST *x)
 
 Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)
 {
+    if (Type *typ = x->asType())
+        return typ;
+
     if (RefUnaryExprAST *refExpr = x->asRefUnaryExpr()) {
         int xDerefLevel = 0;
         Type *typ = resolveExpr(refExpr->x, xDerefLevel);
