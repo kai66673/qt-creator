@@ -38,7 +38,7 @@ GoToken::GoToken(int start, int count, TokenKind kind, const QChar *text) :
 {
     /// TODO: prevent compare duplication
     if (text && kind == T_KEYWORD)
-        parseKeyword(text);
+        parseKeyword(text + start);
 }
 
 void GoToken::parseKeyword(const QChar *text)

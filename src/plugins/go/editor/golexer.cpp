@@ -422,8 +422,11 @@ GoToken GoLexer::parseRune()
 GoToken GoLexer::parseSingleLineComment()
 {
     QChar c;
-    while (m_position < m_length)
+    while (m_position < m_length) {
         c = chpp();
+        if (c == QLatin1Char('\n'))
+            break;
+    }
     return GoToken(m_tokenPosition, m_position - m_tokenPosition, T_COMMENT);
 }
 

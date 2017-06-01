@@ -129,6 +129,8 @@ public:
         int prevKeywordEnd = -1;
         for (const GoToken &tk : tokens) {
             TokenKind kind = tk.kind();
+            if (kind == T_COMMENT)
+                continue;
             if (kind == T_PACKAGE) {
                 packageKeywordEnd = tk.end();
             } else if (prevKind == T_IMPORT && kind == T_LPAREN) {

@@ -32,6 +32,7 @@
 
 #include <QBoxLayout>
 #include <QMenu>
+#include <QDebug>
 
 namespace GoEditor {
 namespace Internal {
