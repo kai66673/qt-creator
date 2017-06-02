@@ -108,6 +108,14 @@ QString GoEditorDocumentProcessor::evaluateIdentifierTypeDescription(int pos)
     return QString();
 }
 
+void GoEditorDocumentProcessor::findUsages(int pos)
+{
+    if (isSourceReady()) {
+        SymbolUnderCursor finder(m_source);
+        qDebug() << "GoEditorDocumentProcessor::findUsages" << finder.typeDescription(pos);
+    }
+}
+
 GoSource::Ptr GoEditorDocumentProcessor::actualSource(int revision)
 {
     while (m_source.isNull() || m_source->revision() != revision

@@ -175,6 +175,9 @@ TextEditorWidget::Link GoDocument::findLinkAt(const QTextCursor &tc)
 QString GoDocument::evaluateIdentifierTypeDescription(int pos)
 { return processor()->evaluateIdentifierTypeDescription(pos); }
 
+void GoDocument::findUsages(int pos)
+{ processor()->findUsages(pos); }
+
 void GoDocument::applyFontSettings()
 {
     if (TextEditor::SyntaxHighlighter *highlighter = syntaxHighlighter()) {

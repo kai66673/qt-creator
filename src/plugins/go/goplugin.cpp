@@ -42,14 +42,21 @@
 #include "gocodemodelmanager.h"
 #include "goproject.h"
 #include "gooutlinewidgetfactory.h"
+#include "goeditorconstants.h"
 
+#include <coreplugin/actionmanager/actioncontainer.h>
+#include <coreplugin/actionmanager/actionmanager.h>
+#include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/icore.h>
 #include <coreplugin/jsexpander.h>
 #include <coreplugin/iwizardfactory.h>
 #include <projectexplorer/projectmanager.h>
 #include <projectexplorer/toolchainmanager.h>
+#include <texteditor/texteditorconstants.h>
 #include <texteditor/snippets/snippetprovider.h>
 #include <utils/mimetypes/mimedatabase.h>
+
+#include <QMenu>
 
 namespace GoLang {
 
@@ -77,6 +84,7 @@ public:
 
     GoIconProvider *iconProvider;
     GoLang::GoSettings *settings;
+    QAction *m_findUsagesAction;
 };
 
 GoPlugin *GoPlugin::m_instance(nullptr);
@@ -136,6 +144,8 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     connect(d->settings, &GoLang::GoSettings::generalSettingsChanged,
             codeModel, &GoTools::GoCodeModelManager::cleanPackageCache);
 
+    createActions();
+
     return true;
 }
 
@@ -173,6 +183,39 @@ GoPlugin *GoPlugin::instance()
 
 void GoPlugin::emitOutlineSortingChanged(bool sorted)
 { emit outlineSortingChanged(sorted); }
+
+void GoPlugin::findUsages()
+{
+    if (Core::IEditor *currentEditor = Core::EditorManager::currentEditor())
+        if (GoEditorWidget *editorWidget = qobject_cast<GoEditorWidget *>(currentEditor->widget()))
+            editorWidget->findUsages();
+}
+
+void GoPlugin::createActions()
+{
+    Core::Context context(::GoEditor::Constants::GOEDITOR_ID);
+    Core::Command *cmd;
+
+    Core::ActionContainer *contextMenu = Core::ActionManager::createMenu(::GoEditor::Constants::M_CONTEXT);
+
+    Core::ActionContainer *mtools = Core::ActionManager::actionContainer(Core::Constants::M_TOOLS);
+    Core::ActionContainer *goToolsMenu = Core::ActionManager::createMenu(::GoEditor::Constants::M_TOOLS_GO);
+    QMenu *menu = goToolsMenu->menu();
+    menu->setTitle(tr("&Go"));
+    menu->setEnabled(true);
+    mtools->addMenu(goToolsMenu);
+
+    cmd = Core::ActionManager::command(TextEditor::Constants::FOLLOW_SYMBOL_UNDER_CURSOR);
+    goToolsMenu->addAction(cmd);
+    contextMenu->addAction(cmd);
+
+    d->m_findUsagesAction = new QAction(tr("Find Usages"), this);
+    cmd = Core::ActionManager::registerAction(d->m_findUsagesAction, ::GoEditor::Constants::FIND_USAGES, context);
+    cmd->setDefaultKeySequence(QKeySequence(tr("Ctrl+Shift+U")));
+    connect(d->m_findUsagesAction, &QAction::triggered, this, &GoPlugin::findUsages);
+    contextMenu->addAction(cmd);
+    goToolsMenu->addAction(cmd);
+}
 
 }   // namespace Internal
 }   // namespace Go

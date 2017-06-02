@@ -35,17 +35,8 @@ const char M_CONTEXT[]              = "GoEditor.ContextMenu";
 const char M_TOOLS_GO[]             = "GoEditor.Tools.Menu";
 const char GOTO_DEFINITION[]        = "GoEditor.GotoDefinition";
 
-// Guru Tools Actions
-const char GURU_CALLEES[]           = "GoEditor.GuruCallees";
-const char GURU_CALLERS[]           = "GoEditor.GuruCallers";
-const char GURU_CALLSTACK[]         = "GoEditor.GuruCallstack";
-const char GURU_DESCRIBE[]          = "GoEditor.GuruDescribe";
-const char GURU_FREEVARS[]          = "GoEditor.GuruFreevars";
-const char GURU_IMPLEMENTS[]        = "GoEditor.GuruImplements";
-const char GURU_PEERS[]             = "GoEditor.GuruPeers";
-const char GURU_POINTSTO[]          = "GoEditor.GuruPointsto";
-const char GURU_REFERRERS[]         = "GoEditor.GuruReferrers";
-const char GURU_WHICHERRS[]         = "GoEditor.GuruWhicherrs";
+// Actions
+const char FIND_USAGES[] = "GoEditor.FindUsages";
 
 } // namespace GoEditor
 } // namespace Constants

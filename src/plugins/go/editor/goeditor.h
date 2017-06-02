@@ -67,6 +67,7 @@ public:
                                                        TextEditor::AssistReason reason) const override;
 
     QString evaluateIdentifierTypeDescription(int pos);
+    void findUsages();
 
 protected:
     virtual Link findLinkAt(const QTextCursor &tc, bool resolveTarget = true,

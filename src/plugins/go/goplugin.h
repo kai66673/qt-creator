@@ -50,11 +50,14 @@ public:
 
     static GoPlugin *instance();
     void emitOutlineSortingChanged(bool sorted);
+    void findUsages();
 
 signals:
     void outlineSortingChanged(bool sort);
 
 private:
+    void createActions();
+
     static GoPlugin *m_instance;
     GoPluginPrivate *d;
 };

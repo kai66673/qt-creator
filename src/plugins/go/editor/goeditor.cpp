@@ -182,6 +182,9 @@ AssistInterface *GoEditorWidget::createAssistInterface(AssistKind kind, AssistRe
 QString GoEditorWidget::evaluateIdentifierTypeDescription(int pos)
 { return d->m_goDocument->evaluateIdentifierTypeDescription(pos); }
 
+void GoEditorWidget::findUsages()
+{ d->m_goDocument->findUsages(textCursor().position()); }
+
 TextEditorWidget::Link GoEditorWidget::findLinkAt(const QTextCursor &tc, bool /*resolveTarget*/, bool /*inNextSplit*/)
 { return d->m_goDocument->findLinkAt(tc); }
 
