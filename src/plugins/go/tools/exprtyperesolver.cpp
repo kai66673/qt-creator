@@ -42,10 +42,10 @@ ExprTypeResolver::~ExprTypeResolver()
     GoPackageCache::instance()->releaseSnapshot();
 }
 
-void ExprTypeResolver::resolve(ExprListAST *list, TurpleType *&result)
+void ExprTypeResolver::resolve(ExprListAST *list, TupleType *&result)
 {
-    result = new TurpleType;
-    m_turples.append(&result);
+    result = new TupleType;
+    m_tuples.append(&result);
     for (ExprListAST *it = list; it; it = it->next) {
         if (ExprAST *expr = it->value) {
             if (Type *typ = expr->asType()) {
@@ -58,10 +58,10 @@ void ExprTypeResolver::resolve(ExprListAST *list, TurpleType *&result)
     }
 }
 
-void ExprTypeResolver::resolve(ExprAST *expr, TurpleType *&result)
+void ExprTypeResolver::resolve(ExprAST *expr, TupleType *&result)
 {
-    result = new TurpleType;
-    m_turples.append(&result);
+    result = new TupleType;
+    m_tuples.append(&result);
     if (Type *typ = expr->asType()) {
         result->appendType(new TypeWithDerefLevel(0, typ));
         return;
@@ -75,15 +75,15 @@ GoSnapshot *ExprTypeResolver::snapshot()
 
 void ExprTypeResolver::eraseResolvedTypes()
 {
-    for (auto turple: m_turples) {
-        delete *turple;
-        *turple = 0;
+    for (auto tuple: m_tuples) {
+        delete *tuple;
+        *tuple = 0;
     }
 
-    m_turples.clear();
+    m_tuples.clear();
 }
 
-void ExprTypeResolver::resolveExpr(TurpleType *turple, ExprAST *x)
+void ExprTypeResolver::resolveExpr(TupleType *tuple, ExprAST *x)
 {
     int derefLevel = 0;
 
@@ -93,20 +93,20 @@ void ExprTypeResolver::resolveExpr(TurpleType *turple, ExprAST *x)
             if (funcIdent->isNewKeyword()) {            // new(...) builting function
                 if (callExpr->args) {
                     if (Type *typ = resolveExpr(callExpr->args->value, derefLevel)) {
-                        turple->appendType(new TypeWithDerefLevel(derefLevel - 1, typ));
+                        tuple->appendType(new TypeWithDerefLevel(derefLevel - 1, typ));
                         return;
                     }
                 }
-                turple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
+                tuple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
                 return;
             } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
                 if (callExpr->args) {
                     if (Type *typ = resolveExpr(callExpr->args->value, derefLevel)) {
-                        turple->appendType(new TypeWithDerefLevel(derefLevel, typ));
+                        tuple->appendType(new TypeWithDerefLevel(derefLevel, typ));
                         return;
                     }
                 }
-                turple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
+                tuple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
                 return;
             }
         }
@@ -116,7 +116,7 @@ void ExprTypeResolver::resolveExpr(TurpleType *turple, ExprAST *x)
                 if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
                     if (Type *typeConvertion = tryResolveNamedType(starExpr->x)) {
                         derefLevel = 0;
-                        turple->appendType(new TypeWithDerefLevel(derefLevel, typeConvertion));
+                        tuple->appendType(new TypeWithDerefLevel(derefLevel, typeConvertion));
                         return;
                     }
                 }
@@ -124,16 +124,16 @@ void ExprTypeResolver::resolveExpr(TurpleType *turple, ExprAST *x)
         }
         // common case - function call
         if (Type *context = resolveExpr(callExpr->fun, derefLevel)) {
-            context->fillTurple(turple, this);
+            context->fillTuple(tuple, this);
             return;
         }
 
-        turple->appendType(new TypeWithDerefLevel(derefLevel, Control::builtinType()));
+        tuple->appendType(new TypeWithDerefLevel(derefLevel, Control::builtinType()));
         return;
     }
 
     Type *typ = resolveExpr(x, derefLevel);
-    turple->appendType(new TypeWithDerefLevel(derefLevel, typ));
+    tuple->appendType(new TypeWithDerefLevel(derefLevel, typ));
 }
 
 Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)

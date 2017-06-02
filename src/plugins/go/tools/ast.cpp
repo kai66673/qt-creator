@@ -1006,20 +1006,20 @@ Type *FuncTypeAST::calleeType(int index, ExprTypeResolver *) const
     return 0;
 }
 
-void FuncTypeAST::fillTurple(TurpleType *turple, ExprTypeResolver *) const
+void FuncTypeAST::fillTuple(TupleType *tuple, ExprTypeResolver *) const
 {
     if (results && results->fields) {
         for (FieldListAST *it = results->fields; it; it = it->next) {
             if (FieldAST *field = it->value) {
-                turple->appendType(new TypeWithDerefLevel(0, field->type ? field->type->asType() : Control::builtinType()));
+                tuple->appendType(new TypeWithDerefLevel(0, field->type ? field->type->asType() : Control::builtinType()));
             } else {
-                turple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
+                tuple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
             }
         }
         return;
     }
 
-    turple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
+    tuple->appendType(new TypeWithDerefLevel(0, Control::builtinType()));
 }
 
 QString FuncTypeAST::describe() const
@@ -1884,10 +1884,10 @@ Type *TypeSpecAST::elementsType(ExprTypeResolver *resolver)
 Type *TypeSpecAST::calleeType(int index, ExprTypeResolver *resolver) const
 { return type ? type->calleeType(index, resolver) : 0; }
 
-void TypeSpecAST::fillTurple(TurpleType *turple, ExprTypeResolver *resolver) const
+void TypeSpecAST::fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const
 {
     if (type)
-        type->fillTurple(turple, resolver);
+        type->fillTuple(tuple, resolver);
 }
 
 Type *TypeSpecAST::chanValueType() const
@@ -2124,12 +2124,12 @@ Type *TypeIdentAST::calleeType(int index, ExprTypeResolver *resolver) const
     return 0;
 }
 
-void TypeIdentAST::fillTurple(TurpleType *turple, ExprTypeResolver *resolver) const
+void TypeIdentAST::fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const
 {
     if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
         if (symbol->kind() == Symbol::Typ) {
             Type *resolvedType = symbol->type(resolver);
-            resolvedType->fillTurple(turple, resolver);
+            resolvedType->fillTuple(tuple, resolver);
         }
     }
 }

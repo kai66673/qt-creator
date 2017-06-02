@@ -29,7 +29,7 @@
 
 namespace GoTools {
 
-class TurpleType;
+class TupleType;
 
 class Type: public LookupContext
 {
@@ -40,7 +40,7 @@ public:
     virtual Type *elementsType(ExprTypeResolver *resolver) = 0;                   // value:   S[K] -> type of S[...]
     virtual Type *calleeType(int index, ExprTypeResolver *resolver) const = 0;    // type of function call returns
     virtual Type *chanValueType() const = 0;
-    virtual void fillTurple(TurpleType *turple, ExprTypeResolver *) const;
+    virtual void fillTuple(TupleType *tuple, ExprTypeResolver *) const;
     virtual Type *derefType() const { return 0; }
 
     virtual Type *baseType() { return this; }
@@ -159,10 +159,10 @@ private:
     Type *_baseType;
 };
 
-class TurpleType
+class TupleType
 {
 public:
-    virtual ~TurpleType() { }
+    virtual ~TupleType() { }
 
     Type *type(int index);
     void appendType(TypeWithDerefLevel *typ);

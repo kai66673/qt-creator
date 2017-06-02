@@ -61,7 +61,7 @@ static Identifier s_newIdentifier("!0", 2);
 static Identifier s_makeIdentifier("!1", 2);
 
 static BuiltinType s_builtinType;
-static TurpleType s_nullTurpleType;
+static TupleType s_nullTupleType;
 
 class Control::Data
 {
@@ -278,8 +278,8 @@ const Identifier *Control::builtinComplex128Identifier()
 Type *Control::builtinType()
 { return &s_builtinType; }
 
-TurpleType *Control::nullTurpleType()
-{ return &s_nullTurpleType; }
+TupleType *Control::nullTupleType()
+{ return &s_nullTupleType; }
 
 const Identifier *Control::newIdentifier()
 { return &s_newIdentifier; }

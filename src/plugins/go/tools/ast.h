@@ -423,7 +423,7 @@ public:
     virtual Type *indexType(ExprTypeResolver *resolver) override;
     virtual Type *elementsType(ExprTypeResolver *resolver) override;
     virtual Type *calleeType(int index, ExprTypeResolver *resolver) const override;
-    virtual void fillTurple(TurpleType *turple, ExprTypeResolver *resolver) const override;
+    virtual void fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const override;
     virtual Type *chanValueType() const override;
 
     QString describe() const;
@@ -564,7 +564,7 @@ protected:
 class RhsExprListAST: public ExprAST
 {
 public:
-    TurpleType *resolvedType = 0;
+    TupleType *resolvedType = 0;
 
 public:
     ExprListAST *list;
@@ -588,7 +588,7 @@ protected:
 class RangeExpAST: public ExprAST
 {
 public:
-    TurpleType *resolvedType = 0;
+    TupleType *resolvedType = 0;
 
 public:
     ExprAST *x;
@@ -749,7 +749,7 @@ public:
     virtual Type *elementsType(ExprTypeResolver *resolver) override;
     virtual Type *indexType(ExprTypeResolver *resolver) override;
     virtual Type *calleeType(int index, ExprTypeResolver *resolver) const override;
-    virtual void fillTurple(TurpleType *turple, ExprTypeResolver *resolver) const override;
+    virtual void fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const override;
 
     virtual QString describe() const override;
 
@@ -951,8 +951,8 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ExprTypeResolver *resolver, Predicate = 0) override
     { if (typ) typ->fillMemberCompletions(completions, resolver); }
-    virtual void fillTurple(TurpleType *turple, ExprTypeResolver *resolver) const override
-    { if (typ) typ->fillTurple(turple, resolver); }
+    virtual void fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const override
+    { if (typ) typ->fillTuple(tuple, resolver); }
 
     virtual Type *baseType() override { return typ ? typ->baseType() : 0; }
     virtual int refLevel() const override { return typ ? -1 + typ->refLevel() : -1; }
@@ -1181,7 +1181,7 @@ public:
     virtual bool isValidCompositeLiteralType() const { return false; }
 
     virtual Type *calleeType(int index, ExprTypeResolver *) const override;
-    virtual void fillTurple(TurpleType *turple, ExprTypeResolver *) const override;
+    virtual void fillTuple(TupleType *tuple, ExprTypeResolver *) const override;
     virtual QString describe() const override;
 
 protected:

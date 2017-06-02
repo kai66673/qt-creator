@@ -36,7 +36,7 @@ class Identifier;
 class Scope;
 class FileScope;
 class Type;
-class TurpleType;
+class TupleType;
 class FuncDeclAST;
 class FuncTypeAST;
 class TypeSpecAST;
@@ -96,7 +96,7 @@ public:
     static const Identifier *builtinComplex128Identifier();
 
     static Type *builtinType();
-    static TurpleType *nullTurpleType();
+    static TupleType *nullTupleType();
 
     static const Identifier *newIdentifier();
     static const Identifier *makeIdentifier();

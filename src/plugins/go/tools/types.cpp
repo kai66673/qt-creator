@@ -26,17 +26,17 @@
 
 namespace GoTools {
 
-Type *TurpleType::type(int index)
+Type *TupleType::type(int index)
 {
     if (index >= 0 && index < _types.size())
         return _types.at(index);
     return 0;
 }
 
-void TurpleType::appendType(TypeWithDerefLevel *typ)
+void TupleType::appendType(TypeWithDerefLevel *typ)
 { _types.append(typ); }
 
-void Type::fillTurple(TurpleType *turple, ExprTypeResolver *) const
-{ turple->appendType(new TypeWithDerefLevel(0, Control::builtinType())); }
+void Type::fillTuple(TupleType *tuple, ExprTypeResolver *) const
+{ tuple->appendType(new TypeWithDerefLevel(0, Control::builtinType())); }
 
 }   // namespace GoTools

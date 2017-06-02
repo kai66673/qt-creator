@@ -166,7 +166,7 @@ public:
     ShortVarDecl(unsigned tokenIndex, const Identifier *identifier, RhsExprListAST *decl, unsigned index, Scope *owner)
         : Symbol(tokenIndex, identifier, owner)
         , _decl(decl)
-        , _indexInTurple(index)
+        , _indexInTuple(index)
     { }
 
     virtual ExprAST *declExpr() const override;
@@ -176,7 +176,7 @@ public:
 
 private:
     RhsExprListAST *_decl;
-    unsigned _indexInTurple;
+    unsigned _indexInTuple;
 };
 
 class RangeKeyDecl: public Symbol

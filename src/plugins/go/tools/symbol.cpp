@@ -137,11 +137,11 @@ ExprAST *ShortVarDecl::declExpr() const
 { return _decl; }
 
 Type *ShortVarDecl::type(ExprTypeResolver *resolver)
-{ return _decl->type(resolver, _indexInTurple); }
+{ return _decl->type(resolver, _indexInTuple); }
 
 QString ShortVarDecl::describeType(ExprTypeResolver *resolver) const
 {
-    if (Type *type = _decl->type(resolver, _indexInTurple))
+    if (Type *type = _decl->type(resolver, _indexInTuple))
         return type->describe();
     return QString();
 }

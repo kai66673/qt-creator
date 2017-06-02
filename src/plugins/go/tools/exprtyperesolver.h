@@ -37,14 +37,14 @@ public:
     ExprTypeResolver();
     virtual ~ExprTypeResolver();
 
-    void resolve(ExprListAST *list, TurpleType *&result);
-    void resolve(ExprAST *list, TurpleType *&result);
+    void resolve(ExprListAST *list, TupleType *&result);
+    void resolve(ExprAST *list, TupleType *&result);
     GoSnapshot *snapshot();
 
     void eraseResolvedTypes();
 
 protected:
-    void resolveExpr(TurpleType *turple, ExprAST *x);
+    void resolveExpr(TupleType *tuple, ExprAST *x);
     Type *resolveExpr(ExprAST *x, int &derefLevel);
     Type *tryResolveNamedType(ExprAST *x);
     Type *resolveCompositExpr(CompositeLitAST *ast);
@@ -55,7 +55,7 @@ protected:
     GoSnapshot *m_snapshot;
     int m_currentIndex;
     Scope *m_currentScope;
-    QList<TurpleType **> m_turples;
+    QList<TupleType **> m_tuples;
 };
 
 }   // namespace GoTools
