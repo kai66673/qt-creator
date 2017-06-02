@@ -66,6 +66,7 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
     m_token = 0;
     m_useReason = reason;
     m_symbolTypeDescription.clear();
+    m_packageAlias.clear();
 
     if (m_doc->translationUnit() && m_snapshot) {
         m_snapshot->runProtectedTask(
@@ -76,28 +77,52 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
                     if (m_currentIndex != -1) {
                         m_ended = false;
 
-                        for (DeclListAST *it = fileAst->decls; it; it = it->next) {
-                            const Token &firstToken = _tokens->at(it->value->firstToken());
-                            const Token &lastToken = _tokens->at(it->value->lastToken());
-                            if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                                accept(it->value);
-                                break;
-                            }
-
-                            if (m_pos <= firstToken.begin()) {
-                                break;
+                        if (m_useReason == DescribeType) {
+                            for (DeclListAST *it = fileAst->importDecls; it; it = it->next) {
+                                const Token &firstToken = _tokens->at(it->value->firstToken());
+                                const Token &lastToken = _tokens->at(it->value->lastToken());
+                                if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
+                                    accept(it->value);
+                                    m_ended = true;
+                                    break;
+                                }
+                                if (m_pos <= firstToken.begin()) {
+                                    m_ended = true;
+                                    break;
+                                }
                             }
                         }
 
-                        if (m_symbol) {
-                            switch (m_useReason) {
-                                case Link:
+                        if (!m_ended) {
+                            for (DeclListAST *it = fileAst->decls; it; it = it->next) {
+                                const Token &firstToken = _tokens->at(it->value->firstToken());
+                                const Token &lastToken = _tokens->at(it->value->lastToken());
+                                if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
+                                    accept(it->value);
                                     break;
-                                case DescribeType:
+                                }
+                                if (m_pos <= firstToken.begin()) {
+                                    break;
+                                }
+                            }
+                        }
+
+                        switch (m_useReason) {
+                            case Link:
+                                break;
+                            case DescribeType:
+                                if (m_symbol) {
                                     switchScope(m_symbol->owner());
                                     m_symbolTypeDescription = m_symbol->describeType(this);
-                                    break;
-                            }
+                                } else if (!m_packageAlias.isEmpty()) {
+                                    for (const GoSource::Import &import: m_doc->imports()) {
+                                        if (import.alias == m_packageAlias) {
+                                            m_symbolTypeDescription = QLatin1String("package: ") + import.resolvedDir;
+                                            break;
+                                        }
+                                    }
+                                }
+                                break;
                         }
 
                         eraseResolvedTypes();
@@ -110,6 +135,33 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
 
 bool SymbolUnderCursor::preVisit(AST *)
 { return !m_ended; }
+
+bool SymbolUnderCursor::visit(ImportSpecAST *ast)
+{
+    if (ast->t_path) {
+        unsigned startPos = ast->name ? ast->name->t_identifier : ast->t_path;
+        const Token &firstToken = _tokens->at(startPos);
+        const Token &lastToken = _tokens->at(ast->t_path);
+
+        if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
+            if (ast->name) {
+                m_packageAlias = ast->name->ident->toString();
+            } else {
+                QString path = lastToken.string->unquoted();
+                if (!path.isEmpty()) {
+                    int pos = path.lastIndexOf('/') + 1;
+                    m_packageAlias = path.mid(pos);
+                }
+            }
+            m_ended = true;
+        }
+
+        else if (m_pos <= lastToken.end())
+            m_ended = true;
+    }
+
+    return false;
+}
 
 bool SymbolUnderCursor::visit(DeclIdentAST *ast)
 {
@@ -134,8 +186,14 @@ bool SymbolUnderCursor::visit(IdentAST *ast)
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
         m_ended = true;
-        if (ast->isLookable())
+        if (ast->isLookable()) {
             m_symbol = m_currentScope->lookupMember(ast, this);
+            if (!m_symbol && m_useReason == DescribeType) { // may be a package
+                QString packageAlias(ast->ident->toString());
+                if (m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+                    m_packageAlias = packageAlias;
+            }
+        }
     }
 
     else if (m_pos <= tk.end())
@@ -164,6 +222,18 @@ bool SymbolUnderCursor::visit(TypeIdentAST *ast)
 
 bool SymbolUnderCursor::visit(PackageTypeAST *ast)
 {
+    if (m_useReason == DescribeType) {
+        const Token &tk = _tokens->at(ast->packageAlias->t_identifier);
+        if (m_pos >= tk.begin() && m_pos <= tk.end()) {
+            m_ended = true;
+            QString packageAlias(ast->packageAlias->ident->toString());
+            if (ast->packageAlias->isLookable())
+                if (m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+                    m_packageAlias = packageAlias;
+            return false;
+        }
+    }
+
     const Token &tk = _tokens->at(ast->typeName->t_identifier);
     m_token = &tk;
 

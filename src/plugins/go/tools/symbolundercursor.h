@@ -48,6 +48,8 @@ public:
 protected:
     virtual bool preVisit(AST *);
 
+    virtual bool visit(ImportSpecAST *ast);
+
     virtual bool visit(DeclIdentAST *ast);
     virtual bool visit(IdentAST *ast);
     virtual bool visit(TypeIdentAST *ast);
@@ -77,6 +79,7 @@ private:
     const Token *m_token;
     UseReason m_useReason;
     QString m_symbolTypeDescription;
+    QString m_packageAlias;
     bool m_ended;
 };
 
