@@ -90,13 +90,7 @@ void GoEditorDocumentProcessor::editorDocumentTimerRestarted()
 
 TextEditor::TextEditorWidget::Link GoEditorDocumentProcessor::findLinkAt(const QTextCursor &tc)
 {
-    if (m_source.isNull())
-        return TextEditor::TextEditorWidget::Link();
-
-    if (m_source->revision() != m_textDocument->document()->revision())
-        return TextEditor::TextEditorWidget::Link();
-
-    if (m_semanticHighlighter->revision() == m_textDocument->document()->revision() && !m_semanticHighlighter->isRunning()) {
+    if (isSourceReady()) {
         SymbolUnderCursor finder(m_source);
         return finder.link(tc.position());
     }
@@ -106,13 +100,7 @@ TextEditor::TextEditorWidget::Link GoEditorDocumentProcessor::findLinkAt(const Q
 
 QString GoEditorDocumentProcessor::evaluateIdentifierTypeDescription(int pos)
 {
-    if (m_source.isNull())
-        return QString();
-
-    if (m_source->revision() != m_textDocument->document()->revision())
-        return QString();
-
-    if (m_semanticHighlighter->revision() == m_textDocument->document()->revision() && !m_semanticHighlighter->isRunning()) {
+    if (isSourceReady()) {
         SymbolUnderCursor finder(m_source);
         return finder.typeDescription(pos);
     }
@@ -171,5 +159,16 @@ GoTools::GoSource::Ptr GoEditorDocumentProcessor::source() const
 
 void GoEditorDocumentProcessor::setForceSemanticRehighligting()
 { m_forceSemanticRehighligting = true; }
+
+bool GoEditorDocumentProcessor::isSourceReady() const
+{
+    if (m_source.isNull())
+        return false;
+
+    if (m_source->revision() != m_textDocument->document()->revision())
+        false;
+
+    return m_semanticHighlighter->revision() == m_textDocument->document()->revision() && !m_semanticHighlighter->isRunning();
+}
 
 }   // namespace GoTools

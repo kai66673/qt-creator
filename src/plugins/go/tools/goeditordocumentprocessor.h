@@ -83,6 +83,8 @@ public:
     void setForceSemanticRehighligting();
 
 private:
+    bool isSourceReady() const;
+
     TextEditor::TextDocument *m_textDocument;
     QFuture<void> m_parserFuture;
     GoEditorDocumentParser::Ptr m_parser;

@@ -137,8 +137,6 @@ private:
     void declareConst(Scope *scope, DeclIdentAST *ident);
     void declareConst(Scope *scope, DeclIdentListAST *idents);
 
-//    void declareSymbol(ExprAST *typ, Scope *scope, Symbol::Kind kind, DeclIdentAST *ident);
-//    void declareSymbol(ExprAST *typ, Scope *scope, Symbol::Kind kind, DeclIdentListAST *idents);
     void declareFunc(FuncTypeAST *typ, Scope *scope, DeclIdentAST *ident);
     void declareFunc(FuncTypeAST *typ, Scope *scope, DeclIdentListAST *idents);
     void declareMethod(FuncDeclAST *ast);
