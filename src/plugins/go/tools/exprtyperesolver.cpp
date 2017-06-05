@@ -73,6 +73,12 @@ void ExprTypeResolver::resolve(ExprAST *expr, TupleType *&result)
 GoSnapshot *ExprTypeResolver::snapshot()
 { return m_snapshot; }
 
+Scope *ExprTypeResolver::currentScope() const
+{ return m_currentScope; }
+
+PackageType *ExprTypeResolver::packageTypeForAlias(const QString &alias)
+{ return m_snapshot->packageTypeForAlias(m_currentIndex, alias); }
+
 void ExprTypeResolver::eraseResolvedTypes()
 {
     for (auto tuple: m_tuples) {
@@ -114,7 +120,7 @@ void ExprTypeResolver::resolveExpr(TupleType *tuple, ExprAST *x)
         if (ParenExprAST *parenExpr = callExpr->fun->asParenExpr()) {
             if (parenExpr->x) {
                 if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-                    if (Type *typeConvertion = tryResolveNamedType(starExpr->x)) {
+                    if (Type *typeConvertion = tryResolveNamedType(this, starExpr->x)) {
                         derefLevel = 0;
                         tuple->appendType(new TypeWithDerefLevel(derefLevel, typeConvertion));
                         return;
@@ -141,163 +147,7 @@ Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)
     if (Type *typ = x->asType())
         return typ;
 
-    if (RefUnaryExprAST *refExpr = x->asRefUnaryExpr()) {
-        int xDerefLevel = 0;
-        Type *typ = resolveExpr(refExpr->x, xDerefLevel);
-        derefLevel += xDerefLevel - 1;
-        return typ;
-    }
-
-    if (StarExprAST *starExpr = x->asStarExpr()) {
-        int xDerefLevel = 0;
-        Type *typ = resolveExpr(starExpr->x, xDerefLevel);
-        derefLevel += xDerefLevel + 1;
-        return typ;
-    }
-
-    if (ArrowUnaryExprAST *arrowExpr = x->asArrowUnaryExpr()) {
-        int xDerefLevel = 0;
-        if (Type *type = resolveExpr(arrowExpr->x, xDerefLevel)) {
-            if (type->refLevel() + xDerefLevel == 0)
-                if (Type *baseTyp = type->baseType())
-                    return baseTyp->chanValueType();
-        }
-        return 0;
-    }
-
-    if (IdentAST *ident = x->asIdent()) {
-        QTC_ASSERT(!derefLevel, return 0);
-        if (!ident->isLookable())
-            return 0;
-        QString idStr(ident->ident->toString());
-        if (Symbol *s = m_currentScope->lookupMember(ident, this)) {
-            return s->type(this);
-        }
-        if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, idStr)) {
-            return context;
-        }
-    } else if (SelectorExprAST *selAst = x->asSelectorExpr()) {
-        QTC_ASSERT(!derefLevel, return 0);
-        Type *context = resolveExpr(selAst->x, derefLevel);
-        if (IdentAST *ident = selAst->sel) {
-            if (context && ident->isLookable()) {
-                int testDerefLevel = context->refLevel() + derefLevel;
-                if (testDerefLevel == 0 || testDerefLevel == -1) {
-                    if (Type *baseTyp = context->baseType()) {
-                        if (Symbol *s = baseTyp->lookupMember(ident, this)) {
-                            derefLevel = 0;
-                            return s->type(this);
-                        }
-                    }
-                }
-            }
-        }
-    } else if (CallExprAST *callExpr = x->asCallExpr()) {
-        QTC_ASSERT(!derefLevel, return 0);
-        // check for...
-        if (IdentAST *funcIdent = callExpr->fun->asIdent()) {
-            if (funcIdent->isNewKeyword()) {            // new(...) builting function
-                if (callExpr->args) {
-                    int xDerefLevel = 0;
-                    if (Type *typ = resolveExpr(callExpr->args->value, xDerefLevel)) {
-                        derefLevel = xDerefLevel - 1;
-                        return typ;
-                    }
-                }
-                return 0;
-            } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
-                if (callExpr->args) {
-                    int xDerefLevel = 0;
-                    if (Type *typ = resolveExpr(callExpr->args->value, xDerefLevel)) {
-                        derefLevel = xDerefLevel;
-                        return typ;
-                    }
-                }
-                return 0;
-            }
-        }
-        // check for type convertion
-        if (ParenExprAST *parenExpr = callExpr->fun->asParenExpr()) {
-            if (parenExpr->x) {
-                if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-                    if (Type *typeConvertion = tryResolveNamedType(starExpr->x)) {
-                        derefLevel = 0;
-                        return typeConvertion;
-                    }
-                }
-            }
-        }
-        // common case - function call
-        if (Type *context = resolveExpr(callExpr->fun, derefLevel)) {
-            if (context->refLevel() + derefLevel == 0) {
-                if (Type *baseTyp = context->baseType()) {
-                    derefLevel = 0;
-                    return baseTyp->calleeType(0, this);
-                }
-            }
-        }
-    } else if (IndexExprAST *indexExpr = x->asIndexExpr()) {
-        QTC_ASSERT(!derefLevel, return 0);
-        if (Type *context = resolveExpr(indexExpr->x, derefLevel)) {
-            if (context->refLevel() + derefLevel == 0) {
-                if (Type *baseTyp = context->baseType()) {
-                    derefLevel = 0;
-                    return baseTyp->elementsType(this);
-                }
-            }
-        }
-    } else if (CompositeLitAST *compositLit = x->asCompositeLit()) {
-        return resolveCompositExpr(compositLit);
-    } else if (TypeAssertExprAST *typeAssert = x->asTypeAssertExpr()) {
-        derefLevel = 0;
-        return typeAssert->typ ? typeAssert->typ->asType() : 0;
-    } else if (ParenExprAST *parenExpr = x->asParenExpr()) {
-        if (parenExpr->x) {
-            if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-                if (Type *typeConvertion = tryResolveNamedType(starExpr->x)) {
-                    derefLevel = 0;
-                    return typeConvertion;
-                }
-            }
-            return resolveExpr(parenExpr->x, derefLevel);
-        }
-    } else if (FuncLitAST *funcLit = x->asFuncLit()) {
-        return funcLit->type;
-    } else {
-        QTC_ASSERT(false, return 0);
-    }
-
-    return 0;
-}
-
-Type *ExprTypeResolver::tryResolveNamedType(ExprAST *x)
-{
-    if (x) {
-        if (IdentAST *ident = x->asIdent()) {
-            if (ident->isLookable()) {
-                if (Symbol *s = m_currentScope->lookupMember(ident, this)) {
-                    if (s->kind() == Symbol::Typ) {
-                        return s->type(this);
-                    }
-                }
-            }
-        } else if (SelectorExprAST *selExpr = x->asSelectorExpr()) {
-            if (selExpr->sel->isLookable()) {
-                if (IdentAST *packageIdent = selExpr->x->asIdent()) {
-                    QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias)) {
-                        if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
-                            if (s->kind() == Symbol::Typ) {
-                                return s->type(this);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return 0;
+    return x->resolve(this, derefLevel);
 }
 
 Type *ExprTypeResolver::resolveCompositExpr(CompositeLitAST *ast)
@@ -306,7 +156,7 @@ Type *ExprTypeResolver::resolveCompositExpr(CompositeLitAST *ast)
         if (TypeAST *typ = type->asType())
             return typ;
 
-    return tryResolveNamedType(ast->type);
+    return tryResolveNamedType(this, ast->type);
 }
 
 Scope *ExprTypeResolver::switchScope(Scope *scope)
@@ -316,6 +166,36 @@ Scope *ExprTypeResolver::switchScope(Scope *scope)
 
     std::swap(m_currentScope, scope);
     return scope;
+}
+
+Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x)
+{
+    if (x) {
+        if (IdentAST *ident = x->asIdent()) {
+            if (ident->isLookable()) {
+                if (Symbol *s = resolver->currentScope()->lookupMember(ident, resolver)) {
+                    if (s->kind() == Symbol::Typ) {
+                        return s->type(resolver);
+                    }
+                }
+            }
+        } else if (SelectorExprAST *selExpr = x->asSelectorExpr()) {
+            if (selExpr->sel->isLookable()) {
+                if (IdentAST *packageIdent = selExpr->x->asIdent()) {
+                    QString packageAlias(packageIdent->ident->toString());
+                    if (PackageType *context = resolver->packageTypeForAlias(packageAlias)) {
+                        if (Symbol *s = context->lookupMember(selExpr->sel, resolver)) {
+                            if (s->kind() == Symbol::Typ) {
+                                return s->type(resolver);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return 0;
 }
 
 }   // namespace GoTools

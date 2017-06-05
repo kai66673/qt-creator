@@ -80,6 +80,7 @@ private:
     UseReason m_useReason;
     QString m_symbolTypeDescription;
     QString m_packageAlias;
+    ImportSpecAST *m_importSpec;
     bool m_ended;
 };
 

@@ -40,13 +40,14 @@ public:
     void resolve(ExprListAST *list, TupleType *&result);
     void resolve(ExprAST *list, TupleType *&result);
     GoSnapshot *snapshot();
+    Scope *currentScope() const;
+    PackageType *packageTypeForAlias(const QString &alias);
 
     void eraseResolvedTypes();
 
 protected:
     void resolveExpr(TupleType *tuple, ExprAST *x);
     Type *resolveExpr(ExprAST *x, int &derefLevel);
-    Type *tryResolveNamedType(ExprAST *x);
     Type *resolveCompositExpr(CompositeLitAST *ast);
 
     Scope *switchScope(Scope *scope);
@@ -57,5 +58,7 @@ protected:
     Scope *m_currentScope;
     QList<TupleType **> m_tuples;
 };
+
+Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x);
 
 }   // namespace GoTools

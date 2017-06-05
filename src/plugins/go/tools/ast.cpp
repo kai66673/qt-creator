@@ -137,6 +137,16 @@ unsigned IdentAST::lastToken() const
     return t_identifier;
 }
 
+Type *IdentAST::resolve(ExprTypeResolver *resolver, int &) const
+{
+    if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver)) {
+        return s->type(resolver);
+    }
+
+    QString idStr(ident->toString());
+    return resolver->packageTypeForAlias(idStr);
+}
+
 void IdentAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -303,6 +313,26 @@ unsigned SelectorExprAST::lastToken() const
     return x->lastToken();
 }
 
+Type *SelectorExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    if (sel) {
+        Type *context = x->resolve(resolver, derefLevel);
+        if (context && sel->isLookable()) {
+            int testDerefLevel = context->refLevel() + derefLevel;
+            if (testDerefLevel == 0 || testDerefLevel == -1) {
+                if (Type *baseTyp = context->baseType()) {
+                    if (Symbol *s = baseTyp->lookupMember(sel, resolver)) {
+                        derefLevel = 0;
+                        return s->type(resolver);
+                    }
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
 void SelectorExprAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -372,6 +402,21 @@ unsigned ParenExprAST::lastToken() const
     if (x)
         return x->lastToken();
     return t_lparen;
+}
+
+Type *ParenExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    if (x) {
+        if (StarExprAST *starExpr = x->asStarExpr()) {
+            if (Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x)) {
+                derefLevel = 0;
+                return typeConvertion;
+            }
+        }
+        return x->resolve(resolver, derefLevel);
+    }
+
+    return 0;
 }
 
 void ParenExprAST::accept0(ASTVisitor *visitor)
@@ -446,12 +491,31 @@ void UnaryExprAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
+Type *ArrowUnaryExprAST::resolve(ExprTypeResolver *resolver, int &) const
+{
+    int xDerefLevel = 0;
+    if (Type *type = x->resolve(resolver, xDerefLevel)) {
+        if (type->refLevel() + xDerefLevel == 0)
+            if (Type *baseTyp = type->baseType())
+                return baseTyp->chanValueType();
+    }
+    return 0;
+}
+
 void ArrowUnaryExprAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
         accept(x, visitor);
     }
     visitor->endVisit(this);
+}
+
+Type *RefUnaryExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    int xDerefLevel = 0;
+    Type *typ = x->resolve(resolver, xDerefLevel);
+    derefLevel += xDerefLevel - 1;
+    return typ;
 }
 
 void RefUnaryExprAST::accept0(ASTVisitor *visitor)
@@ -495,6 +559,14 @@ unsigned StarExprAST::lastToken() const
     if (x)
         return x->lastToken();
     return t_star;
+}
+
+Type *StarExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    int xDerefLevel = 0;
+    Type *typ = x->resolve(resolver, xDerefLevel);
+    derefLevel += xDerefLevel + 1;
+    return typ;
 }
 
 void StarExprAST::accept0(ASTVisitor *visitor)
@@ -554,6 +626,15 @@ unsigned CompositeLitAST::lastToken() const
     if (type)
         return type->lastToken();
     return 0;
+}
+
+Type *CompositeLitAST::resolve(ExprTypeResolver *resolver, int &) const
+{
+    if (type)
+        if (TypeAST *typ = type->asType())
+            return typ;
+
+    return tryResolveNamedType(resolver, type);
 }
 
 void CompositeLitAST::accept0(ASTVisitor *visitor)
@@ -626,6 +707,54 @@ unsigned CallExprAST::lastToken() const
     return 0;
 }
 
+Type *CallExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    // check for...
+    if (IdentAST *funcIdent = fun->asIdent()) {
+        if (funcIdent->isNewKeyword()) {            // new(...) builting function
+            if (args && args->value) {
+                int xDerefLevel = 0;
+                if (Type *typ = args->value->resolve(resolver, xDerefLevel)) {
+                    derefLevel = xDerefLevel - 1;
+                    return typ;
+                }
+            }
+            return 0;
+        } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
+            if (args && args->value) {
+                int xDerefLevel = 0;
+                if (Type *typ = args->value->resolve(resolver, xDerefLevel)) {
+                    derefLevel = xDerefLevel;
+                    return typ;
+                }
+            }
+            return 0;
+        }
+    }
+    // check for type convertion
+    if (ParenExprAST *parenExpr = fun->asParenExpr()) {
+        if (parenExpr->x) {
+            if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
+                if (Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x)) {
+                    derefLevel = 0;
+                    return typeConvertion;
+                }
+            }
+        }
+    }
+    // common case - function call
+    if (Type *context = fun->resolve(resolver, derefLevel)) {
+        if (context->refLevel() + derefLevel == 0) {
+            if (Type *baseTyp = context->baseType()) {
+                derefLevel = 0;
+                return baseTyp->calleeType(0, resolver);
+            }
+        }
+    }
+
+    return 0;
+}
+
 void CallExprAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -658,6 +787,20 @@ unsigned IndexExprAST::lastToken() const
         return t_lbracket;
     if (x)
         return x->lastToken();
+    return 0;
+}
+
+Type *IndexExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    if (Type *context = x->resolve(resolver, derefLevel)) {
+        if (context->refLevel() + derefLevel == 0) {
+            if (Type *baseTyp = context->baseType()) {
+                derefLevel = 0;
+                return baseTyp->elementsType(resolver);
+            }
+        }
+    }
+
     return 0;
 }
 
@@ -739,6 +882,12 @@ unsigned TypeAssertExprAST::lastToken() const
     if (x)
         return x->lastToken();
     return 0;
+}
+
+Type *TypeAssertExprAST::resolve(ExprTypeResolver *, int &derefLevel) const
+{
+    derefLevel = 0;
+    return typ ? typ->asType() : 0;
 }
 
 void TypeAssertExprAST::accept0(ASTVisitor *visitor)
@@ -1923,6 +2072,11 @@ unsigned FuncLitAST::lastToken() const
     if (type)
         return type->lastToken();
     return 0;
+}
+
+Type *FuncLitAST::resolve(ExprTypeResolver *, int &) const
+{
+    return type;
 }
 
 void FuncLitAST::accept0(ASTVisitor *visitor)

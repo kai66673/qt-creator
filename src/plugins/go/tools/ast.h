@@ -518,6 +518,8 @@ class ExprAST: public AST
 public:
     ExprAST() {}
     virtual ExprAST *asExpr() { return this; }
+
+    virtual Type *resolve(ExprTypeResolver *, int &) const { return 0; }
 };
 
 class BadExprAST: public ExprAST
@@ -556,6 +558,8 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -629,6 +633,8 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual Type *resolve(ExprTypeResolver *resolver, int &) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -811,6 +817,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -832,6 +840,8 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -883,6 +893,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual Type *resolve(ExprTypeResolver *, int &derefLevel) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -924,6 +936,8 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -982,6 +996,8 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
+    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -1015,6 +1031,8 @@ public:
 
     virtual ArrowUnaryExprAST *asArrowUnaryExpr() { return this; }
 
+    virtual Type *resolve(ExprTypeResolver *resolver, int &) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -1027,6 +1045,8 @@ public:
     { }
 
     virtual RefUnaryExprAST *asRefUnaryExpr() { return this; }
+
+    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1326,6 +1346,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual Type *resolve(ExprTypeResolver *, int &) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -1347,6 +1369,8 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual Type *resolve(ExprTypeResolver *resolver, int &) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);

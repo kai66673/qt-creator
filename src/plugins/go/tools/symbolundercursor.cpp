@@ -67,6 +67,7 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
     m_useReason = reason;
     m_symbolTypeDescription.clear();
     m_packageAlias.clear();
+    m_importSpec = 0;
 
     if (m_doc->translationUnit() && m_snapshot) {
         m_snapshot->runProtectedTask(
@@ -146,11 +147,13 @@ bool SymbolUnderCursor::visit(ImportSpecAST *ast)
         if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
             if (ast->name) {
                 m_packageAlias = ast->name->ident->toString();
+                m_importSpec = ast;
             } else {
                 QString path = lastToken.string->unquoted();
                 if (!path.isEmpty()) {
                     int pos = path.lastIndexOf('/') + 1;
                     m_packageAlias = path.mid(pos);
+                    m_importSpec = ast;
                 }
             }
             m_ended = true;
