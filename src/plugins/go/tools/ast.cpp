@@ -316,7 +316,7 @@ unsigned SelectorExprAST::lastToken() const
 Type *SelectorExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
 {
     if (sel) {
-        Type *context = x->resolve(resolver, derefLevel);
+        Type *context = resolver->resolveExpr(x, derefLevel);
         if (context && sel->isLookable()) {
             int testDerefLevel = context->refLevel() + derefLevel;
             if (testDerefLevel == 0 || testDerefLevel == -1) {
@@ -413,7 +413,7 @@ Type *ParenExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
                 return typeConvertion;
             }
         }
-        return x->resolve(resolver, derefLevel);
+        return resolver->resolveExpr(x, derefLevel);
     }
 
     return 0;
@@ -425,6 +425,13 @@ void ParenExprAST::accept0(ASTVisitor *visitor)
         accept(x, visitor);
     }
     visitor->endVisit(this);
+}
+
+void ExprAST::topLevelResolve(ExprTypeResolver *resolver, TupleType *tuple) const
+{
+    int derefLevel = 0;
+    Type *typ = resolve(resolver, derefLevel);
+    tuple->appendType(new TypeWithDerefLevel(derefLevel, typ));
 }
 
 void BadExprAST::accept0(ASTVisitor *visitor)
@@ -494,7 +501,7 @@ void UnaryExprAST::accept0(ASTVisitor *visitor)
 Type *ArrowUnaryExprAST::resolve(ExprTypeResolver *resolver, int &) const
 {
     int xDerefLevel = 0;
-    if (Type *type = x->resolve(resolver, xDerefLevel)) {
+    if (Type *type = resolver->resolveExpr(x, xDerefLevel)) {
         if (type->refLevel() + xDerefLevel == 0)
             if (Type *baseTyp = type->baseType())
                 return baseTyp->chanValueType();
@@ -513,7 +520,7 @@ void ArrowUnaryExprAST::accept0(ASTVisitor *visitor)
 Type *RefUnaryExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
 {
     int xDerefLevel = 0;
-    Type *typ = x->resolve(resolver, xDerefLevel);
+    Type *typ = resolver->resolveExpr(x, xDerefLevel);
     derefLevel += xDerefLevel - 1;
     return typ;
 }
@@ -564,7 +571,7 @@ unsigned StarExprAST::lastToken() const
 Type *StarExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
 {
     int xDerefLevel = 0;
-    Type *typ = x->resolve(resolver, xDerefLevel);
+    Type *typ = resolver->resolveExpr(x, xDerefLevel);
     derefLevel += xDerefLevel + 1;
     return typ;
 }
@@ -707,28 +714,66 @@ unsigned CallExprAST::lastToken() const
     return 0;
 }
 
+void CallExprAST::topLevelResolve(ExprTypeResolver *resolver, TupleType *tuple) const
+{
+    int derefLevel = 0;
+
+    // Check for special cases: new(...), make(...), (type).
+    if (Type *typ = tryResolvePeculiarCase(resolver, derefLevel)) {
+        tuple->appendType(new TypeWithDerefLevel(derefLevel, typ));
+        return;
+    }
+
+    // Common case - function call
+    if (Type *context = resolver->resolveExpr(fun, derefLevel)) {
+        context->fillTuple(tuple, resolver);
+        return;
+    }
+
+    tuple->appendType(new TypeWithDerefLevel(derefLevel, Control::builtinType()));
+}
+
 Type *CallExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
+{
+    // Check for special cases: new(...), make(...), (type).
+    if (Type *typ = tryResolvePeculiarCase(resolver, derefLevel))
+        return typ;
+
+    // Common case - function call
+    if (Type *context = resolver->resolveExpr(fun, derefLevel)) {
+        if (context->refLevel() + derefLevel == 0) {
+            if (Type *baseTyp = context->baseType()) {
+                derefLevel = 0;
+                return baseTyp->calleeType(0, resolver);
+            }
+        }
+    }
+
+    return 0;
+}
+
+Type *CallExprAST::tryResolvePeculiarCase(ExprTypeResolver *resolver, int &derefLevel) const
 {
     // check for...
     if (IdentAST *funcIdent = fun->asIdent()) {
         if (funcIdent->isNewKeyword()) {            // new(...) builting function
+            int xDerefLevel = 0;
             if (args && args->value) {
-                int xDerefLevel = 0;
-                if (Type *typ = args->value->resolve(resolver, xDerefLevel)) {
+                if (Type *typ = resolver->resolveExpr(args->value, xDerefLevel)) {
                     derefLevel = xDerefLevel - 1;
                     return typ;
                 }
             }
-            return 0;
+            return Control::builtinType();
         } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
+            int xDerefLevel = 0;
             if (args && args->value) {
-                int xDerefLevel = 0;
-                if (Type *typ = args->value->resolve(resolver, xDerefLevel)) {
+                if (Type *typ = resolver->resolveExpr(args->value, xDerefLevel)) {
                     derefLevel = xDerefLevel;
                     return typ;
                 }
             }
-            return 0;
+            return Control::builtinType();
         }
     }
     // check for type convertion
@@ -739,15 +784,6 @@ Type *CallExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
                     derefLevel = 0;
                     return typeConvertion;
                 }
-            }
-        }
-    }
-    // common case - function call
-    if (Type *context = fun->resolve(resolver, derefLevel)) {
-        if (context->refLevel() + derefLevel == 0) {
-            if (Type *baseTyp = context->baseType()) {
-                derefLevel = 0;
-                return baseTyp->calleeType(0, resolver);
             }
         }
     }
@@ -792,7 +828,7 @@ unsigned IndexExprAST::lastToken() const
 
 Type *IndexExprAST::resolve(ExprTypeResolver *resolver, int &derefLevel) const
 {
-    if (Type *context = x->resolve(resolver, derefLevel)) {
+    if (Type *context = resolver->resolveExpr(x, derefLevel)) {
         if (context->refLevel() + derefLevel == 0) {
             if (Type *baseTyp = context->baseType()) {
                 derefLevel = 0;

@@ -45,9 +45,10 @@ public:
 
     void eraseResolvedTypes();
 
+    Type *resolveExpr(ExprAST *x, int &derefLevel);
+
 protected:
     void resolveExpr(TupleType *tuple, ExprAST *x);
-    Type *resolveExpr(ExprAST *x, int &derefLevel);
     Type *resolveCompositExpr(CompositeLitAST *ast);
 
     Scope *switchScope(Scope *scope);

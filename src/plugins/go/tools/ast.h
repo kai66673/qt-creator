@@ -519,6 +519,7 @@ public:
     ExprAST() {}
     virtual ExprAST *asExpr() { return this; }
 
+    virtual void topLevelResolve(ExprTypeResolver *resolver, TupleType *tuple) const;
     virtual Type *resolve(ExprTypeResolver *, int &) const { return 0; }
 };
 
@@ -937,9 +938,11 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual void topLevelResolve(ExprTypeResolver *resolver, TupleType *tuple) const override;
     virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
+    Type *tryResolvePeculiarCase(ExprTypeResolver *resolver, int &derefLevel) const;
     virtual void accept0(ASTVisitor *visitor);
 };
 
