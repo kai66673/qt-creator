@@ -231,20 +231,20 @@ TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEdit
             TextEditor::IAssistProposal *proposal = new TextEditor::FunctionHintProposal(functionHint.lparenPosition() + 1, model);
             return proposal;
         }
-        bool isDotTrigger = triggerChar == QChar('.');
-        if (!isDotTrigger && !(triggerChar.isLetterOrNumber() || triggerChar == QChar('_') || triggerChar == QChar('$')))
+        bool isDotTrigger = triggerChar == QLatin1Char('.');
+        if (!isDotTrigger && !(triggerChar.isLetterOrNumber() || triggerChar == QLatin1Char('_') || triggerChar == QLatin1Char('$')))
             return 0;
         bool isGlobalCompletion = !isDotTrigger;
         int startOfName = m_interface->position();
         int pos = startOfName;
         if (!isDotTrigger) {
-            startOfName--;
-            while (m_interface->characterAt(startOfName).isLetterOrNumber())
-                startOfName--;
+            QChar tst = m_interface->characterAt(--startOfName);
+            while (m_interface->characterAt(startOfName).isLetterOrNumber() || tst == QLatin1Char('_') || tst == QLatin1Char('$'))
+                tst = m_interface->characterAt(startOfName--);
             pos = startOfName;
             startOfName++;
             while (pos > 0) {
-                QChar tst = m_interface->characterAt(pos--);
+                tst = m_interface->characterAt(pos--);
                 if (tst.isSpace())
                     continue;
                 if (tst == QLatin1Char('.')) {

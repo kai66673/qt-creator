@@ -113,6 +113,23 @@ private:
     TypeAST *_decl;
 };
 
+class FieldDecl: public Symbol
+{
+public:
+    FieldDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner)
+        : Symbol(tokenIndex, identifier, owner)
+        , _decl(decl)
+    { }
+
+    virtual ExprAST *declExpr() const override;
+    virtual const Type *type(ExprTypeResolver *) override;
+    virtual QString describeType(ExprTypeResolver *) const override;
+    virtual Kind kind() const override;
+
+private:
+    TypeAST *_decl;
+};
+
 class FuncDecl: public Symbol
 {
 public:

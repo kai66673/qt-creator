@@ -97,6 +97,18 @@ QString VarDecl::describeType(ExprTypeResolver *) const
 Symbol::Kind VarDecl::kind() const
 { return Var; }
 
+ExprAST *FieldDecl::declExpr() const
+{ return _decl; }
+
+const Type *FieldDecl::type(ExprTypeResolver *)
+{ return _decl->asType(); }
+
+QString FieldDecl::describeType(ExprTypeResolver *) const
+{ return _decl->describe(); }
+
+Symbol::Kind FieldDecl::kind() const
+{ return Fld; }
+
 ExprAST *FuncDecl::declExpr() const
 { return _decl; }
 

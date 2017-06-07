@@ -67,6 +67,7 @@ public:
     Symbol *newMethod(FuncDeclAST *funcDecl, Scope *owner);
     Symbol *newFuncDecl(unsigned tokenIndex, const Identifier *identifier, FuncTypeAST *decl, Scope *owner);
     Symbol *newVarDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner);
+    Symbol *newFieldDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner);
     Symbol *newTypeDecl(unsigned tokenIndex, const Identifier *identifier, TypeSpecAST *decl, Scope *owner);
     Symbol *newConstDecl(unsigned tokenIndex, const Identifier *identifier, Scope *owner);
     Symbol *newShortVarDecl(unsigned tokenIndex, const Identifier *identifier, RhsExprListAST *decl, unsigned index, Scope *owner);

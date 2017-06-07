@@ -80,6 +80,7 @@ public:
         qDeleteAll(methods);
         qDeleteAll(functions);
         qDeleteAll(variables);
+        qDeleteAll(fields);
         qDeleteAll(types);
         qDeleteAll(constants);
         qDeleteAll(shortVarDecls);
@@ -98,6 +99,7 @@ public:
     QList<Symbol *> methods;
     QList<FuncDecl *> functions;
     QList<VarDecl *> variables;
+    QList<FieldDecl *> fields;
     QList<TypeDecl *> types;
     QList<ConstDecl *> constants;
     QList<ShortVarDecl *> shortVarDecls;
@@ -177,6 +179,13 @@ Symbol *Control::newVarDecl(unsigned tokenIndex, const Identifier *identifier, T
 {
     VarDecl *symbol  = new VarDecl(tokenIndex, identifier, decl, owner);
     d->variables.append(symbol);
+    return symbol;
+}
+
+Symbol *Control::newFieldDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner)
+{
+    FieldDecl *symbol = new FieldDecl(tokenIndex, identifier, decl, owner);
+    d->fields.append(symbol);
     return symbol;
 }
 

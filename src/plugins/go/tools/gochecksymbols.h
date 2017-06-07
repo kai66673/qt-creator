@@ -101,7 +101,7 @@ protected:
     virtual bool visit(DeclIdentAST *ast) override;
 
 private:
-    const Type *resolveSelectorExpr(ExprAST *x, bool &isFieldOrMethod, int &derefLevel);
+    const Type *resolveSelectorExpr(ExprAST *x, int &derefLevel);
     const Type *tryAcceptTypeConvertion(ExprAST *x);
     const Type *acceptCompositLiteral(CompositeLitAST *ast);
     const Type *resolveCompositExprType(CompositeLitAST *ast);

@@ -1120,7 +1120,7 @@ FieldAST *Parser::parseStructFieldDecl(Scope *scope)
     expectSemi();
 
     FieldAST *field = new (_pool) FieldAST(doc, idents, typ, tag, lineComment);
-    declareVar(typ, scope, idents);
+    declareFld(typ, scope, idents);
     return field;
 }
 
@@ -1770,6 +1770,26 @@ void Parser::declareVar(TypeAST *typ, Scope *scope, DeclIdentListAST *idents)
 {
     for (DeclIdentListAST *it = idents; it; it = it->next)
         declareVar(typ, scope, it->value);
+}
+
+void Parser::declareFld(TypeAST *typ, Scope *scope, DeclIdentAST *field)
+{
+    if (!field || field->ident == _control->underscoreIdentifier())
+        return;
+
+    if (scope->find(field->ident)) {
+        _translationUnit->error(field->t_identifier, "field redeclaration");
+        return;
+    }
+
+    field->symbol = _control-> newFieldDecl(field->t_identifier, field->ident, typ, scope);
+    scope->addMember(field->symbol);
+}
+
+void Parser::declareFld(TypeAST *typ, Scope *scope, DeclIdentListAST *fields)
+{
+    for (DeclIdentListAST *it = fields; it; it = it->next)
+        declareFld(typ, scope, it->value);
 }
 
 void Parser::declareType(TypeSpecAST *typ, Scope *scope, DeclIdentAST *ident)

@@ -131,6 +131,9 @@ private:
     void declareVar(TypeAST *typ, Scope *scope, DeclIdentAST *ident);
     void declareVar(TypeAST *typ, Scope *scope, DeclIdentListAST *idents);
 
+    void declareFld(TypeAST *typ, Scope *scope, DeclIdentAST *field);
+    void declareFld(TypeAST *typ, Scope *scope, DeclIdentListAST *fields);
+
     void declareType(TypeSpecAST *typ, Scope *scope, DeclIdentAST *ident);
     void declareType(TypeSpecAST *typ, Scope *scope, DeclIdentListAST *idents);
 

@@ -42,6 +42,7 @@ static GoSemanticHighlighter::Kind kindForSymbol(const Symbol *symbol)
         case Symbol::Con: return GoSemanticHighlighter::Const;
         case Symbol::Typ: return GoSemanticHighlighter::Type;
         case Symbol::Var: return GoSemanticHighlighter::Var;
+        case Symbol::Fld: return GoSemanticHighlighter::Field;
         case Symbol::Fun: return GoSemanticHighlighter::Func;
         case Symbol::Lbl: return GoSemanticHighlighter::Label;
         default: break; // prevent -Wswitch warning
@@ -290,9 +291,7 @@ bool GoCheckSymbols::visit(FieldAST *ast)
     for (DeclIdentListAST *it = ast->names; it; it = it->next)
         if (DeclIdentAST *ident = it->value)
             addUse(ident, _isFuncDecl ? GoSemanticHighlighter::Arg
-                                      : (ident->symbol && ident->symbol->kind() == Symbol::Fun
-                                         ? GoSemanticHighlighter::Func
-                                         : GoSemanticHighlighter::Field));
+                                      : kindForSymbol(ident->symbol));
 
     accept(ast->type);
     return false;
@@ -350,19 +349,14 @@ bool GoCheckSymbols::visit(PackageTypeAST *ast)
 
 bool GoCheckSymbols::visit(SelectorExprAST *ast)
 {
-    bool isFieldOrMethod = false;
     int derefLevel = 0;
-    const Type *context = resolveSelectorExpr(ast->x, isFieldOrMethod, derefLevel);
+    const Type *context = resolveSelectorExpr(ast->x, derefLevel);
     if (context && ast->sel && ast->sel->isLookable()) {
         derefLevel += context->refLevel();
         if (derefLevel == 0 || derefLevel == -1) {
             if (const Type *baseTyp = context->baseType()) {
                 if (Symbol *s = baseTyp->lookupMember(ast->sel, this)) {
-                    addUse(ast->sel, isFieldOrMethod
-                                     ? (s->kind() == Symbol::Fun
-                                        ? GoSemanticHighlighter::Func
-                                        : GoSemanticHighlighter::Field)
-                                     : kindForSymbol(s));
+                    addUse(ast->sel, kindForSymbol(s));
                 }
             }
         }
@@ -430,25 +424,25 @@ bool GoCheckSymbols::visit(DeclIdentAST *ast)
     return false;
 }
 
-const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMethod, int &derefLevel)
+const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, int &derefLevel)
 {
     if (RefUnaryExprAST *refExpr = x->asRefUnaryExpr()) {
         int xDerefLevel = 0;
-        const Type *typ = resolveSelectorExpr(refExpr->x, isFieldOrMethod, xDerefLevel);
+        const Type *typ = resolveSelectorExpr(refExpr->x, xDerefLevel);
         derefLevel += xDerefLevel - 1;
         return typ;
     }
 
     if (StarExprAST *starExpr = x->asStarExpr()) {
         int xDerefLevel = 0;
-        const Type *typ = resolveSelectorExpr(starExpr->x, isFieldOrMethod, xDerefLevel);
+        const Type *typ = resolveSelectorExpr(starExpr->x, xDerefLevel);
         derefLevel += xDerefLevel + 1;
         return typ;
     }
 
     if (ArrowUnaryExprAST *arrowExpr = x->asArrowUnaryExpr()) {
         int xDerefLevel = 0;
-        if (const Type *type = resolveSelectorExpr(arrowExpr->x, isFieldOrMethod, xDerefLevel)) {
+        if (const Type *type = resolveSelectorExpr(arrowExpr->x, xDerefLevel)) {
             if (type->refLevel() + xDerefLevel == 0)
                 if (const Type *baseTyp = type->baseType())
                     return baseTyp->chanValueType();
@@ -463,7 +457,6 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMetho
         QString idStr(ident->ident->toString());
         if (Symbol *s = m_currentScope->lookupMember(ident, this)) {
             addUse(ident, kindForSymbol(s));
-            isFieldOrMethod = true;
             return s->type(this);
         }
         if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, idStr)) {
@@ -472,17 +465,14 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMetho
         }
     } else if (SelectorExprAST *selAst = x->asSelectorExpr()) {
         QTC_ASSERT(!derefLevel, return 0);
-        const Type *context = resolveSelectorExpr(selAst->x, isFieldOrMethod, derefLevel);
+        const Type *context = resolveSelectorExpr(selAst->x, derefLevel);
         if (IdentAST *ident = selAst->sel) {
             if (context && ident->isLookable()) {
                 int testDerefLevel = derefLevel + context->refLevel();
                 if (testDerefLevel == 0 || testDerefLevel == -1) {
                     if (const Type *baseTyp = context->baseType()) {
                         if (Symbol *s = baseTyp->lookupMember(ident, this)) {
-                            addUse(ident, isFieldOrMethod
-                                   ? (s->kind() == Symbol::Fun ? GoSemanticHighlighter::Func : GoSemanticHighlighter::Field)
-                                   : kindForSymbol(s));
-                            isFieldOrMethod = true;
+                            addUse(ident, kindForSymbol(s));
                             derefLevel = 0;
                             return s->type(this);
                         }
@@ -527,10 +517,9 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMetho
             }
         }
         // common case - function call
-        if (const Type *context = resolveSelectorExpr(callExpr->fun, isFieldOrMethod, derefLevel)) {
+        if (const Type *context = resolveSelectorExpr(callExpr->fun, derefLevel)) {
             if (context->refLevel() + derefLevel == 0) {
                 if (const Type *baseTyp = context->baseType()) {
-                    isFieldOrMethod = true;
                     derefLevel = 0;
                     return baseTyp->calleeType(0, this);
                 }
@@ -539,10 +528,9 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMetho
     } else if (IndexExprAST *indexExpr = x->asIndexExpr()) {
         accept(indexExpr->index);
         QTC_ASSERT(!derefLevel, return 0);
-        if (const Type *context = resolveSelectorExpr(indexExpr->x, isFieldOrMethod, derefLevel)) {
+        if (const Type *context = resolveSelectorExpr(indexExpr->x, derefLevel)) {
             if (context->refLevel() + derefLevel == 0) {
                 if (const Type *baseTyp = context->baseType()) {
-                    isFieldOrMethod = true;
                     derefLevel = 0;
                     return baseTyp->elementsType(this);
                 }
@@ -550,25 +538,22 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, bool &isFieldOrMetho
         }
     } else if (CompositeLitAST *compositLit = x->asCompositeLit()) {
         if (const Type *context = acceptCompositLiteral(compositLit)) {
-            isFieldOrMethod = true;
             return context;
         }
     } else if (TypeAssertExprAST *typeAssert = x->asTypeAssertExpr()) {
         accept(typeAssert->x);
         accept(typeAssert->typ);
-        isFieldOrMethod = true;
         derefLevel = 0;
         return typeAssert->typ ? typeAssert->typ->asType() : 0;
     } else if (ParenExprAST *parenExpr = x->asParenExpr()) {
         if (parenExpr->x) {
-            isFieldOrMethod = true;
             if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
                 if (const Type *typeConvertion = tryAcceptTypeConvertion(starExpr->x)) {
                     derefLevel = 0;
                     return typeConvertion;
                 }
             }
-            return resolveSelectorExpr(parenExpr->x, isFieldOrMethod, derefLevel);
+            return resolveSelectorExpr(parenExpr->x, derefLevel);
         }
     }
 
