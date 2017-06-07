@@ -66,7 +66,7 @@ Symbol *Scope::find(const HashedLiteral *name) const
 Scope *Scope::outer() const
 { return m_outer; }
 
-Symbol *Scope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver)
+Symbol *Scope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
 {
     if (Symbol *s = find(ident->ident)) {
         unsigned lastToken = s->declExpr() ? s->declExpr()->lastToken() : s->sourceLocation();
@@ -77,7 +77,7 @@ Symbol *Scope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver)
 }
 
 void Scope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                  ExprTypeResolver *resolver, Predicate predicate)
+                                  ExprTypeResolver *resolver, Predicate predicate) const
 {
     for (unsigned i = 0; i < memberCount(); i++) {
         Symbol *symbol = memberAt(i);
@@ -112,7 +112,7 @@ FileScope::FileScope(GoSource *source)
 void FileScope::declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl)
 { m_methods.addMethod(typeId, funcDecl); }
 
-Symbol *FileScope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver)
+Symbol *FileScope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
 {
     return m_indexInSnapshot != -1
             ? resolver->snapshot()->packageTypetAt(m_indexInSnapshot)->lookupMember(ident, resolver)
@@ -120,7 +120,7 @@ Symbol *FileScope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolve
 }
 
 void FileScope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                      ExprTypeResolver *resolver, Predicate predicate)
+                                      ExprTypeResolver *resolver, Predicate predicate) const
 {
     if (m_indexInSnapshot == -1) {
         for (unsigned i = 0; i < memberCount(); i++) {

@@ -57,7 +57,7 @@ void PackageType::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &
     }
 }
 
-Symbol *PackageType::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver)
+Symbol *PackageType::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
 {
     for (int i = m_first; i < m_last; i++) {
         Scope *scope = resolver->snapshot()->m_scopeTable.at(i)->scope;
@@ -69,7 +69,7 @@ Symbol *PackageType::lookupMember(const IdentAST *ident, ExprTypeResolver *resol
 }
 
 void PackageType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                        ExprTypeResolver *resolver, Predicate)
+                                        ExprTypeResolver *resolver, Predicate) const
 {
     for (int i = m_first; i < m_last; i++) {
         Scope *scope = resolver->snapshot()->m_scopeTable.at(i)->scope;
@@ -83,16 +83,16 @@ void PackageType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInte
     }
 }
 
-Type *PackageType::indexType(ExprTypeResolver *)
+const Type *PackageType::indexType(ExprTypeResolver *) const
 { return 0; }
 
-Type *PackageType::elementsType(ExprTypeResolver *)
+const Type *PackageType::elementsType(ExprTypeResolver *) const
 { return 0; }
 
-Type *PackageType::calleeType(int, ExprTypeResolver *) const
+const Type *PackageType::calleeType(int, ExprTypeResolver *) const
 { return 0; }
 
-Type *PackageType::chanValueType() const
+const Type *PackageType::chanValueType() const
 { return 0; }
 
 GoSnapshot::GoSnapshot(const QHash<GoPackageKey, GoPackage *> &packages)

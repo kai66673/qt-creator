@@ -73,7 +73,7 @@ private:
     unsigned m_pos;
 
     std::vector<Token> *_tokens;
-    std::stack<Type *> m_nestedCimpositLitType;
+    std::stack<const Type *> m_nestedCimpositLitType;
 
     Symbol *m_symbol;
     const Token *m_token;

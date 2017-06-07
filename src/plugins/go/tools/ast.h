@@ -414,19 +414,19 @@ public:
     virtual unsigned lastToken() const;
 
     // LookupContext implemntation
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate) override;
+                                       ExprTypeResolver *resolver, Predicate) const override;
 
 
     // Type implementation
-    virtual Type *indexType(ExprTypeResolver *resolver) override;
-    virtual Type *elementsType(ExprTypeResolver *resolver) override;
-    virtual Type *calleeType(int index, ExprTypeResolver *resolver) const override;
+    virtual const Type *indexType(ExprTypeResolver *resolver) const override;
+    virtual const Type *elementsType(ExprTypeResolver *resolver) const override;
+    virtual const Type *calleeType(int index, ExprTypeResolver *resolver) const override;
     virtual void fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const override;
-    virtual Type *chanValueType() const override;
+    virtual const Type *chanValueType() const override;
 
-    QString describe() const;
+    virtual QString describe() const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -520,7 +520,7 @@ public:
     virtual ExprAST *asExpr() { return this; }
 
     virtual void topLevelResolve(ExprTypeResolver *resolver, TupleType *tuple) const;
-    virtual Type *resolve(ExprTypeResolver *, int &) const { return 0; }
+    virtual const Type *resolve(ExprTypeResolver *, int &) const { return 0; }
 };
 
 class BadExprAST: public ExprAST
@@ -560,7 +560,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -584,7 +584,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    Type *type(ExprTypeResolver *resolver, int index);
+    const Type *type(ExprTypeResolver *resolver, int index);
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -606,7 +606,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    Type *type(ExprTypeResolver *resolver, int index);
+    const Type *type(ExprTypeResolver *resolver, int index);
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -635,7 +635,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -666,17 +666,20 @@ public:
     virtual bool isValidCompositeLiteralType() const = 0;
 
     // LookupContext implemntation
-    virtual Symbol *lookupMember(const IdentAST *, ExprTypeResolver *) override { return 0; }
+    virtual Symbol *lookupMember(const IdentAST *, ExprTypeResolver *) const override { return 0; }
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &,
-                                       ExprTypeResolver *, Predicate = 0) override { }
+                                       ExprTypeResolver *, Predicate = 0) const override { }
 
     // Type implementation
-    virtual Type *indexType(ExprTypeResolver *) override { return 0; }
-    virtual Type *elementsType(ExprTypeResolver *) override { return 0; }
-    virtual Type *calleeType(int, ExprTypeResolver *) const override { return 0; }
-    virtual Type *chanValueType() const override { return 0; }
+    virtual const Type *indexType(ExprTypeResolver *) const override { return 0; }
+    virtual const Type *elementsType(ExprTypeResolver *) const override { return 0; }
+    virtual const Type *calleeType(int, ExprTypeResolver *) const override { return 0; }
+    virtual const Type *chanValueType() const override { return 0; }
 
     virtual Symbol *declaration(ExprTypeResolver *) { return 0; }
+
+    virtual void topLevelResolve(ExprTypeResolver *, TupleType *tuple) const override;
+    virtual const Type *resolve(ExprTypeResolver *, int &) const override;
 };
 
 class BadTypeAST: public TypeAST
@@ -749,13 +752,13 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return true; }
 
-    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate = 0) override;
+                                       ExprTypeResolver *resolver, Predicate = 0) const override;
 
-    virtual Type *elementsType(ExprTypeResolver *resolver) override;
-    virtual Type *indexType(ExprTypeResolver *resolver) override;
-    virtual Type *calleeType(int index, ExprTypeResolver *resolver) const override;
+    virtual const Type *elementsType(ExprTypeResolver *resolver) const override;
+    virtual const Type *indexType(ExprTypeResolver *resolver) const override;
+    virtual const Type *calleeType(int index, ExprTypeResolver *resolver) const override;
     virtual void fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const override;
 
     virtual QString describe() const override;
@@ -788,12 +791,12 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return true; }
 
-    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate) override;
+                                       ExprTypeResolver *resolver, Predicate) const override;
 
-    virtual Type *elementsType(ExprTypeResolver *resolver) override;
-    virtual Type *indexType(ExprTypeResolver *resolver) override;
+    virtual const Type *elementsType(ExprTypeResolver *resolver) const override;
+    virtual const Type *indexType(ExprTypeResolver *resolver) const override;
     virtual QString describe() const override;
 
     virtual Symbol *declaration(ExprTypeResolver *resolver) override;
@@ -818,7 +821,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -842,7 +845,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -939,10 +942,10 @@ public:
     virtual unsigned lastToken() const;
 
     virtual void topLevelResolve(ExprTypeResolver *resolver, TupleType *tuple) const override;
-    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
-    Type *tryResolvePeculiarCase(ExprTypeResolver *resolver, int &derefLevel) const;
+    const Type *tryResolvePeculiarCase(ExprTypeResolver *resolver, int &derefLevel) const;
     virtual void accept0(ASTVisitor *visitor);
 };
 
@@ -964,14 +967,15 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) override { return typ ? typ->lookupMember(ident, resolver) : 0; }
+    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override
+    { return typ ? typ->lookupMember(ident, resolver) : 0; }
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate = 0) override
+                                       ExprTypeResolver *resolver, Predicate = 0) const override
     { if (typ) typ->fillMemberCompletions(completions, resolver); }
     virtual void fillTuple(TupleType *tuple, ExprTypeResolver *resolver) const override
     { if (typ) typ->fillTuple(tuple, resolver); }
 
-    virtual Type *baseType() override { return typ ? typ->baseType() : 0; }
+    virtual const Type *baseType() const override { return typ ? typ->baseType() : 0; }
     virtual int refLevel() const override { return typ ? -1 + typ->refLevel() : -1; }
 
     virtual QString describe() const override;
@@ -999,7 +1003,7 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1034,7 +1038,7 @@ public:
 
     virtual ArrowUnaryExprAST *asArrowUnaryExpr() { return this; }
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1049,7 +1053,7 @@ public:
 
     virtual RefUnaryExprAST *asRefUnaryExpr() { return this; }
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &derefLevel) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1115,7 +1119,7 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
-    virtual Type *elementsType(ExprTypeResolver *) override;
+    virtual const Type *elementsType(ExprTypeResolver *) const override;
     virtual QString describe() const override;
 
 protected:
@@ -1142,7 +1146,7 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return true; }
 
-    virtual Type *elementsType(ExprTypeResolver *) override;
+    virtual const Type *elementsType(ExprTypeResolver *) const override;
     virtual QString describe() const override;
 
 protected:
@@ -1229,9 +1233,9 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return true; }
 
-    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate = 0) override;
+                                       ExprTypeResolver *resolver, Predicate = 0) const override;
     virtual QString describe() const override;
 
 protected:
@@ -1259,9 +1263,9 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
-    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate = 0) override;
+                                       ExprTypeResolver *resolver, Predicate = 0) const override;
     virtual QString describe() const override;
 
 protected:
@@ -1287,8 +1291,8 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return true; }
 
-    virtual Type *elementsType(ExprTypeResolver *) override;
-    virtual Type *indexType(ExprTypeResolver *) override;
+    virtual const Type *elementsType(ExprTypeResolver *) const override;
+    virtual const Type *indexType(ExprTypeResolver *) const override;
     virtual QString describe() const override;
 
 protected:
@@ -1373,7 +1377,7 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ExprTypeResolver *resolver, int &) const override;
+    virtual const Type *resolve(ExprTypeResolver *resolver, int &) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);

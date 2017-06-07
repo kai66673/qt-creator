@@ -272,10 +272,10 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
         m_ended = true;
         if (ast->sel->isLookable()) {
             int derefLevel = 0;
-            if (Type *type = resolveExpr(ast->x, derefLevel)) {
+            if (const Type *type = resolveExpr(ast->x, derefLevel)) {
                 derefLevel += type->refLevel();
                 if (derefLevel == 0 || derefLevel == -1) {
-                    if (Type *baseTyp = type->baseType()) {
+                    if (const Type *baseTyp = type->baseType()) {
                         m_symbol = baseTyp->lookupMember(ast->sel, this);
                     }
                 }
@@ -420,7 +420,7 @@ bool SymbolUnderCursor::visit(CompositeLitAST *ast)
         const Token &firstToken = _tokens->at(ast->elements->firstToken());
         const Token &lastToken = _tokens->at(ast->elements->lastToken());
         if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-            Type *type = 0;
+            const Type *type = 0;
             if (ExprAST *typeExpr = ast->type) {
                 type = typeExpr->asType();
                 if (!type) {
@@ -444,7 +444,7 @@ bool SymbolUnderCursor::visit(CompositeLitAST *ast)
 
 bool SymbolUnderCursor::visit(KeyValueExprAST *ast)
 {
-    Type *elementsType = m_nestedCimpositLitType.empty() ? 0 : m_nestedCimpositLitType.top();
+    const Type *elementsType = m_nestedCimpositLitType.empty() ? 0 : m_nestedCimpositLitType.top();
     if (elementsType && ast->key) {
         if (IdentAST *keyIdent = ast->key->asIdent()) {
             const Token &tk = _tokens->at(keyIdent->t_identifier);

@@ -67,9 +67,9 @@ public:
 
     Scope *outer() const;
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate predicate = 0) override;
+                                       ExprTypeResolver *resolver, Predicate predicate = 0) const override;
 
     virtual FileScope *asFileScope() { return 0; }
 
@@ -88,9 +88,9 @@ public:
     FileScope(GoSource *source);
     void declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl);
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate predicate = 0) override;
+                                       ExprTypeResolver *resolver, Predicate predicate = 0) const override;
     Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId);
     void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
                      const Identifier *typeId);

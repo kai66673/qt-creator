@@ -81,7 +81,7 @@ public:
     FileScope *fileScope() const;
 
     virtual ExprAST *declExpr() const = 0;
-    virtual Type *type(ExprTypeResolver *) = 0;
+    virtual const Type *type(ExprTypeResolver *) = 0;
     virtual QString describeType(ExprTypeResolver *) const = 0;
     virtual Kind kind() const = 0;
 
@@ -105,7 +105,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *) override;
+    virtual const Type *type(ExprTypeResolver *) override;
     virtual QString describeType(ExprTypeResolver *) const override;
     virtual Kind kind() const override;
 
@@ -122,7 +122,7 @@ public:
     {}
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *) override;
+    virtual const Type *type(ExprTypeResolver *) override;
     virtual QString describeType(ExprTypeResolver *) const override;
     virtual Kind kind() const override;
 
@@ -138,7 +138,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *) override;
+    virtual const Type *type(ExprTypeResolver *) override;
     virtual QString describeType(ExprTypeResolver *) const override;
     virtual Kind kind() const override;
 };
@@ -152,7 +152,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *) override;
+    virtual const Type *type(ExprTypeResolver *) override;
     virtual QString describeType(ExprTypeResolver *) const override;
     virtual Kind kind() const override;
 
@@ -170,7 +170,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *resolver) override;
+    virtual const Type *type(ExprTypeResolver *resolver) override;
     virtual QString describeType(ExprTypeResolver *resolver) const override;
     virtual Kind kind() const override;
 
@@ -188,7 +188,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *resolver) override;
+    virtual const Type *type(ExprTypeResolver *resolver) override;
     virtual QString describeType(ExprTypeResolver *resolver) const override;
     virtual Kind kind() const override;
 
@@ -205,7 +205,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual Type *type(ExprTypeResolver *resolver) override;
+    virtual const Type *type(ExprTypeResolver *resolver) override;
     virtual QString describeType(ExprTypeResolver *resolver) const override;
     virtual Kind kind() const override;
 

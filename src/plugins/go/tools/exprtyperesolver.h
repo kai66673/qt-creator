@@ -45,11 +45,10 @@ public:
 
     void eraseResolvedTypes();
 
-    Type *resolveExpr(ExprAST *x, int &derefLevel);
-
 protected:
     void resolveExpr(TupleType *tuple, ExprAST *x);
-    Type *resolveCompositExpr(CompositeLitAST *ast);
+    const Type *resolveExpr(ExprAST *x, int &derefLevel);
+    const Type *resolveCompositExpr(CompositeLitAST *ast);
 
     Scope *switchScope(Scope *scope);
 
@@ -60,6 +59,6 @@ protected:
     QList<TupleType **> m_tuples;
 };
 
-Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x);
+const Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x);
 
 }   // namespace GoTools

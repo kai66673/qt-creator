@@ -101,15 +101,15 @@ protected:
     virtual bool visit(DeclIdentAST *ast) override;
 
 private:
-    Type *resolveSelectorExpr(ExprAST *x, bool &isFieldOrMethod, int &derefLevel);
-    Type *tryAcceptTypeConvertion(ExprAST *x);
-    Type *acceptCompositLiteral(CompositeLitAST *ast);
-    Type *resolveCompositExprType(CompositeLitAST *ast);
-    Type *resolveNamedType(TypeIdentAST *ast);
-    Type *resolveNamedType(PackageTypeAST *ast);
+    const Type *resolveSelectorExpr(ExprAST *x, bool &isFieldOrMethod, int &derefLevel);
+    const Type *tryAcceptTypeConvertion(ExprAST *x);
+    const Type *acceptCompositLiteral(CompositeLitAST *ast);
+    const Type *resolveCompositExprType(CompositeLitAST *ast);
+    const Type *resolveNamedType(TypeIdentAST *ast);
+    const Type *resolveNamedType(PackageTypeAST *ast);
 
 private:
-    std::stack<Type *> m_nestedCimpositLitType;
+    std::stack<const Type *> m_nestedCimpositLitType;
 
     GoSource::Ptr m_doc;
     Control *m_control;

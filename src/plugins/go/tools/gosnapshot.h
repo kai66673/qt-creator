@@ -49,15 +49,15 @@ public:
                      const Identifier *typeId, GoSnapshot *snapshot);
 
     // LookupContext implemntation
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate = 0) override;
+                                       ExprTypeResolver *resolver, Predicate = 0) const override;
 
     // Type implemntation
-    virtual Type *indexType(ExprTypeResolver *) override;
-    virtual Type *elementsType(ExprTypeResolver *) override;
-    virtual Type *calleeType(int, ExprTypeResolver *) const override;
-    virtual Type *chanValueType() const override;
+    virtual const Type *indexType(ExprTypeResolver *) const override;
+    virtual const Type *elementsType(ExprTypeResolver *) const override;
+    virtual const Type *calleeType(int, ExprTypeResolver *) const override;
+    virtual const Type *chanValueType() const override;
 
     virtual QString describe() const override { return QLatin1String("package"); }
 

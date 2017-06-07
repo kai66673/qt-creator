@@ -228,7 +228,7 @@ bool GoCompletionAssistVisitor::visit(CompositeLitAST *ast)
             const Token &firstToken = _tokens->at(ast->elements->firstToken());
             const Token &lastToken = _tokens->at(ast->elements->lastToken());
             if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                Type *type = 0;
+                const Type *type = 0;
                 if (ExprAST *typeExpr = ast->type) {
                     type = typeExpr->asType();
                     if (!type) {
@@ -263,10 +263,10 @@ bool GoCompletionAssistVisitor::visit(DeclIdentAST *ast)
             m_ended = true;
             if (ast->isLookable()) {
                 int derefLevel = 0;
-                if (Type *type = resolveExpr(ast, derefLevel)) {
+                if (const Type *type = resolveExpr(ast, derefLevel)) {
                     derefLevel += type->refLevel();
                     if (derefLevel == 0 || derefLevel == -1) {
-                        if (Type *baseTyp = type->baseType()) {
+                        if (const Type *baseTyp = type->baseType()) {
                             baseTyp->fillMemberCompletions(m_completions, this);
                         }
                     }
@@ -290,10 +290,10 @@ bool GoCompletionAssistVisitor::visit(IdentAST *ast)
             m_ended = true;
             if (ast->isLookable()) {
                 int derefLevel = 0;
-                if (Type *type = resolveExpr(ast, derefLevel)) {
+                if (const Type *type = resolveExpr(ast, derefLevel)) {
                     derefLevel += type->refLevel();
                     if (derefLevel == 0 || derefLevel == -1) {
-                        if (Type *baseTyp = type->baseType()) {
+                        if (const Type *baseTyp = type->baseType()) {
                             baseTyp->fillMemberCompletions(m_completions, this);
                         }
                     }
@@ -334,10 +334,10 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             m_ended = true;
             int derefLevel = 0;
-            if (Type *type = resolveExpr(ast->x, derefLevel)) {
+            if (const Type *type = resolveExpr(ast->x, derefLevel)) {
                 derefLevel += type->refLevel();
                 if (derefLevel == 0 || derefLevel == -1) {
-                    if (Type *baseTyp = type->baseType()) {
+                    if (const Type *baseTyp = type->baseType()) {
                         baseTyp->fillMemberCompletions(m_completions, this);
                     }
                 }
@@ -348,10 +348,10 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
             if (m_pos >= tk.begin() && m_pos <= tk.end()) {
                 m_ended = true;
                 int derefLevel = 0;
-                if (Type *type = resolveExpr(ast, derefLevel)) {
+                if (const Type *type = resolveExpr(ast, derefLevel)) {
                     derefLevel += type->refLevel();
                     if (derefLevel == 0 || derefLevel == -1) {
-                        if (Type *baseTyp = type->baseType()) {
+                        if (const Type *baseTyp = type->baseType()) {
                             baseTyp->fillMemberCompletions(m_completions, this);
                         }
                     }

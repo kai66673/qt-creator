@@ -88,7 +88,7 @@ QIcon Symbol::icon(Symbol::Kind kind)
 ExprAST *VarDecl::declExpr() const
 { return _decl; }
 
-Type *VarDecl::type(ExprTypeResolver *)
+const Type *VarDecl::type(ExprTypeResolver *)
 { return _decl->asType(); }
 
 QString VarDecl::describeType(ExprTypeResolver *) const
@@ -100,7 +100,7 @@ Symbol::Kind VarDecl::kind() const
 ExprAST *FuncDecl::declExpr() const
 { return _decl; }
 
-Type *FuncDecl::type(ExprTypeResolver *)
+const Type *FuncDecl::type(ExprTypeResolver *)
 { return _decl; }
 
 QString FuncDecl::describeType(ExprTypeResolver *) const
@@ -112,7 +112,7 @@ Symbol::Kind FuncDecl::kind() const
 ExprAST *ConstDecl::declExpr() const
 { return 0; }
 
-Type *ConstDecl::type(ExprTypeResolver *)
+const Type *ConstDecl::type(ExprTypeResolver *)
 { return Control::builtinType(); }
 
 QString ConstDecl::describeType(ExprTypeResolver *) const
@@ -124,7 +124,7 @@ Symbol::Kind ConstDecl::kind() const
 ExprAST *TypeDecl::declExpr() const
 { return _decl->type; }
 
-Type *TypeDecl::type(ExprTypeResolver *)
+const Type *TypeDecl::type(ExprTypeResolver *)
 { return _decl; }
 
 QString TypeDecl::describeType(ExprTypeResolver *) const
@@ -136,12 +136,12 @@ Symbol::Kind TypeDecl::kind() const
 ExprAST *ShortVarDecl::declExpr() const
 { return _decl; }
 
-Type *ShortVarDecl::type(ExprTypeResolver *resolver)
+const Type *ShortVarDecl::type(ExprTypeResolver *resolver)
 { return _decl->type(resolver, _indexInTuple); }
 
 QString ShortVarDecl::describeType(ExprTypeResolver *resolver) const
 {
-    if (Type *type = _decl->type(resolver, _indexInTuple))
+    if (const Type *type = _decl->type(resolver, _indexInTuple))
         return type->describe();
     return QString();
 }
@@ -152,12 +152,12 @@ Symbol::Kind ShortVarDecl::kind() const
 ExprAST *RangeKeyDecl::declExpr() const
 { return _decl; }
 
-Type *RangeKeyDecl::type(ExprTypeResolver *resolver)
+const Type *RangeKeyDecl::type(ExprTypeResolver *resolver)
 { return _decl->type(resolver, 0); }
 
 QString RangeKeyDecl::describeType(ExprTypeResolver *resolver) const
 {
-    if (Type *type = _decl->type(resolver, 0))
+    if (const Type *type = _decl->type(resolver, 0))
         return type->describe();
     return QString();
 }
@@ -168,12 +168,12 @@ Symbol::Kind RangeKeyDecl::kind() const
 ExprAST *RangeValueDecl::declExpr() const
 { return _decl; }
 
-Type *RangeValueDecl::type(ExprTypeResolver *resolver)
+const Type *RangeValueDecl::type(ExprTypeResolver *resolver)
 { return _decl->type(resolver, 1); }
 
 QString RangeValueDecl::describeType(ExprTypeResolver *resolver) const
 {
-    if (Type *type = _decl->type(resolver, 1))
+    if (const Type *type = _decl->type(resolver, 1))
         return type->describe();
     return QString();
 }

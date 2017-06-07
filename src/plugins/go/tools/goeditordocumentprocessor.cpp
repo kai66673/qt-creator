@@ -174,7 +174,7 @@ bool GoEditorDocumentProcessor::isSourceReady() const
         return false;
 
     if (m_source->revision() != m_textDocument->document()->revision())
-        false;
+        return false;
 
     return m_semanticHighlighter->revision() == m_textDocument->document()->revision() && !m_semanticHighlighter->isRunning();
 }

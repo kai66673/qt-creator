@@ -80,22 +80,15 @@ void ExprTypeResolver::eraseResolvedTypes()
 
 void ExprTypeResolver::resolveExpr(TupleType *tuple, ExprAST *x)
 {
-    if (Type *typ = x->asType())
-        tuple->appendType(new TypeWithDerefLevel(0, typ));
-    else
-        x->topLevelResolve(this, tuple);
-    return;
+    x->topLevelResolve(this, tuple);
 }
 
-Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)
+const Type *ExprTypeResolver::resolveExpr(ExprAST *x, int &derefLevel)
 {
-    if (Type *typ = x->asType())
-        return typ;
-
     return x->resolve(this, derefLevel);
 }
 
-Type *ExprTypeResolver::resolveCompositExpr(CompositeLitAST *ast)
+const Type *ExprTypeResolver::resolveCompositExpr(CompositeLitAST *ast)
 {
     if (ExprAST *type = ast->type)
         if (TypeAST *typ = type->asType())
@@ -113,7 +106,7 @@ Scope *ExprTypeResolver::switchScope(Scope *scope)
     return scope;
 }
 
-Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x)
+const Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x)
 {
     if (x) {
         if (IdentAST *ident = x->asIdent()) {

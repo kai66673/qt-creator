@@ -65,7 +65,7 @@ private:
     GoSource::Ptr m_doc;
 
     std::vector<Token> *_tokens;
-    std::stack<Type *> m_nestedCimpositLitType;
+    std::stack<const Type *> m_nestedCimpositLitType;
 
     QList<TextEditor::AssistProposalItemInterface *> &m_completions;
     bool m_ended;
