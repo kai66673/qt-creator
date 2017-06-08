@@ -36,6 +36,7 @@ namespace GoTools {
 
 class PackageType;
 class SymbolTable;
+class GoSnapshot;
 
 class Scope: public LookupContext
 {
@@ -95,19 +96,22 @@ public:
     void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
                      const Identifier *typeId);
 
-    int indexInSnapshot() const;
-    void setIndexInSnapshot(int index);
-
     virtual FileScope *asFileScope() override { return this; }
 
     void fillLink(TextEditor::TextEditorWidget::Link &link, unsigned tokenIndex);
 
     GoSource *source() const;
 
+    PackageType *packageType() const;
+    void setPackageType(PackageType *packageType);
+    PackageType *packageTypeForAlias(const QString &alias, GoTools::GoSnapshot *snapshot);
+
 private:
     GoSource *m_source;
     MethodsScope m_methods;
-    int m_indexInSnapshot = -1;
+    PackageType *m_packageType;
+
+    QHash<QString, PackageType *> m_aliasToLookupContext;
 };
 
 }   // namespace GoTools

@@ -55,6 +55,7 @@ protected:
     virtual bool visit(TypeIdentAST *ast);
     virtual bool visit(PackageTypeAST *ast);
     virtual bool visit(SelectorExprAST *ast);
+
     virtual bool visit(FuncDeclAST *ast);
     virtual bool visit(BlockStmtAST *ast);
     virtual bool visit(IfStmtAST *ast);
@@ -63,6 +64,7 @@ protected:
     virtual bool visit(TypeSwitchStmtAST *ast);
     virtual bool visit(SwitchStmtAST *ast);
     virtual bool visit(CaseClauseAST *ast);
+
     virtual bool visit(CompositeLitAST *ast);
     virtual bool visit(KeyValueExprAST *ast);
 

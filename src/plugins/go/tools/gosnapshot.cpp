@@ -37,42 +37,35 @@ PackageType::PackageType()
 PackageType::~PackageType()
 { }
 
-Symbol *PackageType::lookupMethod(const Identifier *typeId, const Identifier *funcId, GoSnapshot *snapshot)
+Symbol *PackageType::lookupMethod(const Identifier *typeId, const Identifier *funcId)
 {
-    for (int i = m_first; i < m_last; i++) {
-        FileScope *scope = snapshot->m_scopeTable.at(i)->scope;
+    for (FileScope *scope: m_fileScopes)
         if (Symbol *symbol = scope->lookupMethod(typeId, funcId))
             return symbol;
-    }
 
     return 0;
 }
 
 void PackageType::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                              const Identifier *typeId, GoSnapshot *snapshot)
+                              const Identifier *typeId)
 {
-    for (int i = m_first; i < m_last; i++) {
-        FileScope *scope = snapshot->m_scopeTable.at(i)->scope;
+    for (FileScope *scope: m_fileScopes)
         scope->fillMethods(completions, typeId);
-    }
 }
 
-Symbol *PackageType::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
+Symbol *PackageType::lookupMember(const IdentAST *ident, ExprTypeResolver *) const
 {
-    for (int i = m_first; i < m_last; i++) {
-        Scope *scope = resolver->snapshot()->m_scopeTable.at(i)->scope;
+    for (FileScope *scope: m_fileScopes)
         if (Symbol *symbol = scope->find(ident->ident))
             return symbol;
-    }
 
     return 0;
 }
 
 void PackageType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                        ExprTypeResolver *resolver, Predicate) const
+                                        ExprTypeResolver *, Predicate) const
 {
-    for (int i = m_first; i < m_last; i++) {
-        Scope *scope = resolver->snapshot()->m_scopeTable.at(i)->scope;
+    for (FileScope *scope: m_fileScopes) {
         for (unsigned i = 0; i < scope->memberCount(); i++) {
             Symbol *symbol = scope->memberAt(i);
             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
@@ -97,33 +90,23 @@ const Type *PackageType::chanValueType() const
 
 GoSnapshot::GoSnapshot(const QHash<GoPackageKey, GoPackage *> &packages)
 {
-    int index = 0;
     for (QHash<GoPackageKey, GoPackage *>::const_iterator it = packages.constBegin();
          it != packages.constEnd(); ++it) {
         PackageType *lookupContext = new PackageType();
-        lookupContext->m_first = index;
         m_packages.insert(it.key(), lookupContext);
         GoPackage *package = it.value();
         for (const GoSource::Ptr &doc: package->sources().values()) {
-            ScopeRecord *record = new ScopeRecord();
-            record->source = doc;
             if (FileAST *fileAst = doc->translationUnit()->fileAst()) {
-                record->scope = fileAst->scope;
-                record->lookupcontext = lookupContext;
-                m_scopeTable.append(record);
-                index++;
+                lookupContext->m_fileScopes.append(fileAst->scope);
+                fileAst->scope->setPackageType(lookupContext);
             }
         }
-        lookupContext->m_last = index;
     }
-
-    bindScopes();
 }
 
 GoSnapshot::~GoSnapshot()
 {
     qDeleteAll(m_packages.values());
-    qDeleteAll(m_scopeTable);
 }
 
 static QMutex s_mutex;
@@ -134,40 +117,11 @@ void GoSnapshot::runProtectedTask(GoSnapshot::ProtectedTask task)
     task();
 }
 
-void GoSnapshot::bindScopes()
+PackageType *GoSnapshot::packageTypeForImport(const GoSource::Import &import)
 {
-    int i = 0;
-    for (ScopeRecord *record: m_scopeTable) {
-        record->scope->setIndexInSnapshot(i);
-        i++;
-    }
-}
-
-PackageType *GoSnapshot::packageTypetAt(int index) const
-{ return m_scopeTable.at(index)->lookupcontext; }
-
-FileScope *GoSnapshot::fileScopeAt(int index) const
-{ return m_scopeTable.at(index)->scope; }
-
-PackageType *GoSnapshot::packageTypeForAlias(int index, const QString &alias)
-{
-    ScopeRecord *record = m_scopeTable.at(index);
-
-    auto it = record->aliasToLookupContext.constFind(alias);
-    if (record->aliasToLookupContext.constFind(alias) != record->aliasToLookupContext.constEnd())
-        return it.value();
-
-    for (const GoSource::Import &import: record->source->imports()) {
-        if (import.alias == QStringLiteral("_"))
-            continue;
-        if (import.alias == alias) {
-            auto context_it = m_packages.constFind({import.resolvedDir, import.packageName});
-            if (context_it != m_packages.constEnd()) {
-                record->aliasToLookupContext.insert(alias, context_it.value());
-                return context_it.value();
-            }
-            return 0;
-        }
+    auto context_it = m_packages.constFind({import.resolvedDir, import.packageName});
+    if (context_it != m_packages.constEnd()) {
+        return context_it.value();
     }
     return 0;
 }

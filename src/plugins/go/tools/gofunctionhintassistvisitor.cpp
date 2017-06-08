@@ -45,8 +45,8 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
             [this]() -> void {
                 if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
                     m_currentScope = fileAst->scope;
-                    m_currentIndex = fileAst->scope->indexInSnapshot();
-                    if (m_currentIndex != -1) {
+                    m_fileScope = fileAst->scope;
+                    if (m_fileScope->packageType()) {
                         m_ended = false;
 
                         acceptForPosition(fileAst->decls, m_pos);

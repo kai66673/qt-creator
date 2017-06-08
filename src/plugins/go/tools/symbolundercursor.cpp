@@ -72,8 +72,8 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
             [this]() -> void {
                 if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
                     m_currentScope = fileAst->scope;
-                    m_currentIndex = fileAst->scope->indexInSnapshot();
-                    if (m_currentIndex != -1) {
+                    m_fileScope = fileAst->scope;
+                    if (m_fileScope->packageType()) {
                         m_ended = false;
 
                         if (m_useReason == DescribeType)
@@ -166,7 +166,7 @@ bool SymbolUnderCursor::visit(IdentAST *ast)
             m_symbol = m_currentScope->lookupMember(ast, this);
             if (!m_symbol && m_useReason == DescribeType) { // may be a package
                 QString packageAlias(ast->ident->toString());
-                if (m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+                if (packageTypeForAlias(packageAlias))
                     m_packageAlias = packageAlias;
             }
         }
@@ -204,7 +204,7 @@ bool SymbolUnderCursor::visit(PackageTypeAST *ast)
             m_ended = true;
             QString packageAlias(ast->packageAlias->ident->toString());
             if (ast->packageAlias->isLookable())
-                if (m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+                if (packageTypeForAlias(packageAlias))
                     m_packageAlias = packageAlias;
             return false;
         }
@@ -217,7 +217,7 @@ bool SymbolUnderCursor::visit(PackageTypeAST *ast)
         m_ended = true;
         if (ast->typeName->isLookable()) {
             QString packageAlias(ast->packageAlias->ident->toString());
-            if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+            if (PackageType *context = packageTypeForAlias(packageAlias))
                 m_symbol = context->lookupMember(ast->typeName, this);
         }
     }

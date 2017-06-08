@@ -32,8 +32,8 @@ namespace GoTools {
 
 ExprTypeResolver::ExprTypeResolver()
     : m_snapshot(GoPackageCache::instance()->getSnapshot())
-    , m_currentIndex(-1)
     , m_currentScope(0)
+    , m_fileScope(0)
 { }
 
 ExprTypeResolver::~ExprTypeResolver()
@@ -66,7 +66,7 @@ Scope *ExprTypeResolver::currentScope() const
 { return m_currentScope; }
 
 PackageType *ExprTypeResolver::packageTypeForAlias(const QString &alias)
-{ return m_snapshot->packageTypeForAlias(m_currentIndex, alias); }
+{ return m_fileScope->packageTypeForAlias(alias, m_snapshot); }
 
 void ExprTypeResolver::eraseResolvedTypes()
 {

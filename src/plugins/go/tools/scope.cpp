@@ -107,6 +107,7 @@ FileScope *Scope::fileScope()
 FileScope::FileScope(GoSource *source)
     : Scope(0)
     , m_source(source)
+    , m_packageType(0)
 { }
 
 void FileScope::declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl)
@@ -114,15 +115,15 @@ void FileScope::declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl)
 
 Symbol *FileScope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
 {
-    return m_indexInSnapshot != -1
-            ? resolver->snapshot()->packageTypetAt(m_indexInSnapshot)->lookupMember(ident, resolver)
+    return m_packageType
+            ? m_packageType->lookupMember(ident, resolver)
             : find(ident->ident);
 }
 
 void FileScope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                       ExprTypeResolver *resolver, Predicate predicate) const
 {
-    if (m_indexInSnapshot == -1) {
+    if (!m_packageType) {
         for (unsigned i = 0; i < memberCount(); i++) {
             Symbol *symbol = memberAt(i);
             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
@@ -133,7 +134,7 @@ void FileScope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterf
         return;
     }
 
-    resolver->snapshot()->packageTypetAt(m_indexInSnapshot)->fillMemberCompletions(completions, resolver, predicate);
+    m_packageType->fillMemberCompletions(completions, resolver, predicate);
 }
 
 Symbol *FileScope::lookupMethod(const Identifier *typeId, const Identifier *funcId)
@@ -154,12 +155,6 @@ void FileScope::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &co
     }
 }
 
-int FileScope::indexInSnapshot() const
-{ return m_indexInSnapshot; }
-
-void FileScope::setIndexInSnapshot(int index)
-{ m_indexInSnapshot = index; }
-
 void FileScope::fillLink(TextEditor::TextEditorWidget::Link &link, unsigned tokenIndex)
 {
     const Token &tk = m_source->translationUnit()->tokenAt(tokenIndex);
@@ -170,5 +165,30 @@ void FileScope::fillLink(TextEditor::TextEditorWidget::Link &link, unsigned toke
 
 GoSource *FileScope::source() const
 { return m_source; }
+
+PackageType *FileScope::packageType() const
+{ return m_packageType; }
+
+void FileScope::setPackageType(PackageType *packageType)
+{ m_packageType = packageType; }
+
+PackageType *FileScope::packageTypeForAlias(const QString &alias, GoSnapshot *snapshot)
+{
+    auto it = m_aliasToLookupContext.constFind(alias);
+    if (m_aliasToLookupContext.constFind(alias) != m_aliasToLookupContext.constEnd())
+        return it.value();
+
+    for (const GoSource::Import &import: m_source->imports()) {
+        if (import.alias == QStringLiteral("_"))
+            continue;
+        if (import.alias == alias) {
+            PackageType *pkg = snapshot->packageTypeForImport(import);
+            if (pkg)
+                m_aliasToLookupContext.insert(alias, pkg);
+            return pkg;
+        }
+    }
+    return 0;
+}
 
 }   // namespace GoTools

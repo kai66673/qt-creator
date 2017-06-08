@@ -44,14 +44,13 @@ public:
     PackageType();
     virtual ~PackageType();
 
-    Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId, GoSnapshot *snapshot);
+    Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId);
     void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                     const Identifier *typeId, GoSnapshot *snapshot);
+                     const Identifier *typeId);
 
     // LookupContext implemntation
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
-    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate = 0) const override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *) const override;
+    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions, ExprTypeResolver *, Predicate = 0) const override;
 
     // Type implemntation
     virtual const Type *indexType(ExprTypeResolver *) const override;
@@ -62,23 +61,13 @@ public:
     virtual QString describe() const override { return QLatin1String("package"); }
 
 private:
-    int m_first;
-    int m_last;
+    QList<FileScope *> m_fileScopes;
 };
 
 class GoSnapshot
 {
     friend class PackageType;
 
-    struct ScopeRecord {
-        GoSource::Ptr source;
-        FileScope *scope;
-        PackageType *lookupcontext;
-        QHash<QString, PackageType *> aliasToLookupContext;
-    };
-
-    typedef QList<ScopeRecord *> ScopeTable;
-    typedef QList<ScopeRecord *>::iterator ScopeTableIterator;
     typedef std::function<void ()> ProtectedTask;
 
 public:
@@ -87,17 +76,11 @@ public:
 
     void runProtectedTask(ProtectedTask task);
 
-    PackageType *packageTypetAt(int index) const;
-    FileScope *fileScopeAt(int index) const;
-    PackageType *packageTypeForAlias(int index, const QString &alias);
+    PackageType *packageTypeForImport(const GoSource::Import &import);
 
 private:
-    void bindScopes();
-
     QHash<GoPackageKey, PackageType *> m_packages;
     PackageType m_nullPackage;
-
-    QList<ScopeRecord *> m_scopeTable;
 };
 
 }   // namespace GoTools
