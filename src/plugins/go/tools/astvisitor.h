@@ -48,6 +48,24 @@ public:
             accept(it->value);
     }
 
+    template <typename _Tp>
+    void acceptForPosition(List<_Tp> *it, unsigned pos)
+    {
+        for (; it && !m_ended; it = it->next) {
+            switch (positionRelation(it->value, pos)) {
+                case Before:
+                    m_ended = true;
+                    break;
+                case In:
+                    accept(it->value);
+                    m_ended = true;
+                    break;
+                case After:
+                    break;
+            }
+        }
+    }
+
     virtual bool preVisit(AST *) { return true; }
     virtual void postVisit(AST *) {}
 
@@ -192,7 +210,12 @@ public:
     TranslationUnit *translationUnit() const;
 
 protected:
+    enum PositionRelation { Before, In, After };
+    PositionRelation positionRelation(AST *ast, unsigned pos) const;
+
     TranslationUnit *_translationUnit;
+    std::vector<Token> *_tokens;
+    bool m_ended;
 };
 
 }   // namespace GoTools

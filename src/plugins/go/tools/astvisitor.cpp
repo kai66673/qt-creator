@@ -29,6 +29,7 @@ namespace GoTools {
 
 ASTVisitor::ASTVisitor(TranslationUnit *unit)
     : _translationUnit(unit)
+    , _tokens(unit->tokens())
 { }
 
 ASTVisitor::~ASTVisitor()
@@ -39,6 +40,17 @@ void ASTVisitor::accept(AST *ast)
 
 TranslationUnit *ASTVisitor::translationUnit() const
 { return _translationUnit; }
+
+ASTVisitor::PositionRelation ASTVisitor::positionRelation(AST *ast, unsigned pos) const
+{
+    if (pos < _tokens->at(ast->firstToken()).begin())
+        return Before;
+
+    if (pos <= _tokens->at(ast->lastToken()).end())
+        return In;
+
+    return After;
+}
 
 
 }   // namespace GoTools

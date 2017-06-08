@@ -31,9 +31,7 @@ namespace GoTools {
 GoFunctionHintAssistVisitor::GoFunctionHintAssistVisitor(GoSource::Ptr doc)
     : ASTVisitor(doc->translationUnit())
     , m_doc(doc)
-{
-    _tokens = translationUnit()->tokens();
-}
+{ }
 
 QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
 {
@@ -51,18 +49,7 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
                     if (m_currentIndex != -1) {
                         m_ended = false;
 
-                        for (DeclListAST *it = fileAst->decls; it; it = it->next) {
-                            const Token &firstToken = _tokens->at(it->value->firstToken());
-                            const Token &lastToken = _tokens->at(it->value->lastToken());
-                            if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                                accept(it->value);
-                                break;
-                            }
-
-                            if (m_pos <= firstToken.begin()) {
-                                break;
-                            }
-                        }
+                        acceptForPosition(fileAst->decls, m_pos);
 
                         if (m_funcExpr) {
                             int derefLevel = 0;

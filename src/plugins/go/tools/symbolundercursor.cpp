@@ -33,9 +33,7 @@ SymbolUnderCursor::SymbolUnderCursor(GoSource::Ptr doc)
     , m_doc(doc)
     , m_symbol(0)
     , m_token(0)
-{
-    _tokens = translationUnit()->tokens();
-}
+{ }
 
 TextEditor::TextEditorWidget::Link SymbolUnderCursor::link(unsigned pos)
 {
@@ -78,35 +76,10 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
                     if (m_currentIndex != -1) {
                         m_ended = false;
 
-                        if (m_useReason == DescribeType) {
-                            for (DeclListAST *it = fileAst->importDecls; it; it = it->next) {
-                                const Token &firstToken = _tokens->at(it->value->firstToken());
-                                const Token &lastToken = _tokens->at(it->value->lastToken());
-                                if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                                    accept(it->value);
-                                    m_ended = true;
-                                    break;
-                                }
-                                if (m_pos <= firstToken.begin()) {
-                                    m_ended = true;
-                                    break;
-                                }
-                            }
-                        }
+                        if (m_useReason == DescribeType)
+                            acceptForPosition(fileAst->importDecls, m_pos);
 
-                        if (!m_ended) {
-                            for (DeclListAST *it = fileAst->decls; it; it = it->next) {
-                                const Token &firstToken = _tokens->at(it->value->firstToken());
-                                const Token &lastToken = _tokens->at(it->value->lastToken());
-                                if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                                    accept(it->value);
-                                    break;
-                                }
-                                if (m_pos <= firstToken.begin()) {
-                                    break;
-                                }
-                            }
-                        }
+                        acceptForPosition(fileAst->decls, m_pos);
 
                         switch (m_useReason) {
                             case Link:

@@ -72,7 +72,6 @@ private:
     GoSource::Ptr m_doc;
     unsigned m_pos;
 
-    std::vector<Token> *_tokens;
     std::stack<const Type *> m_nestedCimpositLitType;
 
     Symbol *m_symbol;
@@ -81,7 +80,6 @@ private:
     QString m_symbolTypeDescription;
     QString m_packageAlias;
     ImportSpecAST *m_importSpec;
-    bool m_ended;
 };
 
 }   // namespace GoTools

@@ -55,10 +55,7 @@ protected:
     virtual bool visit(CallExprAST *ast) override;
 
 private:
-    std::vector<Token> *_tokens;
-
     GoSource::Ptr m_doc;
-    bool m_ended;
     ExprAST *m_funcExpr;
     unsigned m_lparenPosition;
     QStringList m_functionArgs;

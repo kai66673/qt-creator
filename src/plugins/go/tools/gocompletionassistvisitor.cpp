@@ -33,9 +33,7 @@ GoCompletionAssistVisitor::GoCompletionAssistVisitor(GoSource::Ptr doc, QList<Te
     , ExprTypeResolver()
     , m_doc(doc)
     , m_completions(completions)
-{
-    _tokens = translationUnit()->tokens();
-}
+{ }
 
 void GoCompletionAssistVisitor::fillCompletions(bool isGlobalCompletion, unsigned pos)
 {

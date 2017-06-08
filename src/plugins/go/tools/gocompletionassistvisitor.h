@@ -64,11 +64,9 @@ protected:
 private:
     GoSource::Ptr m_doc;
 
-    std::vector<Token> *_tokens;
     std::stack<const Type *> m_nestedCimpositLitType;
 
     QList<TextEditor::AssistProposalItemInterface *> &m_completions;
-    bool m_ended;
     bool m_inImportSection;
     bool m_isGlobalCompletion;
     unsigned m_pos;
