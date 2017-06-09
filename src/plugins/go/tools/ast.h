@@ -399,12 +399,12 @@ public:
 
 public:
     CommentGroupAST *doc;
-    IdentAST *name;
+    DeclIdentAST *name;
     TypeAST *type;
     CommentGroupAST *comment;
 
 public:
-    TypeSpecAST(CommentGroupAST *doc_ = 0, IdentAST *name_ = 0, TypeAST *type_ = 0, CommentGroupAST *comment_ = 0)
+    TypeSpecAST(CommentGroupAST *doc_ = 0, DeclIdentAST *name_ = 0, TypeAST *type_ = 0, CommentGroupAST *comment_ = 0)
         : doc(doc_), name(name_), type(type_), comment(comment_)
     { }
 

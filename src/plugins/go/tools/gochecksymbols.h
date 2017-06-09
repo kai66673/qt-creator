@@ -78,10 +78,11 @@ protected:
     virtual void postVisit(AST *) override { }
 
     virtual bool visit(ImportSpecAST *ast) override;
-    virtual bool visit(TypeSpecAST *ast) override;
-    virtual bool visit(VarSpecWithTypeAST *ast) override;
-    virtual bool visit(VarSpecWithValuesAST *ast) override;
-    virtual bool visit(ConstSpecAST *ast) override;
+//    virtual bool visit(TypeSpecAST *ast) override;
+//    virtual bool visit(VarSpecWithTypeAST *ast) override;
+//    virtual bool visit(VarSpecWithValuesAST *ast) override;
+//    virtual bool visit(ConstSpecAST *ast) override;
+
     virtual bool visit(FuncDeclAST *ast) override;
     virtual bool visit(BlockStmtAST *ast) override;
     virtual bool visit(IfStmtAST *ast) override;
@@ -90,6 +91,7 @@ protected:
     virtual bool visit(TypeSwitchStmtAST *ast) override;
     virtual bool visit(SwitchStmtAST *ast) override;
     virtual bool visit(CaseClauseAST *ast) override;
+
     virtual bool visit(FieldAST *ast) override;
     virtual bool visit(TypeIdentAST *ast) override;
     virtual bool visit(PackageTypeAST *ast) override;

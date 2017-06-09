@@ -145,49 +145,10 @@ bool GoCheckSymbols::visit(ImportSpecAST *ast)
     return false;
 }
 
-bool GoCheckSymbols::visit(TypeSpecAST *ast)
-{
-    addUse(ast->name, GoSemanticHighlighter::TypeDecl);
-    accept(ast->type);
-    return false;
-}
-
-bool GoCheckSymbols::visit(VarSpecWithTypeAST *ast)
-{
-    for (DeclIdentListAST *it = ast->names; it; it = it->next)
-        if (DeclIdentAST *ident = it->value)
-            addUse(ident, GoSemanticHighlighter::VarDecl);
-
-    accept(ast->type);
-    return false;
-}
-
-bool GoCheckSymbols::visit(VarSpecWithValuesAST *ast)
-{
-    for (DeclIdentListAST *it = ast->names; it; it = it->next)
-        if (DeclIdentAST *ident = it->value)
-            addUse(ident, GoSemanticHighlighter::VarDecl);
-
-    /// TODO: prevent double resolving
-    accept(ast->values);
-    return false;
-}
-
-bool GoCheckSymbols::visit(ConstSpecAST *ast)
-{
-    for (DeclIdentListAST *it = ast->names; it; it = it->next)
-        if (DeclIdentAST *ident = it->value)
-            addUse(ident, GoSemanticHighlighter::ConstDecl);
-
-    accept(ast->type);
-    accept(ast->values);
-    return false;
-}
-
 bool GoCheckSymbols::visit(FuncDeclAST *ast)
 {
     accept(ast->recv);
-    addUse(ast->name, GoSemanticHighlighter::FuncDecl);
+    accept(ast->name);
     accept(ast->type);
 
     Scope *scope = switchScope(ast->scope);
@@ -409,8 +370,23 @@ bool GoCheckSymbols::visit(IdentAST *ast)
 
 bool GoCheckSymbols::visit(DeclIdentAST *ast)
 {
-    if (ast->symbol)
-        addUse(ast, GoSemanticHighlighter::VarDecl);
+    if (ast->symbol) {
+        switch (ast->symbol->kind()) {
+            case Symbol::Typ:
+                addUse(ast, GoSemanticHighlighter::TypeDecl);
+                break;
+            case Symbol::Con:
+                addUse(ast, GoSemanticHighlighter::ConstDecl);
+                break;
+            case Symbol::Fun:
+                addUse(ast, GoSemanticHighlighter::FuncDecl);
+                break;
+            default:
+                addUse(ast, GoSemanticHighlighter::VarDecl);
+                break;
+        }
+    }
+
     return false;
 }
 
