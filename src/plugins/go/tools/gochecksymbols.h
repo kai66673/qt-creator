@@ -83,7 +83,6 @@ protected:
     virtual bool visit(VarSpecWithValuesAST *ast) override;
     virtual bool visit(ConstSpecAST *ast) override;
     virtual bool visit(FuncDeclAST *ast) override;
-    virtual bool visit(FuncTypeAST *ast) override;
     virtual bool visit(BlockStmtAST *ast) override;
     virtual bool visit(IfStmtAST *ast) override;
     virtual bool visit(RangeStmtAST *ast) override;
@@ -117,7 +116,6 @@ private:
 
     QVector<Result> _usages;
     int _chunkSize;
-    bool _isFuncDecl = false;
 };
 
 }   // namespace GoTools

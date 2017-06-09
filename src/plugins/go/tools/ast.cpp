@@ -2032,9 +2032,13 @@ void TypeSpecAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInte
     if (!name || !name->ident || !type)
         return;
 
-    if (scope)
-        if (PackageType *pkg = scope->packageType())
-            pkg->fillMethods(completions, name->ident);
+    if (scope) {
+        int packageIndex = scope->indexInSnapshot();
+        if (packageIndex != -1) {
+            if (PackageType *pkg = resolver->snapshot()->packageTypetAt(packageIndex))
+                pkg->fillMethods(completions, name->ident, resolver->snapshot());
+        }
+    }
 
     type->fillMemberCompletions(completions, resolver);
 }
@@ -2044,10 +2048,14 @@ Symbol *TypeSpecAST::lookupMember(const IdentAST *ast, ExprTypeResolver *resolve
     if (!name || !name->ident || !type)
         return 0;
 
-    if (scope)
-        if (PackageType *pkg = scope->packageType())
-            if (Symbol *method = pkg->lookupMethod(name->ident, ast->ident))
+    if (scope) {
+        int packageIndex = scope->indexInSnapshot();
+        if (packageIndex != -1) {
+            PackageType *pkg = resolver->snapshot()->packageTypetAt(packageIndex);
+            if (Symbol *method = pkg->lookupMethod(name->ident, ast->ident, resolver->snapshot()))
                 return method;
+        }
+    }
 
     return type->lookupMember(ast, resolver);
 }
@@ -2153,9 +2161,9 @@ unsigned PackageTypeAST::lastToken() const
 
 Symbol *PackageTypeAST::lookupMember(const IdentAST *ast, ExprTypeResolver *resolver) const
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = fileScope->packageTypeForAlias(packageAlias->ident->toString(),
-                                                                               resolver->snapshot())) {
+    if (fileScope && fileScope->indexInSnapshot() != -1) {
+        if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     const Type *resolvedType = symbol->type(resolver);
@@ -2172,9 +2180,9 @@ Symbol *PackageTypeAST::lookupMember(const IdentAST *ast, ExprTypeResolver *reso
 void PackageTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                            ExprTypeResolver *resolver, LookupContext::Predicate) const
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = fileScope->packageTypeForAlias(packageAlias->ident->toString(),
-                                                                               resolver->snapshot())) {
+    if (fileScope && fileScope->indexInSnapshot() != -1) {
+        if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     if (const Type *resolvedType = symbol->type(resolver))
@@ -2187,9 +2195,9 @@ void PackageTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemI
 
 const Type *PackageTypeAST::elementsType(ExprTypeResolver *resolver) const
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = fileScope->packageTypeForAlias(packageAlias->ident->toString(),
-                                                                               resolver->snapshot())) {
+    if (fileScope && fileScope->indexInSnapshot() != -1) {
+        if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     const Type *resolvedType = symbol->type(resolver);
@@ -2204,9 +2212,9 @@ const Type *PackageTypeAST::elementsType(ExprTypeResolver *resolver) const
 
 const Type *PackageTypeAST::indexType(ExprTypeResolver *resolver) const
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = fileScope->packageTypeForAlias(packageAlias->ident->toString(),
-                                                                               resolver->snapshot())) {
+    if (fileScope && fileScope->indexInSnapshot() != -1) {
+        if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
+                                                                              packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ) {
                     const Type *resolvedType = symbol->type(resolver);
@@ -2224,9 +2232,9 @@ QString PackageTypeAST::describe() const
 
 Symbol *PackageTypeAST::declaration(ExprTypeResolver *resolver)
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = fileScope->packageTypeForAlias(packageAlias->ident->toString(),
-                                                                               resolver->snapshot())) {
+    if (fileScope && fileScope->indexInSnapshot() != -1) {
+        if (PackageType *packageLookupcontext = resolver->snapshot()->packageTypeForAlias(fileScope->indexInSnapshot(),
+                                                                                          packageAlias->ident->toString())) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ)
                     return symbol;

@@ -54,8 +54,8 @@ protected:
 
 
     GoSnapshot *m_snapshot;
+    int m_currentIndex;
     Scope *m_currentScope;
-    FileScope *m_fileScope;
     QList<TupleType **> m_tuples;
 };
 

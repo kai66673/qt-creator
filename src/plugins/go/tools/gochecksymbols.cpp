@@ -70,8 +70,8 @@ void GoCheckSymbols::run()
                 [this]() -> void {
                     if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
                         m_currentScope = fileAst->scope;
-                        m_fileScope = fileAst->scope;
-                        if (m_fileScope->packageType()) {
+                        m_currentIndex = fileAst->scope->indexInSnapshot();
+                        if (m_currentIndex != -1) {
                             if (IdentAST *packageName = fileAst->packageName)
                             addUseCheckFirstLine(packageName, GoSemanticHighlighter::Package);
                             accept(fileAst->importDecls);
@@ -186,25 +186,13 @@ bool GoCheckSymbols::visit(ConstSpecAST *ast)
 
 bool GoCheckSymbols::visit(FuncDeclAST *ast)
 {
-    _isFuncDecl = true;
     accept(ast->recv);
-    _isFuncDecl = false;
     addUse(ast->name, GoSemanticHighlighter::FuncDecl);
     accept(ast->type);
 
     Scope *scope = switchScope(ast->scope);
     accept(ast->body);
     switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(FuncTypeAST *ast)
-{
-    _isFuncDecl = true;
-    accept(ast->params);
-    accept(ast->results);
-    _isFuncDecl = false;
 
     return false;
 }
@@ -290,8 +278,10 @@ bool GoCheckSymbols::visit(FieldAST *ast)
 {
     for (DeclIdentListAST *it = ast->names; it; it = it->next)
         if (DeclIdentAST *ident = it->value)
-            addUse(ident, _isFuncDecl ? GoSemanticHighlighter::Arg
-                                      : kindForSymbol(ident->symbol));
+            if (ident->isLookable())
+                addUse(ident, ident->symbol->kind() == Symbol::Fld
+                       ? GoSemanticHighlighter::Field
+                       : GoSemanticHighlighter::Arg);
 
     accept(ast->type);
     return false;
@@ -323,7 +313,7 @@ bool GoCheckSymbols::visit(TypeIdentAST *ast)
 const Type *GoCheckSymbols::resolveNamedType(PackageTypeAST *ast)
 {
     QString packageAlias(ast->packageAlias->ident->toString());
-    PackageType *context = packageTypeForAlias(packageAlias);
+    PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias);
     if (!context)
         return 0;
 
@@ -459,7 +449,7 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, int &derefLevel)
             addUse(ident, kindForSymbol(s));
             return s->type(this);
         }
-        if (PackageType *context = packageTypeForAlias(idStr)) {
+        if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, idStr)) {
             addUse(ident, GoSemanticHighlighter::Package);
             return context;
         }
@@ -576,7 +566,7 @@ const Type *GoCheckSymbols::tryAcceptTypeConvertion(ExprAST *x)
             if (selExpr->sel->isLookable()) {
                 if (IdentAST *packageIdent = selExpr->x->asIdent()) {
                     QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = packageTypeForAlias(packageAlias)) {
+                    if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias)) {
                         if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
                             if (s->kind() == Symbol::Typ) {
                                 addUse(packageIdent, GoSemanticHighlighter::Package);
@@ -611,7 +601,7 @@ const Type *GoCheckSymbols::resolveCompositExprType(CompositeLitAST *ast)
             if (IdentAST *packageIdent = selExpr->x->asIdent()) {
                 if (packageIdent->isLookable()) {
                     QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = packageTypeForAlias(packageAlias)) {
+                    if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias)) {
                         addUse(packageIdent, GoSemanticHighlighter::Package);
                         if (selExpr->sel->isLookable()) {
                             if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
