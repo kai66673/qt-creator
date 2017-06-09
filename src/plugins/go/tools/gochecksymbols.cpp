@@ -33,8 +33,6 @@
 
 namespace GoTools {
 
-QMutex g_semanticMutex;
-
 static GoSemanticHighlighter::Kind kindForSymbol(const Symbol *symbol)
 {
     switch (symbol->kind()) {
@@ -52,8 +50,7 @@ static GoSemanticHighlighter::Kind kindForSymbol(const Symbol *symbol)
 }
 
 GoCheckSymbols::GoCheckSymbols(GoSource::Ptr doc)
-    : ASTVisitor(doc->translationUnit())
-    , ExprTypeResolver()
+    : ScopeSwitchVisitor(doc)
     , m_doc(doc)
     , m_control(doc->translationUnit()->control())
     , _chunkSize(50)
@@ -142,96 +139,6 @@ bool GoCheckSymbols::visit(ImportSpecAST *ast)
             _usages.append(Result(tk.line(), tk.column() + pos + 1, path.length() - pos, GoSemanticHighlighter::Package));
         }
     }
-    return false;
-}
-
-bool GoCheckSymbols::visit(FuncDeclAST *ast)
-{
-    accept(ast->recv);
-    accept(ast->name);
-    accept(ast->type);
-
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->body);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(BlockStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->list);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(IfStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    accept(ast->cond);
-    accept(ast->body);
-    accept(ast->elseStmt);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(RangeStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->key);
-    accept(ast->value);
-    accept(ast->x);
-    accept(ast->body);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(ForStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    accept(ast->cond);
-    accept(ast->post);
-    accept(ast->body);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(TypeSwitchStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    accept(ast->assign);
-    accept(ast->body);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(SwitchStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    accept(ast->tag);
-    accept(ast->body);
-    switchScope(scope);
-
-    return false;
-}
-
-bool GoCheckSymbols::visit(CaseClauseAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->list);
-    accept(ast->body);
-    switchScope(scope);
-
     return false;
 }
 

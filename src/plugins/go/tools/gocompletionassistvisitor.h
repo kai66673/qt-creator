@@ -25,8 +25,7 @@
 
 #pragma once
 
-#include "astvisitor.h"
-#include "exprtyperesolver.h"
+#include "scopevisitor.h"
 
 #include <texteditor/codeassist/assistproposaliteminterface.h>
 
@@ -34,7 +33,7 @@
 
 namespace GoTools {
 
-class GoCompletionAssistVisitor: protected ASTVisitor, public ExprTypeResolver
+class GoCompletionAssistVisitor: public ScopePositionVisitor
 {
 public:
     GoCompletionAssistVisitor(GoSource::Ptr doc, QList<TextEditor::AssistProposalItemInterface *> &completions);
@@ -44,16 +43,6 @@ public:
     bool inImportSection() const;
 
 protected:
-    virtual bool preVisit(AST *) override;
-
-    virtual bool visit(FuncDeclAST *ast) override;
-    virtual bool visit(BlockStmtAST *ast) override;
-    virtual bool visit(IfStmtAST *ast) override;
-    virtual bool visit(RangeStmtAST *ast) override;
-    virtual bool visit(ForStmtAST *ast) override;
-    virtual bool visit(TypeSwitchStmtAST *ast) override;
-    virtual bool visit(SwitchStmtAST *ast) override;
-    virtual bool visit(CaseClauseAST *ast) override;
     virtual bool visit(CompositeLitAST *ast) override;
 
     virtual bool visit(DeclIdentAST *ast) override;
@@ -69,7 +58,6 @@ private:
     QList<TextEditor::AssistProposalItemInterface *> &m_completions;
     bool m_inImportSection;
     bool m_isGlobalCompletion;
-    unsigned m_pos;
 };
 
 }   // namespace GoTools

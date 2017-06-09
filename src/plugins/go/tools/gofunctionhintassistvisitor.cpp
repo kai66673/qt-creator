@@ -29,7 +29,7 @@
 namespace GoTools {
 
 GoFunctionHintAssistVisitor::GoFunctionHintAssistVisitor(GoSource::Ptr doc)
-    : ASTVisitor(doc->translationUnit())
+    : ScopePositionVisitor(doc)
     , m_doc(doc)
 { }
 
@@ -83,132 +83,6 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
     }
 
     return m_functionArgs;
-}
-
-bool GoFunctionHintAssistVisitor::preVisit(AST *)
-{ return !m_ended; }
-
-bool GoFunctionHintAssistVisitor::visit(FuncDeclAST *ast)
-{
-    if (ast->body) {
-        const Token &firstToken = _tokens->at(ast->firstToken());
-        const Token &lastToken = _tokens->at(ast->lastToken());
-        if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-            switchScope(ast->scope);
-            accept(ast->body);
-        }
-        else if (m_pos <= firstToken.begin()) {
-            m_ended = true;
-        }
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(BlockStmtAST *ast)
-{
-    switchScope(ast->scope);
-    for (StmtListAST *it = ast->list; it; it = it->next) {
-        const Token &firstToken = _tokens->at(it->value->firstToken());
-        const Token &lastToken = _tokens->at(it->value->lastToken());
-        if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-            accept(it->value);
-            break;
-        }
-        if (m_pos <= firstToken.begin()) {
-            m_ended = true;
-            break;
-        }
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(IfStmtAST *ast)
-{
-    accept(ast->init);
-    Scope *scope = switchScope(ast->scope);
-    if (!m_ended) {
-        accept(ast->cond);
-        if (!m_ended) {
-            accept(ast->body);
-            if (!m_ended) {
-                switchScope(scope); // ?? what about init of if-statement
-                accept(ast->elseStmt);
-            }
-        }
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(RangeStmtAST *ast)
-{
-    accept(ast->key);
-    if (!m_ended) {
-        accept(ast->value);
-        if (!m_ended) {
-            accept(ast->x);
-            if (!m_ended) {
-                switchScope(ast->scope);
-                accept(ast->body);
-            }
-        }
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(ForStmtAST *ast)
-{
-    accept(ast->init);
-    if (!m_ended) {
-        switchScope(ast->scope);
-        accept(ast->cond);
-        if (!m_ended) {
-            accept(ast->post);
-            if (!m_ended)
-                accept(ast->body);
-        }
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(TypeSwitchStmtAST *ast)
-{
-    accept(ast->init);
-    if (!m_ended) {
-        switchScope(ast->scope);
-        accept(ast->assign);
-        if (!m_ended)
-            accept(ast->body);
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(SwitchStmtAST *ast)
-{
-    accept(ast->init);
-    if (!m_ended) {
-        accept(ast->tag);
-        switchScope(ast->scope);
-        if (!m_ended)
-            accept(ast->body);
-    }
-
-    return false;
-}
-
-bool GoFunctionHintAssistVisitor::visit(CaseClauseAST *ast)
-{
-    accept(ast->list);
-    switchScope(ast->scope);
-    if (!m_ended)
-        accept(ast->body);
-
-    return false;
 }
 
 bool GoFunctionHintAssistVisitor::visit(CallExprAST *ast)

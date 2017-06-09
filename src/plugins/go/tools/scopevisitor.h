@@ -25,50 +25,46 @@
 
 #pragma once
 
-#include "scopevisitor.h"
-#include "gosnapshot.h"
-
-#include <texteditor/texteditor.h>
-
-#include <stack>
+#include "astvisitor.h"
+#include "exprtyperesolver.h"
 
 namespace GoTools {
 
-class SymbolUnderCursor: public ScopePositionVisitor
+class ScopeSwitchVisitor: protected ASTVisitor , public ExprTypeResolver
 {
-    enum UseReason { Link, DescribeType };
-
 public:
-    SymbolUnderCursor(GoSource::Ptr doc);
-
-    TextEditor::TextEditorWidget::Link link(unsigned pos);
-    QString typeDescription(unsigned pos);
+    ScopeSwitchVisitor(GoSource::Ptr doc);
 
 protected:
-    virtual bool visit(ImportSpecAST *ast);
+    virtual bool visit(FuncDeclAST *ast) override;
+    virtual bool visit(BlockStmtAST *ast) override;
+    virtual bool visit(IfStmtAST *ast) override;
+    virtual bool visit(RangeStmtAST *ast) override;
+    virtual bool visit(ForStmtAST *ast) override;
+    virtual bool visit(TypeSwitchStmtAST *ast) override;
+    virtual bool visit(SwitchStmtAST *ast) override;
+    virtual bool visit(CaseClauseAST *ast) override;
+};
 
-    virtual bool visit(DeclIdentAST *ast);
-    virtual bool visit(IdentAST *ast);
-    virtual bool visit(TypeIdentAST *ast);
-    virtual bool visit(PackageTypeAST *ast);
-    virtual bool visit(SelectorExprAST *ast);
+class ScopePositionVisitor: protected ASTVisitor, public ExprTypeResolver
+{
+public:
+    ScopePositionVisitor(GoSource::Ptr doc);
 
-    virtual bool visit(CompositeLitAST *ast);
-    virtual bool visit(KeyValueExprAST *ast);
+protected:
+    virtual bool preVisit(AST *) override;
 
-private:
-    void defineSymbolUnderCursor(UseReason reason = Link);
+    virtual bool visit(FuncDeclAST *ast) override;
+    virtual bool visit(BlockStmtAST *ast) override;
+    virtual bool visit(IfStmtAST *ast) override;
+    virtual bool visit(RangeStmtAST *ast) override;
+    virtual bool visit(ForStmtAST *ast) override;
+    virtual bool visit(TypeSwitchStmtAST *ast) override;
+    virtual bool visit(SwitchStmtAST *ast) override;
+    virtual bool visit(CaseClauseAST *ast) override;
 
-    GoSource::Ptr m_doc;
-
-    std::stack<const Type *> m_nestedCimpositLitType;
-
-    Symbol *m_symbol;
-    const Token *m_token;
-    UseReason m_useReason;
-    QString m_symbolTypeDescription;
-    QString m_packageAlias;
-    ImportSpecAST *m_importSpec;
+protected:
+    unsigned m_pos;
 };
 
 }   // namespace GoTools

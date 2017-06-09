@@ -28,8 +28,7 @@
 namespace GoTools {
 
 SymbolUnderCursor::SymbolUnderCursor(GoSource::Ptr doc)
-    : ASTVisitor(doc->translationUnit())
-    , ExprTypeResolver()
+    : ScopePositionVisitor(doc)
     , m_doc(doc)
     , m_symbol(0)
     , m_token(0)
@@ -86,7 +85,7 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
                                 break;
                             case DescribeType:
                                 if (m_symbol) {
-                                    switchScope(m_symbol->owner());
+//                                    switchScope(m_symbol->owner());
                                     m_symbolTypeDescription = m_symbol->describeType(this);
                                 } else if (!m_packageAlias.isEmpty()) {
                                     for (const GoSource::Import &import: m_doc->imports()) {
@@ -106,9 +105,6 @@ void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
         );
     }
 }
-
-bool SymbolUnderCursor::preVisit(AST *)
-{ return !m_ended; }
 
 bool SymbolUnderCursor::visit(ImportSpecAST *ast)
 {
@@ -255,134 +251,6 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
             }
         }
     }
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(FuncDeclAST *ast)
-{
-    accept(ast->recv);
-    if (!m_ended) {
-        accept(ast->name);
-        if (!m_ended) {
-            accept(ast->type);
-            if (!m_ended) {
-                Scope *scope = switchScope(ast->scope);
-                accept(ast->body);
-                switchScope(scope);
-            }
-        }
-    }
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(BlockStmtAST *ast)
-{
-    for (StmtListAST *it = ast->list; it; it = it->next) {
-        const Token &firstToken = _tokens->at(it->value->firstToken());
-        const Token &lastToken = _tokens->at(it->value->lastToken());
-        if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-            Scope *scope = switchScope(ast->scope);
-            accept(it->value);
-            switchScope(scope);
-            break;
-        }
-        if (m_pos <= firstToken.begin()) {
-            m_ended = true;
-            break;
-        }
-    }
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(IfStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    if (!m_ended) {
-        accept(ast->cond);
-        if (!m_ended) {
-            accept(ast->body);
-            if (!m_ended)
-                accept(ast->elseStmt);
-        }
-    }
-    switchScope(scope);
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(RangeStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->key);
-    if (!m_ended) {
-        accept(ast->value);
-        if (!m_ended) {
-            accept(ast->x);
-            if (!m_ended)
-                accept(ast->body);
-        }
-    }
-    switchScope(scope);
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(ForStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    if (!m_ended) {
-        accept(ast->cond);
-        if (!m_ended) {
-            accept(ast->post);
-            if (!m_ended)
-                accept(ast->body);
-        }
-    }
-    switchScope(scope);
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(TypeSwitchStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    if (!m_ended) {
-        accept(ast->assign);
-        if (!m_ended)
-            accept(ast->body);
-    }
-    switchScope(scope);
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(SwitchStmtAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->init);
-    if (!m_ended) {
-        accept(ast->tag);
-        if (!m_ended)
-            accept(ast->body);
-    }
-    switchScope(scope);
-
-    return false;
-}
-
-bool SymbolUnderCursor::visit(CaseClauseAST *ast)
-{
-    Scope *scope = switchScope(ast->scope);
-    accept(ast->list);
-    if (!m_ended)
-        accept(ast->body);
-    switchScope(scope);
 
     return false;
 }

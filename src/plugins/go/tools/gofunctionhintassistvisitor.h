@@ -25,12 +25,11 @@
 
 #pragma once
 
-#include "astvisitor.h"
-#include "exprtyperesolver.h"
+#include "scopevisitor.h"
 
 namespace GoTools {
 
-class GoFunctionHintAssistVisitor: protected ASTVisitor, public ExprTypeResolver
+class GoFunctionHintAssistVisitor: public ScopePositionVisitor
 {
 public:
     GoFunctionHintAssistVisitor(GoSource::Ptr doc);
@@ -41,17 +40,6 @@ public:
     { return m_lparenPosition; }
 
 protected:
-    virtual bool preVisit(AST *) override;
-
-    virtual bool visit(FuncDeclAST *ast) override;
-    virtual bool visit(BlockStmtAST *ast) override;
-    virtual bool visit(IfStmtAST *ast) override;
-    virtual bool visit(RangeStmtAST *ast) override;
-    virtual bool visit(ForStmtAST *ast) override;
-    virtual bool visit(TypeSwitchStmtAST *ast) override;
-    virtual bool visit(SwitchStmtAST *ast) override;
-    virtual bool visit(CaseClauseAST *ast) override;
-
     virtual bool visit(CallExprAST *ast) override;
 
 private:
@@ -59,7 +47,6 @@ private:
     ExprAST *m_funcExpr;
     unsigned m_lparenPosition;
     QStringList m_functionArgs;
-    unsigned m_pos;
 };
 
 }   // namespace GoTools

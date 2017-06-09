@@ -25,11 +25,10 @@
 
 #pragma once
 
-#include "astvisitor.h"
 #include "gosemantichighlighter.h"
 #include "gosnapshot.h"
 #include "token.h"
-#include "exprtyperesolver.h"
+#include "scopevisitor.h"
 
 #include <texteditor/semantichighlighter.h>
 
@@ -44,8 +43,7 @@ namespace GoTools {
 
 class GoCheckSymbols
         : public QObject
-        , protected ASTVisitor
-        , public ExprTypeResolver
+        , public ScopeSwitchVisitor
         , public QRunnable
         , public QFutureInterface<TextEditor::HighlightingResult>
 {
@@ -78,19 +76,6 @@ protected:
     virtual void postVisit(AST *) override { }
 
     virtual bool visit(ImportSpecAST *ast) override;
-//    virtual bool visit(TypeSpecAST *ast) override;
-//    virtual bool visit(VarSpecWithTypeAST *ast) override;
-//    virtual bool visit(VarSpecWithValuesAST *ast) override;
-//    virtual bool visit(ConstSpecAST *ast) override;
-
-    virtual bool visit(FuncDeclAST *ast) override;
-    virtual bool visit(BlockStmtAST *ast) override;
-    virtual bool visit(IfStmtAST *ast) override;
-    virtual bool visit(RangeStmtAST *ast) override;
-    virtual bool visit(ForStmtAST *ast) override;
-    virtual bool visit(TypeSwitchStmtAST *ast) override;
-    virtual bool visit(SwitchStmtAST *ast) override;
-    virtual bool visit(CaseClauseAST *ast) override;
 
     virtual bool visit(FieldAST *ast) override;
     virtual bool visit(TypeIdentAST *ast) override;

@@ -29,8 +29,7 @@
 namespace GoTools {
 
 GoCompletionAssistVisitor::GoCompletionAssistVisitor(GoSource::Ptr doc, QList<TextEditor::AssistProposalItemInterface *> &completions)
-    : ASTVisitor(doc->translationUnit())
-    , ExprTypeResolver()
+    : ScopePositionVisitor(doc)
     , m_doc(doc)
     , m_completions(completions)
 { }
@@ -87,136 +86,6 @@ void GoCompletionAssistVisitor::fillCompletions(bool isGlobalCompletion, unsigne
             }
         );
     }
-}
-
-bool GoCompletionAssistVisitor::preVisit(AST *)
-{ return !m_ended; }
-
-bool GoCompletionAssistVisitor::visit(FuncDeclAST *ast)
-{
-    if (ast->body) {
-        const Token &tk = _tokens->at(ast->body->firstToken());
-        if (m_pos >= tk.begin()) {
-            switchScope(ast->scope);
-            accept(ast->body);
-            return false;
-        }
-    }
-
-    accept(ast->recv);
-    if (!m_ended) {
-        accept(ast->name);
-        if (!m_ended)
-            accept(ast->type);
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(BlockStmtAST *ast)
-{
-    switchScope(ast->scope);
-    for (StmtListAST *it = ast->list; it; it = it->next) {
-        const Token &firstToken = _tokens->at(it->value->firstToken());
-        const Token &lastToken = _tokens->at(it->value->lastToken());
-        if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-            accept(it->value);
-            break;
-        }
-        if (m_pos <= firstToken.begin()) {
-            m_ended = true;
-            break;
-        }
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(IfStmtAST *ast)
-{
-    accept(ast->init);
-    Scope *scope = switchScope(ast->scope);
-    if (!m_ended) {
-        accept(ast->cond);
-        if (!m_ended) {
-            accept(ast->body);
-            if (!m_ended) {
-                switchScope(scope); // ?? what about init of if-statement
-                accept(ast->elseStmt);
-            }
-        }
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(RangeStmtAST *ast)
-{
-    accept(ast->key);
-    if (!m_ended) {
-        accept(ast->value);
-        if (!m_ended) {
-            accept(ast->x);
-            if (!m_ended) {
-                switchScope(ast->scope);
-                accept(ast->body);
-            }
-        }
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(ForStmtAST *ast)
-{
-    accept(ast->init);
-    if (!m_ended) {
-        switchScope(ast->scope);
-        accept(ast->cond);
-        if (!m_ended) {
-            accept(ast->post);
-            if (!m_ended)
-                accept(ast->body);
-        }
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(TypeSwitchStmtAST *ast)
-{
-    accept(ast->init);
-    if (!m_ended) {
-        switchScope(ast->scope);
-        accept(ast->assign);
-        if (!m_ended)
-            accept(ast->body);
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(SwitchStmtAST *ast)
-{
-    accept(ast->init);
-    if (!m_ended) {
-        accept(ast->tag);
-        switchScope(ast->scope);
-        if (!m_ended)
-            accept(ast->body);
-    }
-
-    return false;
-}
-
-bool GoCompletionAssistVisitor::visit(CaseClauseAST *ast)
-{
-    accept(ast->list);
-    switchScope(ast->scope);
-    if (!m_ended)
-        accept(ast->body);
-
-    return false;
 }
 
 bool GoCompletionAssistVisitor::visit(CompositeLitAST *ast)
