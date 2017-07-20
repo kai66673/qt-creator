@@ -23,13 +23,13 @@
 **
 ****************************************************************************/
 #include "gocompletionassistvisitor.h"
+#include "packagetype.h"
 #include "ast.h"
-#include "gosnapshot.h"
 
 namespace GoTools {
 
 GoCompletionAssistVisitor::GoCompletionAssistVisitor(GoSource::Ptr doc, QList<TextEditor::AssistProposalItemInterface *> &completions)
-    : ScopePositionVisitor(doc)
+    : ScopePositionVisitor(doc.data())
     , m_doc(doc)
     , m_completions(completions)
 { }
@@ -39,52 +39,40 @@ void GoCompletionAssistVisitor::fillCompletions(bool isGlobalCompletion, unsigne
     m_isGlobalCompletion = isGlobalCompletion;
     m_pos = pos;
 
-    if (m_doc->translationUnit() && m_snapshot) {
-        m_snapshot->runProtectedTask(
-            [this]() -> void {
-                if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
-                    m_currentScope = fileAst->scope;
-                    m_currentIndex = fileAst->scope->indexInSnapshot();
-                    if (m_currentIndex != -1) {
-                        m_ended = false;
+    if (m_doc && isValidResolveContext()) {
+        m_ended = false;
 
-                        /// TODO: imports autocompletions
-                        m_inImportSection = false;
-                        if (fileAst->importDecls) {
-                            const Token &firstToken = _tokens->at(fileAst->importDecls->firstToken());
-                            const Token &lastToken = _tokens->at(fileAst->importDecls->lastToken());
-                            if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                                m_inImportSection = true;
-                                return;
-                            }
-                        }
-
-                        for (DeclListAST *it = fileAst->decls; it; it = it->next) {
-                            const Token &firstToken = _tokens->at(it->value->firstToken());
-                            const Token &lastToken = _tokens->at(it->value->lastToken());
-                            if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-                                accept(it->value);
-                                if (m_isGlobalCompletion) {
-                                    m_currentScope->fillMemberCompletions(m_completions, this,
-                                                                    [this](Symbol *s) -> bool {
-                                                                        if (s->declExpr())
-                                                                            return _tokens->at(s->declExpr()->lastToken()).end() <= m_pos;
-                                                                        return _tokens->at(s->sourceLocation()).end() <= m_pos;
-                                                                    });
-                                }
-                                break;
-                            }
-
-                            if (m_pos <= firstToken.begin()) {
-                                break;
-                            }
-                        }
-
-                        eraseResolvedTypes();
-                    }
-                }
+        /// TODO: imports autocompletions
+        m_inImportSection = false;
+        if (m_initialFileAst->importDecls) {
+            const Token &firstToken = _tokens->at(m_initialFileAst->importDecls->firstToken());
+            const Token &lastToken = _tokens->at(m_initialFileAst->importDecls->lastToken());
+            if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
+                m_inImportSection = true;
+                return;
             }
-        );
+        }
+
+        for (DeclListAST *it = m_initialFileAst->decls; it; it = it->next) {
+            const Token &firstToken = _tokens->at(it->value->firstToken());
+            const Token &lastToken = _tokens->at(it->value->lastToken());
+            if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
+                accept(it->value);
+                if (m_isGlobalCompletion) {
+                    m_currentScope->fillMemberCompletions(m_completions, this,
+                                                    [this](Symbol *s) -> bool {
+                                                        if (s->declExpr())
+                                                            return _tokens->at(s->declExpr()->lastToken()).end() <= m_pos;
+                                                        return _tokens->at(s->sourceLocation()).end() <= m_pos;
+                                                    });
+                }
+                break;
+            }
+
+            if (m_pos <= firstToken.begin()) {
+                break;
+            }
+        }
     }
 }
 
@@ -99,7 +87,7 @@ bool GoCompletionAssistVisitor::visit(CompositeLitAST *ast)
                 if (ExprAST *typeExpr = ast->type) {
                     type = typeExpr->asType();
                     if (!type) {
-                        type = resolveCompositExpr(ast);
+                        type = tryResolveNamedType(this, typeExpr);
                     }
                 } else if (!m_nestedCimpositLitType.empty()) {
                     type = m_nestedCimpositLitType.top();
@@ -130,7 +118,7 @@ bool GoCompletionAssistVisitor::visit(DeclIdentAST *ast)
             m_ended = true;
             if (ast->isLookable()) {
                 int derefLevel = 0;
-                if (const Type *type = resolveExpr(ast, derefLevel)) {
+                if (const Type *type = ast->resolve(this, derefLevel)) {
                     derefLevel += type->refLevel();
                     if (derefLevel == 0 || derefLevel == -1) {
                         if (const Type *baseTyp = type->baseType()) {
@@ -157,7 +145,7 @@ bool GoCompletionAssistVisitor::visit(IdentAST *ast)
             m_ended = true;
             if (ast->isLookable()) {
                 int derefLevel = 0;
-                if (const Type *type = resolveExpr(ast, derefLevel)) {
+                if (const Type *type = ast->resolve(this, derefLevel)) {
                     derefLevel += type->refLevel();
                     if (derefLevel == 0 || derefLevel == -1) {
                         if (const Type *baseTyp = type->baseType()) {
@@ -183,7 +171,7 @@ bool GoCompletionAssistVisitor::visit(PackageTypeAST *ast)
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             m_ended = true;
             QString packageAlias(ast->packageAlias->ident->toString());
-            if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+            if (const PackageType *context = packageTypeForAlias(packageAlias))
                 context->fillMemberCompletions(m_completions, this);
         }
 
@@ -201,7 +189,7 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             m_ended = true;
             int derefLevel = 0;
-            if (const Type *type = resolveExpr(ast->x, derefLevel)) {
+            if (const Type *type = ast->x->resolve(this, derefLevel)) {
                 derefLevel += type->refLevel();
                 if (derefLevel == 0 || derefLevel == -1) {
                     if (const Type *baseTyp = type->baseType()) {
@@ -215,7 +203,7 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
             if (m_pos >= tk.begin() && m_pos <= tk.end()) {
                 m_ended = true;
                 int derefLevel = 0;
-                if (const Type *type = resolveExpr(ast, derefLevel)) {
+                if (const Type *type = ast->resolve(this, derefLevel)) {
                     derefLevel += type->refLevel();
                     if (derefLevel == 0 || derefLevel == -1) {
                         if (const Type *baseTyp = type->baseType()) {

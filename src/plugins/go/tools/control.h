@@ -34,6 +34,7 @@ class Comment;
 class StringLiteral;
 class Identifier;
 class Scope;
+class StructScope;
 class FileScope;
 class Type;
 class TupleType;
@@ -63,6 +64,7 @@ public:
     const StringLiteral *string(const char *chars, unsigned size);
     const Identifier *identifier(const char *chars, unsigned size);
     Scope *newScope(Scope *outer);
+    Scope *newStructScope(Scope *outer);
     FileScope *newFileScope(GoSource *source);
     Symbol *newMethod(FuncDeclAST *funcDecl, Scope *owner);
     Symbol *newFuncDecl(unsigned tokenIndex, const Identifier *identifier, FuncTypeAST *decl, Scope *owner);
@@ -97,7 +99,6 @@ public:
     static const Identifier *builtinComplex128Identifier();
 
     static Type *builtinType();
-    static TupleType *nullTupleType();
 
     static const Identifier *newIdentifier();
     static const Identifier *makeIdentifier();

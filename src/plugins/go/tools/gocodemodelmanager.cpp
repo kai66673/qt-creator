@@ -24,6 +24,7 @@
 ****************************************************************************/
 #include "gocodemodelmanager.h"
 #include "goeditordocumenthandle.h"
+#include "gofindreferences.h"
 
 #include <QMutex>
 #include <QMap>
@@ -39,6 +40,7 @@ public:
     // Editor integration
     mutable QMutex m_goEditorDocumentsMutex;
     QMap<QString, GoEditorDocumentHandle *> m_goEditorDocuments;
+    GoFindReferences *m_findReferences;
 
     QThreadPool m_threadPool;
 };
@@ -47,7 +49,9 @@ GoCodeModelManager::GoCodeModelManager(QObject *parent)
     : QObject(parent)
     , d(new GoCodeModelManagerPrivate)
     , m_packageCache(this)
-{ }
+{
+    d->m_findReferences = new GoFindReferences(this);
+}
 
 GoCodeModelManager::~GoCodeModelManager()
 { delete d; }
@@ -87,6 +91,19 @@ QThreadPool *GoCodeModelManager::sharedThreadPool()
 const QMap<QString, GoEditorDocumentHandle *> *GoCodeModelManager::goEditorDocuments() const
 { return &d->m_goEditorDocuments; }
 
+WorkingCopy GoCodeModelManager::buildWorkingCopy() const
+{
+    WorkingCopy workingCopy;
+
+    QMutexLocker locker(&d->m_goEditorDocumentsMutex);
+    for (const GoEditorDocumentHandle *documantHandle: d->m_goEditorDocuments)
+        workingCopy.insert(documantHandle->filePath(),
+                           documantHandle->contents(),
+                           documantHandle->revision());
+
+    return workingCopy;
+}
+
 void GoCodeModelManager::cleanPackageCache()
 {
     m_packageCache.clean();
@@ -98,5 +115,11 @@ void GoCodeModelManager::indexPackageDirs()
 
 GoPackageDirIndexer::PackageDirs GoCodeModelManager::indexedPackageDirs() const
 { return m_packageIndexer.packages(); }
+
+void GoCodeModelManager::findReferences(GoSource::Ptr source, int pos) const
+{ d->m_findReferences->findReferences(source, pos, false); }
+
+void GoCodeModelManager::renameSymbolUnderCursor(GoSource::Ptr source, int pos) const
+{ d->m_findReferences->findReferences(source, pos, true); }
 
 }   // namespace GoTools

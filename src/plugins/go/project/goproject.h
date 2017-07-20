@@ -69,6 +69,7 @@ private:
     void scheduleProjectScan();
     void collectProjectFiles();
     void updateProject();
+    void reindexProjectFiles();
 
     GoPackageProcessor *m_packageProcessor;
 

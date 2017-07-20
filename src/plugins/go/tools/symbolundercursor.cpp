@@ -24,115 +24,26 @@
 ****************************************************************************/
 #include "ast.h"
 #include "symbolundercursor.h"
+#include "packagetype.h"
 
 namespace GoTools {
 
-SymbolUnderCursor::SymbolUnderCursor(GoSource::Ptr doc)
-    : ScopePositionVisitor(doc)
+SymbolUnderCursor::SymbolUnderCursor(GoSource::Ptr doc, bool protectCache)
+    : ScopePositionVisitor(doc.data(), protectCache)
     , m_doc(doc)
     , m_symbol(0)
     , m_token(0)
 { }
 
-TextEditor::TextEditorWidget::Link SymbolUnderCursor::link(unsigned pos)
+bool SymbolUnderCursor::visit(StructTypeAST *ast)
 {
-    m_pos = pos;
-    defineSymbolUnderCursor();
-
-    if (m_symbol && m_token) {
-        TextEditor::TextEditorWidget::Link link;
-        link.linkTextStart = m_token->begin();
-        link.linkTextEnd = m_token->end();
-        m_symbol->fileScope()->fillLink(link, m_symbol->sourceLocation());
-        return link;
-    }
-
-    return TextEditor::TextEditorWidget::Link();
+    m_structures.push(ast);
+    return true;
 }
 
-QString SymbolUnderCursor::typeDescription(unsigned pos)
+void SymbolUnderCursor::endVisit(StructTypeAST *)
 {
-    m_pos = pos;
-    defineSymbolUnderCursor(DescribeType);
-    return m_symbolTypeDescription;
-}
-
-void SymbolUnderCursor::defineSymbolUnderCursor(UseReason reason)
-{
-    m_symbol = 0;
-    m_token = 0;
-    m_useReason = reason;
-    m_symbolTypeDescription.clear();
-    m_packageAlias.clear();
-    m_importSpec = 0;
-
-    if (m_doc->translationUnit() && m_snapshot) {
-        m_snapshot->runProtectedTask(
-            [this]() -> void {
-                if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
-                    m_currentScope = fileAst->scope;
-                    m_currentIndex = fileAst->scope->indexInSnapshot();
-                    if (m_currentIndex != -1) {
-                        m_ended = false;
-
-                        if (m_useReason == DescribeType)
-                            acceptForPosition(fileAst->importDecls, m_pos);
-
-                        acceptForPosition(fileAst->decls, m_pos);
-
-                        switch (m_useReason) {
-                            case Link:
-                                break;
-                            case DescribeType:
-                                if (m_symbol) {
-//                                    switchScope(m_symbol->owner());
-                                    m_symbolTypeDescription = m_symbol->describeType(this);
-                                } else if (!m_packageAlias.isEmpty()) {
-                                    for (const GoSource::Import &import: m_doc->imports()) {
-                                        if (import.alias == m_packageAlias) {
-                                            m_symbolTypeDescription = QLatin1String("package: ") + import.resolvedDir;
-                                            break;
-                                        }
-                                    }
-                                }
-                                break;
-                        }
-
-                        eraseResolvedTypes();
-                    }
-                }
-            }
-        );
-    }
-}
-
-bool SymbolUnderCursor::visit(ImportSpecAST *ast)
-{
-    if (ast->t_path) {
-        unsigned startPos = ast->name ? ast->name->t_identifier : ast->t_path;
-        const Token &firstToken = _tokens->at(startPos);
-        const Token &lastToken = _tokens->at(ast->t_path);
-
-        if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
-            if (ast->name) {
-                m_packageAlias = ast->name->ident->toString();
-                m_importSpec = ast;
-            } else {
-                QString path = lastToken.string->unquoted();
-                if (!path.isEmpty()) {
-                    int pos = path.lastIndexOf('/') + 1;
-                    m_packageAlias = path.mid(pos);
-                    m_importSpec = ast;
-                }
-            }
-            m_ended = true;
-        }
-
-        else if (m_pos <= lastToken.end())
-            m_ended = true;
-    }
-
-    return false;
+    m_structures.pop();
 }
 
 bool SymbolUnderCursor::visit(DeclIdentAST *ast)
@@ -158,14 +69,8 @@ bool SymbolUnderCursor::visit(IdentAST *ast)
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
         m_ended = true;
-        if (ast->isLookable()) {
+        if (ast->isLookable())
             m_symbol = m_currentScope->lookupMember(ast, this);
-            if (!m_symbol && m_useReason == DescribeType) { // may be a package
-                QString packageAlias(ast->ident->toString());
-                if (m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
-                    m_packageAlias = packageAlias;
-            }
-        }
     }
 
     else if (m_pos <= tk.end())
@@ -194,18 +99,6 @@ bool SymbolUnderCursor::visit(TypeIdentAST *ast)
 
 bool SymbolUnderCursor::visit(PackageTypeAST *ast)
 {
-    if (m_useReason == DescribeType) {
-        const Token &tk = _tokens->at(ast->packageAlias->t_identifier);
-        if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-            m_ended = true;
-            QString packageAlias(ast->packageAlias->ident->toString());
-            if (ast->packageAlias->isLookable())
-                if (m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
-                    m_packageAlias = packageAlias;
-            return false;
-        }
-    }
-
     const Token &tk = _tokens->at(ast->typeName->t_identifier);
     m_token = &tk;
 
@@ -213,7 +106,7 @@ bool SymbolUnderCursor::visit(PackageTypeAST *ast)
         m_ended = true;
         if (ast->typeName->isLookable()) {
             QString packageAlias(ast->packageAlias->ident->toString());
-            if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias))
+            if (PackageType *context = packageTypeForAlias(packageAlias))
                 m_symbol = context->lookupMember(ast->typeName, this);
         }
     }
@@ -241,12 +134,11 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
         m_ended = true;
         if (ast->sel->isLookable()) {
             int derefLevel = 0;
-            if (const Type *type = resolveExpr(ast->x, derefLevel)) {
+            if (const Type *type = ast->x->resolve(this, derefLevel)) {
                 derefLevel += type->refLevel();
                 if (derefLevel == 0 || derefLevel == -1) {
-                    if (const Type *baseTyp = type->baseType()) {
+                    if (const Type *baseTyp = type->baseType())
                         m_symbol = baseTyp->lookupMember(ast->sel, this);
-                    }
                 }
             }
         }
@@ -265,17 +157,17 @@ bool SymbolUnderCursor::visit(CompositeLitAST *ast)
             if (ExprAST *typeExpr = ast->type) {
                 type = typeExpr->asType();
                 if (!type) {
-                    type = resolveCompositExpr(ast);
+                    type = tryResolveNamedType(this, typeExpr);
                 }
-            } else if (!m_nestedCimpositLitType.empty()) {
-                type = m_nestedCimpositLitType.top();
+            } else if (!m_nestedCompositLitType.empty()) {
+                type = m_nestedCompositLitType.top();
                 if (type)
                     type = type->elementsType(this);
             }
 
-            m_nestedCimpositLitType.push(type);
+            m_nestedCompositLitType.push(type);
             accept(ast->elements);
-            m_nestedCimpositLitType.pop();
+            m_nestedCompositLitType.pop();
             return false;
         }
     }
@@ -285,7 +177,7 @@ bool SymbolUnderCursor::visit(CompositeLitAST *ast)
 
 bool SymbolUnderCursor::visit(KeyValueExprAST *ast)
 {
-    const Type *elementsType = m_nestedCimpositLitType.empty() ? 0 : m_nestedCimpositLitType.top();
+    const Type *elementsType = m_nestedCompositLitType.empty() ? 0 : m_nestedCompositLitType.top();
     if (elementsType && ast->key) {
         if (IdentAST *keyIdent = ast->key->asIdent()) {
             const Token &tk = _tokens->at(keyIdent->t_identifier);

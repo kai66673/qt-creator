@@ -40,7 +40,6 @@ Parser::Parser(GoSource *source, unsigned mode)
     , _tokens(_translationUnit->tokens())
 {
     _trace = _mode & Trace;
-    _skipFunctionBody = _translationUnit->skipFunctionBody();
 
     tokenIndex = 0;
     tok.kindAndPos.kind = T_EOF;
@@ -50,6 +49,7 @@ Parser::Parser(GoSource *source, unsigned mode)
     syncTokenIndex = 0;
     syncCnt = 0;
     topScope = 0;
+    structScope = 0;
     fileScope = 0;
 }
 
@@ -95,6 +95,7 @@ FileAST *Parser::parseFile()
     closeScope();
 
     FileAST *fileAst = new (_pool) FileAST(doc, t_package, packageName, import_decls, decls);
+    fileScope->setAst(fileAst);
     fileAst->scope = fileScope;
     return fileAst;
 }
@@ -143,6 +144,7 @@ FileAST *Parser::parsePackageFile(const QString &wantedPackageName)
     closeScope();
 
     FileAST *fileAst = new (_pool) FileAST(doc, t_package, packageName, import_decls, decls);
+    fileScope->setAst(fileAst);
     fileAst->scope = fileScope;
     return fileAst;
 }
@@ -348,6 +350,7 @@ FuncDeclAST *Parser::parseFuncDecl()
 
     FuncTypeAST *type = new (_pool) FuncTypeAST(pos, params, results);
     FuncDeclAST *decl = new (_pool) FuncDeclAST(doc, recv, ident, type, body);
+    scope->setAst(decl);
     decl->scope = scope;
 
     if (!recv) {
@@ -510,10 +513,11 @@ TypeAST *Parser::parseStructType()
 
     FieldListAST *list = 0;
     FieldListAST **list_ptr = &list;
-    Scope *scope = _control->newScope(fileScope);
+
+    openStructScope();
 
     while (tok.kindAndPos.kind == IDENT || tok.kindAndPos.kind == MUL || tok.kindAndPos.kind == LPAREN) {
-        if (FieldAST *field = parseStructFieldDecl(scope)) {
+        if (FieldAST *field = parseStructFieldDecl()) {
             *list_ptr = new (_pool) FieldListAST(field);
             list_ptr = &(*list_ptr)->next;
         }
@@ -522,7 +526,12 @@ TypeAST *Parser::parseStructType()
     unsigned rbrace = expect(RBRACE);
 
     FieldGroupAST *fields = new (_pool) FieldGroupAST(lbrace, list, rbrace);
-    return new (_pool) StructTypeAST(pos, fields);
+    StructTypeAST *structType = new (_pool) StructTypeAST(pos, fields);
+
+    structScope->setAst(structType);
+    closeStructScope();
+
+    return structType;
 }
 
 StarTypeAST *Parser::parsePointerType()
@@ -1079,7 +1088,7 @@ ExprAST *Parser::parseValue()
     return  checkExpr(parseExpr());
 }
 
-FieldAST *Parser::parseStructFieldDecl(Scope *scope)
+FieldAST *Parser::parseStructFieldDecl()
 {
     CommentGroupAST *doc = leadComment;
 
@@ -1120,7 +1129,7 @@ FieldAST *Parser::parseStructFieldDecl(Scope *scope)
     expectSemi();
 
     FieldAST *field = new (_pool) FieldAST(doc, idents, typ, tag, lineComment);
-    declareFld(typ, scope, idents);
+    declareFld(typ, structScope, idents);
     return field;
 }
 
@@ -1139,19 +1148,13 @@ BlockStmtAST *Parser::parseBody(Scope *scope)
 {
     unsigned lbrace = next();
 
-    if (_skipFunctionBody) {
-        unsigned rbrace = skipBlock();
-        if (!rbrace)
-            _translationUnit->error(lbrace, "expected closing parenhesis");
-        return new (_pool) BlockStmtAST(lbrace, 0, rbrace);
-    }
-
     topScope = scope;
     StmtListAST *list = parseStmtList();
     closeScope();
     unsigned rbrace = expect(RBRACE);
 
     BlockStmtAST *block = new (_pool) BlockStmtAST(lbrace, list, rbrace);
+    scope->setAst(block);
     block->scope = scope;
     return block;
 }
@@ -1391,6 +1394,7 @@ BlockStmtAST *Parser::parseBlockStmt()
     unsigned rbrace = expect(RBRACE);
 
     BlockStmtAST *block = new (_pool) BlockStmtAST(lbrace, list, rbrace);
+    scope->setAst(block);
     block->scope = scope;
     return block;
 }
@@ -1446,6 +1450,7 @@ IfStmtAST *Parser::parseIfStmt()
     Scope *scope = topScope;
     closeScope();
     IfStmtAST *ifStmt = new (_pool) IfStmtAST(pos, s, x, body, else_);
+    scope->setAst(ifStmt);
     ifStmt->scope = scope;
     return ifStmt;
 }
@@ -1501,6 +1506,7 @@ StmtAST *Parser::parseSwitchStmt()
 
     if (typeSwitch) {
         TypeSwitchStmtAST *typeSwitchStmt = new (_pool) TypeSwitchStmtAST(pos, s1, s2, body);
+        scope->setAst(typeSwitchStmt);
         typeSwitchStmt->scope = scope;
         if (declForTypeSwitch)
             declareInTypeSwitchCaseClauses(declForTypeSwitch, list);
@@ -1508,6 +1514,7 @@ StmtAST *Parser::parseSwitchStmt()
     }
 
     SwitchStmtAST *switchStmt = new (_pool) SwitchStmtAST(pos, s1, makeExpr(s2, "switch expression"), body);
+    scope->setAst(switchStmt);
     switchStmt->scope = scope;
     return switchStmt;
 }
@@ -1535,6 +1542,7 @@ CaseClauseAST *Parser::parseCaseClause(bool typeSwitch)
     closeScope();
 
     CaseClauseAST *caseClause = new (_pool) CaseClauseAST(pos, list, colon, body);
+    scope->setAst(caseClause);
     caseClause->scope = scope;
     return caseClause;
 }
@@ -1682,11 +1690,13 @@ StmtAST *Parser::parseForStmt()
         ExprAST *x = as->rhs->value->asUnaryExpr()->x;
         declareRange(key, value, scope, x);
         RangeStmtAST *rangeStmt = new (_pool) RangeStmtAST(pos, key, value, as->t_assign, x, body);
+        scope->setAst(rangeStmt);
         rangeStmt->scope = scope;
         return rangeStmt;
     }
 
     ForStmtAST *forStmt = new (_pool) ForStmtAST(pos, s1, makeExpr(s2, "boolean or range expression"), s3, body);
+    scope->setAst(forStmt);
     forStmt->scope = scope;
     return forStmt;
 }
@@ -1936,7 +1946,7 @@ void Parser::shortVarDecl(DeclIdentListAST *lhs, ExprListAST *rhs)
 
 void Parser::declareRange(ExprAST *&key, ExprAST *&value, Scope *scope, ExprAST *range)
 {
-    IdentAST *keyIdent = key->asIdent();
+    IdentAST *keyIdent = key ? key->asIdent() : 0;
     IdentAST *valueIdent = value ? value->asIdent() : 0;
 
     if (!keyIdent && !valueIdent)
@@ -2151,6 +2161,19 @@ void Parser::openScope()
 
 void Parser::closeScope()
 { topScope = topScope->outer(); }
+
+void Parser::openStructScope()
+{
+    Scope *outer = structScope ? structScope : topScope;
+    structScope = _control->newStructScope(outer);
+}
+
+void Parser::closeStructScope()
+{
+    structScope = structScope->outer();
+    if (structScope == topScope)
+        structScope = 0;
+}
 
 unsigned Parser::next()
 {

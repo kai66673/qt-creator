@@ -25,40 +25,19 @@
 
 #pragma once
 
-#include "types.h"
+#include "symbolundercursor.h"
 
 namespace GoTools {
 
-class GoSnapshot;
-
-class ExprTypeResolver
+class LinkUnderCursor: public SymbolUnderCursor
 {
 public:
-    ExprTypeResolver();
-    virtual ~ExprTypeResolver();
+    LinkUnderCursor(GoSource::Ptr doc);
 
-    void resolve(ExprListAST *list, TupleType *&result);
-    void resolve(ExprAST *list, TupleType *&result);
-    GoSnapshot *snapshot();
-    Scope *currentScope() const;
-    PackageType *packageTypeForAlias(const QString &alias);
+    TextEditor::TextEditorWidget::Link link(unsigned pos);
 
-    void eraseResolvedTypes();
-
-protected:
-    void resolveExpr(TupleType *tuple, ExprAST *x);
-    const Type *resolveExpr(ExprAST *x, int &derefLevel);
-    const Type *resolveCompositExpr(CompositeLitAST *ast);
-
-    Scope *switchScope(Scope *scope);
-
-
-    GoSnapshot *m_snapshot;
-    int m_currentIndex;
-    Scope *m_currentScope;
-    QList<TupleType **> m_tuples;
+private:
+    void defineLinkUnderCursor();
 };
-
-const Type *tryResolveNamedType(ExprTypeResolver *resolver, ExprAST *x);
 
 }   // namespace GoTools

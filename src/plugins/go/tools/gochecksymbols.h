@@ -26,7 +26,6 @@
 #pragma once
 
 #include "gosemantichighlighter.h"
-#include "gosnapshot.h"
 #include "token.h"
 #include "scopevisitor.h"
 
@@ -54,7 +53,7 @@ public:
     typedef GoSemanticHighlighter::Kind Kind;
     typedef QFuture<Result> Future;
 
-    explicit GoCheckSymbols(GoSource::Ptr doc);
+    explicit GoCheckSymbols(GoSource *source);
 
     Future start()
     {
@@ -97,7 +96,7 @@ private:
 private:
     std::stack<const Type *> m_nestedCimpositLitType;
 
-    GoSource::Ptr m_doc;
+    GoSource *m_source;
     Control *m_control;
     std::vector<Token> *_tokens;
 

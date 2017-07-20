@@ -26,14 +26,14 @@
 #pragma once
 
 #include "astvisitor.h"
-#include "exprtyperesolver.h"
+#include "resolvecontext.h"
 
 namespace GoTools {
 
-class ScopeSwitchVisitor: protected ASTVisitor , public ExprTypeResolver
+class ScopeSwitchVisitor: protected ASTVisitor , public ResolveContext
 {
 public:
-    ScopeSwitchVisitor(GoSource::Ptr doc);
+    ScopeSwitchVisitor(GoSource *source, bool protectCache = true);
 
 protected:
     virtual bool visit(FuncDeclAST *ast) override;
@@ -46,10 +46,28 @@ protected:
     virtual bool visit(CaseClauseAST *ast) override;
 };
 
-class ScopePositionVisitor: protected ASTVisitor, public ExprTypeResolver
+class ScopePositionVisitor: protected ASTVisitor, public ResolveContext
 {
 public:
-    ScopePositionVisitor(GoSource::Ptr doc);
+    ScopePositionVisitor(GoSource *source, bool protectCache = true);
+
+    template <typename _Tp>
+    void acceptForPosition(List<_Tp> *it)
+    {
+        for (; it && !m_ended; it = it->next) {
+            switch (positionRelation(it->value)) {
+                case Before:
+                    m_ended = true;
+                    break;
+                case In:
+                    accept(it->value);
+                    m_ended = true;
+                    break;
+                case After:
+                    break;
+            }
+        }
+    }
 
 protected:
     virtual bool preVisit(AST *) override;
@@ -63,8 +81,12 @@ protected:
     virtual bool visit(SwitchStmtAST *ast) override;
     virtual bool visit(CaseClauseAST *ast) override;
 
+    enum PositionRelation { Before, In, After };
+    PositionRelation positionRelation(AST *ast) const;
+
 protected:
     unsigned m_pos;
+    bool m_ended;
 };
 
 }   // namespace GoTools

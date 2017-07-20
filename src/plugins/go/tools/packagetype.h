@@ -22,23 +22,36 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-#include "astvisitor.h"
-#include "ast.h"
+
+#pragma once
+
+#include "types.h"
 
 namespace GoTools {
 
-ASTVisitor::ASTVisitor(TranslationUnit *unit)
-    : _translationUnit(unit)
-    , _tokens(unit->tokens())
-{ }
+class PackageType: public Type
+{
+public:
+    PackageType(QHash<QString, GoSource::Ptr> &sources);
+    virtual ~PackageType();
 
-ASTVisitor::~ASTVisitor()
-{ }
+    Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId, ResolveContext *);
+    void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                     const Identifier *typeId, ResolveContext *);
 
-void ASTVisitor::accept(AST *ast)
-{ AST::accept(ast, this); }
+    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *) const override;
+    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                                       ResolveContext *, Predicate = 0) const override;
 
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
+    virtual const Type *indexType(ResolveContext *) const override { return 0; }
+    virtual const Type *elementsType(ResolveContext *) const override { return 0; }
+    virtual const Type *calleeType(int, ResolveContext *) const override { return 0; }
+    virtual const Type *chanValueType() const override { return 0; }
+
+    virtual QString describe() const override { return QLatin1String("package"); }
+
+private:
+    QHash<QString, GoSource::Ptr> &m_sources;
+};
 
 }   // namespace GoTools

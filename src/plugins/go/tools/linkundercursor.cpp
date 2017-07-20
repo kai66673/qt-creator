@@ -22,23 +22,40 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-#include "astvisitor.h"
 #include "ast.h"
+#include "linkundercursor.h"
 
 namespace GoTools {
 
-ASTVisitor::ASTVisitor(TranslationUnit *unit)
-    : _translationUnit(unit)
-    , _tokens(unit->tokens())
+LinkUnderCursor::LinkUnderCursor(GoSource::Ptr doc)
+    : SymbolUnderCursor(doc)
 { }
 
-ASTVisitor::~ASTVisitor()
-{ }
+TextEditor::TextEditorWidget::Link LinkUnderCursor::link(unsigned pos)
+{
+    m_pos = pos;
+    defineLinkUnderCursor();
 
-void ASTVisitor::accept(AST *ast)
-{ AST::accept(ast, this); }
+    if (m_symbol && m_token) {
+        TextEditor::TextEditorWidget::Link link;
+        link.linkTextStart = m_token->begin();
+        link.linkTextEnd = m_token->end();
+        m_symbol->fileScope()->fillLink(link, m_symbol->sourceLocation());
+        return link;
+    }
 
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
+    return TextEditor::TextEditorWidget::Link();
+}
+
+void LinkUnderCursor::defineLinkUnderCursor()
+{
+    m_symbol = 0;
+    m_token = 0;
+
+    if (m_doc && isValidResolveContext()) {
+        m_ended = false;
+        acceptForPosition(m_initialFileAst->decls);
+    }
+}
 
 }   // namespace GoTools

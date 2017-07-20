@@ -127,6 +127,7 @@ private:
 GoSource::GoSource(const QString &fileName)
     : _fileName(fileName)
     , _revision(0)
+    , _package(0)
 {
     _control = new Control();
     _control->setDiagnosticClient(new DocumentDiagnosticClient(this, &_diagnosticMessages));
@@ -269,5 +270,31 @@ QString GoSource::location() const
 
 bool GoSource::isTooBig() const
 { return _source.size() >= 1024 * 200; }
+
+Core::SearchResultItem GoSource::searchResultItemForTokenIndex(unsigned tokenIndex, unsigned length)
+{
+    Core::SearchResultItem item;
+    item.path = QStringList() << QDir::toNativeSeparators(_fileName);
+    const Token &tk = _translationUnit->tokenAt(tokenIndex);
+    unsigned position = tk.begin();
+    int lineBegin = _source.lastIndexOf('\n', position) + 1;
+    int lineEnd = _source.indexOf('\n', position);
+    if (lineEnd == -1)
+        lineEnd = _source.length();
+    const QByteArray matchingLine = _source.mid(lineBegin, lineEnd - lineBegin);
+    item.text = QString::fromUtf8(matchingLine, matchingLine.size());
+    item.mainRange.begin.line = tk.line();
+    item.mainRange.begin.column = tk.column() - 1;
+    item.mainRange.end.line = tk.line();
+    item.mainRange.end.column = tk.column() + length - 1;
+    item.useTextEditorFont = true;
+    return item;
+}
+
+GoPackage *GoSource::package() const
+{ return _package; }
+
+void GoSource::setPackage(GoPackage *package)
+{ _package = package; }
 
 }   // namespace GoTools

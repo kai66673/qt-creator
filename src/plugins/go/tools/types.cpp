@@ -26,17 +26,4 @@
 
 namespace GoTools {
 
-Type *TupleType::type(int index)
-{
-    if (index >= 0 && index < _types.size())
-        return _types.at(index);
-    return 0;
-}
-
-void TupleType::appendType(TypeWithDerefLevel *typ)
-{ _types.append(typ); }
-
-void Type::fillTuple(TupleType *tuple, ExprTypeResolver *) const
-{ tuple->appendType(new TypeWithDerefLevel(0, Control::builtinType())); }
-
 }   // namespace GoTools

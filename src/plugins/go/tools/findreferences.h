@@ -22,23 +22,34 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-#include "astvisitor.h"
-#include "ast.h"
+
+#pragma once
+
+#include "symbolundercursordescriber.h"
+
+#include <coreplugin/find/searchresultwindow.h>
 
 namespace GoTools {
 
-ASTVisitor::ASTVisitor(TranslationUnit *unit)
-    : _translationUnit(unit)
-    , _tokens(unit->tokens())
-{ }
+class GoFindReferencesParameters
+{
+public:
+    QString customReplaceSuffixForFirstItem;
+};
 
-ASTVisitor::~ASTVisitor()
-{ }
+class FindReferences: protected SymbolUnderCursorDescriber
+{
+public:
+    FindReferences(GoSource::Ptr doc);
 
-void ASTVisitor::accept(AST *ast)
-{ AST::accept(ast, this); }
+    Core::SearchResult *proceedReferences(unsigned pos, bool isReplace);
 
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
+private:
+    FileScope *m_fileScope;
+    Core::SearchResult *m_search;
+    bool m_isReplace;
+};
 
 }   // namespace GoTools
+
+Q_DECLARE_METATYPE(GoTools::GoFindReferencesParameters)

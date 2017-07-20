@@ -51,6 +51,7 @@ public:
     static GoPlugin *instance();
     void emitOutlineSortingChanged(bool sorted);
     void findUsages();
+    void renameSymbolUnderCursor();
 
 signals:
     void outlineSortingChanged(bool sort);

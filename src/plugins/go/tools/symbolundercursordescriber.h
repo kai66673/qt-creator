@@ -22,23 +22,30 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-#include "astvisitor.h"
-#include "ast.h"
+
+#pragma once
+
+#include "symbolundercursor.h"
 
 namespace GoTools {
 
-ASTVisitor::ASTVisitor(TranslationUnit *unit)
-    : _translationUnit(unit)
-    , _tokens(unit->tokens())
-{ }
+class SymbolUnderCursorDescriber: public SymbolUnderCursor
+{
+public:
+    SymbolUnderCursorDescriber(GoSource::Ptr doc, bool protectCache = true);
 
-ASTVisitor::~ASTVisitor()
-{ }
+    QString description(unsigned pos);
 
-void ASTVisitor::accept(AST *ast)
-{ AST::accept(ast, this); }
+protected:
+    virtual bool visit(ImportSpecAST *ast);
+    virtual bool visit(IdentAST *ast);
+    virtual bool visit(PackageTypeAST *ast);
 
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
+protected:
+    void defineDescription();
+
+    QString m_symbolTypeDescription;
+    QString m_packageAlias;
+};
 
 }   // namespace GoTools

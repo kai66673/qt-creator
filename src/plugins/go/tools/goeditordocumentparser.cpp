@@ -23,6 +23,7 @@
 **
 ****************************************************************************/
 #include "goeditordocumentparser.h"
+#include "gopackage.h"
 #include "gosource.h"
 
 namespace GoTools {
@@ -44,6 +45,9 @@ void GoEditorDocumentParser::update(const QByteArray &source, unsigned revision,
 
     // resolving imports directories
     doc->resolveImportsAndPackageName(goRoot, goPath);
+
+    // update package cache
+    GoPackageCache::instance()->update(doc);
 
     emit finished(doc);
 }

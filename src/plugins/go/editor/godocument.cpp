@@ -178,6 +178,9 @@ QString GoDocument::evaluateIdentifierTypeDescription(int pos)
 void GoDocument::findUsages(int pos)
 { processor()->findUsages(pos); }
 
+void GoDocument::renameSymbolUnderCursor(int pos)
+{ processor()->renameSymbolUnderCursor(pos); }
+
 void GoDocument::applyFontSettings()
 {
     if (TextEditor::SyntaxHighlighter *highlighter = syntaxHighlighter()) {

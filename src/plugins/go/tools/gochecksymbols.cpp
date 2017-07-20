@@ -25,6 +25,7 @@
 #include "gochecksymbols.h"
 #include "ast.h"
 #include "control.h"
+#include "packagetype.h"
 
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
@@ -49,10 +50,10 @@ static GoSemanticHighlighter::Kind kindForSymbol(const Symbol *symbol)
     return GoSemanticHighlighter::Var;
 }
 
-GoCheckSymbols::GoCheckSymbols(GoSource::Ptr doc)
-    : ScopeSwitchVisitor(doc)
-    , m_doc(doc)
-    , m_control(doc->translationUnit()->control())
+GoCheckSymbols::GoCheckSymbols(GoSource *source)
+    : ScopeSwitchVisitor(source)
+    , m_source(source)
+    , m_control(source->translationUnit()->control())
     , _chunkSize(50)
 {
     _tokens = translationUnit()->tokens();
@@ -61,25 +62,12 @@ GoCheckSymbols::GoCheckSymbols(GoSource::Ptr doc)
 
 void GoCheckSymbols::run()
 {
-    if (!isCanceled()) {
-        if (m_doc->translationUnit() && !m_doc->isTooBig() && m_snapshot) {
-            m_snapshot->runProtectedTask(
-                [this]() -> void {
-                    if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
-                        m_currentScope = fileAst->scope;
-                        m_currentIndex = fileAst->scope->indexInSnapshot();
-                        if (m_currentIndex != -1) {
-                            if (IdentAST *packageName = fileAst->packageName)
-                            addUseCheckFirstLine(packageName, GoSemanticHighlighter::Package);
-                            accept(fileAst->importDecls);
-                            accept(fileAst->decls);
-                            flush();
-                            eraseResolvedTypes();
-                        }
-                    }
-                }
-            );
-        }
+    if (!isCanceled() && isValidResolveContext() && !m_source->isTooBig()) {
+        if (IdentAST *packageName = m_initialFileAst->packageName)
+            addUseCheckFirstLine(packageName, GoSemanticHighlighter::Package);
+        accept(m_initialFileAst->importDecls);
+        accept(m_initialFileAst->decls);
+        flush();
     }
 
     reportFinished();
@@ -146,7 +134,7 @@ bool GoCheckSymbols::visit(FieldAST *ast)
 {
     for (DeclIdentListAST *it = ast->names; it; it = it->next)
         if (DeclIdentAST *ident = it->value)
-            if (ident->isLookable())
+            if (ident->isLookable() && ident->symbol)
                 addUse(ident, ident->symbol->kind() == Symbol::Fld
                        ? GoSemanticHighlighter::Field
                        : GoSemanticHighlighter::Arg);
@@ -181,7 +169,7 @@ bool GoCheckSymbols::visit(TypeIdentAST *ast)
 const Type *GoCheckSymbols::resolveNamedType(PackageTypeAST *ast)
 {
     QString packageAlias(ast->packageAlias->ident->toString());
-    PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias);
+    PackageType *context = packageTypeForAlias(packageAlias);
     if (!context)
         return 0;
 
@@ -332,7 +320,7 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, int &derefLevel)
             addUse(ident, kindForSymbol(s));
             return s->type(this);
         }
-        if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, idStr)) {
+        if (PackageType *context = packageTypeForAlias(idStr)) {
             addUse(ident, GoSemanticHighlighter::Package);
             return context;
         }
@@ -361,7 +349,7 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, int &derefLevel)
             if (funcIdent->isNewKeyword()) {            // new(...) builting function
                 if (callExpr->args) {
                     int xDerefLevel = 0;
-                    if (const Type *typ = resolveExpr(callExpr->args->value, xDerefLevel)) {
+                    if (const Type *typ = callExpr->args->value->resolve(this, xDerefLevel)) {
                         derefLevel = xDerefLevel - 1;
                         return typ;
                     }
@@ -370,7 +358,7 @@ const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, int &derefLevel)
             } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
                 if (callExpr->args) {
                     int xDerefLevel = 0;
-                    if (const Type *typ = resolveExpr(callExpr->args->value, xDerefLevel)) {
+                    if (const Type *typ = callExpr->args->value->resolve(this, xDerefLevel)) {
                         derefLevel = xDerefLevel;
                         return typ;
                     }
@@ -449,7 +437,7 @@ const Type *GoCheckSymbols::tryAcceptTypeConvertion(ExprAST *x)
             if (selExpr->sel->isLookable()) {
                 if (IdentAST *packageIdent = selExpr->x->asIdent()) {
                     QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias)) {
+                    if (PackageType *context = packageTypeForAlias(packageAlias)) {
                         if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
                             if (s->kind() == Symbol::Typ) {
                                 addUse(packageIdent, GoSemanticHighlighter::Package);
@@ -484,7 +472,7 @@ const Type *GoCheckSymbols::resolveCompositExprType(CompositeLitAST *ast)
             if (IdentAST *packageIdent = selExpr->x->asIdent()) {
                 if (packageIdent->isLookable()) {
                     QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = m_snapshot->packageTypeForAlias(m_currentIndex, packageAlias)) {
+                    if (PackageType *context = packageTypeForAlias(packageAlias)) {
                         addUse(packageIdent, GoSemanticHighlighter::Package);
                         if (selExpr->sel->isLookable()) {
                             if (Symbol *s = context->lookupMember(selExpr->sel, this)) {

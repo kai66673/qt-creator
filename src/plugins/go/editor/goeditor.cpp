@@ -185,6 +185,9 @@ QString GoEditorWidget::evaluateIdentifierTypeDescription(int pos)
 void GoEditorWidget::findUsages()
 { d->m_goDocument->findUsages(textCursor().position()); }
 
+void GoEditorWidget::renameSymbolUnderCursor()
+{ d->m_goDocument->renameSymbolUnderCursor(textCursor().position()); }
+
 TextEditorWidget::Link GoEditorWidget::findLinkAt(const QTextCursor &tc, bool /*resolveTarget*/, bool /*inNextSplit*/)
 { return d->m_goDocument->findLinkAt(tc); }
 

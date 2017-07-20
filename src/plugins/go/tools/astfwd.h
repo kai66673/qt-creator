@@ -29,7 +29,7 @@ namespace GoTools {
 
 class LookupContext;
 class PackageType;
-class ExprTypeResolver;
+class ResolveContext;
 
 template <typename _Tp> class List;
 

@@ -30,6 +30,7 @@
 #include "translationunit.h"
 
 #include <texteditor/codeassist/assistproposaliteminterface.h>
+#include <coreplugin/find/searchresultitem.h>
 
 #include <QString>
 #include <QSharedPointer>
@@ -37,6 +38,8 @@
 #include <set>
 
 namespace GoTools {
+
+class GoPackage;
 
 class GoSource
 {
@@ -147,6 +150,10 @@ public:
     QString location() const;
 
     bool isTooBig() const;
+    Core::SearchResultItem searchResultItemForTokenIndex(unsigned tokenIndex, unsigned length);
+
+    GoPackage *package() const;
+    void setPackage(GoPackage *package);
 
 private:
     QString _fileName;
@@ -160,6 +167,8 @@ private:
     QList<Import> _imports;
     std::set<QString> _resolvedImportDirs;
     GoPackageKeySet _importTasks;
+
+    GoPackage *_package;
 };
 
 }   // namespace GoTools

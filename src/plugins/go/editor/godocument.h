@@ -60,6 +60,7 @@ public:
     TextEditor::TextEditorWidget::Link findLinkAt(const QTextCursor &tc);
     QString evaluateIdentifierTypeDescription(int pos);
     void findUsages(int pos);
+    void renameSymbolUnderCursor(int pos);
 
     GoTools::GoSource::Ptr source() const;
     GoTools::GoSource::Ptr actualSource(unsigned revision);

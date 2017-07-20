@@ -24,12 +24,11 @@
 ****************************************************************************/
 #include "gofunctionhintassistvisitor.h"
 #include "ast.h"
-#include "gosnapshot.h"
 
 namespace GoTools {
 
 GoFunctionHintAssistVisitor::GoFunctionHintAssistVisitor(GoSource::Ptr doc)
-    : ScopePositionVisitor(doc)
+    : ScopePositionVisitor(doc.data())
     , m_doc(doc)
 { }
 
@@ -40,46 +39,35 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
     m_functionArgs.clear();
     m_lparenPosition = -1;
 
-    if (m_doc->translationUnit() && m_snapshot) {
-        m_snapshot->runProtectedTask(
-            [this]() -> void {
-                if (FileAST *fileAst = m_doc->translationUnit()->fileAst()) {
-                    m_currentScope = fileAst->scope;
-                    m_currentIndex = fileAst->scope->indexInSnapshot();
-                    if (m_currentIndex != -1) {
-                        m_ended = false;
+    if (m_doc && isValidResolveContext()) {
+        m_ended = false;
 
-                        acceptForPosition(fileAst->decls, m_pos);
+        acceptForPosition(m_initialFileAst->decls);
 
-                        if (m_funcExpr) {
-                            int derefLevel = 0;
-                            if (const FuncTypeAST *type = dynamic_cast<const FuncTypeAST *>(resolveExpr(m_funcExpr, derefLevel))) {
-                                if (type->params) {
-                                    for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
-                                        if (FieldAST *field = field_it->value) {
-                                            QString typeDescr = field->type ? field->type->describe() : "";
-                                            if (DeclIdentListAST *name_it = field->names) {
-                                                for (; name_it; name_it = name_it->next) {
-                                                    QString argName;
-                                                    if (DeclIdentAST *name = name_it->value)
-                                                        argName = name->ident->toString();
-                                                    QString argDescr(argName + QLatin1String(" ") + typeDescr);
-                                                    m_functionArgs << argDescr.trimmed();
-                                                }
-                                            } else if (!typeDescr.isEmpty()) {
-                                                m_functionArgs << typeDescr;
-                                            }
-                                        }
-                                    }
+        if (m_funcExpr) {
+            int derefLevel = 0;
+            if (const FuncTypeAST *type = dynamic_cast<const FuncTypeAST *>(m_funcExpr->resolve(this, derefLevel))) {
+                if (type->params) {
+                    for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
+                        if (FieldAST *field = field_it->value) {
+                            QString typeDescr = field->type ? field->type->describe() : "";
+                            if (DeclIdentListAST *name_it = field->names) {
+                                for (; name_it; name_it = name_it->next) {
+                                    QString argName;
+                                    if (DeclIdentAST *name = name_it->value)
+                                        argName = name->ident->toString();
+                                    QString argDescr(argName + QLatin1String(" ") + typeDescr);
+                                    m_functionArgs << argDescr.trimmed();
                                 }
+                            } else if (!typeDescr.isEmpty()) {
+                                m_functionArgs << typeDescr;
                             }
                         }
-
-                        eraseResolvedTypes();
                     }
                 }
             }
-        );
+        }
+
     }
 
     return m_functionArgs;

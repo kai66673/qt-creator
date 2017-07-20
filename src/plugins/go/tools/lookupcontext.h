@@ -35,7 +35,7 @@
 
 namespace GoTools {
 
-class ExprTypeResolver;
+class ResolveContext;
 
 class LookupContext
 {
@@ -43,9 +43,9 @@ public:
     typedef std::function<bool (Symbol *)> Predicate;
 
     virtual ~LookupContext() {}
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const = 0;
+    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const = 0;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate predicate = 0) const = 0;
+                                       ResolveContext *resolver, Predicate predicate = 0) const = 0;
 };
 
 }   // namespace GoTools

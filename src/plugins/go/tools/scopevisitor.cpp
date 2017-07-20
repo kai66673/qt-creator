@@ -27,9 +27,9 @@
 
 namespace GoTools {
 
-ScopeSwitchVisitor::ScopeSwitchVisitor(GoSource::Ptr doc)
-    : ASTVisitor(doc->translationUnit())
-    , ExprTypeResolver()
+ScopeSwitchVisitor::ScopeSwitchVisitor(GoSource *source, bool protectCache)
+    : ASTVisitor(source->translationUnit())
+    , ResolveContext(source, protectCache)
 { }
 
 bool ScopeSwitchVisitor::visit(FuncDeclAST *ast)
@@ -126,9 +126,9 @@ bool ScopeSwitchVisitor::visit(CaseClauseAST *ast)
     return false;
 }
 
-ScopePositionVisitor::ScopePositionVisitor(GoSource::Ptr doc)
-    : ASTVisitor(doc->translationUnit())
-    , ExprTypeResolver()
+ScopePositionVisitor::ScopePositionVisitor(GoSource *source, bool protectCache)
+    : ASTVisitor(source->translationUnit())
+    , ResolveContext(source, protectCache)
 { }
 
 bool ScopePositionVisitor::preVisit(AST *)
@@ -294,6 +294,17 @@ bool ScopePositionVisitor::visit(CaseClauseAST *ast)
     }
 
     return false;
+}
+
+ScopePositionVisitor::PositionRelation ScopePositionVisitor::positionRelation(AST *ast) const
+{
+    if (m_pos < _tokens->at(ast->firstToken()).begin())
+        return Before;
+
+    if (m_pos <= _tokens->at(ast->lastToken()).end())
+        return In;
+
+    return After;
 }
 
 }   // namespace GoTools

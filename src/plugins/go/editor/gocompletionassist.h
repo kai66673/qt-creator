@@ -26,7 +26,6 @@
 #pragma once
 
 #include "godocument.h"
-#include "gosnapshot.h"
 #include "gosource.h"
 
 #include <texteditor/codeassist/assistinterface.h>
@@ -60,7 +59,7 @@ public:
     GoCompletionAssistProcessor();
     virtual ~GoCompletionAssistProcessor();
 
-    virtual TextEditor::IAssistProposal *perform(const TextEditor::AssistInterface *interface) override;
+    virtual TextEditor::IAssistProposal *perform(const TextEditor::AssistInterface *interface_) override;
 
 private:
     void addImports();

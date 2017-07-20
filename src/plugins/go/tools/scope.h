@@ -67,19 +67,38 @@ public:
 
     Scope *outer() const;
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate predicate = 0) const override;
+                                       ResolveContext *resolver, Predicate predicate = 0) const override;
 
     virtual FileScope *asFileScope() { return 0; }
+    virtual bool isLocal() const { return m_outer; }
 
     void dump() const;
     FileScope *fileScope();
 
-protected:
+    AST *ast() const;
+    virtual AST *enclosingAst() const;
+    void setAst(AST *ast);
 
+protected:
     Scope *m_outer;
     SymbolTable *_members;
+    AST *m_ast;
+};
+
+class StructScope: public Scope
+{
+public:
+    StructScope(Scope *outer)
+        : Scope(outer)
+    { }
+
+    virtual AST *enclosingAst() const override
+    { return m_outer ? m_outer->enclosingAst() : 0; }
+
+    virtual bool isLocal() const override
+    { return m_outer ? m_outer->isLocal() : false; }
 };
 
 class FileScope: public Scope
@@ -88,15 +107,12 @@ public:
     FileScope(GoSource *source);
     void declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl);
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override;
+    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate predicate = 0) const override;
+                                       ResolveContext *resolver, Predicate predicate = 0) const override;
     Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId);
     void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
                      const Identifier *typeId);
-
-    int indexInSnapshot() const;
-    void setIndexInSnapshot(int index);
 
     virtual FileScope *asFileScope() override { return this; }
 
@@ -104,10 +120,13 @@ public:
 
     GoSource *source() const;
 
+    QHash<QString, PackageType *> &aliasToLookupContext();
+
 private:
     GoSource *m_source;
     MethodsScope m_methods;
-    int m_indexInSnapshot = -1;
+
+    QHash<QString, PackageType *> m_aliasToLookupContext;
 };
 
 }   // namespace GoTools

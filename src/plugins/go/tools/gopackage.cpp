@@ -25,17 +25,31 @@
 #include "gopackage.h"
 #include "gocodemodelmanager.h"
 #include "gosource.h"
-#include "gosnapshot.h"
+#include "gosettings.h"
+#include "goconstants.h"
+#include "packagetype.h"
+
+#include <coreplugin/progressmanager/progressmanager.h>
+#include <utils/runextensions.h>
+
+#include <QDir>
 
 namespace GoTools {
 
+QStringList C_GO_FILES_FILTER({QStringLiteral("*.go")});
+
 GoPackageCache *GoPackageCache::m_instance = 0;
 
-GoPackage::GoPackage(const QString &location, const QString &name, unsigned revision)
+GoPackage::GoPackage(const QString &location, const QString &name)
     : m_location(location)
     , m_name(name)
-    , m_revision(revision)
+    , m_type(new PackageType(m_sources))
 { }
+
+GoPackage::~GoPackage()
+{
+    delete m_type;
+}
 
 QString GoPackage::location() const
 { return m_location; }
@@ -43,57 +57,48 @@ QString GoPackage::location() const
 QString GoPackage::name() const
 { return m_name; }
 
-GoPackageKeySet GoPackage::depencies() const
+void GoPackage::insertGoSource(const GoSource::Ptr &doc)
 {
-    GoPackageKeySet result;
-
-    for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
-         it != m_sources.constEnd(); ++it)
-        result += it.value()->importTasks();
-
-    return result;
+    QMutexLocker lock(&m_sourcesMutex);
+    m_sources[doc->fileName()] = doc;
+    doc->setPackage(this);
 }
-
-QStringList GoPackage::files() const
-{
-    QStringList result;
-
-    for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
-         it != m_sources.constEnd(); ++it)
-        result << it.value()->fileName();
-
-    return result;
-}
-
-void GoPackage::insertGoSource(const QString &path, GoSource::Ptr doc)
-{ m_sources[path] = doc; }
 
 void GoPackage::removeGoSource(const QString &path)
-{ m_sources.remove(path); }
+{
+    QMutexLocker lock(&m_sourcesMutex);
+    m_sources.remove(path);
+}
 
 QHash<QString, GoSource::Ptr> GoPackage::sources() const
-{ return m_sources; }
+{
+    QMutexLocker lock(&m_sourcesMutex);
+    return m_sources;
+}
+
+PackageType *GoPackage::type() const
+{ return m_type; }
 
 GoPackageCache::GoPackageCache(GoCodeModelManager *model, QObject *parent)
     : QObject(parent)
-    , m_importer(this)
     , m_model(model)
-    , m_snapshot(0)
-    , m_snapshotRefCount(0)
-    , m_dirty(false)
+    , m_mutex(QMutex::Recursive)
 {
     m_instance = this;
-    connect(&m_importer, &GoPackageImporter::packageCacheUpdated,
-            this, &GoPackageCache::onPackageCacheUpdated);
+    connect(&m_indexingFutureWatcher, &QFutureWatcher<IndexingTaskListResult>::finished,
+            this, &GoPackageCache::indexingTaskFinished);
+
 }
 
 GoPackageCache::~GoPackageCache()
 { clean(); }
 
-void GoPackageCache::update(GoSource::Ptr doc)
+void GoPackageCache::update(const GoSource::Ptr &doc)
 {
     if (!doc)
         return;
+
+    QMutexLocker lock(&m_mutex);
 
     // remove doc from package if
     // 1. doc is invalid
@@ -101,122 +106,219 @@ void GoPackageCache::update(GoSource::Ptr doc)
     QHash<QString, GoPackage *>::iterator filesIterator = m_fileToPackageHash.find(doc->fileName());
     if (filesIterator != m_fileToPackageHash.end()) {
         GoPackage *pkg = filesIterator.value();
-        if (!doc->translationUnit()->fileAst() || doc->packageName() != pkg->name())
+        if (!doc->translationUnit()->fileAst() || doc->packageName() != pkg->name()) {
             pkg->removeGoSource(doc->fileName());
+            m_fileToPackageHash.erase(filesIterator);
+        }
     }
 
-    GoPackageKey packageKey({doc->location(), doc->packageName()});
-
-    QHash<GoPackageKey, GoPackage *>::iterator pkgIt = m_packages.find(packageKey);
+    QHash<GoPackageKey, GoPackage *>::iterator pkgIt = m_packages.find({doc->location(), doc->packageName()});
     if (pkgIt == m_packages.end())
-        m_importer.importDocPackage(doc);
+        importPackage({doc->location(), doc->packageName()}, GoCodeModelManager::instance()->buildWorkingCopy(), doc);
     else {
-        pkgIt.value()->insertGoSource(doc->fileName(), doc);
-        importPackages(doc->importTasks());
+        pkgIt.value()->insertGoSource(doc);
+        m_fileToPackageHash[doc->fileName()] = pkgIt.value();
     }
 }
 
-void GoPackageCache::importPackages(const GoPackageKeySet &packages)
+bool GoPackageCache::initializeDocument(const WorkingCopy &workingCopy, GoSource::Ptr &doc)
 {
-    m_importer.importPackages(packages - m_packageSet);
+    const QString filePath = doc->fileName();
+
+    if (workingCopy.contains(filePath)) {
+        const QPair<QByteArray, unsigned> entry = workingCopy.get(filePath);
+        doc->setSource(entry.first);
+        doc->setRevision(entry.second);
+        return true;
+    }
+
+    QFile file(filePath);
+    if (file.open(QIODevice::ReadOnly)) {
+        QByteArray source = file.readAll();
+        for (int i = 0; i < source.size(); i++) {
+            if (source[i] == '\r') {
+                if (source[i+1] == '\n')
+                    source[i++] = ' ';
+                else
+                    source[i] = '\n';
+            }
+        }
+        doc->setSource(source);
+        doc->setRevision(0);
+        return true;
+    }
+
+    return false;
 }
 
-void GoPackageCache::insertEmptyPackage(GoPackage *pkg)
+GoPackage *GoPackageCache::importPackage(const GoPackageKey &pkgKey, const WorkingCopy &workingCopy, const GoSource::Ptr &currentDoc)
 {
-    auto key = qMakePair(pkg->location(), pkg->name());
-    m_packages[key] = pkg;
-    m_packageSet.insert(key);
+    const GoLang::GoGeneralSettings &settings = GoLang::GoSettings::generalSettings();
+    const QString goRoot = settings.goRoot();
+    const QString goPath = settings.goPath();
+
+    GoPackage *newPackage = new GoPackage(pkgKey.first, pkgKey.second);
+    if (!currentDoc.isNull()) {
+        newPackage->insertGoSource(currentDoc);
+        m_fileToPackageHash[currentDoc->fileName()] = newPackage;
+    }
+
+    QDir pkgDir(pkgKey.first);
+    if (pkgDir.exists()) {
+        pkgDir.setNameFilters(C_GO_FILES_FILTER);
+        QStringList goFiles = pkgDir.entryList(QDir::Files);
+        if (!currentDoc.isNull()) {
+            const QString currentDocName = currentDoc->fileName().mid(pkgKey.first.length() + 1);
+            goFiles.removeOne(currentDocName);
+        }
+
+        for (const QString &goFile: goFiles) {
+            GoSource::Ptr newDoc = GoSource::create(pkgKey.first + "/" + goFile);
+            if (initializeDocument(workingCopy, newDoc)) {
+                if (newDoc->parsePackageFile(pkgKey.second)) {
+                    newDoc->resolveImportsAndPackageName(goRoot, goPath);
+                    newPackage->insertGoSource(newDoc);
+                    m_fileToPackageHash[newDoc->fileName()] = newPackage;
+                }
+            }
+        }
+    }
+
+    m_packages.insert(pkgKey, newPackage);
+    return newPackage;
 }
 
-GoPackageKeySet GoPackageCache::insertPackage(GoPackage *pkg)
+void GoPackageCache::addIndexingTask(const IndexingTask &task)
 {
-    auto key = qMakePair(pkg->location(), pkg->name());
-    m_packages[key] = pkg;
-    m_packageSet.insert(key);
+    m_indexingTodo.push_back(task);
+    indexingWakeUp();
+}
 
-    for (const QString &filePath: pkg->files())
-        m_fileToPackageHash[filePath] = pkg;
+void GoPackageCache::runIndexing(QFutureInterface<IndexingTaskListResult> &future, const QSet<QString> &files, const QString &goRoot, const QString &goPath)
+{
+    IndexingTaskListResult result;
 
-    return pkg->depencies() - m_packageSet;
+    future.setProgressRange(0, files.size());
+
+    int progress = 0;
+    for (const QString &fileName: files) {
+        if (future.isCanceled())
+            break;
+        if (fileName.endsWith(QLatin1String(".go"))) {
+            QFile file(fileName);
+            if (file.open(QIODevice::ReadOnly)) {
+                GoSource::Ptr newDoc = GoSource::create(fileName);
+                QByteArray source = file.readAll();
+                for (int i = 0; i < source.size(); i++) {
+                    if (source[i] == '\r') {
+                        if (source[i+1] == '\n')
+                            source[i++] = ' ';
+                        else
+                            source[i] = '\n';
+                    }
+                }
+                newDoc->setSource(source);
+                newDoc->setRevision(0);
+                newDoc->parse(TranslationUnit::Full);
+                newDoc->resolveImportsAndPackageName(goRoot, goPath);
+                result[{newDoc->location(), newDoc->packageName()}].append(newDoc);
+            }
+        }
+        future.setProgressValue(++progress);
+    }
+
+    future.reportFinished(&result);
+}
+
+void GoPackageCache::indexingWakeUp()
+{
+    if (m_indexingTodo.isEmpty() || m_indexingFutureWatcher.isRunning())
+        return;
+
+    const GoLang::GoGeneralSettings &settings = GoLang::GoSettings::generalSettings();
+    const QString goRoot = settings.goRoot();
+    const QString goPath = settings.goPath();
+
+    const IndexingTask task = m_indexingTodo.takeFirst();
+    QFuture<IndexingTaskListResult> future = Utils::runAsync(GoCodeModelManager::instance()->sharedThreadPool(),
+                                                             &GoPackageCache::runIndexing, this, task.second, goRoot, goPath);
+    m_indexingFutureWatcher.setFuture(future);
+    Core::ProgressManager::addTask(future, tr("Indexing project %1 Go files").arg(task.first), "Go.Project.Index");
+}
+
+void GoPackageCache::cancelIndexing()
+{
+    m_indexingTodo.clear();
+    if (m_indexingFutureWatcher.isRunning()) {
+        m_indexingFutureWatcher.cancel();
+        m_indexingFutureWatcher.waitForFinished();
+    }
+}
+
+void GoPackageCache::indexingTaskFinished()
+{
+    IndexingTaskListResult result = m_indexingFutureWatcher.future().result();
+    {
+        QMutexLocker lock(&m_mutex);
+        for (IndexingTaskListResult::const_iterator pkg_it = result.constBegin(); pkg_it != result.constEnd(); ++pkg_it) {
+            GoPackageKey pkgKey = pkg_it.key();
+            QHash<GoPackageKey, GoPackage *>::iterator findPackageIt = m_packages.find(pkgKey);
+            GoPackage *package;
+            if (findPackageIt == m_packages.end()) {
+                package = new GoPackage(pkgKey.first, pkgKey.second);
+                m_packages.insert(pkgKey, package);
+            } else {
+                package = findPackageIt.value();
+            }
+            for (const GoSource::Ptr &doc: pkg_it.value()) {
+                package->insertGoSource(doc);
+                m_fileToPackageHash[doc->fileName()] = package;
+            }
+        }
+    }
+
+    indexingWakeUp();
 }
 
 GoPackageCache *GoPackageCache::instance()
 { return m_instance; }
 
-GoSnapshot *GoPackageCache::getSnapshot()
-{
-    QMutexLocker lock(&m_snapshotMutex);
-
-    if (m_snapshot)
-        m_snapshotRefCount++;
-    return m_snapshot;
-}
-
-void GoPackageCache::releaseSnapshot()
-{
-    bool needEmit = false;
-
-    {
-        QMutexLocker lock(&m_snapshotMutex);
-
-        if (m_snapshotRefCount)
-            m_snapshotRefCount--;
-        if (!m_snapshotRefCount) {
-            if (m_dirty) {
-                m_dirty = false;
-                if (m_snapshot)
-                    delete m_snapshot;
-                m_snapshot = new GoSnapshot(m_packages);
-                needEmit = true;
-            }
-        }
-    }
-
-    if (needEmit)
-        emit packageCacheUpdated();
-}
-
 void GoPackageCache::clean()
 {
-    m_importer.clean();
+    cancelIndexing();
 
     {
-        QMutexLocker lock(&m_snapshotMutex);
+        QMutexLocker lock(&m_mutex);
 
-        while (m_snapshotRefCount)
-            QThread::msleep(25);
-        if (m_snapshot)
-            delete m_snapshot;
-        m_snapshot = 0;
+        qDeleteAll(m_packages.values());
+        m_packages.clear();
+        m_fileToPackageHash.clear();
     }
-
-    qDeleteAll(m_packages.values());
-    m_packages.clear();
-    m_packageSet.clear();
-    m_fileToPackageHash.clear();
 
     emit packageCacheCleaned();
 }
 
-void GoPackageCache::onPackageCacheUpdated()
+void GoPackageCache::indexProjectFiles(const QString &projectName, const QSet<QString> &deletedFiles, const QSet<QString> &addedFiles)
 {
-    bool needEmit = false;
-
     {
-        QMutexLocker lock(&m_snapshotMutex);
-
-        if (!m_snapshotRefCount) {
-            if (m_snapshot)
-                delete m_snapshot;
-            m_snapshot = new GoSnapshot(m_packages);
-            needEmit = true;
-        } else {
-            m_dirty = true;
+        QMutexLocker lock(&m_mutex);
+        for (const QString &fileToDelete: deletedFiles) {
+            QHash<QString, GoPackage *>::iterator filesIterator = m_fileToPackageHash.find(fileToDelete);
+            if (filesIterator != m_fileToPackageHash.end()) {
+                GoPackage *pkg = filesIterator.value();
+                pkg->removeGoSource(fileToDelete);
+                m_fileToPackageHash.erase(filesIterator);
+            }
         }
     }
 
-    if (needEmit)
-        emit packageCacheUpdated();
+    addIndexingTask({projectName, addedFiles});
 }
+
+void GoPackageCache::acquireCache()
+{ m_mutex.lock(); }
+
+void GoPackageCache::releaseCache()
+{ m_mutex.unlock(); }
 
 }   // namespace GoTools

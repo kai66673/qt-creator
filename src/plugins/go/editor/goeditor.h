@@ -68,6 +68,7 @@ public:
 
     QString evaluateIdentifierTypeDescription(int pos);
     void findUsages();
+    void renameSymbolUnderCursor();
 
 protected:
     virtual Link findLinkAt(const QTextCursor &tc, bool resolveTarget = true,

@@ -209,9 +209,9 @@ GoCompletionAssistProcessor::GoCompletionAssistProcessor()
 GoCompletionAssistProcessor::~GoCompletionAssistProcessor()
 { }
 
-TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEditor::AssistInterface *interface)
+TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEditor::AssistInterface *interface_)
 {
-    m_interface.reset(static_cast<const GoCompletionAssistInterface *>(interface));
+    m_interface.reset(static_cast<const GoCompletionAssistInterface *>(interface_));
 
     if (m_interface->reason() != TextEditor::ExplicitlyInvoked) {
         QTextCursor cursor(m_interface->textDocument());

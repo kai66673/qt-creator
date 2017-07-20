@@ -24,8 +24,8 @@
 ****************************************************************************/
 #include "scope.h"
 #include "ast.h"
-#include "gosnapshot.h"
-#include "exprtyperesolver.h"
+#include "resolvecontext.h"
+#include "packagetype.h"
 
 #include <texteditor/codeassist/assistproposalitem.h>
 
@@ -37,6 +37,7 @@ namespace GoTools {
 Scope::Scope(Scope *outer)
     : m_outer(outer)
     , _members(new SymbolTable)
+    , m_ast(0)
 { }
 
 Scope::~Scope()
@@ -66,7 +67,7 @@ Symbol *Scope::find(const HashedLiteral *name) const
 Scope *Scope::outer() const
 { return m_outer; }
 
-Symbol *Scope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
+Symbol *Scope::lookupMember(const IdentAST *ident, ResolveContext *resolver) const
 {
     if (Symbol *s = find(ident->ident)) {
         unsigned lastToken = s->declExpr() ? s->declExpr()->lastToken() : s->sourceLocation();
@@ -77,7 +78,7 @@ Symbol *Scope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) c
 }
 
 void Scope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                  ExprTypeResolver *resolver, Predicate predicate) const
+                                  ResolveContext *resolver, Predicate predicate) const
 {
     for (unsigned i = 0; i < memberCount(); i++) {
         Symbol *symbol = memberAt(i);
@@ -104,6 +105,19 @@ void Scope::dump() const
 FileScope *Scope::fileScope()
 { return m_outer ? m_outer->fileScope() : asFileScope(); }
 
+AST *Scope::ast() const
+{ return m_ast; }
+
+AST *Scope::enclosingAst() const
+{
+    if (m_ast)
+        return m_ast;
+    return m_outer ? m_outer->enclosingAst() : 0;
+}
+
+void Scope::setAst(AST *ast)
+{ m_ast = ast; }
+
 FileScope::FileScope(GoSource *source)
     : Scope(0)
     , m_source(source)
@@ -112,28 +126,15 @@ FileScope::FileScope(GoSource *source)
 void FileScope::declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl)
 { m_methods.addMethod(typeId, funcDecl); }
 
-Symbol *FileScope::lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const
+Symbol *FileScope::lookupMember(const IdentAST *ident, ResolveContext *resolver) const
 {
-    return m_indexInSnapshot != -1
-            ? resolver->snapshot()->packageTypetAt(m_indexInSnapshot)->lookupMember(ident, resolver)
-            : find(ident->ident);
+    return resolver->fileScopePackageType(this)->lookupMember(ident, resolver);
 }
 
 void FileScope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                      ExprTypeResolver *resolver, Predicate predicate) const
+                                      ResolveContext *resolver, Predicate predicate) const
 {
-    if (m_indexInSnapshot == -1) {
-        for (unsigned i = 0; i < memberCount(); i++) {
-            Symbol *symbol = memberAt(i);
-            TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-            item->setText(symbol->identifier()->toString());
-            item->setIcon(Symbol::icon(symbol->kind()));
-            completions.append(item);
-        }
-        return;
-    }
-
-    resolver->snapshot()->packageTypetAt(m_indexInSnapshot)->fillMemberCompletions(completions, resolver, predicate);
+    resolver->fileScopePackageType(this)->fillMemberCompletions(completions, resolver, predicate);
 }
 
 Symbol *FileScope::lookupMethod(const Identifier *typeId, const Identifier *funcId)
@@ -154,12 +155,6 @@ void FileScope::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &co
     }
 }
 
-int FileScope::indexInSnapshot() const
-{ return m_indexInSnapshot; }
-
-void FileScope::setIndexInSnapshot(int index)
-{ m_indexInSnapshot = index; }
-
 void FileScope::fillLink(TextEditor::TextEditorWidget::Link &link, unsigned tokenIndex)
 {
     const Token &tk = m_source->translationUnit()->tokenAt(tokenIndex);
@@ -170,5 +165,8 @@ void FileScope::fillLink(TextEditor::TextEditorWidget::Link &link, unsigned toke
 
 GoSource *FileScope::source() const
 { return m_source; }
+
+QHash<QString, PackageType *> &FileScope::aliasToLookupContext()
+{ return m_aliasToLookupContext; }
 
 }   // namespace GoTools

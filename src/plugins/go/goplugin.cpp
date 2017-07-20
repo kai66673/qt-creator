@@ -84,7 +84,9 @@ public:
 
     GoIconProvider *iconProvider;
     GoLang::GoSettings *settings;
+
     QAction *m_findUsagesAction;
+    QAction *m_renameSymbolUnderCursorAction;
 };
 
 GoPlugin *GoPlugin::m_instance(nullptr);
@@ -191,6 +193,13 @@ void GoPlugin::findUsages()
             editorWidget->findUsages();
 }
 
+void GoPlugin::renameSymbolUnderCursor()
+{
+    if (Core::IEditor *currentEditor = Core::EditorManager::currentEditor())
+        if (GoEditorWidget *editorWidget = qobject_cast<GoEditorWidget *>(currentEditor->widget()))
+            editorWidget->renameSymbolUnderCursor();
+}
+
 void GoPlugin::createActions()
 {
     Core::Context context(::GoEditor::Constants::GOEDITOR_ID);
@@ -213,6 +222,13 @@ void GoPlugin::createActions()
     cmd = Core::ActionManager::registerAction(d->m_findUsagesAction, ::GoEditor::Constants::FIND_USAGES, context);
     cmd->setDefaultKeySequence(QKeySequence(tr("Ctrl+Shift+U")));
     connect(d->m_findUsagesAction, &QAction::triggered, this, &GoPlugin::findUsages);
+    contextMenu->addAction(cmd);
+    goToolsMenu->addAction(cmd);
+
+    d->m_renameSymbolUnderCursorAction = new QAction(tr("Rename Symbol Under Cursor"), this);
+    cmd = Core::ActionManager::registerAction(d->m_renameSymbolUnderCursorAction, ::GoEditor::Constants::RENAME_SYMBOL_UNDER_CURSOR, context);
+    cmd->setDefaultKeySequence(QKeySequence(tr("Ctrl+Shift+R")));
+    connect(d->m_renameSymbolUnderCursorAction, &QAction::triggered, this, &GoPlugin::renameSymbolUnderCursor);
     contextMenu->addAction(cmd);
     goToolsMenu->addAction(cmd);
 }

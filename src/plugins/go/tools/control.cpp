@@ -61,7 +61,6 @@ static Identifier s_newIdentifier("!0", 2);
 static Identifier s_makeIdentifier("!1", 2);
 
 static BuiltinType s_builtinType;
-static TupleType s_nullTupleType;
 
 class Control::Data
 {
@@ -150,6 +149,13 @@ const Identifier *Control::identifier(const char *chars, unsigned size)
 Scope *Control::newScope(Scope *outer)
 {
     Scope *scope = new Scope(outer);
+    d->scopes.append(scope);
+    return scope;
+}
+
+Scope *Control::newStructScope(Scope *outer)
+{
+    Scope *scope = new StructScope(outer);
     d->scopes.append(scope);
     return scope;
 }
@@ -286,9 +292,6 @@ const Identifier *Control::builtinComplex128Identifier()
 
 Type *Control::builtinType()
 { return &s_builtinType; }
-
-TupleType *Control::nullTupleType()
-{ return &s_nullTupleType; }
 
 const Identifier *Control::newIdentifier()
 { return &s_newIdentifier; }

@@ -28,6 +28,7 @@
 #include "goprojectnode.h"
 #include "gopackageprocessor.h"
 #include "gotoolchain.h"
+#include "gopackage.h"
 
 #include <coreplugin/progressmanager/progressmanager.h>
 #include <projectexplorer/kit.h>
@@ -56,6 +57,9 @@ GoProject::GoProject(const Utils::FileName &fileName)
     connect(&m_projectScanTimer, &QTimer::timeout, this, &GoProject::collectProjectFiles);
     connect(&m_futureWatcher, &QFutureWatcher<QList<ProjectExplorer::FileNode *>>::finished,
             this, &GoProject::updateProject);
+
+    connect(GoTools::GoPackageCache::instance(), &GoTools::GoPackageCache::packageCacheCleaned,
+            this, &GoProject::reindexProjectFiles);
 
     collectProjectFiles();
 }
@@ -188,6 +192,15 @@ void GoProject::updateProject()
     newRoot->addNestedNodes(fileNodes);
     setRootProjectNode(newRoot);
     emit parsingFinished();
+
+    QSet<QString> oldFilesSet = oldFiles.toSet();
+    QSet<QString> newFilesSet = m_files.toSet();
+    GoTools::GoPackageCache::instance()->indexProjectFiles(displayName(), oldFilesSet - newFilesSet, newFilesSet - oldFilesSet);
+}
+
+void GoProject::reindexProjectFiles()
+{
+    GoTools::GoPackageCache::instance()->indexProjectFiles(displayName(), QSet<QString>(), m_files.toSet());
 }
 
 }   // GoLang

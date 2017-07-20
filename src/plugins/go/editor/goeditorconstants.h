@@ -29,14 +29,15 @@ namespace GoEditor {
 namespace Constants {
 
 // Id & display name
-const char GOEDITOR_ID[]            = "GoEditor.GoEditor";
-const char GOEDITOR_DISPLAY_NAME[]  = "Go Editor";
-const char M_CONTEXT[]              = "GoEditor.ContextMenu";
-const char M_TOOLS_GO[]             = "GoEditor.Tools.Menu";
-const char GOTO_DEFINITION[]        = "GoEditor.GotoDefinition";
+const char GOEDITOR_ID[]                = "GoEditor.GoEditor";
+const char GOEDITOR_DISPLAY_NAME[]      = "Go Editor";
+const char M_CONTEXT[]                  = "GoEditor.ContextMenu";
+const char M_TOOLS_GO[]                 = "GoEditor.Tools.Menu";
+const char GOTO_DEFINITION[]            = "GoEditor.GotoDefinition";
 
 // Actions
-const char FIND_USAGES[] = "GoEditor.FindUsages";
+const char FIND_USAGES[]                = "GoEditor.FindUsages";
+const char RENAME_SYMBOL_UNDER_CURSOR[] = "GoEditor.RenameSymbolUnderCursor";
 
 } // namespace GoEditor
 } // namespace Constants

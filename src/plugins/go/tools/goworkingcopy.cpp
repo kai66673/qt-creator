@@ -22,23 +22,11 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-#include "astvisitor.h"
-#include "ast.h"
+#include "goworkingcopy.h"
 
 namespace GoTools {
 
-ASTVisitor::ASTVisitor(TranslationUnit *unit)
-    : _translationUnit(unit)
-    , _tokens(unit->tokens())
+WorkingCopy::WorkingCopy()
 { }
-
-ASTVisitor::~ASTVisitor()
-{ }
-
-void ASTVisitor::accept(AST *ast)
-{ AST::accept(ast, this); }
-
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
 
 }   // namespace GoTools

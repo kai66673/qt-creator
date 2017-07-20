@@ -22,23 +22,27 @@
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ****************************************************************************/
-#include "astvisitor.h"
-#include "ast.h"
+
+#pragma once
+
+#include "gosource.h"
+
+#include <QObject>
 
 namespace GoTools {
 
-ASTVisitor::ASTVisitor(TranslationUnit *unit)
-    : _translationUnit(unit)
-    , _tokens(unit->tokens())
-{ }
+class GoFindReferences: public QObject
+{
+    Q_OBJECT
 
-ASTVisitor::~ASTVisitor()
-{ }
+public:
+    explicit GoFindReferences(QObject *parent = nullptr);
 
-void ASTVisitor::accept(AST *ast)
-{ AST::accept(ast, this); }
+    void findReferences(GoTools::GoSource::Ptr source, int pos, bool isReplace);
 
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
+private:
+    void openEditor(const Core::SearchResultItem &item);
+    void onReplaceButtonClicked(const QString &text, const QList<Core::SearchResultItem> &items, bool preserveCase);
+};
 
 }   // namespace GoTools

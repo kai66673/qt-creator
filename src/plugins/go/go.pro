@@ -46,51 +46,55 @@ HEADERS += \
     project/gorunconfigurationwidget.h \
     project/gotoolchain.h \
     project/gotoolchainconfigwidget.h \
-    tools/gosource.h \
-    tools/control.h \
-    tools/diagnosticclient.h \
-    tools/translationunit.h \
-    tools/literals.h \
-    tools/token.h \
-    tools/parser.h \
-    tools/memorypool.h \
-    tools/ast.h \
-    tools/astfwd.h \
-    tools/astvisitor.h \
-    tools/scanner.h \
-    tools/symbol.h \
-    tools/symboltable.h \
-    tools/scope.h \
-    tools/literaltable.h \
     settings/gogeneralsettings.h \
     settings/gosettings.h \
     settings/gotoolssettingspage.h \
     settings/gotoolssettings.h \
     settings/gotoolssettingspagewidget.h \
+    editor/gocompletionassist.h \
+    editor/gooutlinewidgetfactory.h \
+    tools/control.h \
+    tools/diagnosticclient.h \
     tools/gocodemodelmanager.h \
     tools/goeditordocumenthandle.h \
-    tools/goeditordocumentprocessor.h \
     tools/goeditordocumentparser.h \
-    tools/gooverviewmodel.h \
+    tools/goeditordocumentprocessor.h \
     tools/goeditoroutline.h \
+    tools/gooverviewmodel.h \
     tools/gopackage.h \
-    tools/gopackageimporter.h \
+    tools/gopackagedirindexer.h \
     tools/gopackagetypes.h \
     tools/gosemantichighlighter.h \
-    tools/gosnapshot.h \
-    tools/gochecksymbols.h \
-    editor/gohoverhandler.h \
+    tools/gosource.h \
+    tools/literals.h \
+    tools/literaltable.h \
     tools/lookupcontext.h \
+    tools/memorypool.h \
     tools/methodsscope.h \
+    tools/parser.h \
+    tools/scanner.h \
+    tools/scope.h \
+    tools/symbol.h \
+    tools/symboltable.h \
+    tools/token.h \
+    tools/translationunit.h \
     tools/types.h \
-    tools/exprtyperesolver.h \
-    editor/gocompletionassist.h \
+    tools/ast.h \
+    tools/astfwd.h \
+    tools/astvisitor.h \
+    editor/gohoverhandler.h \
+    tools/gochecksymbols.h \
+    tools/scopevisitor.h \
+    tools/resolvecontext.h \
+    tools/packagetype.h \
     tools/gocompletionassistvisitor.h \
-    tools/gopackagedirindexer.h \
-    tools/symbolundercursor.h \
-    editor/gooutlinewidgetfactory.h \
     tools/gofunctionhintassistvisitor.h \
-    tools/scopevisitor.h
+    tools/symbolundercursor.h \
+    tools/symbolundercursordescriber.h \
+    tools/linkundercursor.h \
+    tools/gofindreferences.h \
+    tools/findreferences.h \
+    tools/goworkingcopy.h
 
 SOURCES += \
     goplugin.cpp \
@@ -123,48 +127,52 @@ SOURCES += \
     project/gorunconfigurationwidget.cpp \
     project/gotoolchain.cpp \
     project/gotoolchainconfigwidget.cpp \
-    tools/gosource.cpp \
-    tools/control.cpp \
-    tools/diagnosticclient.cpp \
-    tools/translationunit.cpp \
-    tools/literals.cpp \
-    tools/token.cpp \
-    tools/parser.cpp \
-    tools/memorypool.cpp \
-    tools/ast.cpp \
-    tools/astvisitor.cpp \
-    tools/scanner.cpp \
-    tools/symbol.cpp \
-    tools/symboltable.cpp \
-    tools/scope.cpp \
     settings/gogeneralsettings.cpp \
     settings/gosettings.cpp \
     settings/gotoolssettingspage.cpp \
     settings/gotoolssettings.cpp \
     settings/gotoolssettingspagewidget.cpp \
+    editor/gohoverhandler.cpp \
+    editor/gocompletionassist.cpp \
+    editor/gooutlinewidgetfactory.cpp \
+    tools/control.cpp \
+    tools/diagnosticclient.cpp \
     tools/gocodemodelmanager.cpp \
     tools/goeditordocumenthandle.cpp \
-    tools/goeditordocumentprocessor.cpp \
     tools/goeditordocumentparser.cpp \
-    tools/gooverviewmodel.cpp \
+    tools/goeditordocumentprocessor.cpp \
     tools/goeditoroutline.cpp \
+    tools/gooverviewmodel.cpp \
     tools/gopackage.cpp \
-    tools/gopackageimporter.cpp \
+    tools/gopackagedirindexer.cpp \
     tools/gopackagetypes.cpp \
     tools/gosemantichighlighter.cpp \
-    tools/gosnapshot.cpp \
-    tools/gochecksymbols.cpp \
-    editor/gohoverhandler.cpp \
+    tools/gosource.cpp \
+    tools/literals.cpp \
+    tools/memorypool.cpp \
     tools/methodsscope.cpp \
+    tools/parser.cpp \
+    tools/scanner.cpp \
+    tools/scope.cpp \
+    tools/symbol.cpp \
+    tools/symboltable.cpp \
+    tools/token.cpp \
+    tools/translationunit.cpp \
     tools/types.cpp \
-    tools/exprtyperesolver.cpp \
-    editor/gocompletionassist.cpp \
+    tools/ast.cpp \
+    tools/astvisitor.cpp \
+    tools/gochecksymbols.cpp \
+    tools/scopevisitor.cpp \
+    tools/resolvecontext.cpp \
+    tools/packagetype.cpp \
     tools/gocompletionassistvisitor.cpp \
-    tools/gopackagedirindexer.cpp \
-    tools/symbolundercursor.cpp \
-    editor/gooutlinewidgetfactory.cpp \
     tools/gofunctionhintassistvisitor.cpp \
-    tools/scopevisitor.cpp
+    tools/symbolundercursor.cpp \
+    tools/symbolundercursordescriber.cpp \
+    tools/linkundercursor.cpp \
+    tools/gofindreferences.cpp \
+    tools/findreferences.cpp \
+    tools/goworkingcopy.cpp
 
 FORMS += \
     project/gocompilerbuildstepconfigwidget.ui \

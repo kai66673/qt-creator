@@ -27,6 +27,7 @@
 
 #include "gopackage.h"
 #include "gopackagedirindexer.h"
+#include "goworkingcopy.h"
 
 #include <QObject>
 #include <QThreadPool>
@@ -51,10 +52,14 @@ public:
 
     QThreadPool *sharedThreadPool();
     const QMap<QString, GoEditorDocumentHandle *> *goEditorDocuments() const;
+    WorkingCopy buildWorkingCopy() const;
 
     void cleanPackageCache();
     void indexPackageDirs();
     GoPackageDirIndexer::PackageDirs indexedPackageDirs() const;
+
+    void findReferences(GoSource::Ptr source, int pos) const;
+    void renameSymbolUnderCursor(GoSource::Ptr source, int pos) const;
 
 private:
     GoCodeModelManagerPrivate *d;

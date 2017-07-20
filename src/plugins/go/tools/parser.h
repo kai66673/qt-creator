@@ -104,7 +104,7 @@ private:
     ExprAST *parseLiteralValue(ExprAST *type);
     ExprAST *parseElement();
     ExprAST *parseValue();
-    FieldAST *parseStructFieldDecl(Scope *scope);
+    FieldAST *parseStructFieldDecl();
     TypeAST *parseVarType(bool isParam);
     BlockStmtAST *parseBody(Scope *scope);
     StmtListAST *parseStmtList();
@@ -167,6 +167,9 @@ private:
     void openScope();
     void closeScope();
 
+    void openStructScope();
+    void closeStructScope();
+
     unsigned next();
     void next0();
     void consumeCommentGroup(unsigned offset, CommentGroupAST *&node, unsigned &endline);
@@ -189,7 +192,6 @@ private:
     std::vector<Token> *_tokens;
 
     bool _trace;
-    bool _skipFunctionBody;
 
     CommentGroupAST *leadComment;
     CommentGroupAST *lineComment;
@@ -198,6 +200,7 @@ private:
     unsigned syncTokenIndex;
     int syncCnt;
     Scope *topScope;
+    Scope *structScope;
     FileScope *fileScope;
 
     Token tok;

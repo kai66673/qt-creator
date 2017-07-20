@@ -29,24 +29,35 @@
 
 namespace GoTools {
 
-class TupleType;
+class TypeSpecAST;
+
+class NamedType
+{
+public:
+    virtual ~NamedType() { }
+
+    virtual const TypeSpecAST *typeSpec(ResolveContext *resolver) const = 0;
+};
 
 class Type: public LookupContext
 {
 public:
     virtual ~Type() { }
 
-    virtual const Type *indexType(ExprTypeResolver *resolver) const = 0;                // key:     S[K] -> type of K
-    virtual const Type *elementsType(ExprTypeResolver *resolver) const = 0;             // value:   S[K] -> type of S[...]
-    virtual const Type *calleeType(int index, ExprTypeResolver *resolver) const = 0;    // type of function call returns
+    virtual const Type *indexType(ResolveContext *resolver) const = 0;                // key:     S[K] -> type of K
+    virtual const Type *elementsType(ResolveContext *resolver) const = 0;             // value:   S[K] -> type of S[...]
+    virtual const Type *calleeType(int index, ResolveContext *resolver) const = 0;    // type of function call returns
     virtual const Type *chanValueType() const = 0;
-    virtual void fillTuple(TupleType *tuple, ExprTypeResolver *) const;
     virtual const Type *derefType() const { return 0; }
 
     virtual const Type *baseType() const { return this; }
     virtual int refLevel() const { return 0; }
+    virtual const Type *unstar() const { return 0; }
+    virtual int countInTurple() const { return 1; }
 
     virtual QString describe() const  = 0;
+
+    virtual const NamedType *asNamedType() const { return 0; }
 };
 
 class BuiltinType: public Type
@@ -54,121 +65,16 @@ class BuiltinType: public Type
 public:
     virtual ~BuiltinType() { }
 
-    virtual Symbol *lookupMember(const IdentAST *, ExprTypeResolver *) const override { return 0; }
+    virtual Symbol *lookupMember(const IdentAST *, ResolveContext *) const override { return 0; }
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &,
-                                       ExprTypeResolver *, Predicate) const override { }
+                                       ResolveContext *, Predicate) const override { }
 
-    virtual const Type *indexType(ExprTypeResolver *) const override { return 0; }
-    virtual const Type *elementsType(ExprTypeResolver *) const override { return 0; }
-    virtual const Type *calleeType(int, ExprTypeResolver *) const override { return 0; }
+    virtual const Type *indexType(ResolveContext *) const override { return 0; }
+    virtual const Type *elementsType(ResolveContext *) const override { return 0; }
+    virtual const Type *calleeType(int, ResolveContext *) const override { return 0; }
     virtual const Type *chanValueType() const override { return 0; }
 
     virtual QString describe() const override { return QLatin1String("builtin"); }
-};
-
-class TypeWithDerefLevel: public Type
-{
-public:
-    TypeWithDerefLevel(int derefLevel, const Type *type)
-        : _derefLevel(derefLevel)
-        , _baseType(type)
-    { }
-
-    virtual ~TypeWithDerefLevel() { }
-
-    virtual Symbol *lookupMember(const IdentAST *ident, ExprTypeResolver *resolver) const override
-    {
-        if (_baseType) {
-            if (const Type *baseTyp = _baseType->baseType()) {
-                switch (_derefLevel + _baseType->refLevel()) {
-                    case 0:
-                    case -1:
-                        return baseTyp->lookupMember(ident, resolver);
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ExprTypeResolver *resolver, Predicate p = 0) const override
-    {
-        if (_baseType) {
-            if (const Type *baseTyp = _baseType->baseType()) {
-                switch (_derefLevel + _baseType->refLevel()) {
-                    case 0:
-                    case -1:
-                        baseTyp->fillMemberCompletions(completions, resolver, p);
-                        break;
-                }
-            }
-        }
-    }
-
-    virtual const Type *indexType(ExprTypeResolver *resolver) const override
-    {
-        if (_baseType)
-            if (_derefLevel + _baseType->refLevel() == 0)
-                if (const Type *typ = _baseType->baseType())
-                    return typ->indexType(resolver);
-        return 0;
-    }
-
-    virtual const Type *elementsType(ExprTypeResolver *resolver) const override
-    {
-        if (_baseType)
-            if (_derefLevel + _baseType->refLevel() == 0)
-                if (const Type *typ = _baseType->baseType())
-                    return typ->elementsType(resolver);
-        return 0;
-    }
-
-    virtual const Type *calleeType(int index, ExprTypeResolver *resolver) const override
-    {
-        if (_baseType)
-            if (_derefLevel + _baseType->refLevel() == 0)
-                if (const Type *typ = _baseType->baseType())
-                    return typ->calleeType(index, resolver);
-        return 0;
-    }
-
-    virtual const Type *chanValueType() const override
-    {
-        if (_baseType)
-            if (_derefLevel + _baseType->refLevel() == 0)
-                if (const Type *typ = _baseType->baseType())
-                    return typ->chanValueType();
-        return 0;
-    }
-
-    virtual QString describe() const override
-    {
-        switch (_derefLevel) {
-            case 0: return _baseType ? _baseType->describe() : QString();
-            case -1: return _baseType ? QLatin1String("*") + _baseType->describe() : QString();
-        }
-        return QString();
-    }
-
-    virtual const Type *baseType() const override { return _baseType; }
-    virtual int refLevel() const override { return _derefLevel; }
-
-private:
-    int _derefLevel;
-    const Type *_baseType;
-};
-
-class TupleType
-{
-public:
-    virtual ~TupleType() { }
-
-    Type *type(int index);
-    void appendType(TypeWithDerefLevel *typ);
-
-private:
-    QList<TypeWithDerefLevel *> _types;
 };
 
 }   // namespace GoTools

@@ -26,7 +26,9 @@
 #include "goeditordocumentprocessor.h"
 #include "gochecksymbols.h"
 #include "gosettings.h"
-#include "symbolundercursor.h"
+#include "linkundercursor.h"
+#include "symbolundercursordescriber.h"
+//#include "findreferences.h"
 
 #include <texteditor/textdocument.h>
 #include <utils/runextensions.h>
@@ -44,7 +46,7 @@ GoEditorDocumentProcessor::GoEditorDocumentProcessor(TextEditor::TextDocument *d
 {
     m_semanticHighlighter->setHighlightingRunner(
                 [this]() -> QFuture<TextEditor::HighlightingResult> {
-                    GoCheckSymbols *checkSymbols = new GoCheckSymbols(m_source);
+                    GoCheckSymbols *checkSymbols = new GoCheckSymbols(m_source.data());
                     return checkSymbols->start();
                 });
 
@@ -91,8 +93,8 @@ void GoEditorDocumentProcessor::editorDocumentTimerRestarted()
 TextEditor::TextEditorWidget::Link GoEditorDocumentProcessor::findLinkAt(const QTextCursor &tc)
 {
     if (isSourceReady()) {
-        SymbolUnderCursor finder(m_source);
-        return finder.link(tc.position());
+        LinkUnderCursor linkFinder(m_source);
+        return linkFinder.link(tc.position());
     }
 
     return TextEditor::TextEditorWidget::Link();
@@ -101,8 +103,8 @@ TextEditor::TextEditorWidget::Link GoEditorDocumentProcessor::findLinkAt(const Q
 QString GoEditorDocumentProcessor::evaluateIdentifierTypeDescription(int pos)
 {
     if (isSourceReady()) {
-        SymbolUnderCursor finder(m_source);
-        return finder.typeDescription(pos);
+        SymbolUnderCursorDescriber describer(m_source);
+        return describer.description(pos);
     }
 
     return QString();
@@ -110,10 +112,14 @@ QString GoEditorDocumentProcessor::evaluateIdentifierTypeDescription(int pos)
 
 void GoEditorDocumentProcessor::findUsages(int pos)
 {
-    if (isSourceReady()) {
-        SymbolUnderCursor finder(m_source);
-        qDebug() << "GoEditorDocumentProcessor::findUsages" << finder.typeDescription(pos);
-    }
+    if (isSourceReady())
+        GoCodeModelManager::instance()->findReferences(m_source, pos);
+}
+
+void GoEditorDocumentProcessor::renameSymbolUnderCursor(int pos)
+{
+    if (isSourceReady())
+        GoCodeModelManager::instance()->renameSymbolUnderCursor(m_source, pos);
 }
 
 GoSource::Ptr GoEditorDocumentProcessor::actualSource(int revision)
@@ -145,8 +151,7 @@ void GoEditorDocumentProcessor::onParserFinished(GoTools::GoSource::Ptr doc)
 
     m_source = doc;
 
-    // update package cache
-    GoPackageCache::instance()->update(doc);
+    onPackageCacheUpdated();
 
     emit goDocumentUpdated(doc);
 }

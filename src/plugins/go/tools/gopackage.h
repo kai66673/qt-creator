@@ -26,82 +26,96 @@
 #pragma once
 
 #include "gosource.h"
-#include "gopackageimporter.h"
 #include "gopackagetypes.h"
+#include "goeditordocumenthandle.h"
+#include "goworkingcopy.h"
 
 #include <QString>
 #include <QHash>
 #include <QMutex>
+#include <QFutureWatcher>
 
 namespace GoTools {
 
 class GoPackageCache;
 class GoCodeModelManager;
-class GoSnapshot;
+class PackageType;
 
 class GoPackage
 {
+    friend class ResolveContext;
+
 public:
-    GoPackage(const QString &location, const QString &name, unsigned revision = 0);
+    GoPackage(const QString &location, const QString &name);
+    ~GoPackage();
 
     QString location() const;
     QString name() const;
 
-    GoPackageKeySet depencies() const;
-    QStringList files() const;
-    void insertGoSource(const QString &path, GoSource::Ptr doc);
+    void insertGoSource(const GoSource::Ptr &doc);
     void removeGoSource(const QString &path);
 
     QHash<QString, GoSource::Ptr> sources() const;
 
+    PackageType *type() const;
+
 private:
     QString m_location;
     QString m_name;
-    unsigned m_revision;
+
+    mutable QMutex m_sourcesMutex;
     QHash<QString, GoSource::Ptr> m_sources;
+    PackageType *m_type;
 };
 
 class GoPackageCache: public QObject
 {
     Q_OBJECT
 
+    friend class ResolveContext;
+
 public:
     GoPackageCache(GoCodeModelManager *model, QObject *parent = 0);
     virtual ~GoPackageCache();
 
-    void update(GoSource::Ptr doc);
-    void importPackages(const GoPackageKeySet &packages);
-    void insertEmptyPackage(GoPackage *pkg);
-    GoPackageKeySet insertPackage(GoPackage *pkg);
+    void update(const GoSource::Ptr &doc);
 
     static GoPackageCache *instance();
 
-    GoSnapshot *getSnapshot();
-    void releaseSnapshot();
-
     void clean();
+    void indexProjectFiles(const QString &projectName, const QSet<QString> &deletedFiles, const QSet<QString> &addedFiles);
+
+private:
+    void acquireCache();
+    void releaseCache();
+    bool initializeDocument(const WorkingCopy &workingCopy, GoSource::Ptr &doc);
+    GoPackage *importPackage(const GoPackageKey &pkgKey, const WorkingCopy &workingCopy, const GoSource::Ptr &currentDoc = GoSource::Ptr());
+
+    typedef QPair<QString, QSet<QString> > IndexingTask;
+    typedef QList<IndexingTask> IndexingTaskList;
+    typedef QHash<GoPackageKey, QList<GoSource::Ptr> > IndexingTaskListResult;
+
+    void addIndexingTask(const IndexingTask &task);
+    void runIndexing(QFutureInterface<IndexingTaskListResult> &future, const QSet<QString> &files, const QString &goRoot, const QString &goPath);
+    void indexingWakeUp();
+    void cancelIndexing();
+    void indexingTaskFinished();
+
+    IndexingTaskList m_indexingTodo;
+    QFutureWatcher<IndexingTaskListResult> m_indexingFutureWatcher;
 
 signals:
     void packageCacheUpdated();
     void packageCacheCleaned();
 
 private:
-    void onPackageCacheUpdated();
-
-private:
     static GoPackageCache *m_instance;
 
-    GoPackageImporter m_importer;
     GoCodeModelManager *m_model;
 
+    QMutex m_mutex;
     QHash<GoPackageKey, GoPackage *> m_packages;
-    GoPackageKeySet m_packageSet;
     QHash<QString, GoPackage *> m_fileToPackageHash;
-
-    QMutex m_snapshotMutex;
-    GoSnapshot *m_snapshot;
-    unsigned m_snapshotRefCount;
-    bool m_dirty;
 };
 
 }   // namespace GoTools

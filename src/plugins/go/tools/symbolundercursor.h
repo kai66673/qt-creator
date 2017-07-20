@@ -26,7 +26,6 @@
 #pragma once
 
 #include "scopevisitor.h"
-#include "gosnapshot.h"
 
 #include <texteditor/texteditor.h>
 
@@ -36,16 +35,12 @@ namespace GoTools {
 
 class SymbolUnderCursor: public ScopePositionVisitor
 {
-    enum UseReason { Link, DescribeType };
-
 public:
-    SymbolUnderCursor(GoSource::Ptr doc);
-
-    TextEditor::TextEditorWidget::Link link(unsigned pos);
-    QString typeDescription(unsigned pos);
+    SymbolUnderCursor(GoSource::Ptr doc, bool protectCache = true);
 
 protected:
-    virtual bool visit(ImportSpecAST *ast);
+    virtual bool visit(StructTypeAST *ast);
+    virtual void endVisit(StructTypeAST *);
 
     virtual bool visit(DeclIdentAST *ast);
     virtual bool visit(IdentAST *ast);
@@ -56,19 +51,14 @@ protected:
     virtual bool visit(CompositeLitAST *ast);
     virtual bool visit(KeyValueExprAST *ast);
 
-private:
-    void defineSymbolUnderCursor(UseReason reason = Link);
-
+protected:
     GoSource::Ptr m_doc;
 
-    std::stack<const Type *> m_nestedCimpositLitType;
+    std::stack<const Type *> m_nestedCompositLitType;
+    std::stack<const StructTypeAST *> m_structures;
 
     Symbol *m_symbol;
     const Token *m_token;
-    UseReason m_useReason;
-    QString m_symbolTypeDescription;
-    QString m_packageAlias;
-    ImportSpecAST *m_importSpec;
 };
 
 }   // namespace GoTools

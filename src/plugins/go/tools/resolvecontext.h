@@ -25,46 +25,39 @@
 
 #pragma once
 
-#include "gopackagetypes.h"
-#include "gosource.h"
-
-#include <QFutureSynchronizer>
-#include <QString>
-#include <QSet>
-#include <QTimer>
+#include "goworkingcopy.h"
+#include "scope.h"
 
 namespace GoTools {
 
-class GoPackage;
 class GoPackageCache;
 
-class GoPackageImporter: public QObject
+class ResolveContext
 {
-    Q_OBJECT
-
 public:
-    GoPackageImporter(GoPackageCache *cache, QObject *parent = 0);
+    ResolveContext(GoSource *source, bool protectCache = true);
+    virtual ~ResolveContext();
 
-    void importPackages(const GoPackageKeySet &imports);
-    void importDocPackage(GoSource::Ptr doc);
-    void clean();
+    Scope *switchScope(Scope *scope);
+    Scope *currentScope() const;
 
-private:
-    void proceedTasks();
+    bool isValidResolveContext() const;
+    PackageType *packageTypeForAlias(const QString &packageAlias, FileScope *fileScope = 0);
+    PackageType *fileScopePackageType(const FileScope *fileScope) const;
 
-signals:
-    void packageCacheUpdated();
+    QList<GoSource *> sources() const;
 
-private:
-    bool runImportTask(const QString &location, const QString &name);
-
-    QFutureSynchronizer<GoPackage *> m_synchronizer;
-    QTimer *m_timer;
-    QSet<GoPackageKey> m_allTasks;
-    QList<GoPackageKey> m_tasksToProceed;
+protected:
+    bool m_protectCache;
     GoPackageCache *m_cache;
-
-    QMap<QString, GoSource::Ptr> m_directlyUpdatingDocs;
+    FileAST *m_initialFileAst;
+    Scope *m_currentScope;
+    FileScope *m_initialFileScope;
+    bool m_isValid;
+    bool m_workingCopyIsObtained;
+    WorkingCopy m_workingCopy;
 };
+
+const Type *tryResolveNamedType(ResolveContext *resolver, ExprAST *x);
 
 }   // namespace GoTools
