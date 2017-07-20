@@ -77,6 +77,7 @@ QIcon Symbol::icon(Symbol::Kind kind)
         case Typ: return iconProvider->icon(Go::GoIconProvider::Type);
         case Var: return iconProvider->icon(Go::GoIconProvider::Variable);
         case Fun: return iconProvider->icon(Go::GoIconProvider::Func);
+        case Mtd: return iconProvider->icon(Go::GoIconProvider::Func);
         case Fld: return iconProvider->icon(Go::GoIconProvider::Variable);
         case Arg: return iconProvider->icon(Go::GoIconProvider::Variable);
         default: break; // prevent -Wswitch warning
@@ -120,6 +121,18 @@ QString FuncDecl::describeType(ResolveContext *) const
 
 Symbol::Kind FuncDecl::kind() const
 { return Fun; }
+
+ExprAST *MethodDecl::declExpr() const
+{ return _decl; }
+
+const Type *MethodDecl::type(ResolveContext *)
+{ return _decl->asType(); }
+
+QString MethodDecl::describeType(ResolveContext *) const
+{ return  QString("(%1)%2").arg(_recvIdent->ident->ident->toString()).arg(_decl->describe()); }
+
+Symbol::Kind MethodDecl::kind() const
+{ return Mtd; }
 
 ExprAST *ConstDecl::declExpr() const
 { return 0; }

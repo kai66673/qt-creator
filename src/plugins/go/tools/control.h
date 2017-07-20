@@ -40,6 +40,7 @@ class Type;
 class TupleType;
 class FuncDeclAST;
 class FuncTypeAST;
+class TypeIdentAST;
 class TypeSpecAST;
 class ExprAST;
 class TypeAST;
@@ -66,7 +67,7 @@ public:
     Scope *newScope(Scope *outer);
     Scope *newStructScope(Scope *outer);
     FileScope *newFileScope(GoSource *source);
-    Symbol *newMethod(FuncDeclAST *funcDecl, Scope *owner);
+    Symbol *newMethod(TypeIdentAST *recv, FuncDeclAST *funcDecl, Scope *owner);
     Symbol *newFuncDecl(unsigned tokenIndex, const Identifier *identifier, FuncTypeAST *decl, Scope *owner);
     Symbol *newVarDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner);
     Symbol *newFieldDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner);

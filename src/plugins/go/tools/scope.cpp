@@ -150,7 +150,7 @@ void FileScope::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &co
     for (const QString &method: m_methods.typeMethods(typeId)) {
         TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
         item->setText(method);
-        item->setIcon(Symbol::icon(Symbol::Fun));
+        item->setIcon(Symbol::icon(Symbol::Mtd));
         completions.append(item);
     }
 }

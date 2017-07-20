@@ -43,6 +43,7 @@ static GoSemanticHighlighter::Kind kindForSymbol(const Symbol *symbol)
         case Symbol::Var: return GoSemanticHighlighter::Var;
         case Symbol::Fld: return GoSemanticHighlighter::Field;
         case Symbol::Fun: return GoSemanticHighlighter::Func;
+        case Symbol::Mtd: return GoSemanticHighlighter::Func;
         case Symbol::Lbl: return GoSemanticHighlighter::Label;
         default: break; // prevent -Wswitch warning
     }
@@ -274,6 +275,7 @@ bool GoCheckSymbols::visit(DeclIdentAST *ast)
                 addUse(ast, GoSemanticHighlighter::ConstDecl);
                 break;
             case Symbol::Fun:
+            case Symbol::Mtd:
                 addUse(ast, GoSemanticHighlighter::FuncDecl);
                 break;
             default:

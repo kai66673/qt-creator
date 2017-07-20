@@ -39,9 +39,20 @@ class ExprAST;
 class TypeAST;
 class TypeSpecAST;
 class FuncTypeAST;
+class TypeIdentAST;
 class RhsExprListAST;
 class ResolveContext;
 class RangeExpAST;
+
+class VarDecl;
+class FieldDecl;
+class FuncDecl;
+class MethodDecl;
+class ConstDecl;
+class TypeDecl;
+class ShortVarDecl;
+class RangeKeyDecl;
+class RangeValueDecl;
 
 class Symbol
 {
@@ -57,7 +68,8 @@ public:
         Con,                // constant
         Typ,                // type
         Var,                // variable
-        Fun,                // function or method
+        Fun,                // function
+        Mtd,                // method
         Fld,                // field of struct type
         Arg,                // function argument or result
         Lbl                 // label
@@ -87,6 +99,16 @@ public:
 
     static QIcon icon(Kind kind);
 
+    virtual VarDecl *asVarDecl() { return 0; }
+    virtual FieldDecl *asFieldDecl() { return 0; }
+    virtual FuncDecl *asFuncDecl() { return 0; }
+    virtual MethodDecl *asMethodDecl() { return 0; }
+    virtual ConstDecl *asConstDecl() { return 0; }
+    virtual TypeDecl *asTypeDecl() { return 0; }
+    virtual ShortVarDecl *asShortVarDecl() { return 0; }
+    virtual RangeKeyDecl *asRangeKeyDecl() { return 0; }
+    virtual RangeValueDecl *asRangeValueDecl() { return 0; }
+
 private:
     unsigned _sourceLocation;
     const Identifier *_identifier;
@@ -109,6 +131,8 @@ public:
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
+    virtual VarDecl *asVarDecl() override { return this; }
+
 private:
     TypeAST *_decl;
 };
@@ -126,6 +150,8 @@ public:
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
+    virtual FieldDecl *asFieldDecl() override { return this; }
+
 private:
     TypeAST *_decl;
 };
@@ -136,15 +162,38 @@ public:
     FuncDecl(unsigned tokenIndex, const Identifier *identifier, FuncTypeAST *decl, Scope *owner)
         : Symbol(tokenIndex, identifier, owner)
         , _decl(decl)
-    {}
+    { }
 
     virtual ExprAST *declExpr() const override;
     virtual const Type *type(ResolveContext *) override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
+    virtual FuncDecl *asFuncDecl() override { return this; }
+
 private:
     FuncTypeAST *_decl;
+};
+
+class MethodDecl: public Symbol
+{
+public:
+    MethodDecl(unsigned tokenIndex, const Identifier *identifier, TypeIdentAST *recvIdent, FuncTypeAST *decl, Scope *owner)
+        : Symbol(tokenIndex, identifier, owner)
+        , _decl(decl)
+        , _recvIdent(recvIdent)
+    { }
+
+    virtual ExprAST *declExpr() const override;
+    virtual const Type *type(ResolveContext *) override;
+    virtual QString describeType(ResolveContext *) const override;
+    virtual Kind kind() const override;
+
+    virtual MethodDecl *asMethodDecl() override { return this; }
+
+private:
+    FuncTypeAST *_decl;
+    TypeIdentAST *_recvIdent;
 };
 
 class ConstDecl: public Symbol
@@ -158,6 +207,8 @@ public:
     virtual const Type *type(ResolveContext *) override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
+
+    virtual ConstDecl *asConstDecl() override { return this; }
 };
 
 class TypeDecl: public Symbol
@@ -172,6 +223,8 @@ public:
     virtual const Type *type(ResolveContext *) override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
+
+    virtual TypeDecl *asTypeDecl() override { return this; }
 
 private:
     TypeSpecAST *_decl;
@@ -191,6 +244,8 @@ public:
     virtual QString describeType(ResolveContext *resolver) const override;
     virtual Kind kind() const override;
 
+    virtual ShortVarDecl *asShortVarDecl() override { return this; }
+
 private:
     RhsExprListAST *_decl;
     unsigned _indexInTuple;
@@ -209,6 +264,8 @@ public:
     virtual QString describeType(ResolveContext *resolver) const override;
     virtual Kind kind() const override;
 
+    virtual RangeKeyDecl *asRangeKeyDecl() override { return this; }
+
 private:
     RangeExpAST *_decl;
 };
@@ -225,6 +282,8 @@ public:
     virtual const Type *type(ResolveContext *resolver) override;
     virtual QString describeType(ResolveContext *resolver) const override;
     virtual Kind kind() const override;
+
+    virtual RangeValueDecl *asRangeValueDecl() override { return this; }
 
 private:
     RangeExpAST *_decl;

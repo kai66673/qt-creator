@@ -1871,7 +1871,7 @@ void Parser::declareMethod(FuncDeclAST *ast)
                     typ = starType->typ;
                 if (TypeIdentAST *typeIdent = typ->asTypeIdent()) {
                     fileScope->declareMethod(typeIdent->ident->ident, ast);
-                    ast->symbol = _control->newMethod(ast, fileScope);
+                    ast->symbol = _control->newMethod(typeIdent, ast, fileScope);
                     ast->name->symbol = ast->symbol;
                 }
             }

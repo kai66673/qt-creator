@@ -95,7 +95,7 @@ public:
     QList<StringLiteral *> strings;
     QList<Identifier *> identifiers;
     QList<Scope *> scopes;
-    QList<Symbol *> methods;
+    QList<MethodDecl *> methods;
     QList<FuncDecl *> functions;
     QList<VarDecl *> variables;
     QList<FieldDecl *> fields;
@@ -167,9 +167,10 @@ FileScope *Control::newFileScope(GoSource *source)
     return scope;
 }
 
-Symbol *Control::newMethod(FuncDeclAST *funcDecl, Scope *owner)
+Symbol *Control::newMethod(TypeIdentAST *recv, FuncDeclAST *funcDecl, Scope *owner)
 {
-    FuncDecl *symbol = new FuncDecl(funcDecl->name->firstToken(), funcDecl->name->ident, funcDecl->type, owner);
+    MethodDecl *symbol = new MethodDecl(funcDecl->name->firstToken(), funcDecl->name->ident,
+                                        recv, funcDecl->type, owner);
     d->methods.append(symbol);
     return symbol;
 }

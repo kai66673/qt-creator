@@ -145,7 +145,6 @@ public:
 protected:
     virtual bool visit(SelectorExprAST *ast) {
         if (m_symbol->identifier()->equalTo(ast->sel->ident)) {
-            const Type *fieldOwnerType = m_fieldOwnerType;
             int derefLevel = 0;
             if (const Type *type = ast->x->resolve(this, derefLevel)) {
                 derefLevel += type->refLevel();
@@ -328,8 +327,7 @@ public:
         m_packageIdent = &packageIdent;
 
         FileAST *fileAst = m_doc->translationUnit()->fileAst();
-        acceptImportDecls(fileAst);
-
+        accept(fileAst->importDecls);
         accept(fileAst->decls);
         return m_results;
     }
@@ -343,40 +341,25 @@ public:
     virtual QString referenceIdentfier() const override
     { return m_packageAlias; }
 
-private:
-    void acceptImportDecls(FileAST *fileAst) {
-        for (DeclListAST *importDecls = fileAst->importDecls; importDecls; importDecls = importDecls->next) {
-            if (DeclAST *decl = importDecls->value) {
-                if (GenDeclAST *genDecl = decl->asGenDecl()) {
-                    for (SpecListAST *specs = genDecl->specs; specs; specs = specs->next) {
-                        if (SpecAST *spec = specs->value) {
-                            if (ImportSpecAST *importSpec = spec->asImportSpec()) {
-                                if (IdentAST *alias = importSpec->name) {
-                                    if (alias->ident->equalTo(m_packageIdent)) {
-                                        m_results << m_doc->searchResultItemForTokenIndex(alias->t_identifier, m_packageAliasLength);
-                                        return;
-                                    }
-                                } else if (importSpec->t_path) {
-                                    const StringLiteral *path = _tokens->at(importSpec->t_path).string;
-                                    QString pathStr = path->unquoted();
-                                    if (!pathStr.isEmpty()) {
-                                        QString aliasPathPart = pathStr.split('/').last();
-                                        if (aliasPathPart == m_packageAlias) {
-                                            m_results << m_doc->searchResultItemForTokenIndex(importSpec->t_path, pathStr.length() + 2);
-                                            m_customReplaceSuffixForFirstItem = QLatin1String(" \"") + pathStr + QLatin1String("\"");
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+protected:
+    virtual bool visit(ImportSpecAST *importSpec) {
+        if (IdentAST *alias = importSpec->name) {
+            if (alias->ident->equalTo(m_packageIdent))
+                m_results << m_doc->searchResultItemForTokenIndex(alias->t_identifier, m_packageAliasLength);
+        } else if (importSpec->t_path) {
+            const StringLiteral *path = _tokens->at(importSpec->t_path).string;
+            QString pathStr = path->unquoted();
+            if (!pathStr.isEmpty()) {
+                QString aliasPathPart = pathStr.split('/').last();
+                if (aliasPathPart == m_packageAlias) {
+                    m_results << m_doc->searchResultItemForTokenIndex(importSpec->t_path, pathStr.length() + 2);
+                    m_customReplaceSuffixForFirstItem = QLatin1String(" \"") + pathStr + QLatin1String("\"");
                 }
             }
         }
+        return false;
     }
 
-protected:
     virtual bool visit(PackageTypeAST *ast) {
         if (IdentAST *packageAlias = ast->packageAlias) {
             if (packageAlias->ident->equalTo(m_packageIdent))
