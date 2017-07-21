@@ -134,6 +134,9 @@ QString MethodDecl::describeType(ResolveContext *) const
 Symbol::Kind MethodDecl::kind() const
 { return Mtd; }
 
+TypeIdentAST *MethodDecl::recvIdent() const
+{ return _recvIdent; }
+
 ExprAST *ConstDecl::declExpr() const
 { return 0; }
 

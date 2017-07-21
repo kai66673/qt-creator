@@ -429,6 +429,7 @@ public:
 
     virtual const NamedType *asNamedType() const override { return this; }
     virtual const TypeSpecAST *typeSpec(ResolveContext *) const override { return this; }
+    bool hasEmbedOrEqualTo(const TypeSpecAST *spec, ResolveContext *ctx) const;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);

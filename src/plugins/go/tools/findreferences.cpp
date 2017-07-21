@@ -45,11 +45,72 @@ public:
     virtual QString referenceIdentfier() const = 0;
 };
 
-class LocalReferences: public IReferencesFinder, protected ASTVisitor
+class GlobalReferencesVisitor: protected ASTVisitor
 {
 public:
-    LocalReferences(GoSource *source, Symbol *symbol)
+    GlobalReferencesVisitor(GoSource *source, Symbol *symbol, unsigned symbolLength, const GoPackageKey &pkgKey)
         : ASTVisitor(source->translationUnit())
+        , m_source(source)
+        , m_symbol(symbol)
+        , m_symbolLength(symbolLength)
+    {
+        for (const GoSource::Import &import: m_source->imports()) {
+            if (import.resolvedDir == pkgKey.first && import.packageName == pkgKey.second) {
+                alias = import.aliasSpecified ? import.alias : import.packageName;
+                break;
+            }
+        }
+    }
+
+    QList<Core::SearchResultItem> acceptDeclarations() {
+        if (!alias.isEmpty()) {
+            if (FileAST *fileAst = m_source->translationUnit()->fileAst()) {
+                const auto aliasBa = alias.toUtf8();
+                const Identifier id(aliasBa.constData(), aliasBa.length());
+                aliasIdent = &id;
+                accept(fileAst->decls);
+            }
+        }
+        return m_results;
+    }
+
+protected:
+    virtual bool visit(PackageTypeAST *ast) override {
+        if (m_symbol->kind() == Symbol::Typ) {
+            if (ast->packageAlias && ast->packageAlias->ident->equalTo(aliasIdent) &&
+                ast->typeName && ast->typeName->ident->equalTo(m_symbol->identifier())) {
+                m_results << m_source->searchResultItemForTokenIndex(ast->typeName->t_identifier, m_symbolLength);
+            }
+        }
+        return false;
+    }
+
+    virtual bool visit(SelectorExprAST *ast) override {
+        if (IdentAST *ident = ast->x->asIdent()) {
+            if (ident->ident->equalTo(aliasIdent) && ast->sel && ast->sel->ident->equalTo(m_symbol->identifier()))
+                m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
+            return false;
+        }
+
+        accept(ast->x);
+        return false;
+    }
+
+private:
+    GoSource *m_source;
+    Symbol *m_symbol;
+    unsigned m_symbolLength;
+    QString alias;
+    const Identifier *aliasIdent;
+    QList<Core::SearchResultItem> m_results;
+};
+
+class LocalReferencesVisitor: public IReferencesFinder, protected ASTVisitor
+{
+public:
+    LocalReferencesVisitor(GoSource *source, Symbol *symbol, bool inSymbolScope = true)
+        : ASTVisitor(source->translationUnit())
+        , m_inSymbolScope(inSymbolScope)
         , m_source(source)
         , m_symbol(symbol)
         , m_skipScopeToEnd(false)
@@ -58,7 +119,11 @@ public:
     }
 
     virtual QList<Core::SearchResultItem> findReferences() override {
-        accept(m_symbol->owner()->ast());
+        if (m_inSymbolScope)
+            accept(m_symbol->owner()->ast());
+        else if (m_source && m_source->translationUnit())
+            if (FileAST *fileAst = m_source->translationUnit()->fileAst())
+                accept(fileAst->decls);
         return m_results;
     }
 
@@ -84,6 +149,8 @@ protected:
     virtual void endVisit(CaseClauseAST *) override { m_skipScopeToEnd = false; }
 
     virtual bool visit(DeclIdentAST *ast) {
+        if (!ast->symbol || ast->symbol->kind() == Symbol::Fld)
+            return false;
         if (ast->ident->equalTo(m_symbol->identifier())) {
             if (ast->symbol == m_symbol)
                 m_results << m_source->searchResultItemForTokenIndex(ast->t_identifier, m_symbolLength);
@@ -109,6 +176,7 @@ protected:
     }
 
 private:
+    bool m_inSymbolScope;
     GoSource *m_source;
     Symbol *m_symbol;
     bool m_skipScopeToEnd;
@@ -388,7 +456,177 @@ private:
     QString m_customReplaceSuffixForFirstItem;
 };
 
-}
+class MethodReferencesVisistor: protected ScopeSwitchVisitor
+{
+public:
+    MethodReferencesVisistor(GoSource *source, MethodDecl *methodDecl, TypeIdentAST *recvIdent,
+                             const TypeSpecAST *recvTypeSpec, unsigned symbolLength)
+        : ScopeSwitchVisitor(source, false)
+        , m_source(source)
+        , m_methodDecl(methodDecl)
+        , m_recvIdent(recvIdent)
+        , m_recvTypeSpec(recvTypeSpec)
+        , m_symbolLength(symbolLength)
+    { }
+
+    QList<Core::SearchResultItem> acceptDeclarations() {
+        if (m_source && m_methodDecl && isValidResolveContext()) {
+            m_methodDeclFileScope = m_methodDecl->owner()->fileScope();
+            accept(m_initialFileAst->decls);
+        }
+        return m_results;
+    }
+
+protected:
+    virtual bool visit(FuncDeclAST *ast) {
+        if (m_methodDeclFileScope == m_initialFileScope && ast->name) {
+            if (ast->recv && ast->recv->fields && !ast->recv->fields->next) {
+                if (FieldAST *field = ast->recv->fields->value) {
+                    if (TypeAST *typ = field->type) {
+                        if (m_recvIdent == typ->baseType())
+                            m_results << m_source->searchResultItemForTokenIndex(ast->name->t_identifier, m_symbolLength);
+                    }
+                }
+            }
+        }
+        accept(ast->body);
+        return false;
+    }
+
+    virtual bool visit(SelectorExprAST *ast) {
+        if (ast->sel && ast->sel->ident->equalTo(m_methodDecl->identifier())) {
+            int derefLevel = 0;
+            if (const Type *typ = ast->x->resolve(this, derefLevel)) {
+                if (derefLevel == 0 || derefLevel == -1) {
+                    const Type *baseTyp = typ->baseType();
+                    if (derefLevel == 0)
+                        if (const Type *unstarType = baseTyp->unstar())
+                            baseTyp = unstarType;
+                    if (const NamedType *namedType = baseTyp->asNamedType()) {
+                        if (const TypeSpecAST *typeSpec = namedType->typeSpec(this))
+                            if (typeSpec->hasEmbedOrEqualTo(m_recvTypeSpec, this))
+                                m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
+                    }
+                }
+            }
+        }
+        accept(ast->x);
+        return false;
+    }
+
+private:
+    GoSource *m_source;
+    MethodDecl *m_methodDecl;
+    TypeIdentAST *m_recvIdent;
+    const TypeSpecAST *m_recvTypeSpec;
+    FileScope *m_methodDeclFileScope;
+    unsigned m_symbolLength;
+    QList<Core::SearchResultItem> m_results;
+};
+
+class MethodReferences: public IReferencesFinder
+{
+public:
+    MethodReferences(Symbol *symbol, ResolveContext *resolveContext)
+        : m_symbolLength(symbol->identifier()->toString().length())
+        , m_symbol(symbol)
+        , m_resolveContext(resolveContext)
+    { }
+
+    virtual QList<Core::SearchResultItem> findReferences() override {
+        QList<Core::SearchResultItem> results;
+        if (MethodDecl *methodDeclaration = m_symbol->asMethodDecl()) {
+            if (const NamedType *namedType = methodDeclaration->recvIdent()->asNamedType()) {
+                if (const TypeSpecAST *typeSpec = namedType->typeSpec(m_resolveContext)) {
+                    const QList<GoSource *> sources = m_resolveContext->sources();
+                    QFutureInterface<void> interface;
+                    interface.setProgressRange(0, sources.size());
+                    Core::ProgressManager::addTask(interface.future(), QObject::tr("Finding Method Usages"),
+                                                   "GoEditor.FindUsages");
+                    int progress = 0;
+                    for (GoSource *source: sources) {
+                        MethodReferencesVisistor visitor(source, methodDeclaration, methodDeclaration->recvIdent(), typeSpec, m_symbolLength);
+                        results << visitor.acceptDeclarations();
+                        interface.setProgressValue(++progress);
+                        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+                    }
+                    interface.reportFinished();
+                }
+            }
+        }
+        return results;
+    }
+
+    virtual QString customReplaceSuffixForFirstItem() const override
+    { return QString(); }
+
+    virtual QString referenceDescription() const override
+    { return QObject::tr("Method Usages:"); }
+
+    virtual QString referenceIdentfier() const override
+    { return m_symbol->identifier()->toString(); }
+
+private:
+    unsigned m_symbolLength;
+    Symbol *m_symbol;
+    ResolveContext *m_resolveContext;
+};
+
+class GlobalReferences: public IReferencesFinder
+{
+public:
+    GlobalReferences(Symbol *symbol, ResolveContext *resolveContext)
+        : m_symbolLength(symbol->identifier()->toString().length())
+        , m_symbol(symbol)
+        , m_resolveContext(resolveContext)
+    { }
+
+    virtual QList<Core::SearchResultItem> findReferences() override {
+        QList<Core::SearchResultItem> results;
+        if (m_symbol) {
+            if (FileScope *symbolFileScope = m_symbol->owner()->fileScope()) {
+                GoPackageKey pkgKey{symbolFileScope->source()->location(), symbolFileScope->source()->packageName()};
+                if (GoPackage *symbolPackage = symbolFileScope->source()->package()) {
+                    const QList<GoSource *> sources = m_resolveContext->sources();
+                    QFutureInterface<void> interface;
+                    interface.setProgressRange(0, sources.size());
+                    Core::ProgressManager::addTask(interface.future(), QObject::tr("Finding Symbol Usages"),
+                                                   "GoEditor.FindUsages");
+                    int progress = 0;
+                    for (GoSource *source: sources) {
+                        if (source->package() == symbolPackage) {
+                            LocalReferencesVisitor visitor(source, m_symbol, false);
+                            results << visitor.findReferences();
+                        } else {
+                            GlobalReferencesVisitor visitor(source, m_symbol, m_symbolLength, pkgKey);
+                            results << visitor.acceptDeclarations();
+                        }
+                        interface.setProgressValue(++progress);
+                        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+                    }
+                    interface.reportFinished();
+                }
+            }
+        }
+        return results;
+    }
+
+    virtual QString customReplaceSuffixForFirstItem() const override
+    { return QString(); }
+
+    virtual QString referenceDescription() const override
+    { return QObject::tr("Symbol Usages:"); }
+
+    virtual QString referenceIdentfier() const override
+    { return m_symbol->identifier()->toString(); }
+
+private:
+    unsigned m_symbolLength;
+    Symbol *m_symbol;
+    ResolveContext *m_resolveContext;
+};
+
+}   // anonimous namesapace
 
 FindReferences::FindReferences(GoSource::Ptr doc)
     : SymbolUnderCursorDescriber(doc)
@@ -425,7 +663,11 @@ Core::SearchResult *FindReferences::proceedReferences(unsigned pos, bool isRepla
             } else {
                 bool isPackageLevelSymbol = m_symbol->owner() == m_symbol->fileScope();
                 if (!isPackageLevelSymbol) {
-                    finder.reset(new LocalReferences(m_doc.data(), m_symbol));
+                    finder.reset(new LocalReferencesVisitor(m_doc.data(), m_symbol));
+                } else if (m_symbol->kind() == Symbol::Mtd) {
+                    finder.reset(new MethodReferences(m_symbol, this));
+                } else {
+                    finder.reset(new GlobalReferences(m_symbol, this));
                 }
                 bool isCurrentPackageSymbol = m_symbol->fileScope() == m_fileScope;
                 qDebug() << "FRU:" << m_symbol->identifier()->toString() << isCurrentPackageSymbol << isPackageLevelSymbol;

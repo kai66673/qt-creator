@@ -2035,6 +2035,31 @@ const Type *TypeSpecAST::chanValueType() const
 QString TypeSpecAST::describe() const
 { return name ? name->ident->toString() : QString(); }
 
+bool TypeSpecAST::hasEmbedOrEqualTo(const TypeSpecAST *spec, ResolveContext *ctx) const
+{
+    if (spec == this)
+        return true;
+
+    if (type) {
+        if (StructTypeAST *structType = type->asStructType()) {
+            if (structType->fields) {
+                for (FieldListAST *fields = structType->fields->fields; fields; fields = fields->next) {
+                    if (FieldAST *field = fields->value) {
+                        if (!field->names && field->type) {
+                            if (const NamedType *namedType = field->type->asNamedType())
+                                if (const TypeSpecAST *typeSpec = namedType->typeSpec(ctx))
+                                    if (typeSpec->hasEmbedOrEqualTo(spec, ctx))
+                                        return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 void TypeSpecAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {

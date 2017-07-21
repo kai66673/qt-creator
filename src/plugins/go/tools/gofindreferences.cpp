@@ -69,7 +69,7 @@ void GoFindReferences::onReplaceButtonClicked(const QString &text, const QList<C
         const Core::SearchResultItem &firstItem = items.first();
         if (parameters.customReplaceSuffixForFirstItem.isEmpty() ||
             firstItem.text[firstItem.mainRange.begin.column] != QChar('\"')) {
-            TextEditor::BaseFileFind::replaceAll(text, items, preserveCase);
+            TextEditor::BaseFileFind::replaceAll(text, items, preserveCase);        /// TODO: Update package cache
         } else {
             QList<Core::SearchResultItem> head;
             head << items.first();

@@ -191,6 +191,8 @@ public:
 
     virtual MethodDecl *asMethodDecl() override { return this; }
 
+    TypeIdentAST *recvIdent() const;
+
 private:
     FuncTypeAST *_decl;
     TypeIdentAST *_recvIdent;
