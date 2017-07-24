@@ -27,6 +27,8 @@
 
 namespace GoTools {
 
+enum PositionRelation { Before, Contain, After };
+
 class LookupContext;
 class PackageType;
 class ResolveContext;

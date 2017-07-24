@@ -40,8 +40,6 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
     m_lparenPosition = -1;
 
     if (m_doc && isValidResolveContext()) {
-        m_ended = false;
-
         acceptForPosition(m_initialFileAst->decls);
 
         if (m_funcExpr) {
@@ -85,7 +83,7 @@ bool GoFunctionHintAssistVisitor::visit(CallExprAST *ast)
             m_funcExpr = ast->fun;
             m_lparenPosition = lparenPosition;
             if (m_pos == lparenPosition) {
-                m_ended = true;
+                _traverseFinished = true;
                 return false;
             }
             accept(ast->args);

@@ -71,7 +71,7 @@ public:
                 const auto aliasBa = alias.toUtf8();
                 const Identifier id(aliasBa.constData(), aliasBa.length());
                 m_aliasIdent = &id;
-                if (!m_source->package()->type()->lookup(m_aliasIdent))
+                if (!m_source->package()->type()->lookup(m_aliasIdent))     // check for symbol identifier shadowing at package level
                     accept(fileAst->decls);
             }
         }
@@ -750,10 +750,9 @@ Core::SearchResult *FindReferences::proceedReferences(unsigned pos, bool isRepla
     m_isReplace = isReplace;
 
     if (m_doc->translationUnit() && isValidResolveContext()) {
-        m_ended = false;
-
         acceptForPosition(m_initialFileAst->importDecls);
-        acceptForPosition(m_initialFileAst->decls);
+        if (!_traverseFinished)
+            acceptForPosition(m_initialFileAst->decls);
         QScopedPointer <IReferencesFinder> finder;
 
         if (m_symbol) {

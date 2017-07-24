@@ -52,12 +52,12 @@ bool SymbolUnderCursor::visit(DeclIdentAST *ast)
     m_token = &tk;
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         m_symbol = ast->symbol;
     }
 
     else if (m_pos <= tk.end())
-        m_ended = true;
+        _traverseFinished = true;
 
     return false;
 }
@@ -68,13 +68,13 @@ bool SymbolUnderCursor::visit(IdentAST *ast)
     m_token = &tk;
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         if (ast->isLookable())
             m_symbol = m_currentScope->lookupMember(ast, this);
     }
 
     else if (m_pos <= tk.end())
-        m_ended = true;
+        _traverseFinished = true;
 
     return false;
 }
@@ -85,14 +85,14 @@ bool SymbolUnderCursor::visit(TypeIdentAST *ast)
     m_token = &tk;
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         IdentAST *ident = ast->ident;
         if (ident->isLookable())
             m_symbol = m_currentScope->lookupMember(ident, this);
     }
 
     else if (m_pos <= tk.end())
-        m_ended = true;
+        _traverseFinished = true;
 
     return false;
 }
@@ -103,7 +103,7 @@ bool SymbolUnderCursor::visit(PackageTypeAST *ast)
     m_token = &tk;
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         if (ast->typeName->isLookable()) {
             QString packageAlias(ast->packageAlias->ident->toString());
             if (PackageType *context = packageTypeForAlias(packageAlias))
@@ -112,7 +112,7 @@ bool SymbolUnderCursor::visit(PackageTypeAST *ast)
     }
 
     else if (m_pos <= tk.end())
-        m_ended = true;
+        _traverseFinished = true;
 
     return false;
 }
@@ -131,7 +131,7 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
     }
 
     if (m_pos <= tk.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         if (ast->sel->isLookable()) {
             int derefLevel = 0;
             if (const Type *type = ast->x->resolve(this, derefLevel)) {
@@ -183,7 +183,7 @@ bool SymbolUnderCursor::visit(KeyValueExprAST *ast)
             const Token &tk = _tokens->at(keyIdent->t_identifier);
             m_token = &tk;
             if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-                m_ended = true;
+                _traverseFinished = true;
                 if (keyIdent->isLookable())
                     m_symbol = elementsType->lookupMember(keyIdent, this);
                 return false;

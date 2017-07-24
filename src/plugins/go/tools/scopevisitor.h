@@ -54,15 +54,13 @@ public:
     template <typename _Tp>
     void acceptForPosition(List<_Tp> *it)
     {
-        for (; it && !m_ended; it = it->next) {
-            switch (positionRelation(it->value)) {
-                case Before:
-                    m_ended = true;
-                    break;
-                case In:
+        for (; it; it = it->next) {
+            switch (it->value->positionRelation(m_pos, _tokens)) {
+                case Contain:
                     accept(it->value);
-                    m_ended = true;
-                    break;
+                case Before:
+                    _traverseFinished = true;
+                    return;
                 case After:
                     break;
             }
@@ -70,8 +68,6 @@ public:
     }
 
 protected:
-    virtual bool preVisit(AST *) override;
-
     virtual bool visit(FuncDeclAST *ast) override;
     virtual bool visit(BlockStmtAST *ast) override;
     virtual bool visit(IfStmtAST *ast) override;
@@ -81,12 +77,9 @@ protected:
     virtual bool visit(SwitchStmtAST *ast) override;
     virtual bool visit(CaseClauseAST *ast) override;
 
-    enum PositionRelation { Before, In, After };
-    PositionRelation positionRelation(AST *ast) const;
-
 protected:
     unsigned m_pos;
-    bool m_ended;
+//    bool m_ended;
 };
 
 }   // namespace GoTools

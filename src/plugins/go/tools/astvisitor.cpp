@@ -30,6 +30,7 @@ namespace GoTools {
 ASTVisitor::ASTVisitor(TranslationUnit *unit)
     : _translationUnit(unit)
     , _tokens(unit->tokens())
+    , _traverseFinished(false)
 { }
 
 ASTVisitor::~ASTVisitor()
@@ -37,8 +38,5 @@ ASTVisitor::~ASTVisitor()
 
 void ASTVisitor::accept(AST *ast)
 { AST::accept(ast, this); }
-
-TranslationUnit *ASTVisitor::translationUnit() const
-{ return _translationUnit; }
 
 }   // namespace GoTools

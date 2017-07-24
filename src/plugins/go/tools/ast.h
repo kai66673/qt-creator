@@ -193,6 +193,14 @@ public:
     virtual unsigned firstToken() const = 0;
     virtual unsigned lastToken() const = 0;
 
+    PositionRelation positionRelation(unsigned pos, const std::vector<Token> *tokens) const {
+        return pos < tokens->at(firstToken()).begin()
+                ? Before
+                : (pos <= tokens->at(lastToken()).end()
+                   ? Contain
+                   : After);
+    }
+
 protected:
     virtual void accept0(ASTVisitor *visitor) = 0;
 };

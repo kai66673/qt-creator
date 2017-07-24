@@ -56,11 +56,11 @@ bool SymbolUnderCursorDescriber::visit(ImportSpecAST *ast)
                     m_packageAlias = path.mid(pos);
                 }
             }
-            m_ended = true;
+            _traverseFinished = true;
         }
 
         else if (m_pos <= lastToken.end())
-            m_ended = true;
+            _traverseFinished = true;
     }
 
     return false;
@@ -72,7 +72,7 @@ bool SymbolUnderCursorDescriber::visit(IdentAST *ast)
     m_token = &tk;
 
     if (m_pos >= tk.begin() && m_pos <= tk.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         if (ast->isLookable()) {
             m_symbol = m_currentScope->lookupMember(ast, this);
             if (!m_symbol) { // may be a package
@@ -84,7 +84,7 @@ bool SymbolUnderCursorDescriber::visit(IdentAST *ast)
     }
 
     else if (m_pos <= tk.end())
-        m_ended = true;
+        _traverseFinished = true;
 
     return false;
 }
@@ -93,7 +93,7 @@ bool SymbolUnderCursorDescriber::visit(PackageTypeAST *ast)
 {
     const Token &packageToken = _tokens->at(ast->packageAlias->t_identifier);
     if (m_pos >= packageToken.begin() && m_pos <= packageToken.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         QString packageAlias(ast->packageAlias->ident->toString());
         if (ast->packageAlias->isLookable())
             if (packageTypeForAlias(packageAlias))
@@ -105,7 +105,7 @@ bool SymbolUnderCursorDescriber::visit(PackageTypeAST *ast)
     m_token = &typeToken;
 
     if (m_pos >= typeToken.begin() && m_pos <= typeToken.end()) {
-        m_ended = true;
+        _traverseFinished = true;
         if (ast->typeName->isLookable()) {
             QString packageAlias(ast->packageAlias->ident->toString());
             if (PackageType *context = packageTypeForAlias(packageAlias))
@@ -114,7 +114,7 @@ bool SymbolUnderCursorDescriber::visit(PackageTypeAST *ast)
     }
 
     else if (m_pos <= typeToken.end())
-        m_ended = true;
+        _traverseFinished = true;
 
     return false;
 }
@@ -127,10 +127,9 @@ void SymbolUnderCursorDescriber::defineDescription()
     m_packageAlias.clear();
 
     if (m_doc && isValidResolveContext()) {
-        m_ended = false;
-
         acceptForPosition(m_initialFileAst->importDecls);
-        acceptForPosition(m_initialFileAst->decls);
+        if (!_traverseFinished)
+            acceptForPosition(m_initialFileAst->decls);
 
         if (m_symbol) {
             m_symbolTypeDescription = m_symbol->describeType(this);

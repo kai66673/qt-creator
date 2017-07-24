@@ -52,10 +52,8 @@ void LinkUnderCursor::defineLinkUnderCursor()
     m_symbol = 0;
     m_token = 0;
 
-    if (m_doc && isValidResolveContext()) {
-        m_ended = false;
+    if (m_doc && isValidResolveContext())
         acceptForPosition(m_initialFileAst->decls);
-    }
 }
 
 }   // namespace GoTools

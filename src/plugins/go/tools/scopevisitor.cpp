@@ -131,25 +131,21 @@ ScopePositionVisitor::ScopePositionVisitor(GoSource *source, bool protectCache)
     , ResolveContext(source, protectCache)
 { }
 
-bool ScopePositionVisitor::preVisit(AST *)
-{ return !m_ended; }
-
 bool ScopePositionVisitor::visit(FuncDeclAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->recv);
-        accept(ast->name);
-        accept(ast->type);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->body);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->recv);
+            accept(ast->name);
+            accept(ast->type);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->body);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
@@ -159,15 +155,14 @@ bool ScopePositionVisitor::visit(BlockStmtAST *ast)
 {
     switchScope(ast->scope);
     for (StmtListAST *it = ast->list; it; it = it->next) {
-        if (m_pos < _tokens->at(it->value->firstToken()).begin()) {
-            m_ended = true;
-            break;
-        }
-
-        if (m_pos <= _tokens->at(it->value->lastToken()).end()) {
-            accept(it->value);
-            m_ended = true;
-            break;
+        switch (it->value->positionRelation(m_pos, _tokens)) {
+            case Contain:
+                accept(it->value);
+            case Before:
+                _traverseFinished = true;
+                return false;
+            case After:
+                break;
         }
     }
 
@@ -176,20 +171,19 @@ bool ScopePositionVisitor::visit(BlockStmtAST *ast)
 
 bool ScopePositionVisitor::visit(IfStmtAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->init);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->cond);
-            accept(ast->body);
-            accept(ast->elseStmt);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->init);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->cond);
+                accept(ast->body);
+                accept(ast->elseStmt);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
@@ -197,20 +191,19 @@ bool ScopePositionVisitor::visit(IfStmtAST *ast)
 
 bool ScopePositionVisitor::visit(RangeStmtAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->key);
-        accept(ast->value);
-        accept(ast->x);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->body);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->key);
+            accept(ast->value);
+            accept(ast->x);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->body);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
@@ -218,20 +211,19 @@ bool ScopePositionVisitor::visit(RangeStmtAST *ast)
 
 bool ScopePositionVisitor::visit(ForStmtAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->init);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->cond);
-            accept(ast->post);
-            accept(ast->body);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->init);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->cond);
+                accept(ast->post);
+                accept(ast->body);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
@@ -239,19 +231,18 @@ bool ScopePositionVisitor::visit(ForStmtAST *ast)
 
 bool ScopePositionVisitor::visit(TypeSwitchStmtAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->init);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->assign);
-            accept(ast->body);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->init);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->assign);
+                accept(ast->body);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
@@ -259,19 +250,18 @@ bool ScopePositionVisitor::visit(TypeSwitchStmtAST *ast)
 
 bool ScopePositionVisitor::visit(SwitchStmtAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->init);
-        accept(ast->tag);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->body);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->init);
+            accept(ast->tag);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->body);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
@@ -279,32 +269,20 @@ bool ScopePositionVisitor::visit(SwitchStmtAST *ast)
 
 bool ScopePositionVisitor::visit(CaseClauseAST *ast)
 {
-    if (m_pos < _tokens->at(ast->firstToken()).begin()) {
-        m_ended = true;
-        return false;
-    }
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end()) {
-        accept(ast->list);
-        if (!m_ended) {
-            switchScope(ast->scope);
-            accept(ast->body);
-            m_ended = true;
-        }
+    switch (ast->positionRelation(m_pos, _tokens)) {
+        case Contain:
+            accept(ast->list);
+            if (!_traverseFinished) {
+                switchScope(ast->scope);
+                accept(ast->body);
+            }
+        case Before:
+            _traverseFinished = true;
+        case After:
+            break;
     }
 
     return false;
-}
-
-ScopePositionVisitor::PositionRelation ScopePositionVisitor::positionRelation(AST *ast) const
-{
-    if (m_pos < _tokens->at(ast->firstToken()).begin())
-        return Before;
-
-    if (m_pos <= _tokens->at(ast->lastToken()).end())
-        return In;
-
-    return After;
 }
 
 }   // namespace GoTools

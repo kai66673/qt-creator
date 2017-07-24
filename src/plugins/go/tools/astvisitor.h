@@ -44,11 +44,11 @@ public:
     template <typename _Tp>
     void accept(List<_Tp> *it)
     {
-        for (; it; it = it->next)
+        for (; it && !_traverseFinished; it = it->next)
             accept(it->value);
     }
 
-    virtual bool preVisit(AST *) { return true; }
+    virtual bool preVisit(AST *) { return !_traverseFinished; }
     virtual void postVisit(AST *) {}
 
     virtual bool visit(FileAST *) { return true; }
@@ -189,11 +189,15 @@ public:
     virtual void endVisit(ForStmtAST *) {}
     virtual void endVisit(RangeStmtAST *) {}
 
-    TranslationUnit *translationUnit() const;
+    TranslationUnit *translationUnit() const { return _translationUnit; }
+
+    bool traverseFinished() const { return _traverseFinished; }
+    void setTraverseFinished(bool traverseFinished) { _traverseFinished = traverseFinished; }
 
 protected:
     TranslationUnit *_translationUnit;
     std::vector<Token> *_tokens;
+    bool _traverseFinished;
 };
 
 }   // namespace GoTools
