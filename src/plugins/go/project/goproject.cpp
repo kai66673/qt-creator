@@ -195,12 +195,12 @@ void GoProject::updateProject()
 
     QSet<QString> oldFilesSet = oldFiles.toSet();
     QSet<QString> newFilesSet = m_files.toSet();
-    GoTools::GoPackageCache::instance()->indexProjectFiles(displayName(), oldFilesSet - newFilesSet, newFilesSet - oldFilesSet);
+    GoTools::GoPackageCache::instance()->indexGoFiles(displayName(), oldFilesSet - newFilesSet, newFilesSet - oldFilesSet);
 }
 
 void GoProject::reindexProjectFiles()
 {
-    GoTools::GoPackageCache::instance()->indexProjectFiles(displayName(), QSet<QString>(), m_files.toSet());
+    GoTools::GoPackageCache::instance()->indexGoFiles(displayName(), QSet<QString>(), m_files.toSet());
 }
 
 }   // GoLang

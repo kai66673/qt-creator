@@ -83,7 +83,7 @@ public:
     static GoPackageCache *instance();
 
     void clean();
-    void indexProjectFiles(const QString &projectName, const QSet<QString> &deletedFiles, const QSet<QString> &addedFiles);
+    void indexGoFiles(const QString &projectName, const QSet<QString> &deletedFiles, const QSet<QString> &addedFiles);
 
 private:
     void acquireCache();

@@ -243,7 +243,10 @@ void GoPackageCache::indexingWakeUp()
     QFuture<IndexingTaskListResult> future = Utils::runAsync(GoCodeModelManager::instance()->sharedThreadPool(),
                                                              &GoPackageCache::runIndexing, this, task.second, goRoot, goPath);
     m_indexingFutureWatcher.setFuture(future);
-    Core::ProgressManager::addTask(future, tr("Indexing project %1 Go files").arg(task.first), "Go.Project.Index");
+    if (task.first.isEmpty())
+        Core::ProgressManager::addTask(future, tr("Indexing Go files"), "Go.Files.Index");
+    else
+        Core::ProgressManager::addTask(future, tr("Indexing project %1 Go files").arg(task.first), "Go.Files.Index");
 }
 
 void GoPackageCache::cancelIndexing()
@@ -298,7 +301,7 @@ void GoPackageCache::clean()
     emit packageCacheCleaned();
 }
 
-void GoPackageCache::indexProjectFiles(const QString &projectName, const QSet<QString> &deletedFiles, const QSet<QString> &addedFiles)
+void GoPackageCache::indexGoFiles(const QString &projectName, const QSet<QString> &deletedFiles, const QSet<QString> &addedFiles)
 {
     {
         QMutexLocker lock(&m_mutex);
