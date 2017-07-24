@@ -64,6 +64,21 @@ void PackageType::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &
     }
 }
 
+Symbol *PackageType::lookup(const Identifier *ident) const
+{
+    for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
+         it != m_sources.constEnd(); ++it) {
+        if (FileAST *fileAst = it.value()->translationUnit()->fileAst()) {
+            if (FileScope *fileScope = fileAst->scope) {
+                if (Symbol *symbol = fileScope->find(ident))
+                    return symbol;
+            }
+        }
+    }
+
+    return 0;
+}
+
 Symbol *PackageType::lookupMember(const IdentAST *ident, ResolveContext *) const
 {
     for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();

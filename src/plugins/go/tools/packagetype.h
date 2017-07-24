@@ -38,6 +38,7 @@ public:
     Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId, ResolveContext *);
     void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
                      const Identifier *typeId, ResolveContext *);
+    Symbol *lookup(const Identifier *ident) const;
 
     virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,

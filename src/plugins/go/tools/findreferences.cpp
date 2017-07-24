@@ -25,6 +25,8 @@
 #include "ast.h"
 #include "findreferences.h"
 #include "gosettings.h"
+#include "gopackage.h"
+#include "packagetype.h"
 
 #include <coreplugin/progressmanager/progressmanager.h>
 #include <coreplugin/find/searchresultitem.h>
@@ -53,6 +55,7 @@ public:
         , m_source(source)
         , m_symbol(symbol)
         , m_symbolLength(symbolLength)
+        , m_aliasShadowed(false)
     {
         for (const GoSource::Import &import: m_source->imports()) {
             if (import.resolvedDir == pkgKey.first && import.packageName == pkgKey.second) {
@@ -67,17 +70,108 @@ public:
             if (FileAST *fileAst = m_source->translationUnit()->fileAst()) {
                 const auto aliasBa = alias.toUtf8();
                 const Identifier id(aliasBa.constData(), aliasBa.length());
-                aliasIdent = &id;
-                accept(fileAst->decls);
+                m_aliasIdent = &id;
+                if (!m_source->package()->type()->lookup(m_aliasIdent))
+                    accept(fileAst->decls);
             }
         }
         return m_results;
     }
 
 protected:
+    virtual bool visit(FuncDeclAST *ast) override {
+        accept(ast->recv);
+        accept(ast->name);
+        accept(ast->type);
+        if (m_aliasShadowed)
+            m_aliasShadowed = false;
+        else
+            accept(ast->body);
+        return false;
+    }
+
+    virtual bool visit(BlockStmtAST *ast) override {
+        for (StmtListAST *stmt_it = ast->list; stmt_it && !m_aliasShadowed; stmt_it = stmt_it->next)
+            accept(stmt_it->value);
+        m_aliasShadowed = false;
+        return false;
+    }
+
+    virtual bool visit(IfStmtAST *ast) override {
+        accept(ast->init);
+        if (m_aliasShadowed)
+            m_aliasShadowed = false;
+        else {
+            accept(ast->cond);
+            accept(ast->body);
+            accept(ast->elseStmt);
+        }
+        return false;
+    }
+
+    virtual bool visit(RangeStmtAST *ast) override {
+        accept(ast->key);
+        accept(ast->value);
+        accept(ast->x);
+        if (m_aliasShadowed)
+            m_aliasShadowed = false;
+        else
+            accept(ast->body);
+        return false;
+    }
+
+    virtual bool visit(ForStmtAST *ast) override {
+
+        accept(ast->init);
+        if (m_aliasShadowed)
+            m_aliasShadowed = false;
+        else {
+            accept(ast->cond);
+            accept(ast->post);
+            accept(ast->body);
+        }
+        return false;
+    }
+
+    virtual bool visit(TypeSwitchStmtAST *ast) override {
+        accept(ast->init);
+        accept(ast->assign);
+        if (m_aliasShadowed)
+            m_aliasShadowed = false;
+        else
+            accept(ast->body);
+        return false;
+    }
+
+    virtual bool visit(SwitchStmtAST *ast) override {
+        accept(ast->init);
+        if (m_aliasShadowed)
+            m_aliasShadowed = false;
+        else
+            accept(ast->body);
+        return false;
+    }
+
+    virtual bool visit(CaseClauseAST *ast) override {
+        accept(ast->list);
+        for (StmtListAST *stmt_it = ast->body; stmt_it && !m_aliasShadowed; stmt_it = stmt_it->next)
+            accept(stmt_it->value);
+        m_aliasShadowed = false;
+        return false;
+    }
+
+    virtual bool visit(DeclIdentAST *ast) {
+        if (!ast->symbol || ast->symbol->kind() == Symbol::Fld)
+            return false;
+        if (ast->ident->equalTo(m_aliasIdent)) {
+            m_aliasShadowed = true;
+        }
+        return false;
+    }
+
     virtual bool visit(PackageTypeAST *ast) override {
         if (m_symbol->kind() == Symbol::Typ) {
-            if (ast->packageAlias && ast->packageAlias->ident->equalTo(aliasIdent) &&
+            if (ast->packageAlias && ast->packageAlias->ident->equalTo(m_aliasIdent) &&
                 ast->typeName && ast->typeName->ident->equalTo(m_symbol->identifier())) {
                 m_results << m_source->searchResultItemForTokenIndex(ast->typeName->t_identifier, m_symbolLength);
             }
@@ -87,7 +181,7 @@ protected:
 
     virtual bool visit(SelectorExprAST *ast) override {
         if (IdentAST *ident = ast->x->asIdent()) {
-            if (ident->ident->equalTo(aliasIdent) && ast->sel && ast->sel->ident->equalTo(m_symbol->identifier()))
+            if (ident->ident->equalTo(m_aliasIdent) && ast->sel && ast->sel->ident->equalTo(m_symbol->identifier()))
                 m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
             return false;
         }
@@ -101,7 +195,8 @@ private:
     Symbol *m_symbol;
     unsigned m_symbolLength;
     QString alias;
-    const Identifier *aliasIdent;
+    const Identifier *m_aliasIdent;
+    bool m_aliasShadowed;
     QList<Core::SearchResultItem> m_results;
 };
 
@@ -113,9 +208,11 @@ public:
         , m_inSymbolScope(inSymbolScope)
         , m_source(source)
         , m_symbol(symbol)
-        , m_skipScopeToEnd(false)
+        , m_symbolShadowed(false)
+        , m_inShadowDecl(false)
     {
         m_symbolLength = m_symbol->identifier()->toString().length();
+        m_sourceFileScope = source->translationUnit()->fileAst() ? source->translationUnit()->fileAst()->scope : 0;
     }
 
     virtual QList<Core::SearchResultItem> findReferences() override {
@@ -137,16 +234,16 @@ public:
     { return m_symbol->identifier()->toString(); }
 
 protected:
-    virtual bool preVisit(AST *) { return !m_skipScopeToEnd; }
+    virtual bool preVisit(AST *) { return !m_symbolShadowed; }
 
-    virtual void endVisit(FuncDeclAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(BlockStmtAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(IfStmtAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(RangeStmtAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(ForStmtAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(TypeSwitchStmtAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(SwitchStmtAST *) override { m_skipScopeToEnd = false; }
-    virtual void endVisit(CaseClauseAST *) override { m_skipScopeToEnd = false; }
+    virtual void endVisit(FuncDeclAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(BlockStmtAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(IfStmtAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(RangeStmtAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(ForStmtAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(TypeSwitchStmtAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(SwitchStmtAST *) override { m_symbolShadowed = false; }
+    virtual void endVisit(CaseClauseAST *) override { m_symbolShadowed = false; }
 
     virtual bool visit(DeclIdentAST *ast) {
         if (!ast->symbol || ast->symbol->kind() == Symbol::Fld)
@@ -154,15 +251,22 @@ protected:
         if (ast->ident->equalTo(m_symbol->identifier())) {
             if (ast->symbol == m_symbol)
                 m_results << m_source->searchResultItemForTokenIndex(ast->t_identifier, m_symbolLength);
-            else
-                m_skipScopeToEnd = true;
+            else {
+                m_inShadowDecl = true;
+                accept(ast->symbol->declExpr());
+                m_inShadowDecl = false;
+                m_symbolShadowed = true;
+            }
         }
         return false;
     }
 
     virtual bool visit(IdentAST *ast) {
-        if (ast->ident->equalTo(m_symbol->identifier()))
-            m_results << m_source->searchResultItemForTokenIndex(ast->t_identifier, m_symbolLength);
+        if (ast->ident->equalTo(m_symbol->identifier()) && !m_symbolShadowed)
+            if (m_inShadowDecl || m_symbol->owner()->fileScope() != m_sourceFileScope ||
+                    ast->t_identifier < m_symbol->declExpr()->firstToken() ||
+                    ast->t_identifier > m_symbol->declExpr()->lastToken())
+                m_results << m_source->searchResultItemForTokenIndex(ast->t_identifier, m_symbolLength);
         return false;
     }
 
@@ -179,9 +283,11 @@ private:
     bool m_inSymbolScope;
     GoSource *m_source;
     Symbol *m_symbol;
-    bool m_skipScopeToEnd;
+    bool m_symbolShadowed;
+    bool m_inShadowDecl;
     QList<Core::SearchResultItem> m_results;
     unsigned m_symbolLength;
+    FileScope *m_sourceFileScope;
 };
 
 class FieldReferencesVisitor: protected ScopeSwitchVisitor
