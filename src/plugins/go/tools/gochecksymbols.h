@@ -66,9 +66,13 @@ public:
 
     virtual void run();
 
+    Kind kindForSymbol(const Symbol *symbol) const;
+    void addUse(const IdentAST *ast, Kind kind);
+
+    const Type *acceptCompositLiteral(const CompositeLitAST *ast);
+
 protected:
     void flush();
-    void addUse(IdentAST *ast, Kind kind);
     void addUseCheckFirstLine(IdentAST *ast, Kind kind);
 
     virtual bool preVisit(AST *) override;
@@ -84,14 +88,6 @@ protected:
     virtual bool visit(KeyValueExprAST *ast) override;
     virtual bool visit(IdentAST *ast) override;
     virtual bool visit(DeclIdentAST *ast) override;
-
-private:
-    const Type *resolveSelectorExpr(ExprAST *x, int &derefLevel);
-    const Type *tryAcceptTypeConvertion(ExprAST *x);
-    const Type *acceptCompositLiteral(CompositeLitAST *ast);
-    const Type *resolveCompositExprType(CompositeLitAST *ast);
-    const Type *resolveNamedType(TypeIdentAST *ast);
-    const Type *resolveNamedType(PackageTypeAST *ast);
 
 private:
     std::stack<const Type *> m_nestedCimpositLitType;

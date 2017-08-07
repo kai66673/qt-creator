@@ -94,7 +94,8 @@ HEADERS += \
     tools/linkundercursor.h \
     tools/gofindreferences.h \
     tools/findreferences.h \
-    tools/goworkingcopy.h
+    tools/goworkingcopy.h \
+    tools/exprtype.h
 
 SOURCES += \
     goplugin.cpp \
@@ -172,7 +173,8 @@ SOURCES += \
     tools/linkundercursor.cpp \
     tools/gofindreferences.cpp \
     tools/findreferences.cpp \
-    tools/goworkingcopy.cpp
+    tools/goworkingcopy.cpp \
+    tools/exprtype.cpp
 
 FORMS += \
     project/gocompilerbuildstepconfigwidget.ui \

@@ -97,6 +97,8 @@ public:
     QString toString() const;
 
     bool isBuiltinTypeIdentifier() const;
+    bool isBuiltinStringTypeIdentifier() const;
+    bool isBuiltinIntegralTypeIdentifier() const;
 };
 
 }   // namespace GoTools

@@ -46,10 +46,11 @@ public:
 
     virtual const Type *indexType(ResolveContext *) const override { return 0; }
     virtual const Type *elementsType(ResolveContext *) const override { return 0; }
-    virtual const Type *calleeType(int, ResolveContext *) const override { return 0; }
     virtual const Type *chanValueType() const override { return 0; }
 
     virtual QString describe() const override { return QLatin1String("package"); }
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
 
 private:
     QHash<QString, GoSource::Ptr> &m_sources;

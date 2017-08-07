@@ -25,41 +25,45 @@
 
 #pragma once
 
-#include "goworkingcopy.h"
-#include "scope.h"
+#include "types.h"
+#include "astfwd.h"
+
+#include <QPair>
 
 namespace GoTools {
 
-class GoPackageCache;
 class GoCheckSymbols;
 
-class ResolveContext
+typedef QPair<int, const Type *> ExprTypeItem;
+
+class ExprType: public QList<ExprTypeItem>
 {
 public:
-    ResolveContext(GoSource *source, bool protectCache = true);
-    virtual ~ResolveContext();
+    ExprType(const Type *typ = 0, int derefLevel = 0);
+    ExprType(const QList<const Type *> &types);
 
-    Scope *switchScope(Scope *scope);
-    Scope *currentScope() const;
+    const Type *type() const;
+    const Type *type(int indexInTuple) const;
+    const Type *typeForMemberAccess() const;
+    const Type *typeForDirectAccess() const;
 
-    bool isValidResolveContext() const;
-    PackageType *packageTypeForAlias(const QString &packageAlias, FileScope *fileScope = 0);
-    PackageType *fileScopePackageType(const FileScope *fileScope) const;
+    Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver);
+    void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                                       ResolveContext *resolver);
 
-    QList<GoSource *> sources() const;
+    bool applyCommaJoin(ExprAST *x, ResolveContext *resolver);
 
-protected:
-    bool m_protectCache;
-    GoPackageCache *m_cache;
-    FileAST *m_initialFileAst;
-    Scope *m_currentScope;
-    FileScope *m_initialFileScope;
-    bool m_isValid;
-    bool m_workingCopyIsObtained;
-    WorkingCopy m_workingCopy;
+    ExprType &unresolve();
+    ExprType &applyIntegralOperation(ExprAST *x, ResolveContext *resolver);
+    ExprType &applyPlusOperation(ExprAST *x, ResolveContext *resolver);
+    ExprType &unstar();
+    ExprType &deref();
+    ExprType &switchTo(const Type *typ);
+    ExprType &memberAccess(IdentAST *ident, ResolveContext *resolver);
+    ExprType &checkMemberAccess(IdentAST *ident, GoCheckSymbols *resolver);
+    ExprType &rangeValue(ResolveContext *resolver);
+    ExprType &keyValue(ResolveContext *resolver);
+    ExprType &chanValue(ResolveContext *);
 };
-
-const Type *tryResolveNamedType(ResolveContext *resolver, ExprAST *x);
-const Type *tryCheckNamedType(GoCheckSymbols *resolver, ExprAST *x);
 
 }   // namespace GoTools

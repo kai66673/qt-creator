@@ -264,6 +264,7 @@ protected:
     virtual bool visit(IdentAST *ast) {
         if (ast->ident->equalTo(m_symbol->identifier()) && !m_symbolShadowed)
             if (m_inShadowDecl || m_symbol->owner()->fileScope() != m_sourceFileScope ||
+                    !m_symbol->declExpr() ||
                     ast->t_identifier < m_symbol->declExpr()->firstToken() ||
                     ast->t_identifier > m_symbol->declExpr()->lastToken())
                 m_results << m_source->searchResultItemForTokenIndex(ast->t_identifier, m_symbolLength);
@@ -319,21 +320,13 @@ public:
 protected:
     virtual bool visit(SelectorExprAST *ast) {
         if (m_symbol->identifier()->equalTo(ast->sel->ident)) {
-            int derefLevel = 0;
-            if (const Type *type = ast->x->resolve(this, derefLevel)) {
-                derefLevel += type->refLevel();
-                if (derefLevel == 0 || derefLevel == -1) {
-                    const Type *baseTyp = type->baseType();
-                    if (derefLevel == 0)
-                        if (const Type *unstarType = baseTyp->unstar())
-                            baseTyp = unstarType;
-                    if (baseTyp == m_fieldOwnerType) {
-                        m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
-                    } else if (const NamedType *namedType = baseTyp->asNamedType()) {
-                        if (const TypeSpecAST *ts = namedType->typeSpec(this)) {
-                            if (ts->type == m_fieldOwnerType)
-                                m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
-                        }
+            if (const Type *type = ast->x->resolveExprType(this).typeForMemberAccess()) {
+                if (type == m_fieldOwnerType) {
+                    m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
+                } else if (const NamedType *namedType = type->asNamedType()) {
+                    if (const TypeSpecAST *ts = namedType->typeSpec(this)) {
+                        if (ts->type == m_fieldOwnerType)
+                            m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                     }
                 }
             }
@@ -601,18 +594,11 @@ protected:
 
     virtual bool visit(SelectorExprAST *ast) {
         if (ast->sel && ast->sel->ident->equalTo(m_methodDecl->identifier())) {
-            int derefLevel = 0;
-            if (const Type *typ = ast->x->resolve(this, derefLevel)) {
-                if (derefLevel == 0 || derefLevel == -1) {
-                    const Type *baseTyp = typ->baseType();
-                    if (derefLevel == 0)
-                        if (const Type *unstarType = baseTyp->unstar())
-                            baseTyp = unstarType;
-                    if (const NamedType *namedType = baseTyp->asNamedType()) {
-                        if (const TypeSpecAST *typeSpec = namedType->typeSpec(this))
-                            if (typeSpec->hasEmbedOrEqualTo(m_recvTypeSpec, this))
-                                m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
-                    }
+            if (const Type *typ = ast->x->resolveExprType(this).typeForMemberAccess()) {
+                if (const NamedType *namedType = typ->asNamedType()) {
+                    if (const TypeSpecAST *typeSpec = namedType->typeSpec(this))
+                        if (typeSpec->hasEmbedOrEqualTo(m_recvTypeSpec, this))
+                            m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                 }
             }
         }

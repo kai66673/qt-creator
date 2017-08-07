@@ -26,6 +26,7 @@
 #include "astvisitor.h"
 #include "resolvecontext.h"
 #include "packagetype.h"
+#include "gochecksymbols.h"
 
 #include <texteditor/codeassist/assistproposalitem.h>
 
@@ -103,11 +104,7 @@ void CommentAST::accept0(ASTVisitor *visitor)
 }
 
 bool IdentAST::isLookable() const
-{
-    if (ident->isBuiltinTypeIdentifier() || ident == Control::underscoreIdentifier())
-        return false;
-    return true;
-}
+{ return !ident->isBuiltinTypeIdentifier() && ident != Control::underscoreIdentifier(); }
 
 bool IdentAST::isNewKeyword() const
 {
@@ -137,14 +134,42 @@ unsigned IdentAST::lastToken() const
     return t_identifier;
 }
 
-const Type *IdentAST::resolve(ResolveContext *resolver, int &) const
+ExprType IdentAST::resolveExprType(ResolveContext *resolver) const
 {
+    if (ident->isBuiltinStringTypeIdentifier())
+        return ExprType(Control::stringBuiltingType());
+    if (ident->isBuiltinStringTypeIdentifier())
+        return ExprType(Control::integralBuiltinType());
+
     if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver)) {
-        return s->type(resolver);
+        if (const Type *typ = s->type(resolver))
+            return ExprType(typ->baseType(), typ->refLevel());
+        return ExprType();
     }
 
     QString idStr(ident->toString());
-    return resolver->packageTypeForAlias(idStr);
+    return ExprType(resolver->packageTypeForAlias(idStr));
+}
+
+ExprType IdentAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    if (ident->isBuiltinStringTypeIdentifier())
+        return ExprType(Control::stringBuiltingType());
+    if (ident->isBuiltinStringTypeIdentifier())
+        return ExprType(Control::integralBuiltinType());
+
+    if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver)) {
+        resolver->addUse(this, resolver->kindForSymbol(s));
+        if (const Type *typ = s->type(resolver))
+            return ExprType(typ->baseType(), typ->refLevel());
+        return ExprType();
+    }
+
+    QString idStr(ident->toString());
+    PackageType *pkgTyp = resolver->packageTypeForAlias(idStr);
+    if (pkgTyp)
+        resolver->addUse(this, GoSemanticHighlighter::Package);
+    return ExprType(pkgTyp);
 }
 
 void IdentAST::accept0(ASTVisitor *visitor)
@@ -313,24 +338,20 @@ unsigned SelectorExprAST::lastToken() const
     return x->lastToken();
 }
 
-const Type *SelectorExprAST::resolve(ResolveContext *resolver, int &derefLevel) const
+ExprType SelectorExprAST::resolveExprType(ResolveContext *resolver) const
 {
-    if (sel) {
-        const Type *context = x->resolve(resolver, derefLevel);
-        if (context && sel->isLookable()) {
-            int testDerefLevel = context->refLevel() + derefLevel;
-            if (testDerefLevel == 0 || testDerefLevel == -1) {
-                if (const Type *baseTyp = context->baseType()) {
-                    if (Symbol *s = baseTyp->lookupMember(sel, resolver)) {
-                        derefLevel = 0;
-                        return s->type(resolver);
-                    }
-                }
-            }
-        }
-    }
+    if (x && sel && sel->isLookable())
+        return x->resolveExprType(resolver).memberAccess(sel, resolver);
 
-    return 0;
+    return ExprType();
+}
+
+ExprType SelectorExprAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    if (x && sel && sel->isLookable())
+        return x->checkExprType(resolver).checkMemberAccess(sel, resolver);
+
+    return ExprType();
 }
 
 void SelectorExprAST::accept0(ASTVisitor *visitor)
@@ -363,6 +384,13 @@ const Type *ArrayTypeAST::elementsType(ResolveContext *) const
 
 QString ArrayTypeAST::describe() const
 { return QStringLiteral("[]") + (elementType ? elementType->describe() : QString()); }
+
+ExprType ArrayTypeAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->accept(len);
+    resolver->accept(elementType);
+    return ExprType(baseType(), refLevel());
+}
 
 void ArrayTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -404,19 +432,30 @@ unsigned ParenExprAST::lastToken() const
     return t_lparen;
 }
 
-const Type *ParenExprAST::resolve(ResolveContext *resolver, int &derefLevel) const
+ExprType ParenExprAST::resolveExprType(ResolveContext *resolver) const
 {
     if (x) {
         if (StarExprAST *starExpr = x->asStarExpr()) {
-            if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x)) {
-                derefLevel = 0;
-                return typeConvertion;
-            }
+            if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x))
+                return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
         }
-        return x->resolve(resolver, derefLevel);
+        return x->resolveExprType(resolver);
     }
 
-    return 0;
+    return ExprType();
+}
+
+ExprType ParenExprAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    if (x) {
+        if (StarExprAST *starExpr = x->asStarExpr()) {
+            if (const Type *typeConvertion = tryCheckNamedType(resolver, starExpr->x))
+                return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
+        }
+        return x->checkExprType(resolver);
+    }
+
+    return ExprType();
 }
 
 void ParenExprAST::accept0(ASTVisitor *visitor)
@@ -456,7 +495,23 @@ unsigned BinaryExprAST::lastToken() const
     return 0;
 }
 
+ExprType BinaryExprAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->accept(x);
+    resolver->accept(y);
+    return ExprType();
+}
+
 void BinaryExprAST::accept0(ASTVisitor *visitor)
+{
+    if (visitor->visit(this)) {
+        accept(x, visitor);
+        accept(y, visitor);
+    }
+    visitor->endVisit(this);
+}
+
+void BinaryPlusExprAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
         accept(x, visitor);
@@ -491,16 +546,11 @@ void UnaryExprAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-const Type *ArrowUnaryExprAST::resolve(ResolveContext *resolver, int &) const
-{
-    int xDerefLevel = 0;
-    if (const Type *type = x->resolve(resolver, xDerefLevel)) {
-        if (type->refLevel() + xDerefLevel == 0)
-            if (const Type *baseTyp = type->baseType())
-                return baseTyp->chanValueType();
-    }
-    return 0;
-}
+ExprType ArrowUnaryExprAST::resolveExprType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver).chanValue(resolver) : ExprType(); }
+
+ExprType ArrowUnaryExprAST::checkExprType(GoCheckSymbols *resolver) const
+{ return x ? x->checkExprType(resolver).chanValue(resolver) : ExprType(); }
 
 void ArrowUnaryExprAST::accept0(ASTVisitor *visitor)
 {
@@ -510,13 +560,11 @@ void ArrowUnaryExprAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-const Type *RefUnaryExprAST::resolve(ResolveContext *resolver, int &derefLevel) const
-{
-    int xDerefLevel = 0;
-    const Type *typ = x->resolve(resolver, xDerefLevel);
-    derefLevel += xDerefLevel - 1;
-    return typ;
-}
+ExprType RefUnaryExprAST::resolveExprType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver).deref() : ExprType(); }
+
+ExprType RefUnaryExprAST::checkExprType(GoCheckSymbols *resolver) const
+{ return x ? x->checkExprType(resolver).deref() : ExprType(); }
 
 void RefUnaryExprAST::accept0(ASTVisitor *visitor)
 {
@@ -541,6 +589,9 @@ unsigned StarTypeAST::lastToken() const
 QString StarTypeAST::describe() const
 { return QStringLiteral("*") + (typ ? typ->describe() : QString()); }
 
+ExprType StarTypeAST::checkExprType(GoCheckSymbols *resolver) const
+{ return typ ? typ->checkExprType(resolver).deref() : ExprType(); }
+
 void StarTypeAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -561,13 +612,11 @@ unsigned StarExprAST::lastToken() const
     return t_star;
 }
 
-const Type *StarExprAST::resolve(ResolveContext *resolver, int &derefLevel) const
-{
-    int xDerefLevel = 0;
-    const Type *typ = x->resolve(resolver, xDerefLevel);
-    derefLevel += xDerefLevel + 1;
-    return typ;
-}
+ExprType StarExprAST::resolveExprType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver).unstar() : ExprType(); }
+
+ExprType StarExprAST::checkExprType(GoCheckSymbols *resolver) const
+{ return x ? x->checkExprType(resolver).unstar() : ExprType(); }
 
 void StarExprAST::accept0(ASTVisitor *visitor)
 {
@@ -579,6 +628,12 @@ void StarExprAST::accept0(ASTVisitor *visitor)
 
 QString ChanTypeAST::describe() const
 { return QStringLiteral("chan ") + (value ? value->describe() : QString()); }
+
+ExprType ChanTypeAST::resolveExprType(ResolveContext *) const
+{ return ExprType(baseType(), refLevel()); }
+
+ExprType ChanTypeAST::checkExprType(GoCheckSymbols *) const
+{ return ExprType(baseType(), refLevel()); }
 
 void ChanTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -628,13 +683,20 @@ unsigned CompositeLitAST::lastToken() const
     return 0;
 }
 
-const Type *CompositeLitAST::resolve(ResolveContext *resolver, int &) const
+ExprType CompositeLitAST::resolveExprType(ResolveContext *resolver) const
 {
     if (type)
         if (TypeAST *typ = type->asType())
-            return typ;
+            return ExprType(typ->baseType(), typ->refLevel());
 
-    return tryResolveNamedType(resolver, type);
+    const Type *typ = tryResolveNamedType(resolver, type);
+    return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType();
+}
+
+ExprType CompositeLitAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    const Type *typ = resolver->acceptCompositLiteral(this);
+    return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType();
 }
 
 void CompositeLitAST::accept0(ASTVisitor *visitor)
@@ -707,47 +769,52 @@ unsigned CallExprAST::lastToken() const
     return 0;
 }
 
-const Type *CallExprAST::resolve(ResolveContext *resolver, int &derefLevel) const
+ExprType CallExprAST::resolveExprType(ResolveContext *resolver) const
 {
-    // Check for special cases: new(...), make(...), (type).
-    if (const Type *typ = tryResolvePeculiarCase(resolver, derefLevel))
-        return typ;
+    bool accept = false;
+    ExprType exprType = tryResolvePeculiarCase(resolver, accept);
+    if (accept)
+        return exprType;
 
-    // Common case - function call
-    if (const Type *context = fun->resolve(resolver, derefLevel)) {
-        if (context->refLevel() + derefLevel == 0) {
-            if (const Type *baseTyp = context->baseType()) {
-                derefLevel = 0;
-                return baseTyp->calleeType(0, resolver);
-            }
-        }
+    if (fun) {
+        ExprType typeToCall = fun->resolveExprType(resolver);
+        if (typeToCall.size() == 1 && typeToCall.first().first == 0)
+            return typeToCall.first().second->call(resolver);
     }
 
-    return 0;
+    return ExprType(Control::unresolvedTupleType());
 }
 
-const Type *CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, int &derefLevel) const
+ExprType CallExprAST::checkExprType(GoCheckSymbols *resolver) const
 {
+    resolver->accept(args);
+
+    bool accept = false;
+    ExprType exprType = tryResolvePeculiarCase(resolver, accept);
+    if (accept)
+        return exprType;
+
+    if (fun) {
+        ExprType typeToCall = fun->checkExprType(resolver);
+        if (typeToCall.size() == 1 && typeToCall.first().first == 0)
+            return typeToCall.first().second->call(resolver);
+    }
+
+    return ExprType(Control::unresolvedTupleType());
+}
+
+ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, bool &accept) const
+{
+    accept = false;
+
     // check for...
     if (IdentAST *funcIdent = fun->asIdent()) {
         if (funcIdent->isNewKeyword()) {            // new(...) builting function
-            int xDerefLevel = 0;
-            if (args && args->value) {
-                if (const Type *typ = args->value->resolve(resolver, xDerefLevel)) {
-                    derefLevel = xDerefLevel - 1;
-                    return typ;
-                }
-            }
-            return Control::builtinType();
+            accept = true;
+            return args && args->value ? args->value->resolveExprType(resolver).deref() :ExprType();
         } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
-            int xDerefLevel = 0;
-            if (args && args->value) {
-                if (const Type *typ = args->value->resolve(resolver, xDerefLevel)) {
-                    derefLevel = xDerefLevel;
-                    return typ;
-                }
-            }
-            return Control::builtinType();
+            accept = true;
+            return args && args->value ? args->value->resolveExprType(resolver) : ExprType();
         }
     }
     // check for type convertion
@@ -755,15 +822,44 @@ const Type *CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, int &d
         if (parenExpr->x) {
             if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
                 if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x)) {
-                    derefLevel = 0;
-                    return typeConvertion;
+                    accept = true;
+                    return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
                 }
             }
         }
     }
 
-    return 0;
+    return ExprType();
 }
+
+//ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, GoCheckSymbols *checker, bool &accept) const
+//{
+//    accept = false;
+
+//    // check for...
+//    if (IdentAST *funcIdent = fun->asIdent()) {
+//        if (funcIdent->isNewKeyword()) {            // new(...) builting function
+//            accept = true;
+//            return args && args->value ? args->value->resolveExprType(resolver, checker).deref() :ExprType();
+//        } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
+//            accept = true;
+//            return args && args->value ? args->value->resolveExprType(resolver, checker) : ExprType();
+//        }
+//    }
+//    // check for type convertion
+//    if (ParenExprAST *parenExpr = fun->asParenExpr()) {
+//        if (parenExpr->x) {
+//            if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
+//                if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x, checker)) {
+//                    accept = true;
+//                    return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
+//                }
+//            }
+//        }
+//    }
+
+//    return ExprType();
+//}
 
 void CallExprAST::accept0(ASTVisitor *visitor)
 {
@@ -800,18 +896,13 @@ unsigned IndexExprAST::lastToken() const
     return 0;
 }
 
-const Type *IndexExprAST::resolve(ResolveContext *resolver, int &derefLevel) const
-{
-    if (const Type *context = x->resolve(resolver, derefLevel)) {
-        if (context->refLevel() + derefLevel == 0) {
-            if (const Type *baseTyp = context->baseType()) {
-                derefLevel = 0;
-                return baseTyp->elementsType(resolver);
-            }
-        }
-    }
+ExprType IndexExprAST::resolveExprType(ResolveContext *resolver) const
+{ return x->resolveExprType(resolver).rangeValue(resolver); }
 
-    return 0;
+ExprType IndexExprAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->accept(index);
+    return x->checkExprType(resolver).rangeValue(resolver);
 }
 
 void IndexExprAST::accept0(ASTVisitor *visitor)
@@ -857,6 +948,17 @@ unsigned SliceExprAST::lastToken() const
     return 0;
 }
 
+ExprType SliceExprAST::resolveExprType(ResolveContext *resolver) const
+{ return x->resolveExprType(resolver).rangeValue(resolver); }
+
+ExprType SliceExprAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->accept(low);
+    resolver->accept(high);
+    resolver->accept(max);
+    return x->checkExprType(resolver).rangeValue(resolver);
+}
+
 void SliceExprAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -894,10 +996,14 @@ unsigned TypeAssertExprAST::lastToken() const
     return 0;
 }
 
-Type *TypeAssertExprAST::resolve(ResolveContext *, int &derefLevel) const
+ExprType TypeAssertExprAST::resolveExprType(ResolveContext *) const
+{ return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType(); }
+
+ExprType TypeAssertExprAST::checkExprType(GoCheckSymbols *resolver) const
 {
-    derefLevel = 0;
-    return typ ? typ->asType() : 0;
+    resolver->accept(x);
+    resolver->accept(typ);
+    return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType();
 }
 
 void TypeAssertExprAST::accept0(ASTVisitor *visitor)
@@ -1117,6 +1223,12 @@ void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemIn
 QString StructTypeAST::describe() const
 { return QStringLiteral("struct"); }
 
+ExprType StructTypeAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->accept(fields);
+    return ExprType(baseType(), refLevel());
+}
+
 void StructTypeAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -1147,22 +1259,24 @@ unsigned FuncTypeAST::lastToken() const
     return 0;
 }
 
-Type *FuncTypeAST::calleeType(int index, ResolveContext *) const
+ExprType FuncTypeAST::call(ResolveContext *) const
 {
-    if (results && index >= 0) {
-        FieldListAST *field_it = results->fields;
-        for (int i = 0; i < index; i++) {
-            if (!field_it)
-                return 0;
-            field_it = field_it->next;
+    QList<const Type *> types;
+    if (results) {
+        for (FieldListAST *field_it = results->fields; field_it; field_it = field_it->next) {
+            if (FieldAST *field = field_it->value) {
+                const Type *typ = field->type ? field->type : Control::unresolvedType();
+                if (field->names) {
+                    for (DeclIdentListAST *names_it = field->names; names_it; names_it = names_it->next)
+                        types.push_back(typ);
+                } else {
+                    types.push_back(typ);
+                }
+            }
         }
-        if (!field_it)
-            return 0;
-        if (FieldAST *field = field_it->value)
-            return field->type ? field->type->asType() : 0;
     }
 
-    return 0;
+    return ExprType(types);
 }
 
 int FuncTypeAST::countInTurple() const
@@ -1186,6 +1300,13 @@ QString FuncTypeAST::describe() const
         result += QStringLiteral(":") + results->describe();
 
     return result;
+}
+
+ExprType FuncTypeAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->accept(params);
+    resolver->accept(results);
+    return ExprType(baseType(), refLevel());
 }
 
 void FuncTypeAST::accept0(ASTVisitor *visitor)
@@ -1266,6 +1387,12 @@ void InterfaceTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalIte
 QString InterfaceTypeAST::describe() const
 { return QStringLiteral("interface"); }
 
+ExprType InterfaceTypeAST::resolveExprType(ResolveContext *) const
+{ return ExprType(baseType(), refLevel()); }
+
+ExprType InterfaceTypeAST::checkExprType(GoCheckSymbols *) const
+{ return ExprType(baseType(), refLevel()); }
+
 void InterfaceTypeAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -1305,8 +1432,14 @@ const Type *MapTypeAST::indexType(ResolveContext *) const
 QString MapTypeAST::describe() const
 {
     return QStringLiteral("map[") + (key ? key->describe() : QString()) +
-           QStringLiteral("]") + (value ? value->describe() : QString());
+            QStringLiteral("]") + (value ? value->describe() : QString());
 }
+
+ExprType MapTypeAST::resolveExprType(ResolveContext *) const
+{ return ExprType(baseType(), refLevel()); }
+
+ExprType MapTypeAST::checkExprType(GoCheckSymbols *) const
+{ return ExprType(baseType(), refLevel()); }
 
 void MapTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -2026,14 +2159,27 @@ const Type *TypeSpecAST::indexType(ResolveContext *resolver) const
 const Type *TypeSpecAST::elementsType(ResolveContext *resolver) const
 { return type ? type->elementsType(resolver) : 0; }
 
-const Type *TypeSpecAST::calleeType(int index, ResolveContext *resolver) const
-{ return type ? type->calleeType(index, resolver) : 0; }
-
 const Type *TypeSpecAST::chanValueType() const
 { return type ? type->chanValueType() : 0; }
 
 QString TypeSpecAST::describe() const
 { return name ? name->ident->toString() : QString(); }
+
+bool TypeSpecAST::isString(ResolveContext *) const
+{
+    if (type)
+        if (IdentAST *typIdent = type->asIdent())
+            return typIdent->ident->isBuiltinStringTypeIdentifier();
+    return false;
+}
+
+bool TypeSpecAST::isIntegral(ResolveContext *) const
+{
+    if (type)
+        if (IdentAST *typIdent = type->asIdent())
+            return typIdent->ident->isBuiltinIntegralTypeIdentifier();
+    return false;
+}
 
 bool TypeSpecAST::hasEmbedOrEqualTo(const TypeSpecAST *spec, ResolveContext *ctx) const
 {
@@ -2089,11 +2235,6 @@ unsigned FuncLitAST::lastToken() const
     return 0;
 }
 
-Type *FuncLitAST::resolve(ResolveContext *, int &) const
-{
-    return type;
-}
-
 void FuncLitAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -2119,6 +2260,12 @@ unsigned ParenTypeAST::lastToken() const
 
 QString ParenTypeAST::describe() const
 { return QStringLiteral("(") + (x ? x->describe() : QString()) + QStringLiteral(")"); }
+
+ExprType ParenTypeAST::resolveExprType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver) : ExprType(); }
+
+ExprType ParenTypeAST::checkExprType(GoCheckSymbols *resolver) const
+{ return x ? x->checkExprType(resolver) : ExprType(); }
 
 void ParenTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -2205,6 +2352,45 @@ const Type *PackageTypeAST::indexType(ResolveContext *resolver) const
 QString PackageTypeAST::describe() const
 { return packageAlias->ident->toString() + QStringLiteral(".") + (typeName ? typeName->ident->toString() : QString()); }
 
+bool PackageTypeAST::isString(ResolveContext *resolver) const
+{
+    if (fileScope)
+        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
+                if (const TypeSpecAST *typSpec = symbol->typeSpec())
+                    return typSpec->isString(resolver);
+
+    return false;
+}
+
+bool PackageTypeAST::isIntegral(ResolveContext *resolver) const
+{
+    if (fileScope)
+        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
+                if (const TypeSpecAST *typSpec = symbol->typeSpec())
+                    return typSpec->isIntegral(resolver);
+
+    return false;
+}
+
+ExprType PackageTypeAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    if (fileScope) {
+        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
+            resolver->addUse(packageAlias, GoSemanticHighlighter::Package);
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
+                if (const TypeSpecAST *typSpec = symbol->typeSpec()) {
+                    resolver->addUse(typeName, GoSemanticHighlighter::Type);
+                    return ExprType(typSpec->baseType(), typSpec->refLevel());
+                }
+            }
+        }
+    }
+
+    return ExprType();
+}
+
 Symbol *PackageTypeAST::declaration(ResolveContext *resolver)
 {
     if (fileScope) {
@@ -2290,20 +2476,30 @@ const Type *TypeIdentAST::indexType(ResolveContext *resolver) const
     return 0;
 }
 
-const Type *TypeIdentAST::calleeType(int index, ResolveContext *resolver) const
-{
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
-        if (symbol->kind() == Symbol::Typ) {
-            const Type *resolvedType = symbol->type(resolver);
-            return resolvedType->calleeType(index, resolver);
-        }
-    }
-
-    return 0;
-}
-
 QString TypeIdentAST::describe() const
 { return ident->ident->toString(); }
+
+bool TypeIdentAST::isString(ResolveContext *resolver) const
+{
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (const TypeSpecAST *typeSpec = symbol->typeSpec())
+            return typeSpec->isString(resolver);
+    return false;
+}
+
+bool TypeIdentAST::isIntegral(ResolveContext *resolver) const
+{
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (const TypeSpecAST *typeSpec = symbol->typeSpec())
+            return typeSpec->isIntegral(resolver);
+    return false;
+}
+
+ExprType TypeIdentAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    resolver->addUse(ident, GoSemanticHighlighter::Type);
+    return ExprType(baseType(), refLevel());
+}
 
 Symbol *TypeIdentAST::declaration(ResolveContext *resolver)
 {
@@ -2316,10 +2512,8 @@ Symbol *TypeIdentAST::declaration(ResolveContext *resolver)
 
 const TypeSpecAST *TypeIdentAST::typeSpec(ResolveContext *resolver) const
 {
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
-        if (symbol->kind() == Symbol::Typ)
-            return dynamic_cast<const TypeSpecAST *>(symbol->type(resolver));
-    }
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        return symbol->typeSpec();
 
     return 0;
 }
@@ -2364,38 +2558,30 @@ unsigned RhsExprListAST::lastToken() const
 }
 
 const Type *RhsExprListAST::type(ResolveContext *resolver, int index)
-{
-    ExprListAST *list_it = list;
-    int currInd = 0;
-    while (list_it && currInd <= index) {
-        if (CallExprAST *callExpr = list_it->value->asCallExpr()) {
-            // Check for special cases: new(...), make(...), (type).
-            int derefLevel = 0;
-            if (const Type *typ = callExpr->tryResolvePeculiarCase(resolver, derefLevel)) {
-                if (currInd == index)
-                    return typ;
-                currInd++;
-            }
-            else if (const Type *typ = callExpr->fun->resolve(resolver, derefLevel)) {
-                int cnt = typ->countInTurple();
-                if (currInd <= index && currInd + cnt > index) {
-                    return typ->calleeType(index - currInd, resolver);
-                }
-                currInd += cnt;
-            } else {
-                return 0;
-            }
-        } else {
-            if (index == currInd) {
-                int derefLevel = 0;
-                return list_it->value->resolve(resolver, derefLevel);
-            }
-            currInd++;
-        }
-        list_it = list_it->next;
-    }
+{ return resolveExprType(resolver).type(index); }
 
-    return 0;
+ExprType RhsExprListAST::resolveExprType(ResolveContext *resolver) const
+{
+    ExprType result(Control::voidType());
+
+    for (ExprListAST *expr_it = list; expr_it; expr_it = expr_it->next)
+        if (!result.applyCommaJoin(expr_it->value, resolver))
+            break;
+
+    result.removeFirst();
+    return result;
+}
+
+ExprType RhsExprListAST::checkExprType(GoCheckSymbols *resolver) const
+{
+    ExprType result(Control::voidType());
+
+    for (ExprListAST *expr_it = list; expr_it; expr_it = expr_it->next)
+        if (!result.applyCommaJoin(expr_it->value, resolver))
+            break;
+
+    result.removeFirst();
+    return result;
 }
 
 void RhsExprListAST::accept0(ASTVisitor *visitor)
@@ -2420,18 +2606,17 @@ unsigned RangeExpAST::lastToken() const
     return 0;
 }
 
-const Type *RangeExpAST::type(ResolveContext *resolver, int index)
-{
-    if (!x || index < 0 || index > 1)
-        return 0;
+const Type *RangeExpAST::valueType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver).rangeValue(resolver).type() : 0; }
 
-    int derefLevel = 0;
-    if (const Type *typ = x->resolve(resolver, derefLevel))
-            return index ? typ->elementsType(resolver)
-                         : typ->indexType(resolver);
+const Type *RangeExpAST::keyType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver).keyValue(resolver).type() : 0; }
 
-    return 0;
-}
+ExprType RangeExpAST::resolveExprType(ResolveContext *resolver) const
+{ return x ? x->resolveExprType(resolver) : ExprType(); }
+
+ExprType RangeExpAST::checkExprType(GoCheckSymbols *resolver) const
+{ return x ? x->resolveExprType(resolver) : ExprType(); }
 
 void RangeExpAST::accept0(ASTVisitor *visitor)
 {
@@ -2467,9 +2652,10 @@ void EllipsisTypeAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-const Type *TypeAST::resolve(ResolveContext *, int &) const
-{
-    return this;
-}
+ExprType TypeAST::resolveExprType(ResolveContext *) const
+{ return ExprType(baseType(), refLevel()); }
+
+ExprType TypeAST::checkExprType(GoCheckSymbols *) const
+{ return ExprType(baseType(), refLevel()); }
 
 }   // namespace GoTools

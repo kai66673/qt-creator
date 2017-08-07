@@ -60,7 +60,12 @@ static Identifier s_complex128Identifier("!complex128", 11);
 static Identifier s_newIdentifier("!0", 2);
 static Identifier s_makeIdentifier("!1", 2);
 
-static BuiltinType s_builtinType;
+static VoidType s_voidType;
+static UnresolvedType s_unresolvedType;
+static UnresolvedTupleType s_unresolvedTupleType;
+static IntBuiltinType s_intBuiltinType;
+static IntegralBuiltinType s_integralBuiltinType;
+static StringBuiltinType s_stringBuiltinType;
 
 class Control::Data
 {
@@ -203,9 +208,9 @@ Symbol *Control::newTypeDecl(unsigned tokenIndex, const Identifier *identifier, 
     return symbol;
 }
 
-Symbol *Control::newConstDecl(unsigned tokenIndex, const Identifier *identifier, Scope *owner)
+Symbol *Control::newConstDecl(unsigned tokenIndex, const Identifier *identifier, ExprAST *value , Scope *owner)
 {
-    ConstDecl *symbol = new ConstDecl(tokenIndex, identifier, owner);
+    ConstDecl *symbol = new ConstDecl(tokenIndex, identifier, value, owner);
     d->constants.append(symbol);
     return symbol;
 }
@@ -291,8 +296,23 @@ const Identifier *Control::builtinComplex64Identifier()
 const Identifier *Control::builtinComplex128Identifier()
 { return &s_complex128Identifier; }
 
-Type *Control::builtinType()
-{ return &s_builtinType; }
+Type *Control::voidType()
+{ return &s_voidType; }
+
+Type *Control::unresolvedType()
+{ return &s_unresolvedType; }
+
+Type *Control::unresolvedTupleType()
+{ return &s_unresolvedTupleType; }
+
+Type *Control::intBuiltinType()
+{ return &s_intBuiltinType; }
+
+Type *Control::integralBuiltinType()
+{ return &s_integralBuiltinType; }
+
+Type *Control::stringBuiltingType()
+{ return &s_stringBuiltinType; }
 
 const Identifier *Control::newIdentifier()
 { return &s_newIdentifier; }

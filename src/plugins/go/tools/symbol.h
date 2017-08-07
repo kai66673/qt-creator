@@ -94,6 +94,7 @@ public:
 
     virtual ExprAST *declExpr() const = 0;
     virtual const Type *type(ResolveContext *) = 0;
+    virtual const TypeSpecAST *typeSpec() const { return 0; }
     virtual QString describeType(ResolveContext *) const = 0;
     virtual Kind kind() const = 0;
 
@@ -201,16 +202,20 @@ private:
 class ConstDecl: public Symbol
 {
 public:
-    ConstDecl(unsigned tokenIndex, const Identifier *identifier, Scope *owner)
+    ConstDecl(unsigned tokenIndex, const Identifier *identifier, ExprAST *value, Scope *owner)
         : Symbol(tokenIndex, identifier, owner)
+        , _value(value)
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *) override;
+    virtual const Type *type(ResolveContext *resolver) override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
     virtual ConstDecl *asConstDecl() override { return this; }
+
+private:
+    ExprAST *_value;
 };
 
 class TypeDecl: public Symbol
@@ -223,6 +228,7 @@ public:
 
     virtual ExprAST *declExpr() const override;
     virtual const Type *type(ResolveContext *) override;
+    virtual const TypeSpecAST *typeSpec() const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 

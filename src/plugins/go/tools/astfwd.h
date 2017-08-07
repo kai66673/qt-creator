@@ -74,6 +74,7 @@ class UnaryExprAST;
 class ArrowUnaryExprAST;
 class RefUnaryExprAST;
 class BinaryExprAST;
+class BinaryPlusExprAST;
 class KeyValueExprAST;
 class TypeAST;
 class BadTypeAST;

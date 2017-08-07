@@ -34,7 +34,7 @@
 
 namespace GoTools {
 
-static GoSemanticHighlighter::Kind kindForSymbol(const Symbol *symbol)
+GoSemanticHighlighter::Kind GoCheckSymbols::kindForSymbol(const Symbol *symbol) const
 {
     switch (symbol->kind()) {
         case Symbol::Pkg: return GoSemanticHighlighter::Package;
@@ -91,7 +91,7 @@ void GoCheckSymbols::flush()
     _usages.reserve(cap);
 }
 
-void GoCheckSymbols::addUse(IdentAST *ast, GoCheckSymbols::Kind kind)
+void GoCheckSymbols::addUse(const IdentAST *ast, GoCheckSymbols::Kind kind)
 {
     if (!ast->ident || ast->ident == Control::underscoreIdentifier())
         return;
@@ -144,81 +144,47 @@ bool GoCheckSymbols::visit(FieldAST *ast)
     return false;
 }
 
-const Type *GoCheckSymbols::resolveNamedType(TypeIdentAST *ast)
-{
-    if (IdentAST *ident = ast->ident) {
-        if (ident->isLookable()) {
-            if (Symbol *symbol = m_currentScope->lookupMember(ident, this)) {
-                if (symbol->kind() == Symbol::Typ) {
-                    const Type *resolvedType = symbol->type(this);
-                    addUse(ident, GoSemanticHighlighter::Type);
-                    return resolvedType;
-                }
-            }
-        }
-    }
-
-    return 0;
-}
-
 bool GoCheckSymbols::visit(TypeIdentAST *ast)
 {
-    resolveNamedType(ast);
+    if (IdentAST *ident = ast->ident)
+        if (ident->isLookable())
+            if (Symbol *symbol = m_currentScope->lookupMember(ident, this))
+                if (symbol->kind() == Symbol::Typ)
+                    addUse(ident, GoSemanticHighlighter::Type);
+
     return false;
-}
-
-const Type *GoCheckSymbols::resolveNamedType(PackageTypeAST *ast)
-{
-    QString packageAlias(ast->packageAlias->ident->toString());
-    PackageType *context = packageTypeForAlias(packageAlias);
-    if (!context)
-        return 0;
-
-    addUse(ast->packageAlias, GoSemanticHighlighter::Package);
-
-    if (ast->typeName->isLookable()) {
-        if (Symbol *symbol = context->lookupMember(ast->typeName, this))
-            if (symbol->kind() == Symbol::Typ) {
-                const Type *resolvedType = symbol->type(this);
-                addUse(ast->typeName, GoSemanticHighlighter::Type);
-                return resolvedType;
-            }
-    }
-
-    return 0;
 }
 
 bool GoCheckSymbols::visit(PackageTypeAST *ast)
 {
-    resolveNamedType(ast);
+    QString packageAlias(ast->packageAlias->ident->toString());
+    if (PackageType *context = packageTypeForAlias(packageAlias)) {
+        addUse(ast->packageAlias, GoSemanticHighlighter::Package);
+
+        if (ast->typeName->isLookable())
+            if (Symbol *symbol = context->lookupMember(ast->typeName, this))
+                if (symbol->kind() == Symbol::Typ)
+                    addUse(ast->typeName, GoSemanticHighlighter::Type);
+    }
+
     return false;
 }
 
 bool GoCheckSymbols::visit(SelectorExprAST *ast)
 {
-    int derefLevel = 0;
-    const Type *context = resolveSelectorExpr(ast->x, derefLevel);
-    if (context && ast->sel && ast->sel->isLookable()) {
-        derefLevel += context->refLevel();
-        if (derefLevel == 0 || derefLevel == -1) {
-            if (const Type *baseTyp = context->baseType()) {
-                if (Symbol *s = baseTyp->lookupMember(ast->sel, this)) {
-                    addUse(ast->sel, kindForSymbol(s));
-                }
-            }
-        }
-    }
+    if (Symbol *s = ast->x ? ast->x->checkExprType(this).lookupMember(ast->sel, this) : 0)
+        addUse(ast->sel, kindForSymbol(s));
 
     return false;
 }
 
-const Type *GoCheckSymbols::acceptCompositLiteral(CompositeLitAST *ast)
+const Type *GoCheckSymbols::acceptCompositLiteral(const CompositeLitAST *ast)
 {
     const Type *type = 0;
     if (ExprAST *typeExpr = ast->type) {
         type = typeExpr->asType();
         if (!type) {
-            type = resolveCompositExprType(ast);
+            type = tryCheckNamedType(this, ast->type);
         } else {
             accept(ast->type);
         }
@@ -285,212 +251,6 @@ bool GoCheckSymbols::visit(DeclIdentAST *ast)
     }
 
     return false;
-}
-
-const Type *GoCheckSymbols::resolveSelectorExpr(ExprAST *x, int &derefLevel)
-{
-    if (RefUnaryExprAST *refExpr = x->asRefUnaryExpr()) {
-        int xDerefLevel = 0;
-        const Type *typ = resolveSelectorExpr(refExpr->x, xDerefLevel);
-        derefLevel += xDerefLevel - 1;
-        return typ;
-    }
-
-    if (StarExprAST *starExpr = x->asStarExpr()) {
-        int xDerefLevel = 0;
-        const Type *typ = resolveSelectorExpr(starExpr->x, xDerefLevel);
-        derefLevel += xDerefLevel + 1;
-        return typ;
-    }
-
-    if (ArrowUnaryExprAST *arrowExpr = x->asArrowUnaryExpr()) {
-        int xDerefLevel = 0;
-        if (const Type *type = resolveSelectorExpr(arrowExpr->x, xDerefLevel)) {
-            if (type->refLevel() + xDerefLevel == 0)
-                if (const Type *baseTyp = type->baseType())
-                    return baseTyp->chanValueType();
-        }
-        return 0;
-    }
-
-    if (IdentAST *ident = x->asIdent()) {
-        QTC_ASSERT(!derefLevel, return 0);
-        if (!ident->isLookable())
-            return 0;
-        QString idStr(ident->ident->toString());
-        if (Symbol *s = m_currentScope->lookupMember(ident, this)) {
-            addUse(ident, kindForSymbol(s));
-            return s->type(this);
-        }
-        if (PackageType *context = packageTypeForAlias(idStr)) {
-            addUse(ident, GoSemanticHighlighter::Package);
-            return context;
-        }
-    } else if (SelectorExprAST *selAst = x->asSelectorExpr()) {
-        QTC_ASSERT(!derefLevel, return 0);
-        const Type *context = resolveSelectorExpr(selAst->x, derefLevel);
-        if (IdentAST *ident = selAst->sel) {
-            if (context && ident->isLookable()) {
-                int testDerefLevel = derefLevel + context->refLevel();
-                if (testDerefLevel == 0 || testDerefLevel == -1) {
-                    if (const Type *baseTyp = context->baseType()) {
-                        if (Symbol *s = baseTyp->lookupMember(ident, this)) {
-                            addUse(ident, kindForSymbol(s));
-                            derefLevel = 0;
-                            return s->type(this);
-                        }
-                    }
-                }
-            }
-        }
-    } else if (CallExprAST *callExpr = x->asCallExpr()) {
-        accept(callExpr->args);
-        QTC_ASSERT(!derefLevel, return 0);
-        // check for...
-        if (IdentAST *funcIdent = callExpr->fun->asIdent()) {
-            if (funcIdent->isNewKeyword()) {            // new(...) builting function
-                if (callExpr->args) {
-                    int xDerefLevel = 0;
-                    if (const Type *typ = callExpr->args->value->resolve(this, xDerefLevel)) {
-                        derefLevel = xDerefLevel - 1;
-                        return typ;
-                    }
-                }
-                return 0;
-            } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
-                if (callExpr->args) {
-                    int xDerefLevel = 0;
-                    if (const Type *typ = callExpr->args->value->resolve(this, xDerefLevel)) {
-                        derefLevel = xDerefLevel;
-                        return typ;
-                    }
-                }
-                return 0;
-            }
-        }
-        // check for type convertion
-        if (ParenExprAST *parenExpr = callExpr->fun->asParenExpr()) {
-            if (parenExpr->x) {
-                if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-                    if (const Type *typeConvertion = tryAcceptTypeConvertion(starExpr->x)) {
-                        derefLevel = 0;
-                        return typeConvertion;
-                    }
-                }
-            }
-        }
-        // common case - function call
-        if (const Type *context = resolveSelectorExpr(callExpr->fun, derefLevel)) {
-            if (context->refLevel() + derefLevel == 0) {
-                if (const Type *baseTyp = context->baseType()) {
-                    derefLevel = 0;
-                    return baseTyp->calleeType(0, this);
-                }
-            }
-        }
-    } else if (IndexExprAST *indexExpr = x->asIndexExpr()) {
-        accept(indexExpr->index);
-        QTC_ASSERT(!derefLevel, return 0);
-        if (const Type *context = resolveSelectorExpr(indexExpr->x, derefLevel)) {
-            if (context->refLevel() + derefLevel == 0) {
-                if (const Type *baseTyp = context->baseType()) {
-                    derefLevel = 0;
-                    return baseTyp->elementsType(this);
-                }
-            }
-        }
-    } else if (CompositeLitAST *compositLit = x->asCompositeLit()) {
-        if (const Type *context = acceptCompositLiteral(compositLit)) {
-            return context;
-        }
-    } else if (TypeAssertExprAST *typeAssert = x->asTypeAssertExpr()) {
-        accept(typeAssert->x);
-        accept(typeAssert->typ);
-        derefLevel = 0;
-        return typeAssert->typ ? typeAssert->typ->asType() : 0;
-    } else if (ParenExprAST *parenExpr = x->asParenExpr()) {
-        if (parenExpr->x) {
-            if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-                if (const Type *typeConvertion = tryAcceptTypeConvertion(starExpr->x)) {
-                    derefLevel = 0;
-                    return typeConvertion;
-                }
-            }
-            return resolveSelectorExpr(parenExpr->x, derefLevel);
-        }
-    }
-
-    return 0;
-}
-
-const Type *GoCheckSymbols::tryAcceptTypeConvertion(ExprAST *x)
-{
-    if (x) {
-        if (IdentAST *ident = x->asIdent()) {
-            if (ident->isLookable()) {
-                if (Symbol *s = m_currentScope->lookupMember(ident, this)) {
-                    if (s->kind() == Symbol::Typ) {
-                        addUse(ident, GoSemanticHighlighter::Type);
-                        return s->type(this);
-                    }
-                }
-            }
-        } else if (SelectorExprAST *selExpr = x->asSelectorExpr()) {
-            if (selExpr->sel->isLookable()) {
-                if (IdentAST *packageIdent = selExpr->x->asIdent()) {
-                    QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = packageTypeForAlias(packageAlias)) {
-                        if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
-                            if (s->kind() == Symbol::Typ) {
-                                addUse(packageIdent, GoSemanticHighlighter::Package);
-                                addUse(selExpr->sel, GoSemanticHighlighter::Type);
-                                return s->type(this);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return 0;
-}
-
-const Type *GoCheckSymbols::resolveCompositExprType(CompositeLitAST *ast)
-{
-    if (ExprAST *type = ast->type) {
-        if (TypeAST *typ = type->asType())
-            return typ;
-        if (IdentAST *typeIdent = ast->type->asIdent()) {
-            if (typeIdent->isLookable()) {
-                if (Symbol *s = m_currentScope->lookupMember(typeIdent, this)) {
-                    if (s->kind() == Symbol::Typ) {
-                        addUse(typeIdent, GoSemanticHighlighter::Type);
-                        return s->type(this);
-                    }
-                }
-            }
-        } else if (SelectorExprAST *selExpr = ast->type->asSelectorExpr()) {
-            if (IdentAST *packageIdent = selExpr->x->asIdent()) {
-                if (packageIdent->isLookable()) {
-                    QString packageAlias(packageIdent->ident->toString());
-                    if (PackageType *context = packageTypeForAlias(packageAlias)) {
-                        addUse(packageIdent, GoSemanticHighlighter::Package);
-                        if (selExpr->sel->isLookable()) {
-                            if (Symbol *s = context->lookupMember(selExpr->sel, this)) {
-                                if (s->kind() == Symbol::Typ) {
-                                    addUse(selExpr->sel, GoSemanticHighlighter::Type);
-                                    return s->type(this);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return 0;
 }
 
 }   // namespace GoTools

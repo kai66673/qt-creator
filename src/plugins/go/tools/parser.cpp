@@ -271,7 +271,7 @@ SpecAST *Parser::parseGenDeclConstSpec(CommentGroupAST *doc, int index)
         _translationUnit->error(pos, "missing constant value");
 
     ConstSpecAST *spec = new (_pool) ConstSpecAST(doc, idents, type, values, lineComment);
-    declareConst(topScope, idents);
+    declareConst(topScope, idents, values);
 
     return spec;
 }
@@ -809,7 +809,8 @@ ExprAST *Parser::parseBinaryExpr(int prec1)
             unsigned t_op = tokenIndex;
             next();
             ExprAST *y = parseBinaryExpr(prec + 1);
-            x = new (_pool) BinaryExprAST(checkExpr(x), t_op, checkExpr(y));
+            x = op == ADD ? new (_pool) BinaryPlusExprAST(checkExpr(x), t_op, checkExpr(y))
+                          : new (_pool) BinaryExprAST(checkExpr(x), t_op, checkExpr(y));
         }
     }
 
@@ -1816,13 +1817,7 @@ void Parser::declareType(TypeSpecAST *typ, Scope *scope, DeclIdentAST *ident)
     scope->addMember(ident->symbol);
 }
 
-void Parser::declareType(TypeSpecAST *typ, Scope *scope, DeclIdentListAST *idents)
-{
-    for (DeclIdentListAST *it = idents; it; it = it->next)
-        declareType(typ, scope, it->value);
-}
-
-void Parser::declareConst(Scope *scope, DeclIdentAST *ident)
+void Parser::declareConst(Scope *scope, DeclIdentAST *ident, ExprAST *value)
 {
     if (!ident || ident->ident == _control->underscoreIdentifier())
         return;
@@ -1832,14 +1827,21 @@ void Parser::declareConst(Scope *scope, DeclIdentAST *ident)
         return;
     }
 
-    ident->symbol = _control->newConstDecl(ident->t_identifier, ident->ident, scope);
+    ident->symbol = _control->newConstDecl(ident->t_identifier, ident->ident, value, scope);
     scope->addMember(ident->symbol);
 }
 
-void Parser::declareConst(Scope *scope, DeclIdentListAST *idents)
+void Parser::declareConst(Scope *scope, DeclIdentListAST *idents, ExprListAST *values)
 {
-    for (DeclIdentListAST *it = idents; it; it = it->next)
-        declareConst(scope, it->value);
+    ExprListAST *values_it = values;
+    for (DeclIdentListAST *it = idents; it; it = it->next) {
+        if (values_it) {
+            declareConst(scope, it->value, values_it->value);
+            values_it = values_it->next;
+        } else {
+            declareConst(scope, it->value, 0);
+        }
+    }
 }
 
 void Parser::declareFunc(FuncTypeAST *typ, Scope *scope, DeclIdentAST *ident)

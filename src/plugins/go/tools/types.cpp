@@ -23,7 +23,11 @@
 **
 ****************************************************************************/
 #include "types.h"
+#include "exprtype.h"
 
 namespace GoTools {
+
+ExprType Type::call(ResolveContext *) const
+{ return ExprType(Control::unresolvedTupleType()); }
 
 }   // namespace GoTools

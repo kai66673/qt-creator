@@ -128,4 +128,10 @@ QString Identifier::toString() const
 bool Identifier::isBuiltinTypeIdentifier() const
 { return _chars[0] == '!'; }
 
+bool Identifier::isBuiltinStringTypeIdentifier() const
+{ return _chars[0] == '!' && _chars[1] == 's'; }
+
+bool Identifier::isBuiltinIntegralTypeIdentifier() const
+{ return _chars[0] == '!' && _chars[1] != 's'; }
+
 }   // namespace GoTools

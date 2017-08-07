@@ -30,8 +30,11 @@
 #include "token.h"
 #include "types.h"
 #include "scope.h"
+#include "exprtype.h"
 
 namespace GoTools {
+
+class GoCheckSymbols;
 
 template <typename _Tp>
 class List: public Managed
@@ -430,10 +433,11 @@ public:
     // Type implementation
     virtual const Type *indexType(ResolveContext *resolver) const override;
     virtual const Type *elementsType(ResolveContext *resolver) const override;
-    virtual const Type *calleeType(int index, ResolveContext *resolver) const override;
     virtual const Type *chanValueType() const override;
 
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override;
+    virtual bool isIntegral(ResolveContext *) const override;
 
     virtual const NamedType *asNamedType() const override { return this; }
     virtual const TypeSpecAST *typeSpec(ResolveContext *) const override { return this; }
@@ -530,7 +534,8 @@ public:
     ExprAST() {}
     virtual ExprAST *asExpr() { return this; }
 
-    virtual const Type *resolve(ResolveContext *, int &) const { return 0; }
+    virtual ExprType resolveExprType(ResolveContext *) const = 0;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const = 0;
 };
 
 class BadExprAST: public ExprAST
@@ -548,6 +553,9 @@ public:
 
     virtual unsigned firstToken() const { return t_first; }
     virtual unsigned lastToken() const { return t_last; }
+
+    virtual ExprType resolveExprType(ResolveContext *) const { return ExprType(); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override { return ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -570,7 +578,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual const Type *resolve(ResolveContext *resolver, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -593,6 +602,9 @@ public:
 
     const Type *type(ResolveContext *resolver, int index);
 
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -610,7 +622,10 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    const Type *type(ResolveContext *resolver, int index);
+    const Type *valueType(ResolveContext *resolver) const;
+    const Type *keyType(ResolveContext *resolver) const;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -639,7 +654,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual const Type *resolve(ResolveContext *resolver, int &) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -677,12 +693,12 @@ public:
     // Type implementation
     virtual const Type *indexType(ResolveContext *) const override { return 0; }
     virtual const Type *elementsType(ResolveContext *) const override { return 0; }
-    virtual const Type *calleeType(int, ResolveContext *) const override { return 0; }
     virtual const Type *chanValueType() const override { return 0; }
 
     virtual Symbol *declaration(ResolveContext *) { return 0; }
 
-    virtual const Type *resolve(ResolveContext *, int &) const override;
+    virtual ExprType resolveExprType(ResolveContext *) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *) const override;
 };
 
 class BadTypeAST: public TypeAST
@@ -704,6 +720,10 @@ public:
     virtual bool isValidCompositeLiteralType() const { return true; }
 
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType checkExprType(GoCheckSymbols *) const override { return ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -729,6 +749,13 @@ public:
     virtual bool isValidCompositeLiteralType() const { return false; }
 
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *resolver) const override
+    { return x ? x->isString(resolver) : false; }
+    virtual bool isIntegral(ResolveContext *resolver) const override
+    { return x ? x->isIntegral(resolver) : false; }
+
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -761,9 +788,12 @@ public:
 
     virtual const Type *elementsType(ResolveContext *resolver) const override;
     virtual const Type *indexType(ResolveContext *resolver) const override;
-    virtual const Type *calleeType(int index, ResolveContext *resolver) const override;
 
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *resolver) const override;
+    virtual bool isIntegral(ResolveContext *resolver) const override;
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
     virtual Symbol *declaration(ResolveContext *resolver) override;
 
@@ -802,7 +832,12 @@ public:
 
     virtual const Type *elementsType(ResolveContext *resolver) const override;
     virtual const Type *indexType(ResolveContext *resolver) const override;
+
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *resolver) const override;
+    virtual bool isIntegral(ResolveContext *resolver) const override;
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
     virtual Symbol *declaration(ResolveContext *resolver) override;
 
@@ -829,7 +864,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual const Type *resolve(ResolveContext *resolver, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -853,7 +889,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual const Type *resolve(ResolveContext *resolver, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -882,6 +919,9 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -905,7 +945,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ResolveContext *, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -925,6 +966,9 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual ExprType resolveExprType(ResolveContext *) const override { return ExprType(); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override { return ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -949,9 +993,10 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual const Type *resolve(ResolveContext *resolver, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
-    const Type *tryResolvePeculiarCase(ResolveContext *resolver, int &derefLevel) const;
+    ExprType tryResolvePeculiarCase(ResolveContext *resolver, bool &accept) const;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -976,16 +1021,20 @@ public:
     virtual bool isValidCompositeLiteralType() const { return false; }
 
     virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const override
-    { return typ ? typ->lookupMember(ident, resolver) : 0; }
+    { return typ && !typ->asStarType() ? typ->lookupMember(ident, resolver) : 0; }
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver, Predicate = 0) const override
-    { if (typ) typ->fillMemberCompletions(completions, resolver); }
+    { if (typ && !typ->asStarType()) typ->fillMemberCompletions(completions, resolver); }
 
     virtual const Type *baseType() const override { return typ ? typ->baseType() : 0; }
     virtual int refLevel() const override { return typ ? -1 + typ->refLevel() : -1; }
     virtual const Type *unstar() const override { return typ; }
 
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1010,7 +1059,8 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
-    virtual const Type *resolve(ResolveContext *resolver, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1032,6 +1082,11 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override
+    { return x ? x->resolveExprType(resolver) : ExprType(); }
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override
+    { return x ? x->checkExprType(resolver) : ExprType(); }
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -1045,7 +1100,8 @@ public:
 
     virtual ArrowUnaryExprAST *asArrowUnaryExpr() { return this; }
 
-    virtual const Type *resolve(ResolveContext *resolver, int &) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1060,7 +1116,8 @@ public:
 
     virtual RefUnaryExprAST *asRefUnaryExpr() { return this; }
 
-    virtual const Type *resolve(ResolveContext *resolver, int &derefLevel) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1083,6 +1140,25 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
+    virtual ExprType resolveExprType(ResolveContext *resolver) const
+    { return x ? x->resolveExprType(resolver).applyIntegralOperation(y, resolver) : ExprType(); }
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
+
+protected:
+    virtual void accept0(ASTVisitor *visitor);
+};
+
+class BinaryPlusExprAST: public BinaryExprAST
+{
+public:
+    BinaryPlusExprAST(ExprAST *x_ = 0, unsigned t_op_ = 0, ExprAST *y_ = 0)
+        : BinaryExprAST(x_, t_op_, y_)
+    { }
+
+    virtual ExprType resolveExprType(ResolveContext *resolver) const
+    { return x ? x->resolveExprType(resolver).applyPlusOperation(y,resolver) : ExprType(); }
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -1103,6 +1179,11 @@ public:
 
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
+
+    virtual ExprType resolveExprType(ResolveContext *) const override
+    { return ExprType(); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override
+    { return ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1127,7 +1208,13 @@ public:
     virtual bool isValidCompositeLiteralType() const { return false; }
 
     virtual const Type *elementsType(ResolveContext *) const override;
+
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType resolveExprType(ResolveContext *) const override { return ExprType(); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override { return ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1154,7 +1241,12 @@ public:
     virtual bool isValidCompositeLiteralType() const { return true; }
 
     virtual const Type *elementsType(ResolveContext *) const override;
+
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1190,6 +1282,11 @@ public:
     virtual Type *chanValueType() const override { return value; }
 
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType resolveExprType(ResolveContext *) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1214,9 +1311,14 @@ public:
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
-    virtual Type *calleeType(int index, ResolveContext *) const override;
+    virtual ExprType call(ResolveContext *) const override;
     virtual int countInTurple() const override;
+
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1244,6 +1346,10 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver, Predicate = 0) const override;
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1273,7 +1379,13 @@ public:
     virtual Symbol *lookupMember(const IdentAST *ast, ResolveContext *resolver) const override;
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver, Predicate = 0) const override;
+
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType resolveExprType(ResolveContext *) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1300,7 +1412,13 @@ public:
 
     virtual const Type *elementsType(ResolveContext *) const override;
     virtual const Type *indexType(ResolveContext *) const override;
+
     virtual QString describe() const override;
+    virtual bool isString(ResolveContext *) const override { return false; }
+    virtual bool isIntegral(ResolveContext *) const override { return false; }
+
+    virtual ExprType resolveExprType(ResolveContext *) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1327,6 +1445,11 @@ public:
     virtual unsigned firstToken() const { return t_value; }
     virtual unsigned lastToken() const { return t_value; }
 
+    virtual ExprType resolveExprType(ResolveContext *) const override
+    { return ExprType(Control::integralBuiltinType()); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override
+    { return ExprType(); }
+
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
@@ -1339,6 +1462,11 @@ public:
     { }
 
     virtual StringLitAST *asStringLit() { return this; }
+
+    virtual ExprType resolveExprType(ResolveContext *) const override
+    { return ExprType(Control::stringBuiltingType()); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override
+    { return ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1360,7 +1488,10 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual Type *resolve(ResolveContext *, int &) const override;
+    virtual ExprType resolveExprType(ResolveContext *) const override
+    { return type ? ExprType(type->baseType(), type->refLevel()) : ExprType(); }
+    virtual ExprType checkExprType(GoCheckSymbols *) const override
+    { return type ? ExprType(type->baseType(), type->refLevel()) : ExprType(); }
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1384,7 +1515,8 @@ public:
     virtual unsigned firstToken() const;
     virtual unsigned lastToken() const;
 
-    virtual const Type *resolve(ResolveContext *resolver, int &) const override;
+    virtual ExprType resolveExprType(ResolveContext *resolver) const override;
+    virtual ExprType checkExprType(GoCheckSymbols *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);

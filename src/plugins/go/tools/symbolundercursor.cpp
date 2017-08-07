@@ -132,16 +132,8 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
 
     if (m_pos <= tk.end()) {
         _traverseFinished = true;
-        if (ast->sel->isLookable()) {
-            int derefLevel = 0;
-            if (const Type *type = ast->x->resolve(this, derefLevel)) {
-                derefLevel += type->refLevel();
-                if (derefLevel == 0 || derefLevel == -1) {
-                    if (const Type *baseTyp = type->baseType())
-                        m_symbol = baseTyp->lookupMember(ast->sel, this);
-                }
-            }
-        }
+        if (ast->sel->isLookable())
+            m_symbol = ast->x->resolveExprType(this).lookupMember(ast->sel, this);
     }
 
     return false;

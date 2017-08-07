@@ -135,10 +135,9 @@ private:
     void declareFld(TypeAST *typ, Scope *scope, DeclIdentListAST *fields);
 
     void declareType(TypeSpecAST *typ, Scope *scope, DeclIdentAST *ident);
-    void declareType(TypeSpecAST *typ, Scope *scope, DeclIdentListAST *idents);
 
-    void declareConst(Scope *scope, DeclIdentAST *ident);
-    void declareConst(Scope *scope, DeclIdentListAST *idents);
+    void declareConst(Scope *scope, DeclIdentAST *ident, ExprAST *value);
+    void declareConst(Scope *scope, DeclIdentListAST *idents, ExprListAST *values);
 
     void declareFunc(FuncTypeAST *typ, Scope *scope, DeclIdentAST *ident);
     void declareFunc(FuncTypeAST *typ, Scope *scope, DeclIdentListAST *idents);

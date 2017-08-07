@@ -86,6 +86,7 @@ public:
     virtual bool visit(ArrowUnaryExprAST *) { return true; }
     virtual bool visit(RefUnaryExprAST *) { return true; }
     virtual bool visit(BinaryExprAST *) { return true; }
+    virtual bool visit(BinaryPlusExprAST *) { return true; }
     virtual bool visit(KeyValueExprAST *) { return true; }
     virtual bool visit(ArrayTypeAST *) { return true; }
     virtual bool visit(StructTypeAST *) { return true; }
@@ -155,6 +156,7 @@ public:
     virtual void endVisit(ArrowUnaryExprAST *) {}
     virtual void endVisit(RefUnaryExprAST *) {}
     virtual void endVisit(BinaryExprAST *) {}
+    virtual void endVisit(BinaryPlusExprAST *) {}
     virtual void endVisit(KeyValueExprAST *) {}
     virtual void endVisit(ArrayTypeAST *) {}
     virtual void endVisit(StructTypeAST *) {}

@@ -30,7 +30,7 @@
 
 namespace GoTools {
 
-class ScopeSwitchVisitor: protected ASTVisitor , public ResolveContext
+class ScopeSwitchVisitor: public ASTVisitor , public ResolveContext
 {
 public:
     ScopeSwitchVisitor(GoSource *source, bool protectCache = true);

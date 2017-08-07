@@ -72,7 +72,7 @@ public:
     Symbol *newVarDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner);
     Symbol *newFieldDecl(unsigned tokenIndex, const Identifier *identifier, TypeAST *decl, Scope *owner);
     Symbol *newTypeDecl(unsigned tokenIndex, const Identifier *identifier, TypeSpecAST *decl, Scope *owner);
-    Symbol *newConstDecl(unsigned tokenIndex, const Identifier *identifier, Scope *owner);
+    Symbol *newConstDecl(unsigned tokenIndex, const Identifier *identifier, ExprAST *value, Scope *owner);
     Symbol *newShortVarDecl(unsigned tokenIndex, const Identifier *identifier, RhsExprListAST *decl, unsigned index, Scope *owner);
     Symbol *newRangeKeyDecl(unsigned tokenIndex, const Identifier *identifier, RangeExpAST *decl, Scope *owner);
     Symbol *newRangeValueDecl(unsigned tokenIndex, const Identifier *identifier, RangeExpAST *decl, Scope *owner);
@@ -99,7 +99,12 @@ public:
     static const Identifier *builtinComplex64Identifier();
     static const Identifier *builtinComplex128Identifier();
 
-    static Type *builtinType();
+    static Type *voidType();
+    static Type *unresolvedType();
+    static Type *unresolvedTupleType();
+    static Type *intBuiltinType();
+    static Type *integralBuiltinType();
+    static Type *stringBuiltingType();
 
     static const Identifier *newIdentifier();
     static const Identifier *makeIdentifier();

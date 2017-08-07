@@ -140,8 +140,8 @@ TypeIdentAST *MethodDecl::recvIdent() const
 ExprAST *ConstDecl::declExpr() const
 { return 0; }
 
-const Type *ConstDecl::type(ResolveContext *)
-{ return Control::builtinType(); }
+const Type *ConstDecl::type(ResolveContext *resolver)
+{ return _value ? _value->resolveExprType(resolver).type() : Control::intBuiltinType(); }
 
 QString ConstDecl::describeType(ResolveContext *) const
 { return QString(); }
@@ -153,6 +153,9 @@ ExprAST *TypeDecl::declExpr() const
 { return _decl->type; }
 
 const Type *TypeDecl::type(ResolveContext *)
+{ return _decl; }
+
+const TypeSpecAST *TypeDecl::typeSpec() const
 { return _decl; }
 
 QString TypeDecl::describeType(ResolveContext *) const
@@ -181,11 +184,11 @@ ExprAST *RangeKeyDecl::declExpr() const
 { return _decl; }
 
 const Type *RangeKeyDecl::type(ResolveContext *resolver)
-{ return _decl->type(resolver, 0); }
+{ return _decl->keyType(resolver); }
 
 QString RangeKeyDecl::describeType(ResolveContext *resolver) const
 {
-    if (const Type *type = _decl->type(resolver, 0))
+    if (const Type *type = _decl->keyType(resolver))
         return type->describe();
     return QString();
 }
@@ -197,11 +200,11 @@ ExprAST *RangeValueDecl::declExpr() const
 { return _decl; }
 
 const Type *RangeValueDecl::type(ResolveContext *resolver)
-{ return _decl->type(resolver, 1); }
+{ return _decl->valueType(resolver); }
 
 QString RangeValueDecl::describeType(ResolveContext *resolver) const
 {
-    if (const Type *type = _decl->type(resolver, 1))
+    if (const Type *type = _decl->valueType(resolver))
         return type->describe();
     return QString();
 }
