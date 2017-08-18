@@ -25,6 +25,7 @@
 #include "packagetype.h"
 #include "ast.h"
 #include "scope.h"
+#include "resolvedtype.h"
 
 #include <texteditor/codeassist/assistproposalitem.h>
 
@@ -79,38 +80,43 @@ Symbol *PackageType::lookup(const Identifier *ident) const
     return 0;
 }
 
-Symbol *PackageType::lookupMember(const IdentAST *ident, ResolveContext *) const
+Symbol *PackageType::lookupMember(const IdentAST *ident, ResolveContext *, int refLevel) const
 {
-    for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
-         it != m_sources.constEnd(); ++it) {
-        if (FileAST *fileAst = it.value()->translationUnit()->fileAst()) {
-            if (FileScope *fileScope = fileAst->scope) {
-                if (Symbol *symbol = fileScope->find(ident->ident))
-                    return symbol;
-            }
-        }
-    }
+    if (!refLevel)
+        for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
+             it != m_sources.constEnd(); ++it)
+            if (FileAST *fileAst = it.value()->translationUnit()->fileAst())
+                if (FileScope *fileScope = fileAst->scope)
+                    if (Symbol *symbol = fileScope->find(ident->ident))
+                        return symbol;
 
     return 0;
 }
 
 void PackageType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                        ResolveContext *, LookupContext::Predicate) const
+                                        ResolveContext *, int refLevel, LookupContext::Predicate) const
 {
-    for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
-         it != m_sources.constEnd(); ++it) {
-        if (FileAST *fileAst = it.value()->translationUnit()->fileAst()) {
-            if (FileScope *fileScope = fileAst->scope) {
-                for (unsigned i = 0; i < fileScope->memberCount(); i++) {
-                    Symbol *symbol = fileScope->memberAt(i);
-                    TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
-                    item->setText(symbol->identifier()->toString());
-                    item->setIcon(Symbol::icon(symbol->kind()));
-                    completions.append(item);
-                }
-            }
-        }
-    }
+    if (!refLevel)
+        for (QHash<QString, GoSource::Ptr>::const_iterator it = m_sources.constBegin();
+             it != m_sources.constEnd(); ++it)
+            if (FileAST *fileAst = it.value()->translationUnit()->fileAst())
+                if (FileScope *fileScope = fileAst->scope)
+                    for (unsigned i = 0; i < fileScope->memberCount(); i++) {
+                        Symbol *symbol = fileScope->memberAt(i);
+                        TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
+                        item->setText(symbol->identifier()->toString());
+                        item->setIcon(Symbol::icon(symbol->kind()));
+                        completions.append(item);
+                    }
 }
+
+ResolvedType PackageType::indexType(ResolveContext *, int) const
+{ return 0; }
+
+ResolvedType PackageType::elementsType(ResolveContext *, int) const
+{ return 0; }
+
+ResolvedType PackageType::chanValueType(ResolveContext *, int) const
+{ return 0; }
 
 }   // namespace GoTools

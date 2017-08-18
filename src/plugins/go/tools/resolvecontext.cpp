@@ -129,7 +129,7 @@ const Type *tryResolveNamedType(ResolveContext *resolver, ExprAST *x)
             if (ident->isLookable()) {
                 if (Symbol *s = resolver->currentScope()->lookupMember(ident, resolver)) {
                     if (s->kind() == Symbol::Typ) {
-                        return s->type(resolver);
+                        return s->type(resolver).type();   // TODO:
                     }
                 }
             }
@@ -140,7 +140,7 @@ const Type *tryResolveNamedType(ResolveContext *resolver, ExprAST *x)
                     if (PackageType *context = resolver->packageTypeForAlias(packageAlias)) {
                         if (Symbol *s = context->lookupMember(selExpr->sel, resolver)) {
                             if (s->kind() == Symbol::Typ) {
-                                return s->type(resolver);
+                                return s->type(resolver).type();   // TODO:
                             }
                         }
                     }
@@ -152,7 +152,7 @@ const Type *tryResolveNamedType(ResolveContext *resolver, ExprAST *x)
     return 0;
 }
 
-const Type *tryCheckNamedType(GoCheckSymbols *resolver, ExprAST *x)
+const Type *tryCheckNamedType(GoCheckSymbols *resolver, ExprAST *x) // TODO:
 {
     if (x) {
         if (IdentAST *ident = x->asIdent()) {
@@ -160,7 +160,7 @@ const Type *tryCheckNamedType(GoCheckSymbols *resolver, ExprAST *x)
                 if (Symbol *s = resolver->currentScope()->lookupMember(ident, resolver)) {
                     if (s->kind() == Symbol::Typ) {
                         resolver->addUse(ident, GoSemanticHighlighter::Type);
-                        return s->type(resolver);
+                        return s->type(resolver).type();
                     }
                 }
             }
@@ -173,7 +173,7 @@ const Type *tryCheckNamedType(GoCheckSymbols *resolver, ExprAST *x)
                             if (s->kind() == Symbol::Typ) {
                                 resolver->addUse(packageIdent, GoSemanticHighlighter::Package);
                                 resolver->addUse(selExpr->sel, GoSemanticHighlighter::Type);
-                                return s->type(resolver);
+                                return s->type(resolver).type();
                             }
                         }
                     }

@@ -134,42 +134,37 @@ unsigned IdentAST::lastToken() const
     return t_identifier;
 }
 
-ExprType IdentAST::resolveExprType(ResolveContext *resolver) const
+ResolvedType IdentAST::resolve(ResolveContext *resolver) const
 {
     if (ident->isBuiltinStringTypeIdentifier())
-        return ExprType(Control::stringBuiltingType());
+        return ResolvedType(Control::stringBuiltingType());
     if (ident->isBuiltinStringTypeIdentifier())
-        return ExprType(Control::integralBuiltinType());
+        return ResolvedType(Control::integralBuiltinType());
 
-    if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver)) {
-        if (const Type *typ = s->type(resolver))
-            return ExprType(typ->baseType(), typ->refLevel());
-        return ExprType();
-    }
+    if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver))
+        return s->type(resolver);
 
     QString idStr(ident->toString());
-    return ExprType(resolver->packageTypeForAlias(idStr));
+    return ResolvedType(resolver->packageTypeForAlias(idStr));
 }
 
-ExprType IdentAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType IdentAST::check(GoCheckSymbols *resolver) const
 {
     if (ident->isBuiltinStringTypeIdentifier())
-        return ExprType(Control::stringBuiltingType());
+        return ResolvedType(Control::stringBuiltingType());
     if (ident->isBuiltinStringTypeIdentifier())
-        return ExprType(Control::integralBuiltinType());
+        return ResolvedType(Control::integralBuiltinType());
 
     if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver)) {
         resolver->addUse(this, resolver->kindForSymbol(s));
-        if (const Type *typ = s->type(resolver))
-            return ExprType(typ->baseType(), typ->refLevel());
-        return ExprType();
+        return s->type(resolver);
     }
 
     QString idStr(ident->toString());
     PackageType *pkgTyp = resolver->packageTypeForAlias(idStr);
     if (pkgTyp)
         resolver->addUse(this, GoSemanticHighlighter::Package);
-    return ExprType(pkgTyp);
+    return ResolvedType(pkgTyp);
 }
 
 void IdentAST::accept0(ASTVisitor *visitor)
@@ -338,20 +333,19 @@ unsigned SelectorExprAST::lastToken() const
     return x->lastToken();
 }
 
-ExprType SelectorExprAST::resolveExprType(ResolveContext *resolver) const
+ResolvedType SelectorExprAST::resolve(ResolveContext *resolver) const
 {
     if (x && sel && sel->isLookable())
-        return x->resolveExprType(resolver).memberAccess(sel, resolver);
-
-    return ExprType();
+        return x->resolve(resolver).memberAccess(sel, resolver);
+    return ResolvedType();
 }
 
-ExprType SelectorExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType SelectorExprAST::check(GoCheckSymbols *resolver) const
 {
     if (x && sel && sel->isLookable())
-        return x->checkExprType(resolver).checkMemberAccess(sel, resolver);
+        return x->check(resolver).checkMemberAccess(sel, resolver);
 
-    return ExprType();
+    return ResolvedType();
 }
 
 void SelectorExprAST::accept0(ASTVisitor *visitor)
@@ -379,17 +373,17 @@ unsigned ArrayTypeAST::lastToken() const
     return t_lbracket;
 }
 
-const Type *ArrayTypeAST::elementsType(ResolveContext *) const
-{ return elementType->asType(); }
+ResolvedType ArrayTypeAST::elementsType(ResolveContext *, int refLvl) const
+{ return !refLvl ? elementType->asType() : 0; }
 
 QString ArrayTypeAST::describe() const
 { return QStringLiteral("[]") + (elementType ? elementType->describe() : QString()); }
 
-ExprType ArrayTypeAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType ArrayTypeAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(len);
     resolver->accept(elementType);
-    return ExprType(baseType(), refLevel());
+    return ResolvedType(this);
 }
 
 void ArrayTypeAST::accept0(ASTVisitor *visitor)
@@ -432,30 +426,30 @@ unsigned ParenExprAST::lastToken() const
     return t_lparen;
 }
 
-ExprType ParenExprAST::resolveExprType(ResolveContext *resolver) const
+ResolvedType ParenExprAST::resolve(ResolveContext *resolver) const
 {
     if (x) {
         if (StarExprAST *starExpr = x->asStarExpr()) {
             if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x))
-                return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
+                return ResolvedType(typeConvertion);
         }
-        return x->resolveExprType(resolver);
+        return x->resolve(resolver);
     }
 
-    return ExprType();
+    return ResolvedType();
 }
 
-ExprType ParenExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType ParenExprAST::check(GoCheckSymbols *resolver) const
 {
     if (x) {
         if (StarExprAST *starExpr = x->asStarExpr()) {
             if (const Type *typeConvertion = tryCheckNamedType(resolver, starExpr->x))
-                return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
+                return ResolvedType(typeConvertion);
         }
-        return x->checkExprType(resolver);
+        return x->check(resolver);
     }
 
-    return ExprType();
+    return ResolvedType();
 }
 
 void ParenExprAST::accept0(ASTVisitor *visitor)
@@ -495,11 +489,14 @@ unsigned BinaryExprAST::lastToken() const
     return 0;
 }
 
-ExprType BinaryExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType BinaryExprAST::resolve(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver).applyIntegralOperation(y, resolver) : ResolvedType(); }
+
+ResolvedType BinaryExprAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(x);
     resolver->accept(y);
-    return ExprType();
+    return ResolvedType();
 }
 
 void BinaryExprAST::accept0(ASTVisitor *visitor)
@@ -546,11 +543,11 @@ void UnaryExprAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-ExprType ArrowUnaryExprAST::resolveExprType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver).chanValue(resolver) : ExprType(); }
+ResolvedType ArrowUnaryExprAST::resolve(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver).chanValue(resolver) : ResolvedType(); }
 
-ExprType ArrowUnaryExprAST::checkExprType(GoCheckSymbols *resolver) const
-{ return x ? x->checkExprType(resolver).chanValue(resolver) : ExprType(); }
+ResolvedType ArrowUnaryExprAST::check(GoCheckSymbols *resolver) const
+{ return x ? x->check(resolver).chanValue(resolver) : ResolvedType(); }
 
 void ArrowUnaryExprAST::accept0(ASTVisitor *visitor)
 {
@@ -560,11 +557,11 @@ void ArrowUnaryExprAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-ExprType RefUnaryExprAST::resolveExprType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver).deref() : ExprType(); }
+ResolvedType RefUnaryExprAST::resolve(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver).deref() : ResolvedType(); }
 
-ExprType RefUnaryExprAST::checkExprType(GoCheckSymbols *resolver) const
-{ return x ? x->checkExprType(resolver).deref() : ExprType(); }
+ResolvedType RefUnaryExprAST::check(GoCheckSymbols *resolver) const
+{ return x ? x->check(resolver).deref() : ResolvedType(); }
 
 void RefUnaryExprAST::accept0(ASTVisitor *visitor)
 {
@@ -589,8 +586,8 @@ unsigned StarTypeAST::lastToken() const
 QString StarTypeAST::describe() const
 { return QStringLiteral("*") + (typ ? typ->describe() : QString()); }
 
-ExprType StarTypeAST::checkExprType(GoCheckSymbols *resolver) const
-{ return typ ? typ->checkExprType(resolver).deref() : ExprType(); }
+ResolvedType StarTypeAST::check(GoCheckSymbols *resolver) const
+{ return typ ? typ->check(resolver).deref() : ResolvedType(); }
 
 void StarTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -612,11 +609,11 @@ unsigned StarExprAST::lastToken() const
     return t_star;
 }
 
-ExprType StarExprAST::resolveExprType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver).unstar() : ExprType(); }
+ResolvedType StarExprAST::resolve(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver).unstar() : ResolvedType(); }
 
-ExprType StarExprAST::checkExprType(GoCheckSymbols *resolver) const
-{ return x ? x->checkExprType(resolver).unstar() : ExprType(); }
+ResolvedType StarExprAST::check(GoCheckSymbols *resolver) const
+{ return x ? x->check(resolver).unstar() : ResolvedType(); }
 
 void StarExprAST::accept0(ASTVisitor *visitor)
 {
@@ -626,14 +623,83 @@ void StarExprAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
+unsigned NewExprAST::firstToken() const
+{
+    return t_new;
+}
+
+unsigned NewExprAST::lastToken() const
+{
+    if (t_rparen)
+        return t_rparen + 1;
+    if (typ)
+        return typ->lastToken();
+    if (t_lparen)
+        return t_lparen + 1;
+    return t_new + 1;
+}
+
+ResolvedType NewExprAST::resolve(ResolveContext *) const
+{ return typ ? ResolvedType(typ).deref() : ResolvedType(); }
+
+ResolvedType NewExprAST::check(GoCheckSymbols *resolver) const
+{ return typ ? typ->check(resolver).deref() : ResolvedType(); }
+
+void NewExprAST::accept0(ASTVisitor *visitor)
+{
+    if (visitor->visit(this)) {
+        accept(typ, visitor);
+    }
+    visitor->endVisit(this);
+}
+
+unsigned MakeExprAST::firstToken() const
+{
+    return t_make;
+}
+
+unsigned MakeExprAST::lastToken() const
+{
+    if (t_rparen)
+        return t_rparen + 1;
+    if (list)
+        return list->lastToken();
+    if (t_lparen)
+        return t_lparen + 1;
+    return t_make + 1;
+}
+
+ResolvedType MakeExprAST::resolve(ResolveContext *resolver) const
+{ return list && list->value ? list->value->resolve(resolver) : ResolvedType(); }
+
+ResolvedType MakeExprAST::check(GoCheckSymbols *resolver) const
+{
+    if (list && list->value) {
+        ResolvedType result = list->value->check(resolver);
+        for (ExprListAST *x_it = list->next; x_it; x_it = x_it->next)
+            resolver->accept(x_it->value);
+        return result;
+    }
+
+    return ResolvedType();
+}
+
+void MakeExprAST::accept0(ASTVisitor *visitor)
+{
+    if (visitor->visit(this)) {
+        accept(list, visitor);
+    }
+    visitor->endVisit(this);
+}
+
 QString ChanTypeAST::describe() const
 { return QStringLiteral("chan ") + (value ? value->describe() : QString()); }
 
-ExprType ChanTypeAST::resolveExprType(ResolveContext *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType ChanTypeAST::resolve(ResolveContext *) const
+{ return ResolvedType(this); }
 
-ExprType ChanTypeAST::checkExprType(GoCheckSymbols *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType ChanTypeAST::check(GoCheckSymbols *) const
+{ return ResolvedType(this); }
 
 void ChanTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -683,20 +749,13 @@ unsigned CompositeLitAST::lastToken() const
     return 0;
 }
 
-ExprType CompositeLitAST::resolveExprType(ResolveContext *resolver) const
-{
-    if (type)
-        if (TypeAST *typ = type->asType())
-            return ExprType(typ->baseType(), typ->refLevel());
+ResolvedType CompositeLitAST::resolve(ResolveContext *resolver) const
+{ return type ? type->resolve(resolver) : ResolvedType(); }
 
-    const Type *typ = tryResolveNamedType(resolver, type);
-    return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType();
-}
-
-ExprType CompositeLitAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType CompositeLitAST::check(GoCheckSymbols *resolver) const
 {
     const Type *typ = resolver->acceptCompositLiteral(this);
-    return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType();
+    return typ ? ResolvedType(typ) : ResolvedType();
 }
 
 void CompositeLitAST::accept0(ASTVisitor *visitor)
@@ -769,70 +828,25 @@ unsigned CallExprAST::lastToken() const
     return 0;
 }
 
-ExprType CallExprAST::resolveExprType(ResolveContext *resolver) const
+ResolvedType CallExprAST::resolve(ResolveContext *resolver) const
 {
-    bool accept = false;
-    ExprType exprType = tryResolvePeculiarCase(resolver, accept);
-    if (accept)
-        return exprType;
-
-    if (fun) {
-        ExprType typeToCall = fun->resolveExprType(resolver);
-        if (typeToCall.size() == 1 && typeToCall.first().first == 0)
-            return typeToCall.first().second->call(resolver);
-    }
-
-    return ExprType(Control::unresolvedTupleType());
+    /// TODO: new(...), make(...)
+    return fun ? fun->resolve(resolver).call(resolver) : ResolvedType(Control::unresolvedTupleType());
 }
 
-ExprType CallExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType CallExprAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(args);
 
-    bool accept = false;
-    ExprType exprType = tryResolvePeculiarCase(resolver, accept);
-    if (accept)
-        return exprType;
-
-    if (fun) {
-        ExprType typeToCall = fun->checkExprType(resolver);
-        if (typeToCall.size() == 1 && typeToCall.first().first == 0)
-            return typeToCall.first().second->call(resolver);
-    }
-
-    return ExprType(Control::unresolvedTupleType());
+    /// TODO: new(...), make(...)
+//    bool accept = false;
+//    ExprType exprType = tryResolvePeculiarCase(resolver, accept);
+//    if (accept)
+//        return exprType;
+    return fun ? fun->check(resolver).call(resolver) : ResolvedType(Control::unresolvedTupleType());
 }
 
-ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, bool &accept) const
-{
-    accept = false;
-
-    // check for...
-    if (IdentAST *funcIdent = fun->asIdent()) {
-        if (funcIdent->isNewKeyword()) {            // new(...) builting function
-            accept = true;
-            return args && args->value ? args->value->resolveExprType(resolver).deref() :ExprType();
-        } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
-            accept = true;
-            return args && args->value ? args->value->resolveExprType(resolver) : ExprType();
-        }
-    }
-    // check for type convertion
-    if (ParenExprAST *parenExpr = fun->asParenExpr()) {
-        if (parenExpr->x) {
-            if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-                if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x)) {
-                    accept = true;
-                    return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
-                }
-            }
-        }
-    }
-
-    return ExprType();
-}
-
-//ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, GoCheckSymbols *checker, bool &accept) const
+//ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, bool &accept) const
 //{
 //    accept = false;
 
@@ -840,21 +854,10 @@ ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, bool &acc
 //    if (IdentAST *funcIdent = fun->asIdent()) {
 //        if (funcIdent->isNewKeyword()) {            // new(...) builting function
 //            accept = true;
-//            return args && args->value ? args->value->resolveExprType(resolver, checker).deref() :ExprType();
+//            return args && args->value ? args->value->resolveExprType(resolver).deref() :ExprType();
 //        } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
 //            accept = true;
-//            return args && args->value ? args->value->resolveExprType(resolver, checker) : ExprType();
-//        }
-//    }
-//    // check for type convertion
-//    if (ParenExprAST *parenExpr = fun->asParenExpr()) {
-//        if (parenExpr->x) {
-//            if (StarExprAST *starExpr = parenExpr->x->asStarExpr()) {
-//                if (const Type *typeConvertion = tryResolveNamedType(resolver, starExpr->x, checker)) {
-//                    accept = true;
-//                    return ExprType(typeConvertion->baseType(), typeConvertion->refLevel());
-//                }
-//            }
+//            return args && args->value ? args->value->resolveExprType(resolver) : ExprType();
 //        }
 //    }
 
@@ -896,13 +899,13 @@ unsigned IndexExprAST::lastToken() const
     return 0;
 }
 
-ExprType IndexExprAST::resolveExprType(ResolveContext *resolver) const
-{ return x->resolveExprType(resolver).rangeValue(resolver); }
+ResolvedType IndexExprAST::resolve(ResolveContext *resolver) const
+{ return x->resolve(resolver).rangeValue(resolver); }
 
-ExprType IndexExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType IndexExprAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(index);
-    return x->checkExprType(resolver).rangeValue(resolver);
+    return x->check(resolver).rangeValue(resolver);
 }
 
 void IndexExprAST::accept0(ASTVisitor *visitor)
@@ -948,15 +951,15 @@ unsigned SliceExprAST::lastToken() const
     return 0;
 }
 
-ExprType SliceExprAST::resolveExprType(ResolveContext *resolver) const
-{ return x->resolveExprType(resolver).rangeValue(resolver); }
+ResolvedType SliceExprAST::resolve(ResolveContext *resolver) const
+{ return x->resolve(resolver).rangeValue(resolver); }
 
-ExprType SliceExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType SliceExprAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(low);
     resolver->accept(high);
     resolver->accept(max);
-    return x->checkExprType(resolver).rangeValue(resolver);
+    return x->check(resolver).rangeValue(resolver);
 }
 
 void SliceExprAST::accept0(ASTVisitor *visitor)
@@ -996,14 +999,14 @@ unsigned TypeAssertExprAST::lastToken() const
     return 0;
 }
 
-ExprType TypeAssertExprAST::resolveExprType(ResolveContext *) const
-{ return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType(); }
+ResolvedType TypeAssertExprAST::resolve(ResolveContext *) const
+{ return ResolvedType(typ); }
 
-ExprType TypeAssertExprAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType TypeAssertExprAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(x);
     resolver->accept(typ);
-    return typ ? ExprType(typ->baseType(), typ->refLevel()) : ExprType();
+    return typ ? ResolvedType(typ) : ResolvedType();
 }
 
 void TypeAssertExprAST::accept0(ASTVisitor *visitor)
@@ -1108,6 +1111,29 @@ unsigned FieldGroupAST::lastToken() const
     return 0;
 }
 
+TupleTypeAST *FieldGroupAST::callType(MemoryPool *pool) const
+{
+    TupleTypeAST *result = new (pool) TupleTypeAST;
+    TypeListAST **type_ptr = &result->types;
+
+    for (FieldListAST *field_it = fields; field_it; field_it = field_it->next) {
+        if (FieldAST *field = field_it->value) {
+            TypeAST *typ = field->type;
+            if (field->names) {
+                for (DeclIdentListAST *decl_it = field->names; decl_it; decl_it = decl_it->next) {
+                    *type_ptr = new (pool) TypeListAST(typ);
+                    type_ptr = &(*type_ptr)->next;
+                }
+            } else {
+                *type_ptr = new (pool) TypeListAST(typ);
+                type_ptr = &(*type_ptr)->next;
+            }
+        }
+    }
+
+    return result;
+}
+
 QString FieldGroupAST::describe() const
 {
     QString result;
@@ -1158,9 +1184,9 @@ unsigned StructTypeAST::lastToken() const
     return 0;
 }
 
-Symbol *StructTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolver) const
+Symbol *StructTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolver, int refLvl) const
 {
-    if (fields) {
+    if (fields && (refLvl == 0 || refLvl == -1)) {
         for (FieldListAST *it = fields->fields; it; it = it->next) {
             if (FieldAST *field = it->value) {
                 for (DeclIdentListAST *ident_it = field->names; ident_it; ident_it = ident_it->next) {
@@ -1188,9 +1214,11 @@ Symbol *StructTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolve
 }
 
 void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                          ResolveContext *resolver, LookupContext::Predicate) const
+                                          ResolveContext *resolver,
+                                          int refLvl,
+                                          LookupContext::Predicate) const
 {
-    if (fields) {
+    if (fields && (refLvl == 0 || refLvl == -1)) {
         for (FieldListAST *it = fields->fields; it; it = it->next) {
             if (FieldAST *field = it->value) {
                 for (DeclIdentListAST *ident_it = field->names; ident_it; ident_it = ident_it->next) {
@@ -1223,10 +1251,10 @@ void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemIn
 QString StructTypeAST::describe() const
 { return QStringLiteral("struct"); }
 
-ExprType StructTypeAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType StructTypeAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(fields);
-    return ExprType(baseType(), refLevel());
+    return ResolvedType(this);
 }
 
 void StructTypeAST::accept0(ASTVisitor *visitor)
@@ -1259,25 +1287,8 @@ unsigned FuncTypeAST::lastToken() const
     return 0;
 }
 
-ExprType FuncTypeAST::call(ResolveContext *) const
-{
-    QList<const Type *> types;
-    if (results) {
-        for (FieldListAST *field_it = results->fields; field_it; field_it = field_it->next) {
-            if (FieldAST *field = field_it->value) {
-                const Type *typ = field->type ? field->type : Control::unresolvedType();
-                if (field->names) {
-                    for (DeclIdentListAST *names_it = field->names; names_it; names_it = names_it->next)
-                        types.push_back(typ);
-                } else {
-                    types.push_back(typ);
-                }
-            }
-        }
-    }
-
-    return ExprType(types);
-}
+ResolvedType FuncTypeAST::callType(ResolveContext *, int refLvl) const
+{ return _callType ? (refLvl ? Control::unresolvedTupleType() : _callType) : Control::voidType(); }
 
 int FuncTypeAST::countInTurple() const
 {
@@ -1302,11 +1313,11 @@ QString FuncTypeAST::describe() const
     return result;
 }
 
-ExprType FuncTypeAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType FuncTypeAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(params);
     resolver->accept(results);
-    return ExprType(baseType(), refLevel());
+    return ResolvedType(this);
 }
 
 void FuncTypeAST::accept0(ASTVisitor *visitor)
@@ -1336,9 +1347,11 @@ unsigned InterfaceTypeAST::lastToken() const
     return 0;
 }
 
-Symbol *InterfaceTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolver) const
+Symbol *InterfaceTypeAST::lookupMember(const IdentAST *ast,
+                                       ResolveContext *resolver,
+                                       int refLvl) const
 {
-    if (methods) {
+    if (methods && (refLvl == 0 || refLvl == -1)) {
         for (FieldListAST *it = methods->fields; it; it = it->next) {
             if (FieldAST *field = it->value) {
                 for (DeclIdentListAST *ident_it = field->names; ident_it; ident_it = ident_it->next) {
@@ -1357,13 +1370,16 @@ Symbol *InterfaceTypeAST::lookupMember(const IdentAST *ast, ResolveContext *reso
             }
         }
     }
+
     return 0;
 }
 
 void InterfaceTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                             ResolveContext *resolver, LookupContext::Predicate) const
+                                             ResolveContext *resolver,
+                                             int refLvl,
+                                             LookupContext::Predicate) const
 {
-    if (methods) {
+    if (methods && (refLvl == 0 || refLvl == -1)) {
         for (FieldListAST *it = methods->fields; it; it = it->next) {
             if (FieldAST *field = it->value) {
                 for (DeclIdentListAST *ident_it = field->names; ident_it; ident_it = ident_it->next) {
@@ -1387,11 +1403,11 @@ void InterfaceTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalIte
 QString InterfaceTypeAST::describe() const
 { return QStringLiteral("interface"); }
 
-ExprType InterfaceTypeAST::resolveExprType(ResolveContext *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType InterfaceTypeAST::resolve(ResolveContext *) const
+{ return ResolvedType(this); }
 
-ExprType InterfaceTypeAST::checkExprType(GoCheckSymbols *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType InterfaceTypeAST::check(GoCheckSymbols *) const
+{ return ResolvedType(this); }
 
 void InterfaceTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -1423,23 +1439,20 @@ unsigned MapTypeAST::lastToken() const
     return 0;
 }
 
-const Type *MapTypeAST::elementsType(ResolveContext *) const
-{ return value->asType(); }
+ResolvedType MapTypeAST::elementsType(ResolveContext *, int refLvl) const
+{ return !refLvl ? value->asType() : 0; }
 
-const Type *MapTypeAST::indexType(ResolveContext *) const
-{ return key->asType(); }
+ResolvedType MapTypeAST::indexType(ResolveContext *, int refLvl) const
+{ return !refLvl ? key->asType() : 0; }
 
 QString MapTypeAST::describe() const
 {
     return QStringLiteral("map[") + (key ? key->describe() : QString()) +
-            QStringLiteral("]") + (value ? value->describe() : QString());
+           QStringLiteral("]") + (value ? value->describe() : QString());
 }
 
-ExprType MapTypeAST::resolveExprType(ResolveContext *) const
-{ return ExprType(baseType(), refLevel()); }
-
-ExprType MapTypeAST::checkExprType(GoCheckSymbols *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType MapTypeAST::check(GoCheckSymbols *) const
+{ return ResolvedType(this); }
 
 void MapTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -2125,61 +2138,53 @@ unsigned TypeSpecAST::lastToken() const
     return 0;
 }
 
-void TypeSpecAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                        ResolveContext *resolver, LookupContext::Predicate) const
-{
-    if (!name || !name->ident || !type)
-        return;
-
-    if (scope) {
-        if (PackageType *pkg = resolver->fileScopePackageType(scope))
-            pkg->fillMethods(completions, name->ident, resolver);
-    }
-
-    type->fillMemberCompletions(completions, resolver);
-}
-
-Symbol *TypeSpecAST::lookupMember(const IdentAST *ast, ResolveContext *resolver) const
+Symbol *TypeSpecAST::lookupMember(const IdentAST *ast, ResolveContext *resolver, int refLvl) const
 {
     if (!name || !name->ident || !type)
         return 0;
 
-    if (scope) {
+    if (scope && (refLvl == 0 || refLvl == -1)) {
         PackageType *pkg = resolver->fileScopePackageType(scope);
         if (Symbol *method = pkg->lookupMethod(name->ident, ast->ident, resolver))
             return method;
     }
 
-    return type->lookupMember(ast, resolver);
+    return type->lookupMember(ast, resolver, refLvl);
 }
 
-const Type *TypeSpecAST::indexType(ResolveContext *resolver) const
-{ return type ? type->indexType(resolver) : 0; }
+void TypeSpecAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                                        ResolveContext *resolver,
+                                        int refLvl,
+                                        LookupContext::Predicate) const
+{
+    if (!name || !name->ident || !type)
+        return;
 
-const Type *TypeSpecAST::elementsType(ResolveContext *resolver) const
-{ return type ? type->elementsType(resolver) : 0; }
+    if (scope && (refLvl == 0 || refLvl == -1)) {
+        if (PackageType *pkg = resolver->fileScopePackageType(scope))
+            pkg->fillMethods(completions, name->ident, resolver);
+    }
 
-const Type *TypeSpecAST::chanValueType() const
-{ return type ? type->chanValueType() : 0; }
+    type->fillMemberCompletions(completions, resolver, refLvl);
+}
+
+ResolvedType TypeSpecAST::indexType(ResolveContext *resolver, int refLvl) const
+{ return type ? type->indexType(resolver, refLvl) : 0; }
+
+ResolvedType TypeSpecAST::elementsType(ResolveContext *resolver, int refLvl) const
+{ return type ? type->elementsType(resolver, refLvl) : 0; }
+
+ResolvedType TypeSpecAST::callType(ResolveContext *resolver, int refLvl) const
+{ return type ? type->callType(resolver, refLvl) : Control::unresolvedTupleType(); }
+
+ResolvedType TypeSpecAST::chanValueType(ResolveContext *resolver, int refLvl) const
+{ return type ? type->chanValueType(resolver, refLvl) : 0; }
 
 QString TypeSpecAST::describe() const
 { return name ? name->ident->toString() : QString(); }
 
-bool TypeSpecAST::isString(ResolveContext *) const
-{
-    if (type)
-        if (IdentAST *typIdent = type->asIdent())
-            return typIdent->ident->isBuiltinStringTypeIdentifier();
-    return false;
-}
-
-bool TypeSpecAST::isIntegral(ResolveContext *) const
-{
-    if (type)
-        if (IdentAST *typIdent = type->asIdent())
-            return typIdent->ident->isBuiltinIntegralTypeIdentifier();
-    return false;
-}
+Type::BuiltingKind TypeSpecAST::builtinKind(ResolveContext *resolver, int refLvl) const
+{ return type ? type->builtinKind(resolver, refLvl) : Other; }
 
 bool TypeSpecAST::hasEmbedOrEqualTo(const TypeSpecAST *spec, ResolveContext *ctx) const
 {
@@ -2261,11 +2266,11 @@ unsigned ParenTypeAST::lastToken() const
 QString ParenTypeAST::describe() const
 { return QStringLiteral("(") + (x ? x->describe() : QString()) + QStringLiteral(")"); }
 
-ExprType ParenTypeAST::resolveExprType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver) : ExprType(); }
+ResolvedType ParenTypeAST::resolve(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver) : ResolvedType(); }
 
-ExprType ParenTypeAST::checkExprType(GoCheckSymbols *resolver) const
-{ return x ? x->checkExprType(resolver) : ExprType(); }
+ResolvedType ParenTypeAST::check(GoCheckSymbols *resolver) const
+{ return x ? x->check(resolver) : ResolvedType(); }
 
 void ParenTypeAST::accept0(ASTVisitor *visitor)
 {
@@ -2285,66 +2290,47 @@ unsigned PackageTypeAST::lastToken() const
     return typeName->lastToken();
 }
 
-Symbol *PackageTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolver) const
+Symbol *PackageTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolver, int refLvl) const
 {
-    if (fileScope) {
-        if (const PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
-            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
-                if (symbol->kind() == Symbol::Typ) {
-                    const Type *resolvedType = symbol->type(resolver);
-                    if (Symbol *fieldSymbol = resolvedType->lookupMember(ast, resolver))
-                        return fieldSymbol;
-                }
-            }
-        }
-    }
+    if (fileScope)
+        if (const PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
+                if (symbol->kind() == Symbol::Typ)
+                    return symbol->type(resolver).lookupMember(ast, resolver, refLvl);
 
     return 0;
 }
 
 void PackageTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                           ResolveContext *resolver, LookupContext::Predicate) const
+                                           ResolveContext *resolver,
+                                           int refLvl,
+                                           LookupContext::Predicate) const
 {
-    if (fileScope) {
-        if (const PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
-            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
-                if (symbol->kind() == Symbol::Typ) {
-                    if (const Type *resolvedType = symbol->type(resolver))
-                        resolvedType->fillMemberCompletions(completions, resolver);
-                }
-            }
-        }
-    }
+    if (fileScope)
+        if (const PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
+                if (symbol->kind() == Symbol::Typ)
+                    symbol->type(resolver).fillMemberCompletions(completions, resolver, refLvl);
 }
 
-const Type *PackageTypeAST::elementsType(ResolveContext *resolver) const
+ResolvedType PackageTypeAST::elementsType(ResolveContext *resolver, int refLvl) const
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
-            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
-                if (symbol->kind() == Symbol::Typ) {
-                    const Type *resolvedType = symbol->type(resolver);
-                    return resolvedType->elementsType(resolver);
-                }
-            }
-        }
-    }
+    if (fileScope)
+        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
+                if (symbol->kind() == Symbol::Typ)
+                    return symbol->type(resolver).rangeValue(resolver, refLvl);
 
     return 0;
 }
 
-const Type *PackageTypeAST::indexType(ResolveContext *resolver) const
+ResolvedType PackageTypeAST::indexType(ResolveContext *resolver, int refLvl) const
 {
-    if (fileScope) {
-        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
-            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
-                if (symbol->kind() == Symbol::Typ) {
-                    const Type *resolvedType = symbol->type(resolver);
-                    return resolvedType->indexType(resolver);
-                }
-            }
-        }
-    }
+    if (fileScope)
+        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
+            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
+                if (symbol->kind() == Symbol::Typ)
+                    return symbol->type(resolver).rangeKey(resolver, refLvl);
 
     return 0;
 }
@@ -2352,29 +2338,18 @@ const Type *PackageTypeAST::indexType(ResolveContext *resolver) const
 QString PackageTypeAST::describe() const
 { return packageAlias->ident->toString() + QStringLiteral(".") + (typeName ? typeName->ident->toString() : QString()); }
 
-bool PackageTypeAST::isString(ResolveContext *resolver) const
+Type::BuiltingKind PackageTypeAST::builtinKind(ResolveContext *resolver, int refLvl) const
 {
     if (fileScope)
         if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
                 if (const TypeSpecAST *typSpec = symbol->typeSpec())
-                    return typSpec->isString(resolver);
+                    return typSpec->builtinKind(resolver, refLvl);
 
-    return false;
+    return Other;
 }
 
-bool PackageTypeAST::isIntegral(ResolveContext *resolver) const
-{
-    if (fileScope)
-        if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope))
-            if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver))
-                if (const TypeSpecAST *typSpec = symbol->typeSpec())
-                    return typSpec->isIntegral(resolver);
-
-    return false;
-}
-
-ExprType PackageTypeAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType PackageTypeAST::check(GoCheckSymbols *resolver) const
 {
     if (fileScope) {
         if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
@@ -2382,13 +2357,13 @@ ExprType PackageTypeAST::checkExprType(GoCheckSymbols *resolver) const
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (const TypeSpecAST *typSpec = symbol->typeSpec()) {
                     resolver->addUse(typeName, GoSemanticHighlighter::Type);
-                    return ExprType(typSpec->baseType(), typSpec->refLevel());
+                    return ResolvedType(typSpec);
                 }
             }
         }
     }
 
-    return ExprType();
+    return ResolvedType();
 }
 
 Symbol *PackageTypeAST::declaration(ResolveContext *resolver)
@@ -2411,7 +2386,7 @@ const TypeSpecAST *PackageTypeAST::typeSpec(ResolveContext *resolver) const
         if (PackageType *packageLookupcontext = resolver->packageTypeForAlias(packageAlias->ident->toString(), fileScope)) {
             if (Symbol *symbol = packageLookupcontext->lookupMember(typeName, resolver)) {
                 if (symbol->kind() == Symbol::Typ)
-                    return dynamic_cast<const TypeSpecAST *>(symbol->type(resolver));
+                    return dynamic_cast<const TypeSpecAST *>(symbol->type(resolver).type());
             }
         }
     }
@@ -2428,50 +2403,55 @@ void PackageTypeAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-Symbol *TypeIdentAST::lookupMember(const IdentAST *ast, ResolveContext *resolver) const
+Symbol *TypeIdentAST::lookupMember(const IdentAST *ast, ResolveContext *resolver, int refLvl) const
 {
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
-        if (symbol->kind() == Symbol::Typ) {
-            const Type *resolvedType = symbol->type(resolver);
-            if (Symbol *fieldSymbol = resolvedType->lookupMember(ast, resolver))
-                return fieldSymbol;
-        }
-    }
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (symbol->kind() == Symbol::Typ)
+            return symbol->type(resolver).lookupMember(ast, resolver, refLvl);
 
     return 0;
 }
 
 void TypeIdentAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                         ResolveContext *resolver, LookupContext::Predicate) const
+                                         ResolveContext *resolver, int refLvl, LookupContext::Predicate) const
 {
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
-        if (symbol->kind() == Symbol::Typ) {
-            if (const Type *resolvedType = symbol->type(resolver))
-                resolvedType->fillMemberCompletions(completions, resolver);
-        }
-    }
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (symbol->kind() == Symbol::Typ)
+            symbol->type(resolver).fillMemberCompletions(completions, resolver, refLvl);
 }
 
-const Type *TypeIdentAST::elementsType(ResolveContext *resolver) const
+ResolvedType TypeIdentAST::elementsType(ResolveContext *resolver, int refLvl) const
 {
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
-        if (symbol->kind() == Symbol::Typ) {
-            const Type *resolvedType = symbol->type(resolver);
-            return resolvedType->elementsType(resolver);
-        }
-    }
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (symbol->kind() == Symbol::Typ)
+            return symbol->type(resolver).rangeValue(resolver, refLvl);
 
     return 0;
 }
 
-const Type *TypeIdentAST::indexType(ResolveContext *resolver) const
+ResolvedType TypeIdentAST::indexType(ResolveContext *resolver, int refLvl) const
 {
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver)) {
-        if (symbol->kind() == Symbol::Typ) {
-            const Type *resolvedType = symbol->type(resolver);
-            return resolvedType->indexType(resolver);
-        }
-    }
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (symbol->kind() == Symbol::Typ)
+            return symbol->type(resolver).rangeKey(resolver, refLvl);
+
+    return 0;
+}
+
+ResolvedType TypeIdentAST::callType(ResolveContext *resolver, int refLvl) const
+{
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (symbol->kind() == Symbol::Typ)
+            return symbol->type(resolver).call(resolver, refLvl);
+
+    return Control::unresolvedTupleType();
+}
+
+ResolvedType TypeIdentAST::chanValueType(ResolveContext *resolver, int refLvl) const
+{
+    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
+        if (symbol->kind() == Symbol::Typ)
+            return symbol->type(resolver).chanValue(resolver, refLvl);
 
     return 0;
 }
@@ -2479,26 +2459,18 @@ const Type *TypeIdentAST::indexType(ResolveContext *resolver) const
 QString TypeIdentAST::describe() const
 { return ident->ident->toString(); }
 
-bool TypeIdentAST::isString(ResolveContext *resolver) const
+Type::BuiltingKind TypeIdentAST::builtinKind(ResolveContext *resolver, int refLvl) const
 {
     if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
         if (const TypeSpecAST *typeSpec = symbol->typeSpec())
-            return typeSpec->isString(resolver);
-    return false;
+            return typeSpec->builtinKind(resolver, refLvl);
+    return Other;
 }
 
-bool TypeIdentAST::isIntegral(ResolveContext *resolver) const
-{
-    if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
-        if (const TypeSpecAST *typeSpec = symbol->typeSpec())
-            return typeSpec->isIntegral(resolver);
-    return false;
-}
-
-ExprType TypeIdentAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType TypeIdentAST::check(GoCheckSymbols *resolver) const
 {
     resolver->addUse(ident, GoSemanticHighlighter::Type);
-    return ExprType(baseType(), refLevel());
+    return ResolvedType(this);
 }
 
 Symbol *TypeIdentAST::declaration(ResolveContext *resolver)
@@ -2557,31 +2529,33 @@ unsigned RhsExprListAST::lastToken() const
     return 0;
 }
 
-const Type *RhsExprListAST::type(ResolveContext *resolver, int index)
-{ return resolveExprType(resolver).type(index); }
-
-ExprType RhsExprListAST::resolveExprType(ResolveContext *resolver) const
+ResolvedType RhsExprListAST::type(ResolveContext *resolver, int index)
 {
-    ExprType result(Control::voidType());
+    for (ExprListAST *expr_it = list; expr_it; expr_it = expr_it->next) {
+        if (ExprAST *expr = expr_it->value) {
+            ResolvedType typ = expr->resolve(resolver);
+            int tupleSize = typ.type()->countInTurple();
+            if (!tupleSize)     // unresolved tuple
+                return ResolvedType();
+            if (index < tupleSize)
+                return typ.type()->extractFromTuple(index, typ.referenceLevel());
+            index -= tupleSize;
+        }
+    }
 
-    for (ExprListAST *expr_it = list; expr_it; expr_it = expr_it->next)
-        if (!result.applyCommaJoin(expr_it->value, resolver))
-            break;
-
-    result.removeFirst();
-    return result;
+    return ResolvedType();
 }
 
-ExprType RhsExprListAST::checkExprType(GoCheckSymbols *resolver) const
+ResolvedType RhsExprListAST::resolve(ResolveContext *) const
 {
-    ExprType result(Control::voidType());
+    qDebug() << "RhsExprListAST::resolve: should be unreachable...";
+    return ResolvedType();
+}
 
-    for (ExprListAST *expr_it = list; expr_it; expr_it = expr_it->next)
-        if (!result.applyCommaJoin(expr_it->value, resolver))
-            break;
-
-    result.removeFirst();
-    return result;
+ResolvedType RhsExprListAST::check(GoCheckSymbols *) const
+{
+    qDebug() << "RhsExprListAST::check: unreachable";
+    return ResolvedType();
 }
 
 void RhsExprListAST::accept0(ASTVisitor *visitor)
@@ -2606,17 +2580,23 @@ unsigned RangeExpAST::lastToken() const
     return 0;
 }
 
-const Type *RangeExpAST::valueType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver).rangeValue(resolver).type() : 0; }
+ResolvedType RangeExpAST::rangeValueType(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver).rangeValue(resolver) : ResolvedType(); }
 
-const Type *RangeExpAST::keyType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver).keyValue(resolver).type() : 0; }
+ResolvedType RangeExpAST::rangeKeyType(ResolveContext *resolver) const
+{ return x ? x->resolve(resolver).rangeKey(resolver) : ResolvedType(); }
 
-ExprType RangeExpAST::resolveExprType(ResolveContext *resolver) const
-{ return x ? x->resolveExprType(resolver) : ExprType(); }
+ResolvedType RangeExpAST::resolve(ResolveContext *) const
+{
+    qDebug() << "RangeExpAST::resolve should be unreachable";
+    return ResolvedType();
+}
 
-ExprType RangeExpAST::checkExprType(GoCheckSymbols *resolver) const
-{ return x ? x->resolveExprType(resolver) : ExprType(); }
+ResolvedType RangeExpAST::check(GoCheckSymbols *resolver) const
+{
+    qDebug() << "RangeExpAST::check: unreachable";
+    return x ? x->resolve(resolver) : ResolvedType();
+}
 
 void RangeExpAST::accept0(ASTVisitor *visitor)
 {
@@ -2638,8 +2618,8 @@ unsigned EllipsisTypeAST::lastToken() const
     return t_ellipsis;
 }
 
-const Type *EllipsisTypeAST::elementsType(ResolveContext *) const
-{ return ellipsisElement ? ellipsisElement->asType() : 0; }
+ResolvedType EllipsisTypeAST::elementsType(ResolveContext *, int refLvl) const
+{ return ellipsisElement && !refLvl ? ellipsisElement->asType() : 0; }
 
 QString EllipsisTypeAST::describe() const
 { return QStringLiteral("...") + (ellipsisElement ? ellipsisElement->describe() : QString()); }
@@ -2652,10 +2632,113 @@ void EllipsisTypeAST::accept0(ASTVisitor *visitor)
     visitor->endVisit(this);
 }
 
-ExprType TypeAST::resolveExprType(ResolveContext *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType TypeAST::resolve(ResolveContext *) const
+{ return ResolvedType(this); }
 
-ExprType TypeAST::checkExprType(GoCheckSymbols *) const
-{ return ExprType(baseType(), refLevel()); }
+ResolvedType TypeAST::check(GoCheckSymbols *) const
+{ return ResolvedType(this); }
+
+Symbol *TupleTypeAST::lookupMember(const IdentAST *ident,
+                                   ResolveContext *resolver,
+                                   int refLvl) const
+{
+    if (types && types->value && !types->next && !refLvl)
+        return types->value->lookupMember(ident, resolver, refLvl);
+
+    return 0;
+}
+
+void TupleTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                                         ResolveContext *resolver,
+                                         int refLvl,
+                                         LookupContext::Predicate predicate) const
+{
+    if (types && types->value && !types->next && !refLvl)
+        types->value->fillMemberCompletions(completions, resolver, refLvl, predicate);
+}
+
+int TupleTypeAST::countInTurple() const
+{
+    if (!types)
+        return 1;   // void type
+
+    int result = 0;
+    for (TypeListAST *type_it = types; type_it; type_it = type_it->next)
+        ++result;
+    return result;
+}
+
+ResolvedType TupleTypeAST::extractFromTuple(int index, int refLvl) const
+{
+    if (!types)
+        return index ? ResolvedType() : ResolvedType(Control::voidType()); // void type
+
+    if (refLvl) {
+        if (types->value && !types->next && !index)
+            return ResolvedType(types->value).setRefLevel(refLvl);
+        return ResolvedType();
+    }
+
+    int current = 0;
+    for (TypeListAST *type_it = types; type_it; type_it = type_it->next, current++)
+        if (current == index)
+            return ResolvedType(type_it->value);
+    return ResolvedType();
+}
+
+ResolvedType TupleTypeAST::indexType(ResolveContext *resolver, int refLvl) const
+{
+    if (types && types->value && !types->next)
+        return types->value->indexType(resolver, refLvl);
+
+    return 0;
+}
+
+ResolvedType TupleTypeAST::elementsType(ResolveContext *resolver, int refLvl) const
+{
+    if (types && types->value && !types->next)
+        return types->value->elementsType(resolver, refLvl);
+
+    return 0;
+}
+
+ResolvedType TupleTypeAST::chanValueType(ResolveContext *resolver, int refLvl) const
+{
+    if (types && types->value && !types->next)
+        return types->value->chanValueType(resolver, refLvl);
+
+    return 0;
+}
+
+QString TupleTypeAST::describe() const
+{
+    QString result = "";
+
+    if (types) {
+        result += QStringLiteral("(");
+        bool isFirst = true;
+        for (TypeListAST *type_it = types; type_it; type_it = type_it->next) {
+            if (!isFirst)
+                result += QStringLiteral(",");
+            else
+                isFirst = false;
+            result += type_it->value->describe();
+        }
+        result += QStringLiteral(")");
+    }
+
+    return result;
+}
+
+Type::BuiltingKind TupleTypeAST::builtinKind(ResolveContext *resolver, int refLvl) const
+{
+    if (types && types->value && !types->next)
+        return types->value->builtinKind(resolver, refLvl);
+
+    return Other;
+}
+
+void TupleTypeAST::accept0(ASTVisitor *)
+{ }
 
 }   // namespace GoTools

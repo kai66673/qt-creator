@@ -87,6 +87,8 @@ private:
     FieldGroupAST *parseParameters(Scope *scope, bool ellipsisOk);
     FieldGroupAST *parseResult(Scope *scope);
     FieldListAST *parseParameterList(Scope *scope, bool ellipsisOk);
+    ExprAST *tryParseNewExpr(bool &isNewOrMakeExpr);
+    ExprAST *tryParseMakeExpr(bool &isNewOrMakeExpr);
     ExprAST *parseRhs();
     ExprAST *parseRhsOrType();
     ExprListAST *parseRhsList();
@@ -96,7 +98,7 @@ private:
     ExprAST *parseBinaryExpr(int prec1);
     ExprAST *parseUnaryExpr();
     ExprAST *parsePrimaryExpr();
-    ExprAST *parseOperand();
+    ExprAST *parseOperand(bool &isNewOrMakeExpr);
     ExprAST *parseSelector(ExprAST *x);
     ExprAST *parseTypeAssertion(ExprAST *x);
     ExprAST *parseIndexOrSlice(ExprAST *x);

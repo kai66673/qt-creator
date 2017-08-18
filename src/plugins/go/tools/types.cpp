@@ -23,11 +23,23 @@
 **
 ****************************************************************************/
 #include "types.h"
-#include "exprtype.h"
+#include "resolvedtype.h"
 
 namespace GoTools {
 
-ExprType Type::call(ResolveContext *) const
-{ return ExprType(Control::unresolvedTupleType()); }
+ResolvedType Type::callType(ResolveContext *, int) const
+{ return Control::unresolvedTupleType(); }
+
+ResolvedType Type::extractFromTuple(int index, int refLvl) const
+{ return index ? ResolvedType() : ResolvedType(this).setRefLevel(refLvl); }
+
+ResolvedType BuiltinType::indexType(ResolveContext *, int) const
+{ return ResolvedType(); }
+
+ResolvedType BuiltinType::elementsType(ResolveContext *, int) const
+{ return ResolvedType(); }
+
+ResolvedType BuiltinType::chanValueType(ResolveContext *, int) const
+{ return ResolvedType(); }
 
 }   // namespace GoTools

@@ -82,6 +82,8 @@ public:
     virtual bool visit(CallExprAST *) { return true; }
     virtual bool visit(StarTypeAST *) { return true; }
     virtual bool visit(StarExprAST *) { return true; }
+    virtual bool visit(NewExprAST *) { return true; }
+    virtual bool visit(MakeExprAST *) { return true; }
     virtual bool visit(UnaryExprAST *) { return true; }
     virtual bool visit(ArrowUnaryExprAST *) { return true; }
     virtual bool visit(RefUnaryExprAST *) { return true; }
@@ -152,6 +154,8 @@ public:
     virtual void endVisit(CallExprAST *) {}
     virtual void endVisit(StarTypeAST *) {}
     virtual void endVisit(StarExprAST *) {}
+    virtual void endVisit(NewExprAST *) {}
+    virtual void endVisit(MakeExprAST *) {}
     virtual void endVisit(UnaryExprAST *) {}
     virtual void endVisit(ArrowUnaryExprAST *) {}
     virtual void endVisit(RefUnaryExprAST *) {}

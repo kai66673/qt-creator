@@ -172,7 +172,7 @@ bool GoCheckSymbols::visit(PackageTypeAST *ast)
 
 bool GoCheckSymbols::visit(SelectorExprAST *ast)
 {
-    if (Symbol *s = ast->x ? ast->x->checkExprType(this).lookupMember(ast->sel, this) : 0)
+    if (Symbol *s = ast->x ? ast->x->check(this).lookupMember(ast->sel, this) : 0)
         addUse(ast->sel, kindForSymbol(s));
 
     return false;
@@ -191,7 +191,7 @@ const Type *GoCheckSymbols::acceptCompositLiteral(const CompositeLitAST *ast)
     } else if (!m_nestedCimpositLitType.empty()) {
         type = m_nestedCimpositLitType.top();
         if (type)
-            type = type->elementsType(this);
+            type = type->elementsType(this).type();
     }
 
     m_nestedCimpositLitType.push(type);

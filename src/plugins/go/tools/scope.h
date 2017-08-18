@@ -67,9 +67,15 @@ public:
 
     Scope *outer() const;
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const override;
+    // LookupContext implementation
+    virtual Symbol *lookupMember(const IdentAST *ident,
+                                 ResolveContext *resolver,
+                                 int refLevel = 0) const override;
+
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ResolveContext *resolver, Predicate predicate = 0) const override;
+                                       ResolveContext *resolver,
+                                       int refLevel = 0,
+                                       Predicate predicate = 0) const override;
 
     virtual FileScope *asFileScope() { return 0; }
     virtual bool isLocal() const { return m_outer; }
@@ -107,9 +113,16 @@ public:
     FileScope(GoSource *source);
     void declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl);
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const override;
+    // LookupContext implementation
+    virtual Symbol *lookupMember(const IdentAST *ident,
+                                 ResolveContext *resolver,
+                                 int refLevel = 0) const override;
+
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ResolveContext *resolver, Predicate predicate = 0) const override;
+                                       ResolveContext *resolver,
+                                       int refLevel = 0,
+                                       Predicate predicate = 0) const override;
+
     Symbol *lookupMethod(const Identifier *typeId, const Identifier *funcId);
     void fillMethods(QList<TextEditor::AssistProposalItemInterface *> &completions,
                      const Identifier *typeId);

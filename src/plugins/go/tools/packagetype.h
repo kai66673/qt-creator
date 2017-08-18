@@ -29,6 +29,8 @@
 
 namespace GoTools {
 
+class ResolvedType;
+
 class PackageType: public Type
 {
 public:
@@ -40,17 +42,22 @@ public:
                      const Identifier *typeId, ResolveContext *);
     Symbol *lookup(const Identifier *ident) const;
 
-    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *) const override;
-    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ResolveContext *, Predicate = 0) const override;
+    // LookupContext implementation
+    virtual Symbol *lookupMember(const IdentAST *ident,
+                                 ResolveContext *,
+                                 int refLevel = 0) const override;
 
-    virtual const Type *indexType(ResolveContext *) const override { return 0; }
-    virtual const Type *elementsType(ResolveContext *) const override { return 0; }
-    virtual const Type *chanValueType() const override { return 0; }
+    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                                       ResolveContext *,
+                                       int refLevel = 0,
+                                       Predicate = 0) const override;
+
+    virtual ResolvedType indexType(ResolveContext *, int = 0) const override;
+    virtual ResolvedType elementsType(ResolveContext *, int = 0) const override;
+    virtual ResolvedType chanValueType(ResolveContext *, int = 0) const override;
 
     virtual QString describe() const override { return QLatin1String("package"); }
-    virtual bool isString(ResolveContext *) const override { return false; }
-    virtual bool isIntegral(ResolveContext *) const override { return false; }
+    virtual BuiltingKind builtinKind(ResolveContext *, int = 0) const override { return Other; }
 
 private:
     QHash<QString, GoSource::Ptr> &m_sources;

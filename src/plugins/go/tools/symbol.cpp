@@ -26,6 +26,7 @@
 #include "scope.h"
 #include "ast.h"
 #include "goiconprovider.h"
+#include "resolvedtype.h"
 
 namespace GoTools {
 
@@ -89,8 +90,8 @@ QIcon Symbol::icon(Symbol::Kind kind)
 ExprAST *VarDecl::declExpr() const
 { return _decl; }
 
-const Type *VarDecl::type(ResolveContext *)
-{ return _decl->asType(); }
+ResolvedType VarDecl::type(ResolveContext *) const
+{ return ResolvedType(_decl); }
 
 QString VarDecl::describeType(ResolveContext *) const
 { return _decl->describe(); }
@@ -101,8 +102,8 @@ Symbol::Kind VarDecl::kind() const
 ExprAST *FieldDecl::declExpr() const
 { return _decl; }
 
-const Type *FieldDecl::type(ResolveContext *)
-{ return _decl->asType(); }
+ResolvedType FieldDecl::type(ResolveContext *) const
+{ return ResolvedType(_decl); }
 
 QString FieldDecl::describeType(ResolveContext *) const
 { return _decl->describe(); }
@@ -113,8 +114,8 @@ Symbol::Kind FieldDecl::kind() const
 ExprAST *FuncDecl::declExpr() const
 { return _decl; }
 
-const Type *FuncDecl::type(ResolveContext *)
-{ return _decl; }
+ResolvedType FuncDecl::type(ResolveContext *) const
+{ return ResolvedType(_decl); }
 
 QString FuncDecl::describeType(ResolveContext *) const
 { return _decl->describe(); }
@@ -125,8 +126,8 @@ Symbol::Kind FuncDecl::kind() const
 ExprAST *MethodDecl::declExpr() const
 { return _decl; }
 
-const Type *MethodDecl::type(ResolveContext *)
-{ return _decl->asType(); }
+ResolvedType MethodDecl::type(ResolveContext *) const
+{ return ResolvedType(_decl); }
 
 QString MethodDecl::describeType(ResolveContext *) const
 { return  QString("(%1)%2").arg(_recvIdent->ident->ident->toString()).arg(_decl->describe()); }
@@ -140,8 +141,8 @@ TypeIdentAST *MethodDecl::recvIdent() const
 ExprAST *ConstDecl::declExpr() const
 { return 0; }
 
-const Type *ConstDecl::type(ResolveContext *resolver)
-{ return _value ? _value->resolveExprType(resolver).type() : Control::intBuiltinType(); }
+ResolvedType ConstDecl::type(ResolveContext *resolver) const
+{ return _value ? _value->resolve(resolver) : ResolvedType(Control::integralBuiltinType()); }
 
 QString ConstDecl::describeType(ResolveContext *) const
 { return QString(); }
@@ -152,8 +153,8 @@ Symbol::Kind ConstDecl::kind() const
 ExprAST *TypeDecl::declExpr() const
 { return _decl->type; }
 
-const Type *TypeDecl::type(ResolveContext *)
-{ return _decl; }
+ResolvedType TypeDecl::type(ResolveContext *) const
+{ return ResolvedType(_decl); }
 
 const TypeSpecAST *TypeDecl::typeSpec() const
 { return _decl; }
@@ -167,15 +168,11 @@ Symbol::Kind TypeDecl::kind() const
 ExprAST *ShortVarDecl::declExpr() const
 { return _decl; }
 
-const Type *ShortVarDecl::type(ResolveContext *resolver)
+ResolvedType ShortVarDecl::type(ResolveContext *resolver) const
 { return _decl->type(resolver, _indexInTuple); }
 
 QString ShortVarDecl::describeType(ResolveContext *resolver) const
-{
-    if (const Type *type = _decl->type(resolver, _indexInTuple))
-        return type->describe();
-    return QString();
-}
+{ return _decl->type(resolver, _indexInTuple).describe(); }
 
 Symbol::Kind ShortVarDecl::kind() const
 { return Var; }
@@ -183,15 +180,11 @@ Symbol::Kind ShortVarDecl::kind() const
 ExprAST *RangeKeyDecl::declExpr() const
 { return _decl; }
 
-const Type *RangeKeyDecl::type(ResolveContext *resolver)
-{ return _decl->keyType(resolver); }
+ResolvedType RangeKeyDecl::type(ResolveContext *resolver) const
+{ return _decl->rangeKeyType(resolver); }
 
 QString RangeKeyDecl::describeType(ResolveContext *resolver) const
-{
-    if (const Type *type = _decl->keyType(resolver))
-        return type->describe();
-    return QString();
-}
+{ return _decl->rangeKeyType(resolver).describe(); }
 
 Symbol::Kind RangeKeyDecl::kind() const
 { return Var; }
@@ -199,15 +192,11 @@ Symbol::Kind RangeKeyDecl::kind() const
 ExprAST *RangeValueDecl::declExpr() const
 { return _decl; }
 
-const Type *RangeValueDecl::type(ResolveContext *resolver)
-{ return _decl->valueType(resolver); }
+ResolvedType RangeValueDecl::type(ResolveContext *resolver) const
+{ return _decl->rangeValueType(resolver); }
 
 QString RangeValueDecl::describeType(ResolveContext *resolver) const
-{
-    if (const Type *type = _decl->valueType(resolver))
-        return type->describe();
-    return QString();
-}
+{ return _decl->rangeValueType(resolver).describe(); }
 
 Symbol::Kind RangeValueDecl::kind() const
 { return Var; }

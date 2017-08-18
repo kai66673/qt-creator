@@ -320,7 +320,7 @@ public:
 protected:
     virtual bool visit(SelectorExprAST *ast) {
         if (m_symbol->identifier()->equalTo(ast->sel->ident)) {
-            if (const Type *type = ast->x->resolveExprType(this).typeForMemberAccess()) {
+            if (const Type *type = ast->x->resolve(this).typeForMemberAccess()) {
                 if (type == m_fieldOwnerType) {
                     m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                 } else if (const NamedType *namedType = type->asNamedType()) {
@@ -347,7 +347,7 @@ protected:
             } else if (!m_nestedCompositLitType.empty()) {
                 type = m_nestedCompositLitType.top();
                 if (type)
-                    type = type->elementsType(this);
+                    type = type->elementsType(this).type();
             }
             m_nestedCompositLitType.push(type);
             accept(ast->elements);
@@ -582,7 +582,9 @@ protected:
             if (ast->recv && ast->recv->fields && !ast->recv->fields->next) {
                 if (FieldAST *field = ast->recv->fields->value) {
                     if (TypeAST *typ = field->type) {
-                        if (m_recvIdent == typ->baseType())
+                        if (TypeAST *baseTyp = typ->asStarType())
+                            typ = baseTyp;
+                        if (m_recvIdent == typ)
                             m_results << m_source->searchResultItemForTokenIndex(ast->name->t_identifier, m_symbolLength);
                     }
                 }
@@ -594,7 +596,7 @@ protected:
 
     virtual bool visit(SelectorExprAST *ast) {
         if (ast->sel && ast->sel->ident->equalTo(m_methodDecl->identifier())) {
-            if (const Type *typ = ast->x->resolveExprType(this).typeForMemberAccess()) {
+            if (const Type *typ = ast->x->resolve(this).typeForMemberAccess()) {
                 if (const NamedType *namedType = typ->asNamedType()) {
                     if (const TypeSpecAST *typeSpec = namedType->typeSpec(this))
                         if (typeSpec->hasEmbedOrEqualTo(m_recvTypeSpec, this))

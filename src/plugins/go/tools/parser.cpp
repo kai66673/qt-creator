@@ -348,7 +348,7 @@ FuncDeclAST *Parser::parseFuncDecl()
 
     expectSemi();
 
-    FuncTypeAST *type = new (_pool) FuncTypeAST(pos, params, results);
+    FuncTypeAST *type = new (_pool) FuncTypeAST(pos, params, results, results ? results->callType(_pool) : 0);
     FuncDeclAST *decl = new (_pool) FuncDeclAST(doc, recv, ident, type, body);
     scope->setAst(decl);
     decl->scope = scope;
@@ -552,7 +552,7 @@ QPair<FuncTypeAST *, Scope *> Parser::parseFuncType()
     FieldGroupAST *results = 0;
     parseSignature(params, results, scope);
 
-    return qMakePair(new (_pool) FuncTypeAST(pos, params, results), scope);
+    return qMakePair(new (_pool) FuncTypeAST(pos, params, results, results ? results->callType(_pool) : 0), scope);
 }
 
 InterfaceTypeAST *Parser::parseInterfaceType()
@@ -630,7 +630,7 @@ FieldAST *Parser::parseMethodSpec(Scope *scope)
         FieldGroupAST *params = 0;
         FieldGroupAST *results = 0;
         parseSignature(params, results, scope);
-        FuncTypeAST *funcTyp = new (_pool) FuncTypeAST(0, params, results);
+        FuncTypeAST *funcTyp = new (_pool) FuncTypeAST(0, params, results, results ? results->callType(_pool) : 0);
         declareFunc(funcTyp, scope, idents);
         typ = funcTyp;
     } else {
@@ -729,6 +729,51 @@ FieldListAST *Parser::parseParameterList(Scope *scope, bool ellipsisOk)
         }
     }
     return params;
+}
+
+ExprAST *Parser::tryParseNewExpr(bool &isNewOrMakeExpr)
+{
+    const Identifier *id = tok.identifier;
+    unsigned t_new = next();
+
+    if (tok.kindAndPos.kind != LPAREN)
+        return new(_pool) IdentAST(t_new, id);
+
+    isNewOrMakeExpr = true;
+    unsigned t_lparen = next();
+    TypeAST *typ = tryType();
+    unsigned t_rparen = expect(RPAREN);
+    return new(_pool) NewExprAST(t_new, t_lparen, typ, t_rparen);
+}
+
+ExprAST *Parser::tryParseMakeExpr(bool &isNewOrMakeExpr)
+{
+    const Identifier *id = tok.identifier;
+    unsigned t_make = next();
+
+    if (tok.kindAndPos.kind != LPAREN)
+        return new(_pool) IdentAST(t_make, id);
+
+    isNewOrMakeExpr = true;
+    unsigned t_lparen = next();
+
+    ExprListAST *args = 0;
+    ExprListAST **args_ptr = &args;
+
+    exprLev++;
+    while (tok.kindAndPos.kind != RPAREN && tok.kindAndPos.kind != T_EOF) {
+        if (ExprAST *arg = parseRhsOrType()) {
+            *args_ptr = new (_pool) ExprListAST(arg);
+            args_ptr = &(*args_ptr)->next;
+        }
+        if (!atComma(RPAREN))
+            break;
+        next();
+    }
+    exprLev--;
+
+    unsigned t_rparen = expect(RPAREN);
+    return new (_pool) MakeExprAST(t_make, t_lparen, args, t_rparen);
 }
 
 ExprAST *Parser::parseRhs()
@@ -870,7 +915,10 @@ ExprAST *Parser::parseUnaryExpr()
 
 ExprAST *Parser::parsePrimaryExpr()
 {
-    ExprAST *x = parseOperand();
+    bool isNewOrMakeExpr = false;
+    ExprAST *x = parseOperand(isNewOrMakeExpr);
+    if (isNewOrMakeExpr)
+        return x;
 
     while (true) {
         switch (tok.kindAndPos.kind) {
@@ -911,10 +959,14 @@ ExprAST *Parser::parsePrimaryExpr()
     return x;
 }
 
-ExprAST *Parser::parseOperand()
+ExprAST *Parser::parseOperand(bool &isNewOrMakeExpr)
 {
     switch (tok.kindAndPos.kind) {
         case IDENT:
+            if (tok.identifier == Control::newIdentifier())
+                return tryParseNewExpr(isNewOrMakeExpr);
+            if (tok.identifier == Control::makeIdentifier())
+                return tryParseMakeExpr(isNewOrMakeExpr);
             return parseIdent();
 
         case INT: case FLOAT: case IMAG: case CHAR:
@@ -1875,6 +1927,8 @@ void Parser::declareMethod(FuncDeclAST *ast)
                     fileScope->declareMethod(typeIdent->ident->ident, ast);
                     ast->symbol = _control->newMethod(typeIdent, ast, fileScope);
                     ast->name->symbol = ast->symbol;
+                    if (ast->type->results)
+                        ast->type->_callType = ast->type->results->callType(_pool);
                 }
             }
         }

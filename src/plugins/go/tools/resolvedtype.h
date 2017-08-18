@@ -26,44 +26,48 @@
 #pragma once
 
 #include "types.h"
-#include "astfwd.h"
-
-#include <QPair>
 
 namespace GoTools {
 
 class GoCheckSymbols;
 
-typedef QPair<int, const Type *> ExprTypeItem;
-
-class ExprType: public QList<ExprTypeItem>
+class ResolvedType
 {
-public:
-    ExprType(const Type *typ = 0, int derefLevel = 0);
-    ExprType(const QList<const Type *> &types);
+    int refLevel;
+    const Type *typ;
 
-    const Type *type() const;
-    const Type *type(int indexInTuple) const;
+public:
+    ResolvedType();
+    ResolvedType(const Type *t);
+
+    const Type *type() const { return typ; }
+    int referenceLevel() const { return refLevel; }
+
     const Type *typeForMemberAccess() const;
     const Type *typeForDirectAccess() const;
-
-    Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver);
+    Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver, int refLvl = 0);
     void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ResolveContext *resolver);
+                               ResolveContext *resolver,
+                               int refLvl = 0);
 
-    bool applyCommaJoin(ExprAST *x, ResolveContext *resolver);
+    QString describe() const;
 
-    ExprType &unresolve();
-    ExprType &applyIntegralOperation(ExprAST *x, ResolveContext *resolver);
-    ExprType &applyPlusOperation(ExprAST *x, ResolveContext *resolver);
-    ExprType &unstar();
-    ExprType &deref();
-    ExprType &switchTo(const Type *typ);
-    ExprType &memberAccess(IdentAST *ident, ResolveContext *resolver);
-    ExprType &checkMemberAccess(IdentAST *ident, GoCheckSymbols *resolver);
-    ExprType &rangeValue(ResolveContext *resolver);
-    ExprType &keyValue(ResolveContext *resolver);
-    ExprType &chanValue(ResolveContext *);
+    ResolvedType &setRefLevel(int refLvl);
+
+    ResolvedType &unresolve();
+    ResolvedType &switchTo(const Type *t);
+    ResolvedType &switchTo(const ResolvedType &t);
+
+    ResolvedType &applyIntegralOperation(ExprAST *rhx, ResolveContext *resolver);
+    ResolvedType &applyPlusOperation(ExprAST *rhx, ResolveContext *resolver);
+    ResolvedType &memberAccess(IdentAST *ident, ResolveContext *resolver);
+    ResolvedType &checkMemberAccess(IdentAST *ident, GoTools::GoCheckSymbols *resolver);
+    ResolvedType &call(ResolveContext *resolver, int refLvl = 0);
+    ResolvedType &rangeValue(ResolveContext *resolver, int refLvl = 0);
+    ResolvedType &rangeKey(ResolveContext *resolver, int refLvl = 0);
+    ResolvedType &chanValue(ResolveContext *resolver, int refLvl = 0);
+    ResolvedType &unstar();
+    ResolvedType &deref();
 };
 
 }   // namespace GoTools

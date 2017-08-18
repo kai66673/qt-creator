@@ -33,6 +33,7 @@
 namespace GoTools {
 
 class Type;
+class ResolvedType;
 class Scope;
 class FileScope;
 class ExprAST;
@@ -93,7 +94,7 @@ public:
     FileScope *fileScope() const;
 
     virtual ExprAST *declExpr() const = 0;
-    virtual const Type *type(ResolveContext *) = 0;
+    virtual ResolvedType type(ResolveContext *) const = 0;
     virtual const TypeSpecAST *typeSpec() const { return 0; }
     virtual QString describeType(ResolveContext *) const = 0;
     virtual Kind kind() const = 0;
@@ -128,7 +129,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *) override;
+    virtual ResolvedType type(ResolveContext *) const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
@@ -147,7 +148,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *) override;
+    virtual ResolvedType type(ResolveContext *) const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
@@ -166,7 +167,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *) override;
+    virtual ResolvedType type(ResolveContext *) const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
@@ -186,7 +187,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *) override;
+    virtual ResolvedType type(ResolveContext *) const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
@@ -208,7 +209,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *resolver) override;
+    virtual ResolvedType type(ResolveContext *resolver) const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
 
@@ -227,7 +228,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *) override;
+    virtual ResolvedType type(ResolveContext *) const override;
     virtual const TypeSpecAST *typeSpec() const override;
     virtual QString describeType(ResolveContext *) const override;
     virtual Kind kind() const override;
@@ -248,7 +249,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *resolver) override;
+    virtual ResolvedType type(ResolveContext *resolver) const override;
     virtual QString describeType(ResolveContext *resolver) const override;
     virtual Kind kind() const override;
 
@@ -268,7 +269,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *resolver) override;
+    virtual ResolvedType type(ResolveContext *resolver) const override;
     virtual QString describeType(ResolveContext *resolver) const override;
     virtual Kind kind() const override;
 
@@ -287,7 +288,7 @@ public:
     { }
 
     virtual ExprAST *declExpr() const override;
-    virtual const Type *type(ResolveContext *resolver) override;
+    virtual ResolvedType type(ResolveContext *resolver) const override;
     virtual QString describeType(ResolveContext *resolver) const override;
     virtual Kind kind() const override;
 

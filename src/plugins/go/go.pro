@@ -95,7 +95,7 @@ HEADERS += \
     tools/gofindreferences.h \
     tools/findreferences.h \
     tools/goworkingcopy.h \
-    tools/exprtype.h
+    tools/resolvedtype.h
 
 SOURCES += \
     goplugin.cpp \
@@ -174,7 +174,7 @@ SOURCES += \
     tools/gofindreferences.cpp \
     tools/findreferences.cpp \
     tools/goworkingcopy.cpp \
-    tools/exprtype.cpp
+    tools/resolvedtype.cpp
 
 FORMS += \
     project/gocompilerbuildstepconfigwidget.ui \

@@ -57,7 +57,7 @@ void GoCompletionAssistVisitor::fillCompletions(bool isGlobalCompletion, unsigne
             if (m_pos >= firstToken.begin() && m_pos <= lastToken.end()) {
                 accept(it->value);
                 if (m_isGlobalCompletion) {
-                    m_currentScope->fillMemberCompletions(m_completions, this,
+                    m_currentScope->fillMemberCompletions(m_completions, this, 0,
                                                     [this](Symbol *s) -> bool {
                                                         if (s->declExpr())
                                                             return _tokens->at(s->declExpr()->lastToken()).end() <= m_pos;
@@ -90,7 +90,7 @@ bool GoCompletionAssistVisitor::visit(CompositeLitAST *ast)
                 } else if (!m_nestedCimpositLitType.empty()) {
                     type = m_nestedCimpositLitType.top();
                     if (type)
-                        type = type->elementsType(this);
+                        type = type->elementsType(this).type();
                 }
 
                 m_nestedCimpositLitType.push(type);
@@ -115,7 +115,7 @@ bool GoCompletionAssistVisitor::visit(DeclIdentAST *ast)
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             _traverseFinished = true;
             if (ast->isLookable())
-                ast->resolveExprType(this).fillMemberCompletions(m_completions, this);
+                ast->resolve(this).fillMemberCompletions(m_completions, this);
         }
 
         else if (m_pos <= tk.end())
@@ -133,7 +133,7 @@ bool GoCompletionAssistVisitor::visit(IdentAST *ast)
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             _traverseFinished = true;
             if (ast->isLookable())
-                ast->resolveExprType(this).fillMemberCompletions(m_completions, this);
+                ast->resolve(this).fillMemberCompletions(m_completions, this);
         }
 
         else if (m_pos <= tk.end())
@@ -168,13 +168,13 @@ bool GoCompletionAssistVisitor::visit(SelectorExprAST *ast)
         const Token &tk = _tokens->at(ast->x->lastToken());
         if (m_pos >= tk.begin() && m_pos <= tk.end()) {
             _traverseFinished = true;
-            ast->x->resolveExprType(this).fillMemberCompletions(m_completions, this);
+            ast->x->resolve(this).fillMemberCompletions(m_completions, this);
             return false;
         } else if (ast->sel) {
             const Token &tk = _tokens->at(ast->sel->lastToken());
             if (m_pos >= tk.begin() && m_pos <= tk.end()) {
                 _traverseFinished = true;
-                ast->resolveExprType(this).fillMemberCompletions(m_completions, this);
+                ast->resolve(this).fillMemberCompletions(m_completions, this);
                 return false;
             }
         }

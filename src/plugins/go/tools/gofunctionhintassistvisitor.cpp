@@ -43,7 +43,7 @@ QStringList GoFunctionHintAssistVisitor::functionArguments(unsigned pos)
         acceptForPosition(m_initialFileAst->decls);
 
         if (m_funcExpr) {
-            if (const FuncTypeAST *type = dynamic_cast<const FuncTypeAST *>(m_funcExpr->resolveExprType(this).type())) {
+            if (const FuncTypeAST *type = dynamic_cast<const FuncTypeAST *>(m_funcExpr->resolve(this).type())) {
                 if (type->params) {
                     for (FieldListAST *field_it = type->params->fields; field_it; field_it = field_it->next) {
                         if (FieldAST *field = field_it->value) {

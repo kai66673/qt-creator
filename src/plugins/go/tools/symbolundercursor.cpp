@@ -133,7 +133,7 @@ bool SymbolUnderCursor::visit(SelectorExprAST *ast)
     if (m_pos <= tk.end()) {
         _traverseFinished = true;
         if (ast->sel->isLookable())
-            m_symbol = ast->x->resolveExprType(this).lookupMember(ast->sel, this);
+            m_symbol = ast->x->resolve(this).lookupMember(ast->sel, this);
     }
 
     return false;
@@ -154,7 +154,7 @@ bool SymbolUnderCursor::visit(CompositeLitAST *ast)
             } else if (!m_nestedCompositLitType.empty()) {
                 type = m_nestedCompositLitType.top();
                 if (type)
-                    type = type->elementsType(this);
+                    type = type->elementsType(this).type();
             }
 
             m_nestedCompositLitType.push(type);

@@ -67,18 +67,20 @@ Symbol *Scope::find(const HashedLiteral *name) const
 Scope *Scope::outer() const
 { return m_outer; }
 
-Symbol *Scope::lookupMember(const IdentAST *ident, ResolveContext *resolver) const
+Symbol *Scope::lookupMember(const IdentAST *ident, ResolveContext *resolver, int refLevel) const
 {
     if (Symbol *s = find(ident->ident)) {
         unsigned lastToken = s->declExpr() ? s->declExpr()->lastToken() : s->sourceLocation();
         if (lastToken < ident->t_identifier)
             return s;
     }
-    return m_outer ? m_outer->lookupMember(ident, resolver) : 0;
+    return m_outer ? m_outer->lookupMember(ident, resolver, refLevel) : 0;
 }
 
 void Scope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                  ResolveContext *resolver, Predicate predicate) const
+                                  ResolveContext *resolver,
+                                  int refLevel,
+                                  Predicate predicate) const
 {
     for (unsigned i = 0; i < memberCount(); i++) {
         Symbol *symbol = memberAt(i);
@@ -91,7 +93,7 @@ void Scope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface 
     }
 
     if (m_outer)
-        m_outer->fillMemberCompletions(completions, resolver);
+        m_outer->fillMemberCompletions(completions, resolver, refLevel);
 }
 
 void Scope::dump() const
@@ -126,16 +128,14 @@ FileScope::FileScope(GoSource *source)
 void FileScope::declareMethod(const Identifier *typeId, FuncDeclAST *funcDecl)
 { m_methods.addMethod(typeId, funcDecl); }
 
-Symbol *FileScope::lookupMember(const IdentAST *ident, ResolveContext *resolver) const
-{
-    return resolver->fileScopePackageType(this)->lookupMember(ident, resolver);
-}
+Symbol *FileScope::lookupMember(const IdentAST *ident, ResolveContext *resolver, int refLevel) const
+{ return resolver->fileScopePackageType(this)->lookupMember(ident, resolver, refLevel); }
 
 void FileScope::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                      ResolveContext *resolver, Predicate predicate) const
-{
-    resolver->fileScopePackageType(this)->fillMemberCompletions(completions, resolver, predicate);
-}
+                                      ResolveContext *resolver,
+                                      int refLevel,
+                                      Predicate predicate) const
+{ resolver->fileScopePackageType(this)->fillMemberCompletions(completions, resolver, refLevel, predicate); }
 
 Symbol *FileScope::lookupMethod(const Identifier *typeId, const Identifier *funcId)
 {

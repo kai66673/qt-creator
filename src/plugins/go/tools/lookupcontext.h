@@ -43,9 +43,15 @@ public:
     typedef std::function<bool (Symbol *)> Predicate;
 
     virtual ~LookupContext() {}
-    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *resolver) const = 0;
+
+    virtual Symbol *lookupMember(const IdentAST *ident,
+                                 ResolveContext *resolver,
+                                 int refLevel = 0) const = 0;
+
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
-                                       ResolveContext *resolver, Predicate predicate = 0) const = 0;
+                                       ResolveContext *resolver,
+                                       int refLevel = 0,
+                                       Predicate predicate = 0) const = 0;
 };
 
 }   // namespace GoTools
