@@ -136,9 +136,17 @@ bool GoCheckSymbols::visit(FieldAST *ast)
     for (DeclIdentListAST *it = ast->names; it; it = it->next)
         if (DeclIdentAST *ident = it->value)
             if (ident->isLookable() && ident->symbol)
-                addUse(ident, ident->symbol->kind() == Symbol::Fld
-                       ? GoSemanticHighlighter::Field
-                       : GoSemanticHighlighter::Arg);
+                switch (ident->symbol->kind()) {
+                    case Symbol::Fld:
+                        addUse(ident, GoSemanticHighlighter::Field);
+                        break;
+                    case Symbol::Fun:
+                        addUse(ident, GoSemanticHighlighter::FuncDecl);
+                        break;
+                    default:
+                        addUse(ident, GoSemanticHighlighter::Arg);
+                        break;
+                }
 
     accept(ast->type);
     return false;
