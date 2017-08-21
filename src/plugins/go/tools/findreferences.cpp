@@ -44,7 +44,7 @@ public:
     virtual QList<Core::SearchResultItem> findReferences() = 0;
     virtual QString customReplaceSuffixForFirstItem() const = 0;
     virtual QString referenceDescription() const = 0;
-    virtual QString referenceIdentfier() const = 0;
+    virtual QString referenceIdentifier() const = 0;
 };
 
 class GlobalReferencesVisitor: protected ASTVisitor
@@ -230,7 +230,7 @@ public:
     virtual QString referenceDescription() const override
     { return QObject::tr("Local Symbol Usages:"); }
 
-    virtual QString referenceIdentfier() const override
+    virtual QString referenceIdentifier() const override
     { return m_symbol->identifier()->toString(); }
 
 protected:
@@ -325,9 +325,7 @@ protected:
                     m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                 } else if (const NamedType *namedType = type->asNamedType()) {
                     if (const TypeSpecAST *ts = namedType->typeSpec(this)) {
-                        const Type *fieldOwnerType = m_fieldOwnerType;
                         if (ts->hasEmbedOrEqualToType(m_fieldOwnerType, this))
-//                        if (ts->type == m_fieldOwnerType)
                             m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                     }
                 }
@@ -413,7 +411,7 @@ public:
     virtual QString referenceDescription() const override
     { return QObject::tr("Field Usages:"); }
 
-    virtual QString referenceIdentfier() const override
+    virtual QString referenceIdentifier() const override
     { return m_symbol->identifier()->toString(); }
 
 private:
@@ -467,7 +465,7 @@ public:
     virtual QString referenceDescription() const override
     { return QObject::tr("Field Usages:"); }
 
-    virtual QString referenceIdentfier() const override
+    virtual QString referenceIdentifier() const override
     { return m_symbol->identifier()->toString(); }
 
 private:
@@ -507,7 +505,7 @@ public:
     virtual QString referenceDescription() const override
     { return QObject::tr("Package Alias Usages:"); }
 
-    virtual QString referenceIdentfier() const override
+    virtual QString referenceIdentifier() const override
     { return m_packageAlias; }
 
 protected:
@@ -659,7 +657,7 @@ public:
     virtual QString referenceDescription() const override
     { return QObject::tr("Method Usages:"); }
 
-    virtual QString referenceIdentfier() const override
+    virtual QString referenceIdentifier() const override
     { return m_symbol->identifier()->toString(); }
 
 private:
@@ -713,7 +711,7 @@ public:
     virtual QString referenceDescription() const override
     { return QObject::tr("Symbol Usages:"); }
 
-    virtual QString referenceIdentfier() const override
+    virtual QString referenceIdentifier() const override
     { return m_symbol->identifier()->toString(); }
 
 private:
@@ -775,7 +773,7 @@ Core::SearchResult *FindReferences::proceedReferences(unsigned pos, bool isRepla
         if (finder) {
             m_search = Core::SearchResultWindow::instance()->startNewSearch(finder->referenceDescription(),
                                                                             QString(),
-                                                                            finder->referenceIdentfier(),
+                                                                            finder->referenceIdentifier(),
                                                                             m_isReplace ? Core::SearchResultWindow::SearchAndReplace
                                                                                         : Core::SearchResultWindow::SearchOnly,
                                                                             Core::SearchResultWindow::PreserveCaseDisabled,
@@ -785,7 +783,7 @@ Core::SearchResult *FindReferences::proceedReferences(unsigned pos, bool isRepla
             parameters.customReplaceSuffixForFirstItem = finder->customReplaceSuffixForFirstItem();
             m_search->setUserData(qVariantFromValue(parameters));
             if (m_isReplace)
-                m_search->setTextToReplace(finder->referenceIdentfier());
+                m_search->setTextToReplace(finder->referenceIdentifier());
             m_search->finishSearch(false);
         }
     }
