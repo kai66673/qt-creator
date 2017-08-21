@@ -452,6 +452,7 @@ public:
     virtual const NamedType *asNamedType() const override { return this; }
     virtual const TypeSpecAST *typeSpec(ResolveContext *) const override { return this; }
     bool hasEmbedOrEqualTo(const TypeSpecAST *spec, ResolveContext *ctx) const;
+    bool hasEmbedOrEqualToType(const Type *typ, ResolveContext *ctx) const;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);
@@ -1054,13 +1055,11 @@ public:
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
-//    ExprType tryResolvePeculiarCase(ResolveContext *resolver, bool &accept) const;
-
 protected:
     virtual void accept0(ASTVisitor *visitor);
 };
 
-class StarTypeAST: public TypeAST
+class StarTypeAST: public TypeAST, public NamedType
 {
 public:
     unsigned t_star;
@@ -1108,6 +1107,9 @@ public:
     { return typ ? typ->builtinKind(resolver, refLvl - 1) : Other; }
 
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
+
+    virtual const NamedType *asNamedType() const override { return this; }
+    virtual const TypeSpecAST *typeSpec(ResolveContext *resolver) const override;
 
 protected:
     virtual void accept0(ASTVisitor *visitor);

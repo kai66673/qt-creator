@@ -325,7 +325,9 @@ protected:
                     m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                 } else if (const NamedType *namedType = type->asNamedType()) {
                     if (const TypeSpecAST *ts = namedType->typeSpec(this)) {
-                        if (ts->type == m_fieldOwnerType)
+                        const Type *fieldOwnerType = m_fieldOwnerType;
+                        if (ts->hasEmbedOrEqualToType(m_fieldOwnerType, this))
+//                        if (ts->type == m_fieldOwnerType)
                             m_results << m_source->searchResultItemForTokenIndex(ast->sel->t_identifier, m_symbolLength);
                     }
                 }

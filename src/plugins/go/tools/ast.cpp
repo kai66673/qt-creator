@@ -589,6 +589,15 @@ QString StarTypeAST::describe() const
 ResolvedType StarTypeAST::check(GoCheckSymbols *resolver) const
 { return typ ? typ->check(resolver).deref() : ResolvedType(); }
 
+const TypeSpecAST *StarTypeAST::typeSpec(ResolveContext *resolver) const
+{
+    if (typ)
+        if (!typ->asStarType())
+            if (const NamedType *namedTy = typ->asNamedType())
+                return namedTy->typeSpec(resolver);
+    return 0;
+}
+
 void StarTypeAST::accept0(ASTVisitor *visitor)
 {
     if (visitor->visit(this)) {
@@ -830,39 +839,33 @@ unsigned CallExprAST::lastToken() const
 
 ResolvedType CallExprAST::resolve(ResolveContext *resolver) const
 {
-    /// TODO: new(...), make(...)
-    return fun ? fun->resolve(resolver).call(resolver) : ResolvedType(Control::unresolvedTupleType());
+    if (fun) {
+        bool mayBeTypeConvertion = fun->asParenExpr() != 0;
+        ResolvedType typ = fun->resolve(resolver);
+        ResolvedType callTyp = typ.type()->callType(resolver, typ.referenceLevel());
+        if (mayBeTypeConvertion && callTyp.type() == Control::unresolvedTupleType())
+            return typ;
+        return callTyp;
+    }
+
+    return Control::unresolvedTupleType();
 }
 
 ResolvedType CallExprAST::check(GoCheckSymbols *resolver) const
 {
     resolver->accept(args);
 
-    /// TODO: new(...), make(...)
-//    bool accept = false;
-//    ExprType exprType = tryResolvePeculiarCase(resolver, accept);
-//    if (accept)
-//        return exprType;
-    return fun ? fun->check(resolver).call(resolver) : ResolvedType(Control::unresolvedTupleType());
+    if (fun) {
+        bool mayBeTypeConvertion = fun->asParenExpr() != 0;
+        ResolvedType typ = fun->check(resolver);
+        ResolvedType callTyp = typ.type()->callType(resolver, typ.referenceLevel());
+        if (mayBeTypeConvertion && callTyp.type() == Control::unresolvedTupleType())
+            return typ;
+        return callTyp;
+    }
+
+    return Control::unresolvedTupleType();
 }
-
-//ExprType CallExprAST::tryResolvePeculiarCase(ResolveContext *resolver, bool &accept) const
-//{
-//    accept = false;
-
-//    // check for...
-//    if (IdentAST *funcIdent = fun->asIdent()) {
-//        if (funcIdent->isNewKeyword()) {            // new(...) builting function
-//            accept = true;
-//            return args && args->value ? args->value->resolveExprType(resolver).deref() :ExprType();
-//        } else if (funcIdent->isMakeKeyword()) {    // make(...) builting function
-//            accept = true;
-//            return args && args->value ? args->value->resolveExprType(resolver) : ExprType();
-//        }
-//    }
-
-//    return ExprType();
-//}
 
 void CallExprAST::accept0(ASTVisitor *visitor)
 {
@@ -2200,6 +2203,31 @@ bool TypeSpecAST::hasEmbedOrEqualTo(const TypeSpecAST *spec, ResolveContext *ctx
                             if (const NamedType *namedType = field->type->asNamedType())
                                 if (const TypeSpecAST *typeSpec = namedType->typeSpec(ctx))
                                     if (typeSpec->hasEmbedOrEqualTo(spec, ctx))
+                                        return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+bool TypeSpecAST::hasEmbedOrEqualToType(const Type *typ, ResolveContext *ctx) const
+{
+    if (type) {
+        if (type == typ)
+            return true;
+
+        if (StructTypeAST *structType = type->asStructType()) {
+            if (structType->fields) {
+                for (FieldListAST *fields = structType->fields->fields; fields; fields = fields->next) {
+                    if (FieldAST *field = fields->value) {
+                        if (!field->names && field->type) {
+                            if (const NamedType *namedType = field->type->asNamedType())
+                                if (const TypeSpecAST *typeSpec = namedType->typeSpec(ctx))
+                                    if (typeSpec->hasEmbedOrEqualToType(typ, ctx))
                                         return true;
                         }
                     }

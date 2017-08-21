@@ -33,15 +33,15 @@ class GoCheckSymbols;
 
 class ResolvedType
 {
-    int refLevel;
-    const Type *typ;
+    int m_referenceLevel;
+    const Type *m_type;
 
 public:
     ResolvedType();
     ResolvedType(const Type *t);
 
-    const Type *type() const { return typ; }
-    int referenceLevel() const { return refLevel; }
+    const Type *type() const { return m_type; }
+    int referenceLevel() const { return m_referenceLevel; }
 
     const Type *typeForMemberAccess() const;
     const Type *typeForDirectAccess() const;

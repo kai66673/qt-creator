@@ -30,25 +30,25 @@
 namespace GoTools {
 
 ResolvedType::ResolvedType()
-    : refLevel(0)
-    , typ(Control::unresolvedType())
+    : m_referenceLevel(0)
+    , m_type(Control::unresolvedType())
 { }
 
 ResolvedType::ResolvedType(const Type *t)
-    : refLevel(0)
-    , typ(t ? t: Control::unresolvedType())
+    : m_referenceLevel(0)
+    , m_type(t ? t: Control::unresolvedType())
 { }
 
 const Type *ResolvedType::typeForMemberAccess() const
-{ return refLevel == 0 || refLevel == -1 ? typ : 0; }
+{ return m_referenceLevel == 0 || m_referenceLevel == -1 ? m_type : 0; }
 
 const Type *ResolvedType::typeForDirectAccess() const
-{ return refLevel == 0 ? typ : 0; }
+{ return m_referenceLevel == 0 ? m_type : 0; }
 
 Symbol *ResolvedType::lookupMember(const IdentAST *ident, ResolveContext *resolver, int refLvl)
 {
     if (ident && ident->isLookable())
-        return typ->lookupMember(ident, resolver, refLvl + refLevel);
+        return m_type->lookupMember(ident, resolver, refLvl + m_referenceLevel);
 
     return 0;
 }
@@ -57,52 +57,52 @@ void ResolvedType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInt
                                          ResolveContext *resolver,
                                          int refLvl)
 {
-    typ->fillMemberCompletions(completions, resolver, refLvl + refLevel);
+    m_type->fillMemberCompletions(completions, resolver, refLvl + m_referenceLevel);
 }
 
 QString ResolvedType::describe() const
 {
     QString result;
-    if (refLevel < 0)
-        for (int i = refLevel; i < 0; i++)
+    if (m_referenceLevel < 0)
+        for (int i = m_referenceLevel; i < 0; i++)
             result += QLatin1Char('*');
-    else if (refLevel > 0)
+    else if (m_referenceLevel > 0)
         result += QLatin1Char('?');
-    return result + typ->describe();
+    return result + m_type->describe();
 }
 
 ResolvedType &ResolvedType::setRefLevel(int refLvl)
 {
-    refLevel = refLvl;
+    m_referenceLevel = refLvl;
     return *this;
 }
 
 ResolvedType &ResolvedType::unresolve()
 {
-    refLevel = 0;
-    typ = Control::unresolvedType();
+    m_referenceLevel = 0;
+    m_type = Control::unresolvedType();
     return *this;
 }
 
 ResolvedType &ResolvedType::switchTo(const Type *t)
 {
-    refLevel =  0;
-    typ = t ? t : Control::unresolvedType();
+    m_referenceLevel =  0;
+    m_type = t ? t : Control::unresolvedType();
     return *this;
 }
 
 ResolvedType &ResolvedType::switchTo(const ResolvedType &t)
 {
-    refLevel = t.refLevel;
-    typ = t.typ;
+    m_referenceLevel = t.m_referenceLevel;
+    m_type = t.m_type;
     return *this;
 }
 
 ResolvedType &ResolvedType::applyIntegralOperation(ExprAST *rhx, ResolveContext *resolver)
 {
-    if (rhx && typ->builtinKind(resolver, refLevel) == Type::Integral) {
+    if (rhx && m_type->builtinKind(resolver, m_referenceLevel) == Type::Integral) {
         ResolvedType xTyp = rhx->resolve(resolver);
-        if (xTyp.typ->builtinKind(resolver, xTyp.refLevel) == Type::Integral)
+        if (xTyp.m_type->builtinKind(resolver, xTyp.m_referenceLevel) == Type::Integral)
             return *this;
     }
 
@@ -112,10 +112,10 @@ ResolvedType &ResolvedType::applyIntegralOperation(ExprAST *rhx, ResolveContext 
 ResolvedType &ResolvedType::applyPlusOperation(ExprAST *rhx, ResolveContext *resolver)
 {
     if (rhx) {
-        Type::BuiltingKind kind = typ->builtinKind(resolver, refLevel);
+        Type::BuiltingKind kind = m_type->builtinKind(resolver, m_referenceLevel);
         if (kind == Type::String || kind == Type::Integral) {
             ResolvedType xTyp = rhx->resolve(resolver);
-            if (xTyp.typ->builtinKind(resolver, xTyp.refLevel) == kind)
+            if (xTyp.m_type->builtinKind(resolver, xTyp.m_referenceLevel) == kind)
                 return *this;
         }
     }
@@ -125,7 +125,7 @@ ResolvedType &ResolvedType::applyPlusOperation(ExprAST *rhx, ResolveContext *res
 
 ResolvedType &ResolvedType::memberAccess(IdentAST *ident, ResolveContext *resolver)
 {
-    if (Symbol *s = typ->lookupMember(ident, resolver, refLevel))
+    if (Symbol *s = m_type->lookupMember(ident, resolver, m_referenceLevel))
         return switchTo(s->type(resolver));
 
     return unresolve();
@@ -133,7 +133,7 @@ ResolvedType &ResolvedType::memberAccess(IdentAST *ident, ResolveContext *resolv
 
 ResolvedType &ResolvedType::checkMemberAccess(IdentAST *ident, GoCheckSymbols *resolver)
 {
-    if (Symbol *s = typ->lookupMember(ident, resolver, refLevel)) {
+    if (Symbol *s = m_type->lookupMember(ident, resolver, m_referenceLevel)) {
         resolver->addUse(ident, resolver->kindForSymbol(s));
         return switchTo(s->type(resolver));
     }
@@ -142,21 +142,21 @@ ResolvedType &ResolvedType::checkMemberAccess(IdentAST *ident, GoCheckSymbols *r
 }
 
 ResolvedType &ResolvedType::call(ResolveContext *resolver, int refLvl)
-{ return switchTo(typ->callType(resolver, refLevel + refLvl)); }
+{ return switchTo(m_type->callType(resolver, m_referenceLevel + refLvl)); }
 
 ResolvedType &ResolvedType::rangeValue(ResolveContext *resolver, int refLvl)
-{ return switchTo(typ->elementsType(resolver, refLvl + refLevel)); }
+{ return switchTo(m_type->elementsType(resolver, refLvl + m_referenceLevel)); }
 
 ResolvedType &ResolvedType::rangeKey(ResolveContext *resolver, int refLvl)
-{ return switchTo(typ->indexType(resolver, refLvl + refLevel)); }
+{ return switchTo(m_type->indexType(resolver, refLvl + m_referenceLevel)); }
 
 ResolvedType &ResolvedType::chanValue(ResolveContext *resolver, int refLvl)
-{ return switchTo(typ->chanValueType(resolver, refLvl + refLevel)); }
+{ return switchTo(m_type->chanValueType(resolver, refLvl + m_referenceLevel)); }
 
 ResolvedType &ResolvedType::unstar()
-{ ++refLevel; return *this; }
+{ ++m_referenceLevel; return *this; }
 
 ResolvedType &ResolvedType::deref()
-{ --refLevel; return *this; }
+{ --m_referenceLevel; return *this; }
 
 }   // namespace GoTools
