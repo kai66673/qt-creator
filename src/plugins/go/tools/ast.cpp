@@ -1202,9 +1202,16 @@ Symbol *StructTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolve
                 // embed types
                 if (!field->names && field->type) {
                     if (TypeAST *typ = field->type->asType()) {
+                        if (StarTypeAST *starType = typ->asStarType()) {
+                            typ = starType->typ;
+                            if (!typ)
+                                continue;
+                        }
+                        // self embed type
                         if (Symbol *declSymbol = typ->declaration(resolver))
                             if (declSymbol->identifier()->equalTo(ast->ident))
                                 return declSymbol;
+                        // embed type fields
                         if (Symbol *embedSymbol = typ->lookupMember(ast, resolver))
                             return embedSymbol;
                     }
@@ -1235,6 +1242,11 @@ void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemIn
                 // embed types
                 if (!field->names && field->type) {
                     if (TypeAST *typ = field->type->asType()) {
+                        if (StarTypeAST *starType = typ->asStarType()) {
+                            typ = starType->typ;
+                            if (!typ)
+                                continue;
+                        }
                         // self embed type
                         if (Symbol *declSymbol = typ->declaration(resolver)) {
                             TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;;
