@@ -582,8 +582,8 @@ protected:
             if (ast->recv && ast->recv->fields && !ast->recv->fields->next) {
                 if (FieldAST *field = ast->recv->fields->value) {
                     if (TypeAST *typ = field->type) {
-                        if (TypeAST *baseTyp = typ->asStarType())
-                            typ = baseTyp;
+                        if (StarTypeAST *baseTyp = typ->asStarType())
+                            typ = baseTyp->typ;
                         if (m_recvIdent == typ)
                             m_results << m_source->searchResultItemForTokenIndex(ast->name->t_identifier, m_symbolLength);
                     }
