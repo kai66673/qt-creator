@@ -29,6 +29,8 @@
 
 namespace GoTools {
 
+class Type;
+
 class Literal
 {
     Literal(const Literal &other);
@@ -96,9 +98,8 @@ public:
 
     QString toString() const;
 
+    const Type *asBuiltinType() const;
     bool isBuiltinTypeIdentifier() const;
-    bool isBuiltinStringTypeIdentifier() const;
-    bool isBuiltinIntegralTypeIdentifier() const;
 };
 
 }   // namespace GoTools

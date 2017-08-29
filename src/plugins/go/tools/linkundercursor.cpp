@@ -36,7 +36,7 @@ TextEditor::TextEditorWidget::Link LinkUnderCursor::link(unsigned pos)
     m_pos = pos;
     defineLinkUnderCursor();
 
-    if (m_symbol && m_token) {
+    if (m_symbol && m_token && m_symbol->owner()) {
         TextEditor::TextEditorWidget::Link link;
         link.linkTextStart = m_token->begin();
         link.linkTextEnd = m_token->end();

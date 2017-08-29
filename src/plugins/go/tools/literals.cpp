@@ -23,6 +23,7 @@
 **
 ****************************************************************************/
 #include "literals.h"
+#include "types.h"
 
 #include <cstring>
 
@@ -125,13 +126,20 @@ Identifier::Identifier(const char *chars, unsigned size)
 QString Identifier::toString() const
 { return _chars[0] == '!' ? QString::fromUtf8(_chars + 1, _size - 1) : QString::fromUtf8(_chars, _size); }
 
+const Type *Identifier::asBuiltinType() const
+{
+    if (_chars[0] != '!')
+        return 0;
+
+    switch (_chars[1]) {
+        case 's': return Control::stringBuiltingType();
+        case 'e': return Control::errorBuiltinType();
+    }
+
+    return Control::integralBuiltinType();
+}
+
 bool Identifier::isBuiltinTypeIdentifier() const
 { return _chars[0] == '!'; }
-
-bool Identifier::isBuiltinStringTypeIdentifier() const
-{ return _chars[0] == '!' && _chars[1] == 's'; }
-
-bool Identifier::isBuiltinIntegralTypeIdentifier() const
-{ return _chars[0] == '!' && _chars[1] != 's'; }
 
 }   // namespace GoTools

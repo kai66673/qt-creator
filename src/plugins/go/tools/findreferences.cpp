@@ -743,7 +743,7 @@ Core::SearchResult *FindReferences::proceedReferences(unsigned pos, bool isRepla
             acceptForPosition(m_initialFileAst->decls);
         QScopedPointer <IReferencesFinder> finder;
 
-        if (m_symbol) {
+        if (m_symbol && m_symbol->owner()) {
             if (m_symbol->kind() == Symbol::Fld) {
                 if (m_symbol->owner()) {
                     if (m_symbol->owner()->isLocal()) {

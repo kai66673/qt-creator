@@ -24,6 +24,9 @@
 ****************************************************************************/
 #include "types.h"
 #include "resolvedtype.h"
+#include "ast.h"
+
+#include <texteditor/codeassist/assistproposalitem.h>
 
 namespace GoTools {
 
@@ -41,5 +44,22 @@ ResolvedType BuiltinType::elementsType(ResolveContext *, int) const
 
 ResolvedType BuiltinType::chanValueType(ResolveContext *, int) const
 { return ResolvedType(); }
+
+Symbol *ErrorType::lookupMember(const IdentAST *ident, ResolveContext *, int refLvl) const
+{
+    if ((refLvl == 0 || refLvl == -1) && ident->ident->toString() == QLatin1String("Error"))
+        return Control::errorErrorMethod();
+    return 0;
+}
+
+void ErrorType::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions, ResolveContext *, int refLvl, LookupContext::Predicate) const
+{
+    if (refLvl == 0 || refLvl == -1) {
+        TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;
+        item->setText(QLatin1String("Error"));
+        item->setIcon(Symbol::icon(Symbol::Mtd));
+        completions.append(item);
+    }
+}
 
 }   // namespace GoTools

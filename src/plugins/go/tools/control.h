@@ -79,6 +79,7 @@ public:
 
     static const Identifier *dotIdentifier();
     static const Identifier *underscoreIdentifier();
+    static const Identifier *builtinErrorIdentifier();
 
     static const Identifier *builtinIntIdentifier();
     static const Identifier *builtinByteIdentifier();
@@ -99,6 +100,7 @@ public:
     static const Identifier *builtinComplex64Identifier();
     static const Identifier *builtinComplex128Identifier();
 
+    static Type *errorBuiltinType();
     static Type *voidType();
     static Type *unresolvedType();
     static Type *unresolvedTupleType();
@@ -108,6 +110,8 @@ public:
 
     static const Identifier *newIdentifier();
     static const Identifier *makeIdentifier();
+
+    static Symbol *errorErrorMethod();
 
 private:
     class Data;

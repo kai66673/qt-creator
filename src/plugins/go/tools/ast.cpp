@@ -136,10 +136,8 @@ unsigned IdentAST::lastToken() const
 
 ResolvedType IdentAST::resolve(ResolveContext *resolver) const
 {
-    if (ident->isBuiltinStringTypeIdentifier())
-        return ResolvedType(Control::stringBuiltingType());
-    if (ident->isBuiltinStringTypeIdentifier())
-        return ResolvedType(Control::integralBuiltinType());
+    if (const Type *builtinType = ident->asBuiltinType())
+        return ResolvedType(builtinType);
 
     if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver))
         return s->type(resolver);
@@ -150,10 +148,8 @@ ResolvedType IdentAST::resolve(ResolveContext *resolver) const
 
 ResolvedType IdentAST::check(GoCheckSymbols *resolver) const
 {
-    if (ident->isBuiltinStringTypeIdentifier())
-        return ResolvedType(Control::stringBuiltingType());
-    if (ident->isBuiltinStringTypeIdentifier())
-        return ResolvedType(Control::integralBuiltinType());
+    if (const Type *builtinType = ident->asBuiltinType())
+        return ResolvedType(builtinType);
 
     if (Symbol *s = resolver->currentScope()->lookupMember(this, resolver)) {
         resolver->addUse(this, resolver->kindForSymbol(s));
@@ -2445,6 +2441,9 @@ void PackageTypeAST::accept0(ASTVisitor *visitor)
 
 Symbol *TypeIdentAST::lookupMember(const IdentAST *ast, ResolveContext *resolver, int refLvl) const
 {
+    if (ident->ident == Control::builtinErrorIdentifier() && ast->ident->toString() == QLatin1String("Error"))
+        return Control::errorErrorMethod();
+
     if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
         if (symbol->kind() == Symbol::Typ)
             return symbol->type(resolver).lookupMember(ast, resolver, refLvl);
@@ -2455,6 +2454,14 @@ Symbol *TypeIdentAST::lookupMember(const IdentAST *ast, ResolveContext *resolver
 void TypeIdentAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                          ResolveContext *resolver, int refLvl, LookupContext::Predicate) const
 {
+    if (ident->ident == Control::builtinErrorIdentifier()) {
+        TextEditor::AssistProposalItem *item = new TextEditor::AssistProposalItem;
+        item->setText(QLatin1String("Error"));
+        item->setIcon(Symbol::icon(Symbol::Mtd));
+        completions.append(item);
+        return;
+    }
+
     if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
         if (symbol->kind() == Symbol::Typ)
             symbol->type(resolver).fillMemberCompletions(completions, resolver, refLvl);

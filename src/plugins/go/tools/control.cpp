@@ -43,6 +43,7 @@ static Identifier s_byteIdentifier("!byte", 5);
 static Identifier s_int8Identifier("!int8", 5);
 static Identifier s_runeIdentifier("!rune", 5);
 static Identifier s_uintIdentifier("!uint", 5);
+static Identifier s_errorIdentifier("!error", 6);
 static Identifier s_int16Identifier("!int16", 6);
 static Identifier s_int32Identifier("!int32", 6);
 static Identifier s_int64Identifier("!int64", 6);
@@ -60,12 +61,15 @@ static Identifier s_complex128Identifier("!complex128", 11);
 static Identifier s_newIdentifier("!0", 2);
 static Identifier s_makeIdentifier("!1", 2);
 
+static ErrorType s_errorBuiltinType;
 static VoidType s_voidType;
 static UnresolvedType s_unresolvedType;
 static UnresolvedTupleType s_unresolvedTupleType;
 static IntBuiltinType s_intBuiltinType;
 static IntegralBuiltinType s_integralBuiltinType;
 static StringBuiltinType s_stringBuiltinType;
+
+static ErrorErrorMethod s_errorErrorMethod;
 
 class Control::Data
 {
@@ -242,6 +246,9 @@ const Identifier *Control::dotIdentifier()
 const Identifier *Control::underscoreIdentifier()
 { return &s_underscoreIdentifier; }
 
+const Identifier *Control::builtinErrorIdentifier()
+{ return &s_errorIdentifier; }
+
 const Identifier *Control::builtinIntIdentifier()
 { return &s_intIdentifier; }
 
@@ -296,6 +303,9 @@ const Identifier *Control::builtinComplex64Identifier()
 const Identifier *Control::builtinComplex128Identifier()
 { return &s_complex128Identifier; }
 
+Type *Control::errorBuiltinType()
+{ return &s_errorBuiltinType; }
+
 Type *Control::voidType()
 { return &s_voidType; }
 
@@ -319,6 +329,9 @@ const Identifier *Control::newIdentifier()
 
 const Identifier *Control::makeIdentifier()
 { return &s_makeIdentifier; }
+
+Symbol *Control::errorErrorMethod()
+{ return &s_errorErrorMethod; }
 
 Control::Control()
     : d(new Data(this))

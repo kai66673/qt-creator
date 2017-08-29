@@ -201,4 +201,7 @@ QString RangeValueDecl::describeType(ResolveContext *resolver) const
 Symbol::Kind RangeValueDecl::kind() const
 { return Var; }
 
+ResolvedType ErrorErrorMethod::type(ResolveContext *) const
+{ return ResolvedType(); }
+
 }   // namespace GoTools

@@ -298,4 +298,16 @@ private:
     RangeExpAST *_decl;
 };
 
+
+class ErrorErrorMethod: public Symbol
+{
+public:
+    ErrorErrorMethod() : Symbol(0, 0, 0) { }
+
+    virtual ExprAST *declExpr() const override { return 0; }
+    virtual ResolvedType type(ResolveContext *) const override;
+    virtual QString describeType(ResolveContext *) const override { return QLatin1String("(error)func():string"); }
+    virtual Kind kind() const override { return Mtd; }
+};
+
 }   // namespace GoTools

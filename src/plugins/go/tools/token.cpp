@@ -272,6 +272,13 @@ static void classify5(Token *tok, Control *control, const char *s) {
                 return;
             }
             break;
+        case 'e':
+            if (s[1] == 'r' && s[2] == 'r' && s[3] == 'o' && s[4] == 'r') {
+                tok->kindAndPos.kind = IDENT;
+                tok->identifier = Control::builtinErrorIdentifier();
+                return;
+            }
+            break;
         case 'i':
             if (s[1] == 'n' && s[2] == 't') {
                 if (s[3] == '1' && s[4] == '6') {

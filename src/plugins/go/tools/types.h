@@ -81,6 +81,18 @@ public:
     virtual ResolvedType chanValueType(ResolveContext *, int = 0) const override;
 };
 
+class ErrorType: public BuiltinType
+{
+public:
+    // LookupContext implementation
+    virtual Symbol *lookupMember(const IdentAST *ident, ResolveContext *, int refLvl) const override;
+    virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
+                                       ResolveContext *, int refLvl, Predicate) const override;
+
+    virtual QString describe() const override { return QLatin1String("error"); }
+    virtual BuiltingKind builtinKind(ResolveContext *, int = 0) const override { return Other; }
+};
+
 class VoidType: public BuiltinType
 {
 public:
