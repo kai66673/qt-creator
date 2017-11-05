@@ -26,7 +26,8 @@
 #include "cppquickfixassistant.h"
 
 #include "cppeditorconstants.h"
-#include "cppeditor.h"
+#include "cppeditorwidget.h"
+#include "cppquickfixes.h"
 
 #include <cpptools/cppmodelmanager.h>
 #include <texteditor/textdocument.h>
@@ -49,11 +50,6 @@ namespace Internal {
 IAssistProvider::RunType CppQuickFixAssistProvider::runType() const
 {
     return Synchronous;
-}
-
-bool CppQuickFixAssistProvider::supportsEditor(Core::Id editorId) const
-{
-    return editorId == Constants::CPPEDITOR_ID;
 }
 
 IAssistProcessor *CppQuickFixAssistProvider::createProcessor() const

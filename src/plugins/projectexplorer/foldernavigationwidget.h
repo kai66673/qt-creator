@@ -26,22 +26,58 @@
 #pragma once
 
 #include <coreplugin/inavigationwidgetfactory.h>
+#include <utils/fileutils.h>
 
+#include <QIcon>
 #include <QWidget>
 
-namespace Utils { class ListView; }
 namespace Core { class IEditor; }
 
+namespace Utils {
+class NavigationTreeView;
+}
+
 QT_BEGIN_NAMESPACE
-class QLabel;
-class QSortFilterProxyModel;
-class QModelIndex;
-class QFileSystemModel;
 class QAction;
+class QComboBox;
+class QFileSystemModel;
+class QModelIndex;
 QT_END_NAMESPACE
 
 namespace ProjectExplorer {
 namespace Internal {
+
+class FolderNavigationWidgetFactory : public Core::INavigationWidgetFactory
+{
+    Q_OBJECT
+
+public:
+    struct RootDirectory {
+        QString id;
+        int sortValue;
+        QString displayName;
+        Utils::FileName path;
+        QIcon icon;
+    };
+
+    FolderNavigationWidgetFactory();
+
+    Core::NavigationView createWidget() override;
+    void saveSettings(QSettings *settings, int position, QWidget *widget) override;
+    void restoreSettings(QSettings *settings, int position, QWidget *widget) override;
+
+    static void insertRootDirectory(const RootDirectory &directory);
+    static void removeRootDirectory(const QString &id);
+
+signals:
+    void rootDirectoryAdded(const RootDirectory &directory);
+    void rootDirectoryRemoved(const QString &id);
+
+private:
+    static int rootIndex(const QString &id);
+    void updateProjectsDirectoryRoot();
+    static QVector<RootDirectory> m_rootDirectories;
+};
 
 class FolderNavigationWidget : public QWidget
 {
@@ -58,44 +94,31 @@ public:
     void setAutoSynchronization(bool sync);
     void toggleAutoSynchronization();
 
-private:
-    void setCurrentFile(Core::IEditor *editor);
-    void slotOpenItem(const QModelIndex &viewIndex);
-    void setHiddenFilesFilter(bool filter);
-    void ensureCurrentIndex();
+    void insertRootDirectory(const FolderNavigationWidgetFactory::RootDirectory &directory);
+    void removeRootDirectory(const QString &id);
 
 protected:
     void contextMenuEvent(QContextMenuEvent *ev) override;
 
 private:
-    void setCurrentTitle(QString dirName, const QString &fullPath);
-    bool setCurrentDirectory(const QString &directory);
-    void openItem(const QModelIndex &srcIndex, bool openDirectoryAsProject = false);
-    QModelIndex currentItem() const;
-    QString currentDirectory() const;
+    void setHiddenFilesFilter(bool filter);
+    void setCurrentEditor(Core::IEditor *editor);
+    void selectFile(const Utils::FileName &filePath);
+    void setRootDirectory(const Utils::FileName &directory);
+    int bestRootForFile(const Utils::FileName &filePath);
+    void openItem(const QModelIndex &index);
+    QStringList projectsInDirectory(const QModelIndex &index) const;
+    void openProjectsInDirectory(const QModelIndex &index);
 
-    Utils::ListView *m_listView;
-    QFileSystemModel *m_fileSystemModel;
-    QAction *m_filterHiddenFilesAction;
-    QSortFilterProxyModel *m_filterModel;
-    QLabel *m_title;
+    Utils::NavigationTreeView *m_listView = nullptr;
+    QFileSystemModel *m_fileSystemModel = nullptr;
+    QAction *m_filterHiddenFilesAction = nullptr;
     bool m_autoSync = false;
-    QToolButton *m_toggleSync;
+    QToolButton *m_toggleSync = nullptr;
+    QComboBox *m_rootSelector = nullptr;
 
     // FolderNavigationWidgetFactory needs private members to build a menu
     friend class FolderNavigationWidgetFactory;
-};
-
-class FolderNavigationWidgetFactory : public Core::INavigationWidgetFactory
-{
-    Q_OBJECT
-
-public:
-    FolderNavigationWidgetFactory();
-
-    Core::NavigationView createWidget() override;
-    void saveSettings(QSettings *settings, int position, QWidget *widget) override;
-    void restoreSettings(QSettings *settings, int position, QWidget *widget) override;
 };
 
 } // namespace Internal

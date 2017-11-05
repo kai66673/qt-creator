@@ -37,6 +37,9 @@
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/headerpath.h>
+#include <projectexplorer/project.h>
+#include <projectexplorer/session.h>
+#include <projectexplorer/target.h>
 #include <qtsupport/qtkitinformation.h>
 #include <qtsupport/qtsupportconstants.h>
 
@@ -47,6 +50,7 @@
 #include <utils/runextensions.h>
 #include <utils/synchronousprocess.h>
 #include <utils/winutils.h>
+#include <utils/fileinprojectfinder.h>
 
 #include <QDir>
 #include <QUrl>
@@ -321,6 +325,10 @@ void BaseQtVersion::setupExpander()
         QtKitInformation::tr("The installation location of the current Qt version's plugins."),
         [this] { return qmakeProperty(m_versionInfo, "QT_INSTALL_PLUGINS"); });
 
+    m_expander.registerVariable("Qt:QT_INSTALL_QML",
+        QtKitInformation::tr("The installation location of the current Qt version's QML files."),
+        [this] { return qmakeProperty(m_versionInfo, "QT_INSTALL_QML"); });
+
     m_expander.registerVariable("Qt:QT_INSTALL_IMPORTS",
         QtKitInformation::tr("The installation location of the current Qt version's imports."),
         [this] { return qmakeProperty(m_versionInfo, "QT_INSTALL_IMPORTS"); });
@@ -477,6 +485,11 @@ QSet<Id> BaseQtVersion::availableFeatures() const
     if (qtVersion().matches(5, 8))
         return features;
 
+    features.unite(versionedIds(Constants::FEATURE_QT_QUICK_PREFIX, 2, 9));
+
+    if (qtVersion().matches(5, 9))
+        return features;
+
     return features;
 }
 
@@ -553,6 +566,11 @@ FileName BaseQtVersion::libraryPath() const
 FileName BaseQtVersion::pluginPath() const
 {
     return FileName::fromUserInput(qmakeProperty("QT_INSTALL_PLUGINS"));
+}
+
+FileName BaseQtVersion::qmlPath() const
+{
+    return FileName::fromUserInput(qmakeProperty("QT_INSTALL_QML"));
 }
 
 FileName BaseQtVersion::binPath() const
@@ -1304,11 +1322,58 @@ MacroExpander *BaseQtVersion::macroExpander() const
     return &m_expander;
 }
 
+void BaseQtVersion::populateQmlFileFinder(FileInProjectFinder *finder, const Target *target)
+{
+    // If target given, then use the project associated with that ...
+    const ProjectExplorer::Project *startupProject = target ? target->project() : nullptr;
+
+    // ... else try the session manager's global startup project ...
+    if (!startupProject)
+        startupProject = ProjectExplorer::SessionManager::startupProject();
+
+    // ... and if that is null, use the first project available.
+    const QList<ProjectExplorer::Project *> projects = ProjectExplorer::SessionManager::projects();
+    QTC_CHECK(projects.isEmpty() || startupProject);
+
+    QString projectDirectory;
+    QStringList sourceFiles;
+
+    // Sort files from startupProject to the front of the list ...
+    if (startupProject) {
+        projectDirectory = startupProject->projectDirectory().toString();
+        sourceFiles.append(startupProject->files(ProjectExplorer::Project::SourceFiles));
+    }
+
+    // ... then add all the other projects' files.
+    for (const ProjectExplorer::Project *project : projects) {
+        if (project != startupProject)
+            sourceFiles.append(project->files(ProjectExplorer::Project::SourceFiles));
+    }
+
+    // If no target was given, but we've found a startupProject, then try to deduce a
+    // target from that.
+    if (!target && startupProject)
+        target = startupProject->activeTarget();
+
+    // ... and find the sysroot and qml directory if we have any target at all.
+    const ProjectExplorer::Kit *kit = target ? target->kit() : nullptr;
+    QString activeSysroot = ProjectExplorer::SysRootKitInformation::sysRoot(kit).toString();
+    const QtSupport::BaseQtVersion *qtVersion = QtVersionManager::isLoaded()
+            ? QtSupport::QtKitInformation::qtVersion(kit) : nullptr;
+    QStringList additionalSearchDirectories = qtVersion
+            ? QStringList(qtVersion->qmlPath().toString()) : QStringList();
+
+    // Finally, do populate m_projectFinder
+    finder->setProjectDirectory(projectDirectory);
+    finder->setProjectFiles(sourceFiles);
+    finder->setSysroot(activeSysroot);
+    finder->setAdditionalSearchDirectories(additionalSearchDirectories);
+}
+
 void BaseQtVersion::addToEnvironment(const Kit *k, Environment &env) const
 {
     Q_UNUSED(k);
     env.set(QLatin1String("QTDIR"), QDir::toNativeSeparators(qmakeProperty("QT_HOST_DATA")));
-    env.prependOrSetPath(qmakeProperty("QT_HOST_BINS"));
 }
 
 // Some Qt versions may require environment settings for qmake to work
@@ -1572,8 +1637,7 @@ FileName BaseQtVersion::sourcePath(const QHash<ProKey, ProString> &versionInfo)
     const QString installData = qmakeProperty(versionInfo, "QT_INSTALL_PREFIX");
     QString sourcePath = installData;
     QFile qmakeCache(installData + QLatin1String("/.qmake.cache"));
-    if (qmakeCache.exists()) {
-        qmakeCache.open(QIODevice::ReadOnly | QIODevice::Text);
+    if (qmakeCache.exists() && qmakeCache.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream stream(&qmakeCache);
         while (!stream.atEnd()) {
             QString line = stream.readLine().trimmed();
@@ -1704,7 +1768,7 @@ FileNameList BaseQtVersion::qtCorePaths() const
         if (dir.isEmpty())
             continue;
         QDir d(dir);
-        QFileInfoList infoList = d.entryInfoList();
+        QFileInfoList infoList = d.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
         foreach (const QFileInfo &info, infoList) {
             const QString file = info.fileName();
             if (info.isDir()

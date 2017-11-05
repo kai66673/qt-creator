@@ -110,6 +110,7 @@ namespace Constants {
 const char C_TEXTEDITOR[]          = "Text Editor";
 const char COMPLETE_THIS[]         = "TextEditor.CompleteThis";
 const char QUICKFIX_THIS[]         = "TextEditor.QuickFix";
+const char SHOWCONTEXTMENU[]       = "TextEditor.ShowContextMenu";
 const char CREATE_SCRATCH_BUFFER[] = "TextEditor.CreateScratchBuffer";
 const char VISUALIZE_WHITESPACE[]  = "TextEditor.VisualizeWhitespace";
 const char CLEAN_WHITESPACE[]      = "TextEditor.CleanWhitespace";
@@ -142,6 +143,7 @@ const char INSERT_LINE_ABOVE[]     = "TextEditor.InsertLineAboveCurrentLine";
 const char INSERT_LINE_BELOW[]     = "TextEditor.InsertLineBelowCurrentLine";
 const char UPPERCASE_SELECTION[]   = "TextEditor.UppercaseSelection";
 const char LOWERCASE_SELECTION[]   = "TextEditor.LowercaseSelection";
+const char SORT_SELECTED_LINES[]   = "TextEditor.SortSelectedLines";
 const char CUT_LINE[]              = "TextEditor.CutLine";
 const char COPY_LINE[]             = "TextEditor.CopyLine";
 const char DUPLICATE_SELECTION[]   = "TextEditor.DuplicateSelection";

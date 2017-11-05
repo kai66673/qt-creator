@@ -62,7 +62,7 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
     {
-        QMT_CHECK(option);
+        QMT_ASSERT(option, return);
 
         QStyleOptionGraphicsItem option2(*option);
         option2.state &= ~(QStyle::State_Selected | QStyle::State_HasFocus);
@@ -126,7 +126,7 @@ void BoundaryItem::update()
     } else if (m_noTextItem) {
         m_noTextItem->scene()->removeItem(m_noTextItem);
         delete m_noTextItem;
-        m_noTextItem = 0;
+        m_noTextItem = nullptr;
     }
 
     // item shown if annotation has no text and is not selected
@@ -264,6 +264,21 @@ void BoundaryItem::setFocusSelected(bool focusSelected)
     }
 }
 
+QRectF BoundaryItem::getSecondarySelectionBoundary()
+{
+    return QRectF();
+}
+
+void BoundaryItem::setBoundarySelected(const QRectF &boundary, bool secondary)
+{
+    if (boundary.contains(mapRectToScene(boundingRect()))) {
+        if (secondary)
+            setSecondarySelected(true);
+        else
+            setSelected(true);
+    }
+}
+
 bool BoundaryItem::isEditable() const
 {
     return true;
@@ -308,7 +323,7 @@ void BoundaryItem::updateSelectionMarker()
         if (m_selectionMarker->scene())
             m_selectionMarker->scene()->removeItem(m_selectionMarker);
         delete m_selectionMarker;
-        m_selectionMarker = 0;
+        m_selectionMarker = nullptr;
     }
 }
 

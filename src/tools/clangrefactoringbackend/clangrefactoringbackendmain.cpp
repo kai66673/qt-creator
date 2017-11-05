@@ -26,14 +26,21 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QLoggingCategory>
+#include <QApplication>
+#include <QDir>
 
 #include <connectionserver.h>
+#include <filepathcaching.h>
 #include <refactoringserver.h>
 #include <refactoringclientproxy.h>
+#include <symbolindexing.h>
 
+using ClangBackEnd::FilePathCaching;
 using ClangBackEnd::RefactoringClientProxy;
 using ClangBackEnd::RefactoringServer;
+using ClangBackEnd::RefactoringDatabaseInitializer;
 using ClangBackEnd::ConnectionServer;
+using ClangBackEnd::SymbolIndexing;
 
 QString processArguments(QCoreApplication &application)
 {
@@ -52,7 +59,7 @@ QString processArguments(QCoreApplication &application)
 }
 
 int main(int argc, char *argv[])
-{
+try {
     //QLoggingCategory::setFilterRules(QStringLiteral("*.debug=false"));
 
     QCoreApplication::setOrganizationName(QStringLiteral("QtProject"));
@@ -64,13 +71,19 @@ int main(int argc, char *argv[])
 
     const QString connection =  processArguments(application);
 
-    RefactoringServer clangCodeModelServer;
+    Sqlite::Database database{Utils::PathString{QDir::tempPath() + "/symbol.db"}};
+    RefactoringDatabaseInitializer<Sqlite::Database> databaseInitializer{database};
+    FilePathCaching filePathCache{database};
+    SymbolIndexing symbolIndexing{database, filePathCache};
+    RefactoringServer clangCodeModelServer{symbolIndexing, filePathCache};
     ConnectionServer<RefactoringServer, RefactoringClientProxy> connectionServer(connection);
     connectionServer.start();
     connectionServer.setServer(&clangCodeModelServer);
 
 
     return application.exec();
+} catch (const Sqlite::Exception &exception) {
+    exception.printWarning();
 }
 
 

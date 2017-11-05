@@ -192,7 +192,7 @@ void FindPrivate::setupMenu()
     cmd->setDefaultKeySequence(QKeySequence(tr("Ctrl+Shift+F")));
     mfindadvanced->addAction(cmd);
     connect(m_openFindDialog, &QAction::triggered,
-            this, [this] { Find::openFindDialog(nullptr); });
+            this, [] { Find::openFindDialog(nullptr); });
 }
 
 static QString filterActionName(const IFindFilter *filter)
@@ -220,8 +220,7 @@ void FindPrivate::setupFilterMenuItems()
         cmd->setDefaultKeySequence(filter->defaultShortcut());
         cmd->setAttribute(Command::CA_UpdateText);
         mfindadvanced->addAction(cmd);
-        connect(action, &QAction::triggered,
-                this, [filter, action] { Find::openFindDialog(filter); });
+        connect(action, &QAction::triggered, this, [filter] { Find::openFindDialog(filter); });
         connect(filter, &IFindFilter::enabledChanged, this, [filter, action] {
             action->setEnabled(filter->isEnabled());
             d->m_openFindDialog->setEnabled(d->isAnyFilterEnabled());
@@ -302,13 +301,14 @@ void FindPrivate::readSettings()
 {
     QSettings *settings = ICore::settings();
     settings->beginGroup(QLatin1String("Find"));
-    bool block = m_instance->blockSignals(true);
-    Find::setBackward(settings->value(QLatin1String("Backward"), false).toBool());
-    Find::setCaseSensitive(settings->value(QLatin1String("CaseSensitively"), false).toBool());
-    Find::setWholeWord(settings->value(QLatin1String("WholeWords"), false).toBool());
-    Find::setRegularExpression(settings->value(QLatin1String("RegularExpression"), false).toBool());
-    Find::setPreserveCase(settings->value(QLatin1String("PreserveCase"), false).toBool());
-    m_instance->blockSignals(block);
+    {
+        QSignalBlocker blocker(m_instance);
+        Find::setBackward(settings->value(QLatin1String("Backward"), false).toBool());
+        Find::setCaseSensitive(settings->value(QLatin1String("CaseSensitively"), false).toBool());
+        Find::setWholeWord(settings->value(QLatin1String("WholeWords"), false).toBool());
+        Find::setRegularExpression(settings->value(QLatin1String("RegularExpression"), false).toBool());
+        Find::setPreserveCase(settings->value(QLatin1String("PreserveCase"), false).toBool());
+    }
     m_findCompletions = settings->value(QLatin1String("FindStrings")).toStringList();
     m_replaceCompletions = settings->value(QLatin1String("ReplaceStrings")).toStringList();
     m_findCompletionModel.setStringList(m_findCompletions);

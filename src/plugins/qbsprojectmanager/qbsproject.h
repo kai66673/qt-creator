@@ -66,14 +66,19 @@ public:
     QStringList filesGeneratedFrom(const QString &sourceFile) const override;
 
     bool isProjectEditable() const;
-    bool addFilesToProduct(const QStringList &filePaths, const qbs::ProductData &productData,
-                           const qbs::GroupData &groupData, QStringList *notAdded);
+    // qbs::ProductData and qbs::GroupData are held by the nodes in the project tree.
+    // These methods change those trees and invalidate the lot, so pass in copies of
+    // the data we are interested in!
+    // The overhead is not as big as it seems at first glance: These all are handles
+    // for shared data.
+    bool addFilesToProduct(const QStringList &filePaths, const qbs::ProductData productData,
+                           const qbs::GroupData groupData, QStringList *notAdded);
     bool removeFilesFromProduct(const QStringList &filePaths,
-            const qbs::ProductData &productData, const qbs::GroupData &groupData,
+            const qbs::ProductData productData, const qbs::GroupData groupData,
             QStringList *notRemoved);
     bool renameFileInProduct(const QString &oldPath,
-            const QString &newPath, const qbs::ProductData &productData,
-            const qbs::GroupData &groupData);
+            const QString &newPath, const qbs::ProductData productData,
+            const qbs::GroupData groupData);
 
     qbs::BuildJob *build(const qbs::BuildOptions &opts, QStringList products, QString &error);
     qbs::CleanJob *clean(const qbs::CleanOptions &opts, const QStringList &productNames,
@@ -103,28 +108,22 @@ public:
                                       const qbs::ProductData &product);
     static QString uniqueProductName(const qbs::ProductData &product);
 
-public:
+    void configureAsExampleProject(const QSet<Core::Id> &platforms) final;
+
     void invalidate();
     void delayParsing();
-
-signals:
-    void projectParsingStarted();
-    void projectParsingDone(bool);
 
 private:
     void handleQbsParsingDone(bool success);
 
     void rebuildProjectTree();
 
-    void targetWasAdded(ProjectExplorer::Target *t);
-    void targetWasRemoved(ProjectExplorer::Target *t);
     void changeActiveTarget(ProjectExplorer::Target *t);
     void buildConfigurationChanged(ProjectExplorer::BuildConfiguration *bc);
     void startParsing();
 
-    RestoreResult fromMap(const QVariantMap &map, QString *errorMessage) override;
-
-    void parse(const QVariantMap &config, const Utils::Environment &env, const QString &dir);
+    void parse(const QVariantMap &config, const Utils::Environment &env, const QString &dir,
+               const QString &configName);
 
     void prepareForParsing();
     void updateDocuments(const QSet<QString> &files);
@@ -138,7 +137,11 @@ private:
     bool checkCancelStatus();
     void updateAfterParse();
     void updateProjectNodes();
+
     void projectLoaded() override;
+    ProjectExplorer::ProjectImporter *projectImporter() const override;
+    bool needsConfiguration() const override { return targets().isEmpty(); }
+    bool requiresTargetPanel() const override { return !targets().isEmpty(); }
 
     static bool ensureWriteableQbsFile(const QString &file);
 
@@ -165,6 +168,7 @@ private:
     CppTools::ProjectInfo m_cppCodeModelProjectInfo;
 
     QbsBuildConfiguration *m_currentBc;
+    mutable ProjectExplorer::ProjectImporter *m_importer = nullptr;
 
     QTimer m_parsingDelay;
     QList<ProjectExplorer::ExtraCompiler *> m_extraCompilers;

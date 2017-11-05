@@ -116,9 +116,8 @@ void AndroidToolChain::addToEnvironment(Environment &env) const
         env.set(QLatin1String("JAVA_HOME"), javaHome.toString());
         Utils::FileName javaBin = javaHome;
         javaBin.appendPath(QLatin1String("bin"));
-        const QString jb = javaBin.toUserOutput();
-        if (!Utils::contains(env.path(), [&jb](const QString &p) { return p == jb; }))
-            env.prependOrSetPath(jb);
+        if (!Utils::contains(env.path(), [&javaBin](const Utils::FileName &p) { return p == javaBin; }))
+            env.prependOrSetPath(javaBin.toUserOutput());
     }
     env.set(QLatin1String("ANDROID_HOME"), AndroidConfigurations::currentConfig().sdkLocation().toString());
     env.set(QLatin1String("ANDROID_SDK_ROOT"), AndroidConfigurations::currentConfig().sdkLocation().toString());
@@ -203,21 +202,24 @@ bool AndroidToolChain::fromMap(const QVariantMap &data)
 
 FileNameList AndroidToolChain::suggestedMkspecList() const
 {
-    return FileNameList()<< FileName::fromLatin1("android-g++");
+    return FileNameList() << FileName::fromLatin1("android-g++")
+                          << FileName::fromLatin1("android-clang");
 }
 
 QString AndroidToolChain::makeCommand(const Environment &env) const
 {
-    QStringList extraDirectories = AndroidConfigurations::currentConfig().makeExtraSearchDirectories();
+    const Utils::FileNameList extraDirectories
+            = Utils::transform(AndroidConfigurations::currentConfig().makeExtraSearchDirectories(),
+                               [](const QString &s) { return Utils::FileName::fromString(s); });
     if (HostOsInfo::isWindowsHost()) {
-        FileName tmp = env.searchInPath(QLatin1String("ma-make.exe"), extraDirectories);
+        FileName tmp = env.searchInPath("ma-make.exe", extraDirectories);
         if (!tmp.isEmpty())
-            return QString();
-        tmp = env.searchInPath(QLatin1String("mingw32-make"), extraDirectories);
+            return tmp.toString();
+        tmp = env.searchInPath("mingw32-make", extraDirectories);
         return tmp.isEmpty() ? QLatin1String("mingw32-make") : tmp.toString();
     }
 
-    QString make = QLatin1String("make");
+    QString make = "make";
     FileName tmp = env.searchInPath(make, extraDirectories);
     return tmp.isEmpty() ? make : tmp.toString();
 }
@@ -311,7 +313,7 @@ QList<AndroidToolChainFactory::AndroidToolChainInformation> AndroidToolChainFact
             ati.version = fileName.mid(idx + 1);
             QString platform = fileName.left(idx);
             ati.abi = AndroidConfig::abiForToolChainPrefix(platform);
-            if (ati.abi.architecture() == Abi::UnknownArchitecture) // e.g. mipsel which is not yet supported
+            if (ati.abi.architecture() == Abi::UnknownArchitecture)
                 continue;
             ati.compilerCommand = AndroidConfigurations::currentConfig().gccPath(ati.abi, lang, ati.version);
             result.append(ati);
@@ -399,7 +401,7 @@ AndroidToolChainFactory::autodetectToolChainsForNdk(const FileName &ndkPath,
         QString version = fileName.mid(idx + 1);
         QString platform = fileName.left(idx);
         Abi abi = AndroidConfig::abiForToolChainPrefix(platform);
-        if (abi.architecture() == Abi::UnknownArchitecture) // e.g. mipsel which is not yet supported
+        if (abi.architecture() == Abi::UnknownArchitecture)
             continue;
         QList<AndroidToolChain *> toolChainBundle;
         for (Core::Id lang : {ProjectExplorer::Constants::CXX_LANGUAGE_ID, ProjectExplorer::Constants::C_LANGUAGE_ID}) {
@@ -447,7 +449,7 @@ QList<int> AndroidToolChainFactory::newestToolChainVersionForArch(const Abi &abi
             QList<int> version = versionNumberFromString(fileName.mid(idx + 1));
             QString platform = fileName.left(idx);
             Abi abi = AndroidConfig::abiForToolChainPrefix(platform);
-            if (abi.architecture() == Abi::UnknownArchitecture) // e.g. mipsel which is not yet supported
+            if (abi.architecture() == Abi::UnknownArchitecture)
                 continue;
             QHash<Abi, QList<int> >::const_iterator it
                     = m_newestVersionForAbi.constFind(abi);

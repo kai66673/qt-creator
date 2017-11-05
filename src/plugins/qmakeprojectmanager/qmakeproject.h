@@ -68,8 +68,6 @@ public:
     bool supportsKit(ProjectExplorer::Kit *k, QString *errorMesage) const final;
 
     QmakeProFileNode *rootProjectNode() const final;
-    bool validParse(const Utils::FileName &proFilePath) const;
-    bool parseInProgress(const Utils::FileName &proFilePath) const;
 
     virtual QStringList filesGeneratedFrom(const QString &file) const final;
 
@@ -102,7 +100,7 @@ public:
     /// \internal
     void incrementPendingEvaluateFutures();
     /// \internal
-    void decrementPendingEvaluateFutures();
+    void decrementPendingEvaluateFutures(bool success);
     /// \internal
     bool wasEvaluateCanceled();
 
@@ -188,6 +186,7 @@ private:
     // cached data during project rescan
     QMakeGlobals *m_qmakeGlobals = nullptr;
     int m_qmakeGlobalsRefCnt = 0;
+    bool m_totalEvaluationSuccess = false;
 
     QString m_qmakeSysroot;
 

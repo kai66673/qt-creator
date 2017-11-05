@@ -38,6 +38,8 @@ class QKeyEvent;
 class QLabel;
 class QModelIndex;
 class QMenu;
+class QPlainTextEdit;
+class QStackedWidget;
 class QToolButton;
 QT_END_NAMESPACE
 
@@ -50,6 +52,7 @@ namespace Internal {
 
 class TestResultModel;
 class TestResultFilterModel;
+class TestResult;
 
 class ResultsTreeView : public Utils::TreeView
 {
@@ -88,6 +91,7 @@ public:
     void goToPrev() override;
 
     void addTestResult(const TestResultPtr &result);
+    void addOutput(const QByteArray &output);
 
 private:
     explicit TestResultsPane(QObject *parent = 0);
@@ -106,12 +110,15 @@ private:
     void onScrollBarRangeChanged(int, int max);
     void updateRunActions();
     void onCustomContextMenuRequested(const QPoint &pos);
-    void onCopyItemTriggered(const QModelIndex &idx);
+    const TestResult *getTestResult(const QModelIndex &idx);
+    void onCopyItemTriggered(const TestResult *result);
     void onCopyWholeTriggered();
     void onSaveWholeTriggered();
+    void onRunThisTestTriggered(TestRunMode runMode, const TestResult *result);
+    void toggleOutputStyle();
     QString getWholeOutput(const QModelIndex &parent = QModelIndex());
 
-    QWidget *m_outputWidget;
+    QStackedWidget *m_outputWidget;
     QFrame *m_summaryWidget;
     QLabel *m_summaryLabel;
     ResultsTreeView *m_treeView;
@@ -123,6 +130,8 @@ private:
     QToolButton *m_runSelected;
     QToolButton *m_stopTestRun;
     QToolButton *m_filterButton;
+    QToolButton *m_outputToggleButton;
+    QPlainTextEdit *m_textOutput;
     QMenu *m_filterMenu;
     bool m_wasVisibleBefore = false;
     bool m_autoScroll = false;

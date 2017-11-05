@@ -249,6 +249,7 @@ ImportMatchStrength ImportKey::matchImport(const ImportKey &o, const ViewerConte
     case ImportType::QrcFile:
         if (type != ImportType::QrcFile)
             return ImportMatchStrength();
+        break;
     case ImportType::UnknownFile:
     case ImportType::File:
         switch (type) {
@@ -818,18 +819,6 @@ void ImportDependencies::removeExport(const QString &importId, const ImportKey &
     }
     qCDebug(importsLog) << "removed export "<< importKey.toString() << " for id " << importId
                         << " (" << requiredPath << ")";
-}
-
-void ImportDependencies::iterateOnCoreImports(
-        const ViewerContext &vContext,
-        std::function<bool (const CoreImport &)> const &iterF) const
-{
-    QMapIterator<QString, CoreImport> i(m_coreImports);
-    while (i.hasNext()) {
-        i.next();
-        if (vContext.languageIsCompatible(i.value().language))
-            iterF(i.value()); // check also that at least one export is visible?
-    }
 }
 
 void ImportDependencies::iterateOnLibraryImports(

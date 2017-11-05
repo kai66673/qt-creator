@@ -34,14 +34,14 @@ class RemoteLinuxCustomRunConfiguration : public ProjectExplorer::RunConfigurati
 {
     Q_OBJECT
 public:
-    RemoteLinuxCustomRunConfiguration(ProjectExplorer::Target *parent);
-    RemoteLinuxCustomRunConfiguration(ProjectExplorer::Target *parent,
-                                      RemoteLinuxCustomRunConfiguration *source);
+    explicit RemoteLinuxCustomRunConfiguration(ProjectExplorer::Target *target);
+
+    void initialize();
+    void copyFrom(const RemoteLinuxCustomRunConfiguration *source);
 
     bool fromMap(const QVariantMap &map) override;
     QVariantMap toMap() const override;
 
-    bool isEnabled() const override { return true; }
     bool isConfigured() const override;
     ConfigurationState ensureConfigured(QString *errorMessage) override;
     QWidget *createConfigurationWidget() override;
@@ -58,8 +58,6 @@ public:
     static QString runConfigDefaultDisplayName();
 
 private:
-    void init();
-
     QString m_localExecutable;
     QString m_remoteExecutable;
     QString m_arguments;

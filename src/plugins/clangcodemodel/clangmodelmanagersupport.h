@@ -33,6 +33,8 @@
 #include <QObject>
 #include <QScopedPointer>
 
+#include <memory>
+
 QT_BEGIN_NAMESPACE
 class QMenu;
 class QWidget;
@@ -40,6 +42,7 @@ QT_END_NAMESPACE
 
 namespace Core { class IDocument; }
 namespace TextEditor { class TextEditorWidget; }
+namespace CppTools { class FollowSymbolInterface; }
 
 namespace ClangCodeModel {
 namespace Internal {
@@ -57,8 +60,9 @@ public:
     CppTools::CppCompletionAssistProvider *completionAssistProvider() override;
     CppTools::BaseEditorDocumentProcessor *editorDocumentProcessor(
                 TextEditor::TextDocument *baseTextDocument) override;
+    CppTools::FollowSymbolInterface &followSymbolInterface() override;
 
-    IpcCommunicator &ipcCommunicator();
+    BackendCommunicator &communicator();
     QString dummyUiHeaderOnDiskDirPath() const;
     QString dummyUiHeaderOnDiskPath(const QString &filePath) const;
 
@@ -98,8 +102,9 @@ private:
 
 private:
     UiHeaderOnDiskManager m_uiHeaderOnDiskManager;
-    IpcCommunicator m_ipcCommunicator;
+    BackendCommunicator m_communicator;
     ClangCompletionAssistProvider m_completionAssistProvider;
+    std::unique_ptr<CppTools::FollowSymbolInterface> m_followSymbol;
 };
 
 class ModelManagerSupportProviderClang : public CppTools::ModelManagerSupportProvider

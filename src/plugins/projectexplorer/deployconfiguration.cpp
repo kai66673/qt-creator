@@ -41,8 +41,9 @@ const char BUILD_STEP_LIST_PREFIX[] = "ProjectExplorer.BuildConfiguration.BuildS
 const char DEFAULT_DEPLOYCONFIGURATION_ID[] = "ProjectExplorer.DefaultDeployConfiguration";
 
 DeployConfiguration::DeployConfiguration(Target *target, Core::Id id) :
-    ProjectConfiguration(target, id)
+    ProjectConfiguration(target)
 {
+    ProjectConfiguration::initialize(id);
     Q_ASSERT(target);
     m_stepList = new BuildStepList(this, Core::Id(Constants::BUILDSTEPS_DEPLOY));
     //: Display name of the deploy build step list. Used as part of the labels in the project window.
@@ -53,8 +54,9 @@ DeployConfiguration::DeployConfiguration(Target *target, Core::Id id) :
 }
 
 DeployConfiguration::DeployConfiguration(Target *target, DeployConfiguration *source) :
-    ProjectConfiguration(target, source)
+    ProjectConfiguration(target)
 {
+    ProjectConfiguration::copyFrom(source);
     Q_ASSERT(target);
     // Do not clone stepLists here, do that in the derived constructor instead
     // otherwise BuildStepFactories might reject to set up a BuildStep for us
@@ -139,6 +141,16 @@ bool DeployConfiguration::fromMap(const QVariantMap &map)
 Target *DeployConfiguration::target() const
 {
     return static_cast<Target *>(parent());
+}
+
+Project *DeployConfiguration::project() const
+{
+    return target()->project();
+}
+
+bool DeployConfiguration::isActive() const
+{
+    return target()->isActive() && target()->activeDeployConfiguration() == this;
 }
 
 void DeployConfiguration::cloneSteps(DeployConfiguration *source)

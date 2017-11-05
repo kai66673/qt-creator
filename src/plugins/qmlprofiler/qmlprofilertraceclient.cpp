@@ -138,7 +138,8 @@ void QmlProfilerTraceClientPrivate::processCurrentEvent()
         break;
     case RangeEnd: {
         int typeIndex = resolveStackTop();
-        QTC_ASSERT(typeIndex != -1, break);
+        if (typeIndex == -1)
+            break;
         currentEvent.event.setTypeIndex(typeIndex);
         while (!pendingMessages.isEmpty())
             modelManager->addEvent(pendingMessages.dequeue());
@@ -147,10 +148,12 @@ void QmlProfilerTraceClientPrivate::processCurrentEvent()
         break;
     }
     case RangeData:
-        rangesInProgress.top().type.setData(currentEvent.type.data());
+        if (!rangesInProgress.isEmpty())
+            rangesInProgress.top().type.setData(currentEvent.type.data());
         break;
     case RangeLocation:
-        rangesInProgress.top().type.setLocation(currentEvent.type.location());
+        if (!rangesInProgress.isEmpty())
+            rangesInProgress.top().type.setLocation(currentEvent.type.location());
         break;
     default: {
         int typeIndex = resolveType(currentEvent);
@@ -166,7 +169,7 @@ void QmlProfilerTraceClientPrivate::processCurrentEvent()
 
 void QmlProfilerTraceClientPrivate::sendRecordingStatus(int engineId)
 {
-    QmlDebug::QPacket stream(q->connection()->currentDataStreamVersion());
+    QmlDebug::QPacket stream(q->dataStreamVersion());
     stream << recording << engineId; // engineId -1 is OK. It means "all of them"
     if (recording) {
         stream << requestedFeatures << flushInterval;
@@ -244,7 +247,7 @@ void QmlProfilerTraceClient::setRequestedFeatures(quint64 features)
                        const QmlDebug::QDebugContextInfo &context)
         {
             d->updateFeatures(ProfileDebugMessages);
-            d->currentEvent.event.setTimestamp(context.timestamp);
+            d->currentEvent.event.setTimestamp(context.timestamp > 0 ? context.timestamp : 0);
             d->currentEvent.event.setTypeIndex(-1);
             d->currentEvent.event.setString(text);
             d->currentEvent.type = QmlEventType(DebugMessage, MaximumRangeType, type,
@@ -282,7 +285,7 @@ void QmlProfilerTraceClient::stateChanged(State status)
 
 void QmlProfilerTraceClient::messageReceived(const QByteArray &data)
 {
-    QmlDebug::QPacket stream(connection()->currentDataStreamVersion(), data);
+    QmlDebug::QPacket stream(dataStreamVersion(), data);
 
     stream >> d->currentEvent;
 

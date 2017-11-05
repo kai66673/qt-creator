@@ -31,6 +31,8 @@
 #include "../nimconstants.h"
 
 #include <coreplugin/progressmanager/progressmanager.h>
+#include <coreplugin/iversioncontrol.h>
+#include <coreplugin/vcsmanager.h>
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/kit.h>
 #include <projectexplorer/projectexplorerconstants.h>
@@ -113,8 +115,11 @@ void NimProject::collectProjectFiles()
     m_lastProjectScan.start();
     QTC_ASSERT(!m_futureWatcher.future().isRunning(), return);
     FileName prjDir = projectDirectory();
-    QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir] {
-        return FileNode::scanForFiles(prjDir, [](const FileName &fn) { return new FileNode(fn, FileType::Source, false); });
+    const QList<Core::IVersionControl *> versionControls = Core::VcsManager::versionControls();
+    QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir, versionControls] {
+        return FileNode::scanForFilesWithVersionControls(
+                    prjDir, [](const FileName &fn) { return new FileNode(fn, FileType::Source, false); },
+                    versionControls);
     });
     m_futureWatcher.setFuture(future);
     Core::ProgressManager::addTask(future, tr("Scanning for Nim files"), "Nim.Project.Scan");
@@ -122,6 +127,7 @@ void NimProject::collectProjectFiles()
 
 void NimProject::updateProject()
 {
+    emitParsingStarted();
     const QStringList oldFiles = m_files;
     m_files.clear();
 
@@ -147,7 +153,7 @@ void NimProject::updateProject()
     newRoot->setDisplayName(displayName());
     newRoot->addNestedNodes(fileNodes);
     setRootProjectNode(newRoot);
-    emit parsingFinished();
+    emitParsingFinished(true);
 }
 
 bool NimProject::supportsKit(Kit *k, QString *errorMessage) const
@@ -160,7 +166,7 @@ bool NimProject::supportsKit(Kit *k, QString *errorMessage) const
     }
     if (!tc->compilerCommand().exists()) {
         if (errorMessage)
-            *errorMessage = tr("Nim compiler does not exist");
+            *errorMessage = tr("Nim compiler does not exist.");
         return false;
     }
     return true;

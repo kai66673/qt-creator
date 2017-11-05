@@ -79,12 +79,7 @@ public:
 };
 
 SearchResultWidget::SearchResultWidget(QWidget *parent) :
-    QWidget(parent),
-    m_count(0),
-    m_preserveCaseSupported(true),
-    m_isShowingReplaceUI(false),
-    m_searchAgainSupported(false),
-    m_replaceSupported(false)
+    QWidget(parent)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setMargin(0);
@@ -157,6 +152,7 @@ SearchResultWidget::SearchResultWidget(QWidget *parent) :
     m_label = new QLabel(m_descriptionContainer);
     m_label->setVisible(false);
     m_searchTerm = new QLabel(m_descriptionContainer);
+    m_searchTerm->setTextFormat(Qt::PlainText);
     m_searchTerm->setVisible(false);
     descriptionLayout->addWidget(m_label);
     descriptionLayout->addWidget(m_searchTerm);
@@ -294,8 +290,6 @@ void SearchResultWidget::addResults(const QList<SearchResultItem> &items, Search
     }
 }
 
-
-
 int SearchResultWidget::count() const
 {
     return m_count;
@@ -307,7 +301,6 @@ void SearchResultWidget::setSupportsReplace(bool replaceSupported, const QString
     setShowReplaceUI(replaceSupported);
     m_dontAskAgainGroup = group;
 }
-
 
 void SearchResultWidget::setTextToReplace(const QString &textToReplace)
 {

@@ -52,6 +52,7 @@
 #include <utils/qtcassert.h>
 
 #include <limits>
+#include <memory>
 
 /*!
     \class ProjectExplorer::Project
@@ -126,20 +127,27 @@ bool ProjectDocument::reload(QString *errorString, Core::IDocument::ReloadFlag f
 class ProjectPrivate
 {
 public:
-    ProjectPrivate(Core::IDocument *document) : m_document(document) { }
+    ProjectPrivate(const QString &mimeType, const Utils::FileName &fileName,
+                   const ProjectDocument::ProjectCallback &callback)
+    {
+        m_document = std::make_unique<ProjectDocument>(mimeType, fileName, callback);
+    }
+
     ~ProjectPrivate();
 
     Core::Id m_id;
-    Core::IDocument *m_document = nullptr;
+    bool m_isParsing = false;
+    bool m_hasParsingData = false;
+    std::unique_ptr<Core::IDocument> m_document;
     ProjectNode *m_rootProjectNode = nullptr;
-    ContainerNode *m_containerNode = nullptr;
+    std::unique_ptr<ContainerNode> m_containerNode;
     QList<Target *> m_targets;
     Target *m_activeTarget = nullptr;
     EditorConfiguration m_editorConfiguration;
     Core::Context m_projectContext;
     Core::Context m_projectLanguages;
     QVariantMap m_pluginSettings;
-    Internal::UserFileAccessor *m_accessor = nullptr;
+    std::unique_ptr<Internal::UserFileAccessor> m_accessor;
 
     QString m_displayName;
 
@@ -151,32 +159,28 @@ public:
 
 ProjectPrivate::~ProjectPrivate()
 {
+    qDeleteAll(m_targets);
+
     // Make sure our root node is null when deleting
     ProjectNode *oldNode = m_rootProjectNode;
     m_rootProjectNode = nullptr;
     delete oldNode;
-
-    delete m_containerNode;
-
-    delete m_document;
-    delete m_accessor;
 }
 
 Project::Project(const QString &mimeType, const Utils::FileName &fileName,
                  const ProjectDocument::ProjectCallback &callback) :
-    d(new ProjectPrivate(new ProjectDocument(mimeType, fileName, callback)))
+    d(new ProjectPrivate(mimeType, fileName, callback))
 {
     d->m_macroExpander.setDisplayName(tr("Project"));
     d->m_macroExpander.registerVariable("Project:Name", tr("Project Name"),
             [this] { return displayName(); });
 
     // Only set up containernode after d is set so that it will find the project directory!
-    d->m_containerNode = new ContainerNode(this);
+    d->m_containerNode = std::make_unique<ContainerNode>(this);
 }
 
 Project::~Project()
 {
-    qDeleteAll(d->m_targets);
     delete d;
 }
 
@@ -194,7 +198,7 @@ Core::Id Project::id() const
 Core::IDocument *Project::document() const
 {
     QTC_CHECK(d->m_document);
-    return d->m_document;
+    return d->m_document.get();
 }
 
 Utils::FileName Project::projectFilePath() const
@@ -219,20 +223,6 @@ QString Project::makeUnique(const QString &preferredName, const QStringList &use
     return tryName;
 }
 
-void Project::changeEnvironment()
-{
-    auto t = qobject_cast<Target *>(sender());
-    if (t == activeTarget())
-        emit environmentChanged();
-}
-
-void Project::changeBuildConfigurationEnabled()
-{
-    auto t = qobject_cast<Target *>(sender());
-    if (t == activeTarget())
-        emit buildConfigurationEnabledChanged();
-}
-
 void Project::addTarget(Target *t)
 {
     QTC_ASSERT(t && !d->m_targets.contains(t), return);
@@ -243,10 +233,11 @@ void Project::addTarget(Target *t)
 
     // add it
     d->m_targets.push_back(t);
-    connect(t, &Target::environmentChanged, this, &Project::changeEnvironment);
-    connect(t, &Target::buildConfigurationEnabledChanged,
-            this, &Project::changeBuildConfigurationEnabled);
-    connect(t, &Target::buildDirectoryChanged, this, &Project::onBuildDirectoryChanged);
+    connect(t, &Target::addedProjectConfiguration, this, &Project::addedProjectConfiguration);
+    connect(t, &Target::aboutToRemoveProjectConfiguration, this, &Project::aboutToRemoveProjectConfiguration);
+    connect(t, &Target::removedProjectConfiguration, this, &Project::removedProjectConfiguration);
+    connect(t, &Target::activeProjectConfigurationChanged, this, &Project::activeProjectConfigurationChanged);
+    emit addedProjectConfiguration(t);
     emit addedTarget(t);
 
     // check activeTarget:
@@ -270,9 +261,11 @@ bool Project::removeTarget(Target *target)
             SessionManager::setActiveTarget(this, d->m_targets.at(0), SetActive::Cascade);
     }
 
+    emit aboutToRemoveProjectConfiguration(target);
     emit aboutToRemoveTarget(target);
     d->m_targets.removeOne(target);
     emit removedTarget(target);
+    emit removedProjectConfiguration(target);
 
     delete target;
     return true;
@@ -293,9 +286,8 @@ void Project::setActiveTarget(Target *target)
     if ((!target && !d->m_targets.isEmpty()) ||
         (target && d->m_targets.contains(target) && d->m_activeTarget != target)) {
         d->m_activeTarget = target;
+        emit activeProjectConfigurationChanged(d->m_activeTarget);
         emit activeTargetChanged(d->m_activeTarget);
-        emit environmentChanged();
-        emit buildConfigurationEnabledChanged();
     }
 }
 
@@ -462,6 +454,24 @@ bool Project::setupTarget(Target *t)
     return true;
 }
 
+void Project::emitParsingStarted()
+{
+    QTC_ASSERT(!d->m_isParsing, return);
+
+    d->m_isParsing = true;
+    d->m_hasParsingData = false;
+    emit parsingStarted();
+}
+
+void Project::emitParsingFinished(bool success)
+{
+    QTC_ASSERT(d->m_isParsing, return);
+
+    d->m_isParsing = false;
+    d->m_hasParsingData = success;
+    emit parsingFinished(success);
+}
+
 void Project::setDisplayName(const QString &name)
 {
     if (name == d->m_displayName)
@@ -493,7 +503,7 @@ void Project::setRootProjectNode(ProjectNode *root)
     ProjectNode *oldNode = d->m_rootProjectNode;
     d->m_rootProjectNode = root;
     if (root) {
-        root->setParentFolderNode(d->m_containerNode);
+        root->setParentFolderNode(d->m_containerNode.get());
         // Only announce non-null root, null is only used when project is destroyed.
         // In that case SessionManager::projectRemoved() triggers the update.
         ProjectTree::emitSubtreeChanged(root);
@@ -531,7 +541,7 @@ void Project::saveSettings()
 {
     emit aboutToSaveSettings();
     if (!d->m_accessor)
-        d->m_accessor = new Internal::UserFileAccessor(this);
+        d->m_accessor = std::make_unique<Internal::UserFileAccessor>(this);
     if (!targets().isEmpty())
         d->m_accessor->saveSettings(toMap(), Core::ICore::mainWindow());
 }
@@ -539,7 +549,7 @@ void Project::saveSettings()
 Project::RestoreResult Project::restoreSettings(QString *errorMessage)
 {
     if (!d->m_accessor)
-        d->m_accessor = new Internal::UserFileAccessor(this);
+        d->m_accessor = std::make_unique<Internal::UserFileAccessor>(this);
     QVariantMap map(d->m_accessor->restoreSettings(Core::ICore::mainWindow()));
     RestoreResult result = fromMap(map, errorMessage);
     if (result == RestoreResult::Ok)
@@ -633,7 +643,7 @@ ProjectNode *Project::rootProjectNode() const
 
 ContainerNode *Project::containerNode() const
 {
-    return d->m_containerNode;
+    return d->m_containerNode.get();
 }
 
 Project::RestoreResult Project::fromMap(const QVariantMap &map, QString *errorMessage)
@@ -655,22 +665,31 @@ Project::RestoreResult Project::fromMap(const QVariantMap &map, QString *errorMe
     if (!ok || active < 0 || active >= maxI)
         active = 0;
 
+    if (active >= 0 && active < maxI)
+        createTargetFromMap(map, active); // sets activeTarget since it is the first target created!
+
     for (int i = 0; i < maxI; ++i) {
-        const QString key(QString::fromLatin1(TARGET_KEY_PREFIX) + QString::number(i));
-        if (!map.contains(key))
-            continue;
-        QVariantMap targetMap = map.value(key).toMap();
-
-        Target *t = restoreTarget(targetMap);
-        if (!t)
+        if (i == active) // already covered!
             continue;
 
-        addTarget(t);
-        if (i == active)
-            setActiveTarget(t);
+        createTargetFromMap(map, i);
     }
 
     return RestoreResult::Ok;
+}
+
+void Project::createTargetFromMap(const QVariantMap &map, int index)
+{
+    const QString key = QString::fromLatin1(TARGET_KEY_PREFIX) + QString::number(index);
+    if (!map.contains(key))
+        return;
+    QVariantMap targetMap = map.value(key).toMap();
+
+    Target *t = restoreTarget(targetMap);
+    if (!t)
+        return;
+
+    addTarget(t);
 }
 
 EditorConfiguration *Project::editorConfiguration() const
@@ -811,6 +830,16 @@ Utils::MacroExpander *Project::macroExpander() const
     return &d->m_macroExpander;
 }
 
+bool Project::isParsing() const
+{
+    return d->m_isParsing;
+}
+
+bool Project::hasParsingData() const
+{
+    return d->m_hasParsingData;
+}
+
 ProjectImporter *Project::projectImporter() const
 {
     return nullptr;
@@ -834,13 +863,6 @@ Kit::Predicate Project::preferredKitPredicate() const
 void Project::setPreferredKitPredicate(const Kit::Predicate &predicate)
 {
     d->m_preferredKitPredicate = predicate;
-}
-
-void Project::onBuildDirectoryChanged()
-{
-    auto target = qobject_cast<Target *>(sender());
-    if (target && target == activeTarget())
-        emit buildDirectoryChanged();
 }
 
 } // namespace ProjectExplorer

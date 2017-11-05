@@ -37,6 +37,7 @@
 #include <projectexplorer/target.h>
 
 #include <utils/detailswidget.h>
+#include <utils/fancylineedit.h>
 #include <utils/pathchooser.h>
 #include <utils/qtcassert.h>
 #include <utils/qtcprocess.h>
@@ -59,36 +60,36 @@ const char CMAKE_RC_PREFIX[] = "CMakeProjectManager.CMakeRunConfiguration.";
 const char TITLE_KEY[] = "CMakeProjectManager.CMakeRunConfiguation.Title";
 } // namespace
 
-CMakeRunConfiguration::CMakeRunConfiguration(Target *parent, Core::Id id, const QString &target,
-                                             const Utils::FileName &workingDirectory, const QString &title) :
-    RunConfiguration(parent, id),
-    m_buildSystemTarget(target),
-    m_executable(target),
-    m_title(title)
+CMakeRunConfiguration::CMakeRunConfiguration(Target *target)
+    : RunConfiguration(target)
 {
     addExtraAspect(new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier()));
-    addExtraAspect(new ArgumentsAspect(this, QStringLiteral("CMakeProjectManager.CMakeRunConfiguration.Arguments")));
-    addExtraAspect(new TerminalAspect(this, QStringLiteral("CMakeProjectManager.CMakeRunConfiguration.UseTerminal")));
-
-    auto wd = new WorkingDirectoryAspect(this, QStringLiteral("CMakeProjectManager.CMakeRunConfiguration.UserWorkingDirectory"));
-    wd->setDefaultWorkingDirectory(workingDirectory);
-    addExtraAspect(wd);
-
-    ctor();
+    addExtraAspect(new ArgumentsAspect(this, "CMakeProjectManager.CMakeRunConfiguration.Arguments"));
+    addExtraAspect(new TerminalAspect(this, "CMakeProjectManager.CMakeRunConfiguration.UseTerminal"));
+    addExtraAspect(new WorkingDirectoryAspect(this, "CMakeProjectManager.CMakeRunConfiguration.UserWorkingDirectory"));
 }
 
-CMakeRunConfiguration::CMakeRunConfiguration(Target *parent, CMakeRunConfiguration *source) :
-    RunConfiguration(parent, source),
-    m_buildSystemTarget(source->m_buildSystemTarget),
-    m_executable(source->m_executable),
-    m_title(source->m_title),
-    m_enabled(source->m_enabled)
+void CMakeRunConfiguration::initialize(Core::Id id, const QString &target,
+                                  const Utils::FileName &workingDirectory, const QString &title)
 {
-    ctor();
+    RunConfiguration::initialize(id);
+    m_buildSystemTarget = target;
+    m_executable = target;
+    m_title = title;
+
+    extraAspect<WorkingDirectoryAspect>()->setDefaultWorkingDirectory(workingDirectory);
+
+    setDefaultDisplayName(defaultDisplayName());
 }
 
-void CMakeRunConfiguration::ctor()
+void CMakeRunConfiguration::copyFrom(const CMakeRunConfiguration *source)
 {
+    RunConfiguration::copyFrom(source);
+
+    m_buildSystemTarget = source->m_buildSystemTarget;
+    m_executable = source->m_executable;
+    m_title = source->m_title;
+
     setDefaultDisplayName(defaultDisplayName());
 }
 
@@ -143,12 +144,16 @@ QString CMakeRunConfiguration::defaultDisplayName() const
 {
     if (m_title.isEmpty())
         return tr("Run CMake kit");
-    QString result = m_title;
-    if (!m_enabled) {
-        result += QLatin1Char(' ');
-        result += tr("(disabled)");
-    }
-    return result;
+    return m_title;
+}
+
+void CMakeRunConfiguration::updateEnabledState()
+{
+    auto cp = qobject_cast<CMakeProject *>(target()->project());
+    if (!cp->hasBuildTarget(m_buildSystemTarget))
+        setEnabled(false);
+    else
+        RunConfiguration::updateEnabledState();
 }
 
 QWidget *CMakeRunConfiguration::createConfigurationWidget()
@@ -156,25 +161,22 @@ QWidget *CMakeRunConfiguration::createConfigurationWidget()
     return new CMakeRunConfigurationWidget(this);
 }
 
-void CMakeRunConfiguration::setEnabled(bool b)
-{
-    if (m_enabled == b)
-        return;
-    m_enabled = b;
-    emit enabledChanged();
-    setDefaultDisplayName(defaultDisplayName());
-}
-
-bool CMakeRunConfiguration::isEnabled() const
-{
-    return m_enabled;
-}
-
 QString CMakeRunConfiguration::disabledReason() const
 {
-    if (!m_enabled)
-        return tr("The executable is not built by the current build configuration");
-    return QString();
+    auto cp = qobject_cast<CMakeProject *>(target()->project());
+    QTC_ASSERT(cp, return QString());
+
+    if (!cp->hasBuildTarget(m_buildSystemTarget))
+        return tr("The project no longer builds the target associated with this run configuration.");
+    return RunConfiguration::disabledReason();
+}
+
+static void updateExecutable(CMakeRunConfiguration *rc, Utils::FancyLineEdit *fle)
+{
+    const Runnable runnable = rc->runnable();
+    fle->setText(runnable.is<StandardRunnable>()
+                 ? Utils::FileName::fromString(runnable.as<StandardRunnable>().executable).toUserOutput()
+                 : QString());
 }
 
 // Configuration widget
@@ -184,6 +186,16 @@ CMakeRunConfigurationWidget::CMakeRunConfigurationWidget(CMakeRunConfiguration *
     auto fl = new QFormLayout();
     fl->setMargin(0);
     fl->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+
+    auto executableLabel = new QLabel(tr("Executable:"));
+    auto executable = new Utils::FancyLineEdit;
+    executable->setReadOnly(true);
+    executable->setPlaceholderText(tr("<unknown>"));
+    connect(cmakeRunConfiguration, &CMakeRunConfiguration::enabledChanged,
+            this, std::bind(updateExecutable, cmakeRunConfiguration, executable));
+    updateExecutable(cmakeRunConfiguration, executable);
+
+    fl->addRow(executableLabel, executable);
 
     cmakeRunConfiguration->extraAspect<ArgumentsAspect>()->addToMainConfigurationWidget(this, fl);
     cmakeRunConfiguration->extraAspect<WorkingDirectoryAspect>()->addToMainConfigurationWidget(this, fl);
@@ -199,8 +211,6 @@ CMakeRunConfigurationWidget::CMakeRunConfigurationWidget(CMakeRunConfiguration *
     auto vbx = new QVBoxLayout(this);
     vbx->setMargin(0);
     vbx->addWidget(detailsContainer);
-
-    setEnabled(cmakeRunConfiguration->isEnabled());
 }
 
 // Factory
@@ -247,7 +257,7 @@ RunConfiguration *CMakeRunConfigurationFactory::doCreate(Target *parent, Core::I
     CMakeProject *project = static_cast<CMakeProject *>(parent->project());
     const QString title(buildTargetFromId(id));
     const CMakeBuildTarget &ct = project->buildTargetForTitle(title);
-    return new CMakeRunConfiguration(parent, id, ct.executable.toString(), ct.workingDirectory, ct.title);
+    return createHelper<CMakeRunConfiguration>(parent, id, title, ct.workingDirectory, ct.title);
 }
 
 bool CMakeRunConfigurationFactory::canClone(Target *parent, RunConfiguration *source) const
@@ -261,8 +271,7 @@ RunConfiguration *CMakeRunConfigurationFactory::clone(Target *parent, RunConfigu
 {
     if (!canClone(parent, source))
         return 0;
-    CMakeRunConfiguration *crc(static_cast<CMakeRunConfiguration *>(source));
-    return new CMakeRunConfiguration(parent, crc);
+    return cloneHelper<CMakeRunConfiguration>(parent, source);
 }
 
 bool CMakeRunConfigurationFactory::canRestore(Target *parent, const QVariantMap &map) const
@@ -274,7 +283,8 @@ bool CMakeRunConfigurationFactory::canRestore(Target *parent, const QVariantMap 
 
 RunConfiguration *CMakeRunConfigurationFactory::doRestore(Target *parent, const QVariantMap &map)
 {
-    return new CMakeRunConfiguration(parent, idFromMap(map), QString(), Utils::FileName(), QString());
+    const Core::Id id = idFromMap(map);
+    return createHelper<CMakeRunConfiguration>(parent, id, buildTargetFromId(id), Utils::FileName(), QString());
 }
 
 QString CMakeRunConfigurationFactory::buildTargetFromId(Core::Id id)

@@ -28,7 +28,9 @@
 #include "clangpathwatcherinterface.h"
 #include "clangpathwatchernotifier.h"
 #include "changedfilepathcompressor.h"
-#include "stringcache.h"
+
+#include <filepathcachinginterface.h>
+#include <stringcache.h>
 
 #include <QTimer>
 
@@ -37,38 +39,44 @@ namespace ClangBackEnd {
 class WatcherEntry
 {
 public:
-    uint id;
-    uint path;
+    int id;
+    FilePathId pathId;
 
     friend bool operator==(const WatcherEntry &first, const WatcherEntry &second)
     {
-        return first.id == second.id && first.path == second.path;
+        return first.id == second.id && first.pathId == second.pathId;
     }
 
     friend bool operator<(const WatcherEntry &first, const WatcherEntry &second)
     {
-        return std::tie(first.path, first.id) < std::tie(second.path, second.id);
+        return std::tie(first.pathId, first.id) < std::tie(second.pathId, second.id);
     }
 
-    friend bool operator<(const WatcherEntry &entry, uint path)
+    friend bool operator<(const WatcherEntry &entry, FilePathId pathId)
     {
-        return entry.path < path;
+        return entry.pathId < pathId;
     }
 
-    friend bool operator<(uint path, const WatcherEntry &entry)
+    friend bool operator<(FilePathId pathId, const WatcherEntry &entry)
     {
-        return path < entry.path;
+        return pathId < entry.pathId;
     }
 };
 
 using WatcherEntries = std::vector<WatcherEntry>;
+
+using IdCache = StringCache<Utils::SmallString,
+                            int,
+                            NonLockingMutex,
+                            decltype(&Utils::compare),
+                            Utils::compare>;
 
 template <typename FileSystemWatcher,
           typename Timer>
 class ClangPathWatcher : public ClangPathWatcherInterface
 {
 public:
-    ClangPathWatcher(StringCache<Utils::PathString> &pathCache,
+    ClangPathWatcher(FilePathCachingInterface &pathCache,
                      ClangPathWatcherNotifier *notifier=nullptr)
         : m_pathCache(pathCache),
           m_notifier(notifier)
@@ -130,9 +138,9 @@ unittest_public:
         return ids;
     }
 
-    std::vector<uint> convertToIdNumbers(const Utils::SmallStringVector &ids)
+    std::vector<int> convertToIdNumbers(const Utils::SmallStringVector &ids)
     {
-        std::vector<uint> idNumbers = m_idCache.stringIds(ids);
+        std::vector<int> idNumbers = m_idCache.stringIds(ids);
 
         std::sort(idNumbers.begin(), idNumbers.end());
 
@@ -142,33 +150,33 @@ unittest_public:
     std::size_t sizeOfIdPaths(const std::vector<IdPaths> &idPaths)
     {
         auto sumSize = [] (std::size_t size, const IdPaths &idPath) {
-            return size + idPath.paths.size();
+            return size + idPath.filePathIds.size();
         };
 
         return std::accumulate(idPaths.begin(), idPaths.end(), std::size_t(0), sumSize);
     }
 
 
-    std::pair<WatcherEntries,std::vector<uint>>
+    std::pair<WatcherEntries, std::vector<int>>
     convertIdPathsToWatcherEntriesAndIds(const std::vector<IdPaths> &idPaths)
     {
         WatcherEntries entries;
         entries.reserve(sizeOfIdPaths(idPaths));
-        std::vector<uint> ids;
+        std::vector<int> ids;
         ids.reserve(ids.size());
 
         auto outputIterator = std::back_inserter(entries);
 
         for (const IdPaths &idPath : idPaths)
         {
-            uint id = m_idCache.stringId(idPath.id);
+            int id = m_idCache.stringId(idPath.id);
 
             ids.push_back(id);
 
-            outputIterator = std::transform(idPath.paths.begin(),
-                                            idPath.paths.end(),
+            outputIterator = std::transform(idPath.filePathIds.begin(),
+                                            idPath.filePathIds.end(),
                                             outputIterator,
-                                            [&] (uint path) { return WatcherEntry{id, path}; });
+                                            [&] (FilePathId pathId) { return WatcherEntry{id, pathId}; });
         }
 
         std::sort(entries.begin(), entries.end());
@@ -190,7 +198,7 @@ unittest_public:
     }
 
     void removeUnusedEntries(const WatcherEntries &entries,
-                             const std::vector<uint> &ids)
+                             const std::vector<int> &ids)
     {
         auto oldEntries = notAnymoreWatchedEntriesWithIds(entries, ids);
 
@@ -216,7 +224,9 @@ unittest_public:
         std::transform(watcherEntries.begin(),
                        watcherEntries.end(),
                        std::back_inserter(paths),
-                       [&] (const WatcherEntry &entry) { return m_pathCache.string(entry.path); });
+                       [&] (const WatcherEntry &entry) {
+            return QString(m_pathCache.filePath(entry.pathId).path());
+        });
 
         return paths;
     }
@@ -246,7 +256,7 @@ unittest_public:
     WatcherEntries notWatchedPaths(const WatcherEntries &entries) const
     {
         auto compare = [] (const WatcherEntry &first, const WatcherEntry &second) {
-            return first.path < second.path;
+            return first.pathId < second.pathId;
         };
 
         return notWatchedEntries(entries, compare);
@@ -272,7 +282,7 @@ unittest_public:
 
     WatcherEntries notAnymoreWatchedEntriesWithIds(
             const WatcherEntries &newEntries,
-            const std::vector<uint> &ids) const
+            const std::vector<int> &ids) const
     {
         auto oldEntries = notAnymoreWatchedEntries(newEntries, std::less<WatcherEntry>());
 
@@ -307,7 +317,7 @@ unittest_public:
         WatcherEntries uniqueEntries;
 
         auto compare = [] (const WatcherEntry &first, const WatcherEntry &second) {
-            return first.path == second.path;
+            return first.pathId == second.pathId;
         };
 
         std::unique_copy(pathEntries.begin(),
@@ -328,7 +338,7 @@ unittest_public:
         return m_watchedEntries;
     }
 
-    WatcherEntries removeIdsFromWatchedEntries(const std::vector<uint> &ids)
+    WatcherEntries removeIdsFromWatchedEntries(const std::vector<int> &ids)
     {
 
         auto keep = [&] (const WatcherEntry &entry) {
@@ -368,11 +378,11 @@ unittest_public:
 
     WatcherEntries watchedEntriesForPaths(Utils::PathStringVector &&filePaths)
     {
-        std::vector<uint> pathIds = m_pathCache.stringIds(filePaths);
+        FilePathIds pathIds = m_pathCache.filePathIds(filePaths);
 
         WatcherEntries foundEntries;
 
-        for (uint pathId : pathIds) {
+        for (FilePathId pathId : pathIds) {
             auto range = std::equal_range(m_watchedEntries.begin(), m_watchedEntries.end(), pathId);
             foundEntries.insert(foundEntries.end(), range.first, range.second);
         }
@@ -388,7 +398,7 @@ unittest_public:
                        foundEntries.end(),
                        std::back_inserter(ids),
                        [&] (const WatcherEntry &entry) {
-            return m_idCache.string(entry.id);
+            return Utils::SmallString(m_idCache.string(entry.id));
         });
 
         return ids;
@@ -414,25 +424,23 @@ unittest_public:
         }
     }
 
-    StringCache<Utils::PathString> &pathCache()
+    FilePathCachingInterface &pathCache()
     {
         return m_pathCache;
     }
 
-    StringCache<Utils::SmallString> &idCache()
+    IdCache &idCache()
     {
         return m_idCache;
     }
 
 private:
-    StringCache<Utils::SmallString> m_idCache;
+    IdCache m_idCache;
     WatcherEntries m_watchedEntries;
     ChangedFilePathCompressor<Timer> m_changedFilePathCompressor;
     FileSystemWatcher m_fileSystemWatcher;
-    StringCache<Utils::PathString> &m_pathCache;
+    FilePathCachingInterface &m_pathCache;
     ClangPathWatcherNotifier *m_notifier;
 };
-
-std::ostream &operator<<(std::ostream &out, const WatcherEntry &entry);
 
 } // namespace ClangBackEnd

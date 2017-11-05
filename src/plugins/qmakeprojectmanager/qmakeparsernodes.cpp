@@ -912,8 +912,10 @@ QString QmakePriFile::varNameForAdding(const QString &mimeType)
     if (mimeType == QLatin1String(ProjectExplorer::Constants::FORM_MIMETYPE))
         return QLatin1String("FORMS");
 
-    if (mimeType == QLatin1String(ProjectExplorer::Constants::QML_MIMETYPE))
+    if (mimeType == QLatin1String(ProjectExplorer::Constants::QML_MIMETYPE)
+            || mimeType == QLatin1String(ProjectExplorer::Constants::QMLUI_MIMETYPE)) {
         return QLatin1String("DISTFILES");
+    }
 
     if (mimeType == QLatin1String(ProjectExplorer::Constants::SCXML_MIMETYPE))
         return QLatin1String("STATECHARTS");
@@ -1184,9 +1186,9 @@ void QmakeProFile::asyncUpdate()
     m_parseFutureWatcher.waitForFinished();
     QmakeEvalInput input = evalInput();
     QFuture<QmakeEvalResult *> future = Utils::runAsync(ProjectExplorerPlugin::sharedThreadPool(),
-                                                   QThread::LowestPriority,
-                                                   &QmakeProFile::asyncEvaluate,
-                                                   this, input);
+                                                        QThread::LowestPriority,
+                                                        &QmakeProFile::asyncEvaluate,
+                                                        this, input);
     m_parseFutureWatcher.setFuture(future);
 }
 
@@ -1473,7 +1475,7 @@ void QmakeProFile::asyncEvaluate(QFutureInterface<QmakeEvalResult *> &fi, QmakeE
 void QmakeProFile::applyAsyncEvaluate()
 {
     applyEvaluate(m_parseFutureWatcher.result());
-    m_project->decrementPendingEvaluateFutures();
+    m_project->decrementPendingEvaluateFutures(validParse());
 }
 
 bool sortByParserNodes(Node *a, Node *b)

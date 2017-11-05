@@ -31,7 +31,6 @@
 
 namespace Macros {
 
-class MacroManager;
 
 namespace Internal {
 
@@ -43,9 +42,11 @@ public:
     MacroLocatorFilter();
     ~MacroLocatorFilter();
 
-    QList<Core::LocatorFilterEntry> matchesFor(QFutureInterface<Core::LocatorFilterEntry> &future, const QString &entry);
-    void accept(Core::LocatorFilterEntry selection) const;
-    void refresh(QFutureInterface<void> &future);
+    QList<Core::LocatorFilterEntry> matchesFor(QFutureInterface<Core::LocatorFilterEntry> &future,
+                                               const QString &entry) override;
+    void accept(Core::LocatorFilterEntry selection,
+                QString *newText, int *selectionStart, int *selectionLength) const override;
+    void refresh(QFutureInterface<void> &future) override;
 
 private:
     const QIcon m_icon;

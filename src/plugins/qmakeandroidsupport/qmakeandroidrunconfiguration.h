@@ -40,34 +40,31 @@ namespace Internal {
 class QmakeAndroidRunConfiguration : public Android::AndroidRunConfiguration
 {
     Q_OBJECT
-    friend class QmakeAndroidRunConfigurationFactory;
 
 public:
-    QmakeAndroidRunConfiguration(ProjectExplorer::Target *parent, Core::Id id,
-                                 const Utils::FileName &path = Utils::FileName());
+    explicit QmakeAndroidRunConfiguration(ProjectExplorer::Target *target);
 
     Utils::FileName proFilePath() const;
 
-    bool isEnabled() const override;
     QString disabledReason() const override;
 
     QString buildSystemTarget() const final;
 
-protected:
-    QmakeAndroidRunConfiguration(ProjectExplorer::Target *parent, QmakeAndroidRunConfiguration *source);
+    static QString displayNameForId(Core::Id id);
+
+private:
+    friend class ProjectExplorer::IRunConfigurationFactory;
+    void initialize(Core::Id id);
+    void copyFrom(const QmakeAndroidRunConfiguration *source);
 
     bool fromMap(const QVariantMap &map) override;
     QVariantMap toMap() const override;
     QString defaultDisplayName();
 
-private:
-    void proFileUpdated(QmakeProjectManager::QmakeProFile *pro, bool success, bool parseInProgress);
     QmakeProjectManager::QmakeProject *qmakeProject() const;
-    void init();
+    void ctor();
 
     mutable Utils::FileName m_proFilePath;
-    bool m_parseSuccess;
-    bool m_parseInProgress;
 };
 
 } // namespace Internal

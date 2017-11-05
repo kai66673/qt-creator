@@ -24,12 +24,13 @@
 ****************************************************************************/
 
 #include "googletest.h"
+#include "testenvironment.h"
 
 #include <clangdocument.h>
 #include <clangdocuments.h>
 #include <clangtranslationunit.h>
 #include <cursor.h>
-#include <clangbackendipc_global.h>
+#include <clangsupport_global.h>
 #include <clangstring.h>
 #include <projectpart.h>
 #include <projects.h>
@@ -59,6 +60,8 @@ using testing::IsNull;
 using testing::NotNull;
 using testing::Gt;
 using testing::Contains;
+using testing::ElementsAre;
+using testing::_;
 using testing::EndsWith;
 using testing::AllOf;
 using testing::Not;
@@ -95,6 +98,14 @@ MATCHER_P2(HasTwoTypes, firstType, secondType,
     return arg.hasMainType(firstType) && arg.hasMixinType(secondType);
 }
 
+MATCHER_P(HasMixin, firstType,
+          std::string(negation ? "isn't " : "is ")
+          + PrintToString(firstType)
+          )
+{
+    return  arg.hasMixinType(firstType);
+}
+
 struct Data {
     Data()
     {
@@ -107,7 +118,8 @@ struct Data {
     Utf8String filePath{Utf8StringLiteral(TESTDATA_DIR"/highlightingmarks.cpp")};
     Document document{filePath,
                       ProjectPart(Utf8StringLiteral("projectPartId"),
-                                  {Utf8StringLiteral("-std=c++14"), Utf8StringLiteral("-I" TESTDATA_DIR)}),
+                                  TestEnvironment::addPlatformArguments({Utf8StringLiteral("-std=c++14"),
+                                                                         Utf8StringLiteral("-I" TESTDATA_DIR)})),
                       {},
                       documents};
     TranslationUnit translationUnit{filePath,
@@ -676,49 +688,49 @@ TEST_F(HighlightingMarks, TemplateFunctionDeclaration)
     ASSERT_THAT(infos[1], HasOnlyType(HighlightingType::Function));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(TemplateTypeParameterReference))
+TEST_F(HighlightingMarks, TemplateTypeParameterReference)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(268, 58));
 
     ASSERT_THAT(infos[0], HasOnlyType(HighlightingType::Type));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(TemplateTypeParameterDeclarationReference))
+TEST_F(HighlightingMarks, TemplateTypeParameterDeclarationReference)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(268, 58));
 
     ASSERT_THAT(infos[1], HasOnlyType(HighlightingType::LocalVariable));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(NonTypeTemplateParameterReference))
+TEST_F(HighlightingMarks, NonTypeTemplateParameterReference)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(269, 71));
 
     ASSERT_THAT(infos[3], HasOnlyType(HighlightingType::LocalVariable));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(NonTypeTemplateParameterReferenceReference))
+TEST_F(HighlightingMarks, NonTypeTemplateParameterReferenceReference)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(269, 71));
 
     ASSERT_THAT(infos[1], HasOnlyType(HighlightingType::LocalVariable));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(TemplateTemplateParameterReference))
+TEST_F(HighlightingMarks, TemplateTemplateParameterReference)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(270, 89));
 
     ASSERT_THAT(infos[0], HasOnlyType(HighlightingType::Type));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(TemplateTemplateContainerParameterReference))
+TEST_F(HighlightingMarks, TemplateTemplateContainerParameterReference)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(270, 89));
 
     ASSERT_THAT(infos[2], HasOnlyType(HighlightingType::Type));
 }
 
-TEST_F(HighlightingMarks, DISABLED_ON_WINDOWS(TemplateTemplateParameterReferenceVariable))
+TEST_F(HighlightingMarks, TemplateTemplateParameterReferenceVariable)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(270, 89));
 
@@ -858,21 +870,21 @@ TEST_F(HighlightingMarks, FriendTypeDeclaration)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(350, 28));
 
-    ASSERT_THAT(infos[2], HasOnlyType(HighlightingType::Invalid));
+    ASSERT_THAT(infos[2], HasOnlyType(HighlightingType::Type));
 }
 
 TEST_F(HighlightingMarks, FriendArgumentTypeDeclaration)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(351, 65));
 
-    ASSERT_THAT(infos[6], HasOnlyType(HighlightingType::Invalid));
+    ASSERT_THAT(infos[6], HasOnlyType(HighlightingType::Type));
 }
 
 TEST_F(HighlightingMarks, FriendArgumentDeclaration)
 {
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(351, 65));
 
-    ASSERT_THAT(infos[8], HasOnlyType(HighlightingType::Invalid));
+    ASSERT_THAT(infos[8], HasOnlyType(HighlightingType::LocalVariable));
 }
 
 TEST_F(HighlightingMarks, FieldInitialization)
@@ -996,7 +1008,17 @@ TEST_F(HighlightingMarks, NonConstPointerArgument)
     infos[1];
 
     ASSERT_THAT(infos[2],
-                HasTwoTypes(HighlightingType::LocalVariable, HighlightingType::OutputArgument));
+                HasOnlyType(HighlightingType::LocalVariable));
+}
+
+TEST_F(HighlightingMarks, PointerToConstArgument)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(490, 31));
+
+    infos[1];
+
+    ASSERT_THAT(infos[2],
+                HasOnlyType(HighlightingType::LocalVariable));
 }
 
 TEST_F(HighlightingMarks, ConstPointerArgument)
@@ -1007,6 +1029,20 @@ TEST_F(HighlightingMarks, ConstPointerArgument)
 
     ASSERT_THAT(infos[2],
                 HasOnlyType(HighlightingType::LocalVariable));
+}
+
+TEST_F(HighlightingMarks, NonConstPointerGetterAsArgument)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(580, 42));
+
+    infos[1];
+
+    ASSERT_THAT(infos[2] ,HasMixin(HighlightingType::OutputArgument));
+    ASSERT_THAT(infos[3], HasMixin(HighlightingType::OutputArgument));
+    ASSERT_THAT(infos[4], HasMixin(HighlightingType::OutputArgument));
+    ASSERT_THAT(infos[5], HasMixin(HighlightingType::OutputArgument));
+    ASSERT_THAT(infos[6], HasMixin(HighlightingType::OutputArgument));
+    ASSERT_THAT(infos[7], Not(HasMixin(HighlightingType::OutputArgument)));
 }
 
 TEST_F(HighlightingMarks, NonConstReferenceArgumentCallInsideCall)
@@ -1046,7 +1082,7 @@ TEST_F(HighlightingMarks, NonConstPointerArgumentAsExpression)
     infos[1];
 
     ASSERT_THAT(infos[3],
-                HasTwoTypes(HighlightingType::LocalVariable, HighlightingType::OutputArgument));
+                HasOnlyType(HighlightingType::LocalVariable));
 }
 
 TEST_F(HighlightingMarks, NonConstPointerArgumentAsInstanceWithMember)
@@ -1103,6 +1139,85 @@ TEST_F(HighlightingMarks, DISABLED_ArgumentToUserDefinedIndexOperator)
     const auto infos = translationUnit.highlightingMarksInRange(sourceRange(434, 19));
 
     ASSERT_THAT(infos[2], HasOnlyType(HighlightingType::LocalVariable));
+}
+
+TEST_F(HighlightingMarks, ClassTemplateParticalSpecialization)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(553, 33));
+
+    ASSERT_THAT(infos[6], HasOnlyType(HighlightingType::Type));
+}
+
+TEST_F(HighlightingMarks, UsingFunction)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(556, 27));
+
+    ASSERT_THAT(infos[3], HasOnlyType(HighlightingType::Function));
+}
+
+TEST_F(HighlightingMarks, PreprocessorIfDirective)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(558, 6));
+
+    ASSERT_THAT(infos[1], HasOnlyType(HighlightingType::Preprocessor));
+}
+
+TEST_F(HighlightingMarks, PreprocessorInclusionDirectiveWithKeyword)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(561, 15));
+
+    ASSERT_THAT(infos[3], HasOnlyType(HighlightingType::StringLiteral));
+}
+
+// CLANG-UPGRADE-CHECK: Enable once https://bugs.llvm.org//show_bug.cgi?id=12972 is resolved.
+TEST_F(HighlightingMarks, DISABLED_VariableInOperatorFunctionCall)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(566, 12));
+
+    ASSERT_THAT(infos[2], HasOnlyType(HighlightingType::LocalVariable));
+}
+
+TEST_F(HighlightingMarks, UsingTemplateFunction)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(584, 17));
+
+    ASSERT_THAT(infos[3], HasOnlyType(HighlightingType::Function));
+}
+
+TEST_F(HighlightingMarks, HeaderNameIsInclusion)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(239, 31));
+    ClangBackEnd::HighlightingMarkContainer container(infos[2]);
+    ASSERT_THAT(container.isIncludeDirectivePath(), true);
+}
+
+TEST_F(HighlightingMarks, HeaderNameIsInclusionWithAngleBrackets)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(289, 31));
+    ClangBackEnd::HighlightingMarkContainer container(infos[2]);
+    ASSERT_THAT(container.isIncludeDirectivePath(), true);
+}
+
+
+TEST_F(HighlightingMarks, NotInclusion)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(241, 13));
+    ClangBackEnd::HighlightingMarkContainer container(infos[1]);
+    ASSERT_THAT(container.isIncludeDirectivePath(), false);
+}
+
+TEST_F(HighlightingMarks, MacroIsIdentifier)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(232, 30));
+    ClangBackEnd::HighlightingMarkContainer container(infos[2]);
+    ASSERT_THAT(container.isIdentifier(), true);
+}
+
+TEST_F(HighlightingMarks, DefineIsNotIdentifier)
+{
+    const auto infos = translationUnit.highlightingMarksInRange(sourceRange(232, 30));
+    ClangBackEnd::HighlightingMarkContainer container(infos[1]);
+    ASSERT_THAT(container.isIncludeDirectivePath(), false);
 }
 
 Data *HighlightingMarks::d;

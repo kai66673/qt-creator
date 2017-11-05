@@ -51,7 +51,7 @@ public:
     static ProjectTree *instance();
 
     static Project *currentProject();
-    static Node *currentNode();
+    static Node *findCurrentNode();
 
     // Integration with ProjectTreeWidget
     static void registerWidget(Internal::ProjectTreeWidget *widget);
@@ -68,6 +68,8 @@ public:
     static void registerTreeManager(const TreeManagerFunction &treeChange);
     static void applyTreeManager(FolderNode *folder);
 
+    static bool hasNode(const Node *node);
+
     void collapseAll();
 
     // for nodes to emit signals, do not call unless you are a node
@@ -83,17 +85,20 @@ signals:
     void aboutToShowContextMenu(ProjectExplorer::Project *project,
                                 ProjectExplorer::Node *node);
 
+    // Emitted on any change to the tree
+    void treeChanged();
+
 private:
+    void sessionAndTreeChanged();
     void sessionChanged();
-    void focusChanged();
+    void update();
     void updateFromProjectTreeWidget(Internal::ProjectTreeWidget *widget);
-    void documentManagerCurrentFileChanged();
-    void updateFromDocumentManager(bool invalidCurrentNode = false);
+    void updateFromDocumentManager();
     void updateFromNode(Node *node);
-    void update(Node *node, Project *project);
+    void setCurrent(Node *node, Project *project);
     void updateContext();
 
-    void updateFromFocus(bool invalidCurrentNode = false);
+    void updateFromFocus();
 
     void updateExternalFileWarning();
     static bool hasFocus(Internal::ProjectTreeWidget *widget);
@@ -103,7 +108,7 @@ private:
     static ProjectTree *s_instance;
     QList<QPointer<Internal::ProjectTreeWidget>> m_projectTreeWidgets;
     QVector<TreeManagerFunction> m_treeManagers;
-    QPointer<Node> m_currentNode;
+    Node *m_currentNode = nullptr;
     Project *m_currentProject = nullptr;
     Internal::ProjectTreeWidget *m_focusForContextMenu = nullptr;
     Core::Context m_lastProjectContext;

@@ -26,6 +26,8 @@
 #include <extensionsystem/iplugin.h>
 #include <extensionsystem/pluginmanager.h>
 
+#include <app/app_version.h>
+
 #include <coreplugin/actionmanager/actionmanager.h>
 #include <coreplugin/actionmanager/command.h>
 #include <coreplugin/coreconstants.h>
@@ -48,7 +50,9 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QOpenGLWidget>
 #include <QPainter>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -143,6 +147,7 @@ public:
     {
         setAutoFillBackground(true);
         setMinimumHeight(30);
+        setToolTip(m_openUrl);
 
         const QString fileName = QString(":/welcome/images/%1.png").arg(iconSource);
         const Icon icon({{fileName, Theme::Welcome_ForegroundPrimaryColor}}, Icon::Tint);
@@ -187,7 +192,7 @@ public:
 
     QString m_iconSource;
     QString m_title;
-    QString m_openUrl;
+    const QString m_openUrl;
 
     QLabel *m_icon;
     QLabel *m_label;
@@ -226,7 +231,8 @@ public:
             l->addWidget(newLabel);
 
             auto learnLabel = new QLabel(tr("Learn how to develop your own applications "
-                                            "and explore Qt Creator."), this);
+                                            "and explore %1.")
+                                         .arg(Core::Constants::IDE_DISPLAY_NAME), this);
             learnLabel->setMaximumWidth(200);
             learnLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
             learnLabel->setWordWrap(true);
@@ -288,6 +294,11 @@ WelcomeMode::WelcomeMode()
     m_modeWidget->setPalette(palette);
 
     m_sideBar = new SideBar(m_modeWidget);
+    auto scrollableSideBar = new QScrollArea(m_modeWidget);
+    scrollableSideBar->setWidget(m_sideBar);
+    scrollableSideBar->setWidgetResizable(true);
+    scrollableSideBar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollableSideBar->setFrameShape(QFrame::NoFrame);
 
     auto divider = new QWidget(m_modeWidget);
     divider->setMaximumWidth(1);
@@ -296,10 +307,11 @@ WelcomeMode::WelcomeMode()
     divider->setPalette(themeColor(Theme::Welcome_DividerColor));
 
     m_pageStack = new QStackedWidget(m_modeWidget);
+    m_pageStack->setObjectName("WelcomeScreenStackedWidget");
     m_pageStack->setAutoFillBackground(true);
 
     auto hbox = new QHBoxLayout;
-    hbox->addWidget(m_sideBar);
+    hbox->addWidget(scrollableSideBar);
     hbox->addWidget(divider);
     hbox->addWidget(m_pageStack);
     hbox->setStretchFactor(m_pageStack, 10);
@@ -309,6 +321,12 @@ WelcomeMode::WelcomeMode()
     layout->setSpacing(0);
     layout->addWidget(new StyledBar(m_modeWidget));
     layout->addItem(hbox);
+
+    if (Utils::HostOsInfo::isMacHost()) { // workaround QTBUG-61384
+        auto openglWidget = new QOpenGLWidget;
+        openglWidget->hide();
+        layout->addWidget(openglWidget);
+    }
 
     setWidget(m_modeWidget);
 }
@@ -384,7 +402,7 @@ void WelcomeMode::addPage(IWelcomePage *page)
     stackPage->setAutoFillBackground(true);
     m_pageStack->insertWidget(idx, stackPage);
 
-    auto onClicked = [this, page, pageId, stackPage] {
+    auto onClicked = [this, pageId, stackPage] {
         m_activePage = pageId;
         m_pageStack->setCurrentWidget(stackPage);
         for (WelcomePageButton *pageButton : m_pageButtons)

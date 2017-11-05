@@ -27,11 +27,10 @@
 
 #include "buildstepspage.h"
 #include "deployconfiguration.h"
-#include "deployconfigurationmodel.h"
-#include "runconfigurationmodel.h"
 #include "runconfiguration.h"
 #include "target.h"
 #include "project.h"
+#include "projectconfigurationmodel.h"
 #include "session.h"
 
 #include <extensionsystem/pluginmanager.h>
@@ -39,6 +38,7 @@
 #include <projectexplorer/buildmanager.h>
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
+#include <utils/utilsicons.h>
 
 #include <QVariant>
 #include <QAction>
@@ -184,6 +184,16 @@ RunSettingsWidget::RunSettingsWidget(Target *target) :
     m_runLayout->setMargin(0);
     m_runLayout->setSpacing(5);
 
+    m_disabledIcon = new QLabel;
+    m_disabledIcon->setPixmap(Utils::Icons::WARNING.pixmap());
+    m_disabledText = new QLabel;
+    auto disabledHBox = new QHBoxLayout;
+    disabledHBox->addWidget(m_disabledIcon);
+    disabledHBox->addWidget(m_disabledText);
+    disabledHBox->addStretch(255);
+
+    m_runLayout->addLayout(disabledHBox);
+
     m_addRunMenu = new QMenu(m_addRunToolButton);
     m_addRunToolButton->setMenu(m_addRunMenu);
     RunConfiguration *rc = m_target->activeRunConfiguration();
@@ -303,7 +313,7 @@ void RunSettingsWidget::activeRunConfigurationChanged()
     QModelIndex actRc = m_runConfigurationsModel->indexFor(m_target->activeRunConfiguration());
     m_ignoreChange = true;
     m_runConfigurationCombo->setCurrentIndex(actRc.row());
-    setConfigurationWidget(m_runConfigurationsModel->runConfigurationAt(actRc.row()));
+    setConfigurationWidget(qobject_cast<RunConfiguration *>(m_runConfigurationsModel->projectConfigurationAt(actRc.row())));
     m_ignoreChange = false;
     m_renameRunButton->setEnabled(m_target->activeRunConfiguration());
 }
@@ -333,7 +343,7 @@ void RunSettingsWidget::currentRunConfigurationChanged(int index)
 
     RunConfiguration *selectedRunConfiguration = nullptr;
     if (index >= 0)
-        selectedRunConfiguration = m_runConfigurationsModel->runConfigurationAt(index);
+        selectedRunConfiguration = qobject_cast<RunConfiguration *>(m_runConfigurationsModel->projectConfigurationAt(index));
 
     if (selectedRunConfiguration == m_runConfiguration)
         return;
@@ -353,7 +363,8 @@ void RunSettingsWidget::currentDeployConfigurationChanged(int index)
     if (index == -1)
         SessionManager::setActiveDeployConfiguration(m_target, nullptr, SetActive::Cascade);
     else
-        SessionManager::setActiveDeployConfiguration(m_target, m_deployConfigurationModel->deployConfigurationAt(index),
+        SessionManager::setActiveDeployConfiguration(m_target,
+                                                     qobject_cast<DeployConfiguration *>(m_deployConfigurationModel->projectConfigurationAt(index)),
                                                      SetActive::Cascade);
 }
 
@@ -485,9 +496,12 @@ void RunSettingsWidget::setConfigurationWidget(RunConfiguration *rc)
         return;
     m_runConfigurationWidget = rc->createConfigurationWidget();
     m_runConfiguration = rc;
-    if (m_runConfigurationWidget)
+    if (m_runConfigurationWidget) {
         m_runLayout->addWidget(m_runConfigurationWidget);
-
+        updateEnabledState();
+        connect(m_runConfiguration, &RunConfiguration::enabledChanged,
+                m_runConfigurationWidget, [this]() { updateEnabledState(); });
+    }
     addRunControlWidgets();
 }
 
@@ -560,4 +574,16 @@ void RunSettingsWidget::removeSubWidgets()
         delete item.second;
     }
     m_subWidgets.clear();
+}
+
+void RunSettingsWidget::updateEnabledState()
+{
+    const bool enable = m_runConfiguration ? m_runConfiguration->isEnabled() : false;
+    const QString reason = m_runConfiguration ? m_runConfiguration->disabledReason() : QString();
+
+    m_runConfigurationWidget->setEnabled(enable);
+
+    m_disabledIcon->setVisible(!enable && !reason.isEmpty());
+    m_disabledText->setVisible(!enable && !reason.isEmpty());
+    m_disabledText->setText(reason);
 }

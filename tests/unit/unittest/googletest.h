@@ -37,3 +37,9 @@
 #ifdef CLANG_UNIT_TESTS
 #  include "gtest-clang-printing.h"
 #endif
+
+#include "google-using-declarations.h"
+
+#include "unittest-matchers.h"
+
+#include "unittest-utility-functions.h"

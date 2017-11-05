@@ -54,6 +54,7 @@
 #include <projectexplorer/projectexplorerconstants.h>
 #include <texteditor/snippets/snippetprovider.h>
 #include <texteditor/texteditorconstants.h>
+#include <texteditor/tabsettings.h>
 #include <utils/qtcassert.h>
 #include <utils/json.h>
 
@@ -259,11 +260,28 @@ void QmlJSEditorPlugin::reformatFile()
         if (!document->isParsedCorrectly())
             return;
 
-        const QString &newText = QmlJS::reformat(document);
-        QTextCursor tc(m_currentDocument->document());
-        tc.movePosition(QTextCursor::Start);
-        tc.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
-        tc.insertText(newText);
+        TextEditor::TabSettings tabSettings = m_currentDocument->tabSettings();
+        const QString &newText = QmlJS::reformat(document,
+                                                 tabSettings.m_indentSize,
+                                                 tabSettings.m_tabSize);
+
+        //  QTextDocument::setPlainText cannot be used, as it would reset undo/redo history
+        const auto setNewText = [this, &newText]() {
+            QTextCursor tc(m_currentDocument->document());
+            tc.movePosition(QTextCursor::Start);
+            tc.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+            tc.insertText(newText);
+        };
+
+        IEditor *ed = EditorManager::currentEditor();
+        if (ed) {
+            int line = ed->currentLine();
+            int column = ed->currentColumn();
+            setNewText();
+            ed->gotoLine(line, column);
+        } else {
+            setNewText();
+        }
     }
 }
 

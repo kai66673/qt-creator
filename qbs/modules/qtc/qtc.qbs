@@ -4,18 +4,20 @@ import qbs.FileInfo
 import "qtc.js" as HelperFunctions
 
 Module {
-    property string qtcreator_display_version: '4.4.0-beta1'
+    property string qtcreator_display_version: '4.6.0-beta1'
     property string ide_version_major: '4'
-    property string ide_version_minor: '3'
+    property string ide_version_minor: '5'
     property string ide_version_release: '82'
     property string qtcreator_version: ide_version_major + '.' + ide_version_minor + '.'
                                        + ide_version_release
 
     property string ide_compat_version_major: '4'
-    property string ide_compat_version_minor: '3'
+    property string ide_compat_version_minor: '5'
     property string ide_compat_version_release: '82'
     property string qtcreator_compat_version: ide_compat_version_major + '.'
             + ide_compat_version_minor + '.' + ide_compat_version_release
+
+    property string qtcreator_copyright_year: '2017'
 
     property string libDirName: "lib"
     property string ide_app_path: qbs.targetOS.contains("macos") ? "" : "bin"
@@ -74,6 +76,8 @@ Module {
         "QT_NO_CAST_TO_ASCII",
         "QT_RESTRICTED_CAST_FROM_ASCII",
         "QT_DISABLE_DEPRECATED_BEFORE=0x050600",
+        "QT_USE_FAST_OPERATOR_PLUS",
+        "QT_USE_FAST_CONCATENATION",
     ].concat(testsEnabled ? ["WITH_TESTS"] : [])
 
     Rule {

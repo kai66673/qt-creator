@@ -73,6 +73,7 @@ public:
     QVariantMap toMap() const override;
 
     Target *target() const;
+    Project *project() const override;
 
     virtual bool isEnabled() const;
     virtual QString disabledReason() const;
@@ -87,6 +88,10 @@ public:
 
     static QString buildTypeName(BuildType type);
 
+    bool isActive() const override;
+
+    void prependCompilerPathToEnvironment(Utils::Environment &env) const;
+
 signals:
     void environmentChanged();
     void buildDirectoryChanged();
@@ -98,7 +103,7 @@ protected:
     BuildConfiguration(Target *target, BuildConfiguration *source);
 
     void cloneSteps(BuildConfiguration *source);
-    void emitEnvironmentChanged();
+    void updateCacheAndEmitEnvironmentChanged();
 
 private:
     void handleKitUpdate();

@@ -57,8 +57,7 @@ QList<LocatorFilterEntry> *categorize(const QString &entry, const QString &candi
 
 } // anynoumous namespace
 
-FileSystemFilter::FileSystemFilter(LocatorWidget *locatorWidget)
-        : m_locatorWidget(locatorWidget)
+FileSystemFilter::FileSystemFilter()
 {
     setId("Files in file system");
     setDisplayName(tr("Files in File System"));
@@ -88,7 +87,7 @@ QList<LocatorFilterEntry> FileSystemFilter::matchesFor(QFutureInterface<LocatorF
             directory.prepend(m_currentDocumentDirectory + "/");
     }
     QDir dirInfo(directory);
-    QDir::Filters dirFilter = QDir::Dirs|QDir::Drives|QDir::NoDot;
+    QDir::Filters dirFilter = QDir::Dirs|QDir::Drives|QDir::NoDot|QDir::NoDotDot;
     QDir::Filters fileFilter = QDir::Files;
     if (m_includeHidden) {
         dirFilter |= QDir::Hidden;
@@ -101,6 +100,8 @@ QList<LocatorFilterEntry> FileSystemFilter::matchesFor(QFutureInterface<LocatorF
                                       QDir::Name|QDir::IgnoreCase|QDir::LocaleAware);
     QStringList files = dirInfo.entryList(fileFilter,
                                       QDir::Name|QDir::IgnoreCase|QDir::LocaleAware);
+    dirs.prepend("..");
+
     foreach (const QString &dir, dirs) {
         if (future.isCanceled())
             break;
@@ -148,15 +149,18 @@ QList<LocatorFilterEntry> FileSystemFilter::matchesFor(QFutureInterface<LocatorF
     return betterEntries;
 }
 
-void FileSystemFilter::accept(LocatorFilterEntry selection) const
+void FileSystemFilter::accept(LocatorFilterEntry selection,
+                              QString *newText, int *selectionStart, int *selectionLength) const
 {
+    Q_UNUSED(selectionLength)
     QString fileName = selection.fileName;
     QFileInfo info(fileName);
     if (info.isDir()) {
         QString value = shortcutString();
         value += QLatin1Char(' ');
         value += QDir::toNativeSeparators(info.absoluteFilePath() + QLatin1Char('/'));
-        m_locatorWidget->show(value, value.length());
+        *newText = value;
+        *selectionStart = value.length();
         return;
     } else if (!info.exists()) {
         QFile file(selection.internalData.toString());
@@ -202,7 +206,7 @@ QByteArray FileSystemFilter::saveState() const
     return value;
 }
 
-bool FileSystemFilter::restoreState(const QByteArray &state)
+void FileSystemFilter::restoreState(const QByteArray &state)
 {
     QDataStream in(state);
     in >> m_includeHidden;
@@ -216,6 +220,4 @@ bool FileSystemFilter::restoreState(const QByteArray &state)
         setShortcutString(shortcut);
         setIncludedByDefault(defaultFilter);
     }
-
-    return true;
 }

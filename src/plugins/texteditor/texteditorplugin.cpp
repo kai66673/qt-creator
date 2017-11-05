@@ -37,7 +37,6 @@
 #include "snippets/snippetprovider.h"
 #include "texteditoractionhandler.h"
 #include "texteditorsettings.h"
-#include "textmarkregistry.h"
 
 #include <coreplugin/icore.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -120,6 +119,15 @@ bool TextEditorPlugin::initialize(const QStringList &arguments, QString *errorMe
             editor->editorWidget()->invokeAssist(QuickFix);
     });
 
+    QAction *showContextMenuAction = new QAction(tr("Show Context Menu"), this);
+    ActionManager::registerAction(showContextMenuAction,
+                                  Constants::SHOWCONTEXTMENU,
+                                  context);
+    connect(showContextMenuAction, &QAction::triggered, []() {
+        if (BaseTextEditor *editor = BaseTextEditor::currentTextEditor())
+            editor->editorWidget()->showContextMenu();
+    });
+
     // Generic highlighter.
     connect(ICore::instance(), &ICore::coreOpened, Manager::instance(), &Manager::registerHighlightingFiles);
 
@@ -129,8 +137,6 @@ bool TextEditorPlugin::initialize(const QStringList &arguments, QString *errorMe
 
     m_outlineFactory = new OutlineFactory;
     addAutoReleasedObject(m_outlineFactory);
-
-    m_baseTextMarkRegistry = new TextMarkRegistry(this);
 
     addAutoReleasedObject(new FindInFiles);
     addAutoReleasedObject(new FindInCurrentFile);
@@ -209,11 +215,6 @@ void TextEditorPlugin::extensionsInitialized()
 LineNumberFilter *TextEditorPlugin::lineNumberFilter()
 {
     return m_instance->m_lineNumberFilter;
-}
-
-TextMarkRegistry *TextEditorPlugin::baseTextMarkRegistry()
-{
-    return m_instance->m_baseTextMarkRegistry;
 }
 
 void TextEditorPlugin::updateSearchResultsFont(const FontSettings &settings)

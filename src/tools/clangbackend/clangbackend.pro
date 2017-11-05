@@ -1,10 +1,10 @@
 QTC_LIB_DEPENDS += \
     sqlite \
-    clangbackendipc
+    clangsupport
 
 include(../../qtcreatortool.pri)
 include(../../shared/clang/clang_installation.pri)
-include(ipcsource/clangbackendclangipc-source.pri)
+include(source/clangbackendclangipc-source.pri)
 
 QT += core network
 QT -= gui

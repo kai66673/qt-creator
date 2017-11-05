@@ -175,7 +175,7 @@ void ShortCutManager::registerActions(const Core::Context &qmlDesignerMainContex
 
     //Close All Others Action
     Core::ActionManager::registerAction(&m_closeOtherEditorsAction, Core::Constants::CLOSEOTHERS, qmlDesignerMainContext);
-    connect(&m_closeOtherEditorsAction, &QAction::triggered, em, [em] {
+    connect(&m_closeOtherEditorsAction, &QAction::triggered, em, [] {
         Core::EditorManager::closeOtherDocuments();
     });
 
@@ -248,12 +248,15 @@ void ShortCutManager::registerActions(const Core::Context &qmlDesignerMainContex
         m_copyAction.setEnabled(itemsSelected);
     });
 
-    connect(Core::ICore::instance(), &Core::ICore::contextChanged, this, [this](const Core::Context &context){
+    connect(Core::ICore::instance(), &Core::ICore::contextChanged, this, [&designerActionManager, this](const Core::Context &context){
         if (!context.contains(Constants::C_QMLFORMEDITOR) && !context.contains(Constants::C_QMLNAVIGATOR)) {
             m_deleteAction.setEnabled(false);
             m_cutAction.setEnabled(false);
             m_copyAction.setEnabled(false);
             m_pasteAction.setEnabled(false);
+        } else {
+            designerActionManager.view()->emitSelectionChanged();
+
         }
     });
 

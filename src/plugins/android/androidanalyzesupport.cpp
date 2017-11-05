@@ -24,82 +24,37 @@
 ****************************************************************************/
 
 #include "androidanalyzesupport.h"
-
 #include "androidrunner.h"
-#include "androidmanager.h"
 
-#include <debugger/analyzer/analyzermanager.h>
-#include <debugger/analyzer/analyzerstartparameters.h>
-
-#include <projectexplorer/project.h>
-#include <projectexplorer/runconfiguration.h>
-#include <projectexplorer/target.h>
-
-#include <qtsupport/qtkitinformation.h>
-
-#include <QDir>
-#include <QTcpServer>
-
-using namespace Debugger;
 using namespace ProjectExplorer;
 
 namespace Android {
 namespace Internal {
 
-RunControl *AndroidAnalyzeSupport::createAnalyzeRunControl(RunConfiguration *runConfig, Core::Id runMode)
-{
-    auto runControl = new RunControl(runConfig, runMode);
-    runControl->createWorker(runMode);
-    QTC_ASSERT(runControl, return 0);
-    AnalyzerConnection connection;
-    if (runMode == ProjectExplorer::Constants::QML_PROFILER_RUN_MODE) {
-        QTcpServer server;
-        QTC_ASSERT(server.listen(QHostAddress::LocalHost)
-                   || server.listen(QHostAddress::LocalHostIPv6), return 0);
-        connection.analyzerHost = server.serverAddress().toString();
-    }
-    runControl->setDisplayName(AndroidManager::packageName(runConfig->target()));
-    runControl->setConnection(connection);
-    (void) new AndroidAnalyzeSupport(runControl);
-    return runControl;
-}
-
-AndroidAnalyzeSupport::AndroidAnalyzeSupport(RunControl *runControl)
+AndroidQmlProfilerSupport::AndroidQmlProfilerSupport(RunControl *runControl)
     : RunWorker(runControl)
 {
-    auto runner = new AndroidRunner(this, runControl->runConfiguration(), runControl->runMode());
+    setDisplayName("AndroidQmlProfilerSupport");
 
-    connect(runControl, &RunControl::finished, runner, [runner] { runner->stop(); });
+    auto runner = new AndroidRunner(runControl);
+    addStartDependency(runner);
 
-    connect(runControl, &RunControl::starting, runner, [runner] { runner->start(); });
+    auto profiler = runControl->createWorker(runControl->runMode());
+    profiler->addStartDependency(this);
 
-    connect(&m_outputParser, &QmlDebug::QmlOutputParser::waitingForConnectionOnPort, this,
-        [this, runControl](Utils::Port) {
-            runControl->notifyRemoteSetupDone(m_qmlPort);
-        });
+    connect(runner, &AndroidRunner::qmlServerReady, this, [this, profiler](const QUrl &server) {
+        profiler->recordData("QmlServerUrl", server);
+        reportStarted();
+    });
+}
 
-    connect(runner, &AndroidRunner::remoteProcessStarted, this,
-        [this](Utils::Port, Utils::Port qmlPort) {
-            m_qmlPort = qmlPort;
-        });
+void AndroidQmlProfilerSupport::start()
+{
+}
 
-    connect(runner, &AndroidRunner::remoteProcessFinished, this,
-        [this, runControl](const QString &errorMsg)  {
-            runControl->notifyRemoteFinished();
-            appendMessage(errorMsg, Utils::NormalMessageFormat);
-        });
-
-    connect(runner, &AndroidRunner::remoteErrorOutput, this,
-        [this, runControl](const QString &msg) {
-            appendMessage(msg, Utils::StdErrFormatSameLine);
-            m_outputParser.processOutput(msg);
-        });
-
-    connect(runner, &AndroidRunner::remoteOutput, this,
-        [this, runControl](const QString &msg) {
-            appendMessage(msg, Utils::StdOutFormatSameLine);
-            m_outputParser.processOutput(msg);
-        });
+void AndroidQmlProfilerSupport::stop()
+{
+    reportStopped();
 }
 
 } // namespace Internal

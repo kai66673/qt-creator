@@ -49,7 +49,6 @@ QVariant QtTestTreeItem::data(int column, int role) const
         return QVariant(name() + nameSuffix());
     case Qt::CheckStateRole:
         switch (type()) {
-        case Root:
         case TestDataFunction:
         case TestSpecialFunction:
             return QVariant();
@@ -134,6 +133,8 @@ TestConfiguration *QtTestTreeItem::testConfiguration() const
     default:
         return nullptr;
     }
+    if (config)
+        config->setInternalTargets(internalTargets());
     return config;
 }
 
@@ -141,7 +142,7 @@ TestConfiguration *QtTestTreeItem::debugConfiguration() const
 {
     QtTestConfiguration *config = static_cast<QtTestConfiguration *>(testConfiguration());
     if (config)
-        config->setRunMode(DebuggableTestConfiguration::Debug);
+        config->setRunMode(TestRunMode::Debug);
     return config;
 }
 
@@ -160,6 +161,7 @@ QList<TestConfiguration *> QtTestTreeItem::getAllTestConfigurations() const
         tc->setTestCaseCount(child->childCount());
         tc->setProjectFile(child->proFile());
         tc->setProject(project);
+        tc->setInternalTargets(child->internalTargets());
         result << tc;
     }
     return result;
@@ -185,6 +187,7 @@ QList<TestConfiguration *> QtTestTreeItem::getSelectedTestConfigurations() const
             testConfiguration->setTestCaseCount(child->childCount());
             testConfiguration->setProjectFile(child->proFile());
             testConfiguration->setProject(project);
+            testConfiguration->setInternalTargets(child->internalTargets());
             result << testConfiguration;
             continue;
         case Qt::PartiallyChecked:
@@ -210,6 +213,7 @@ QList<TestConfiguration *> QtTestTreeItem::getSelectedTestConfigurations() const
             testConfiguration->setTestCases(testCases);
             testConfiguration->setProjectFile(child->proFile());
             testConfiguration->setProject(project);
+            testConfiguration->setInternalTargets(child->internalTargets());
             result << testConfiguration;
         }
     }
@@ -243,13 +247,13 @@ bool QtTestTreeItem::modify(const TestParseResult *result)
 
     switch (type()) {
     case TestCase:
-        return modifyTestCaseContent(result->name, result->line, result->column);
+        return modifyTestCaseContent(result);
     case TestFunctionOrSet:
     case TestDataFunction:
     case TestSpecialFunction:
         return modifyTestFunctionContent(result);
     case TestDataTag:
-        return modifyDataTagContent(result->name, result->fileName, result->line, result->column);
+        return modifyDataTagContent(result);
     default:
         return false;
     }

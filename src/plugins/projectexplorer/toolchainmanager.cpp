@@ -492,7 +492,7 @@ public:
     Abi targetAbi() const override { return Abi::hostAbi(); }
     bool isValid() const override { return m_valid; }
     PredefinedMacrosRunner createPredefinedMacrosRunner() const override { return PredefinedMacrosRunner(); }
-    QByteArray predefinedMacros(const QStringList &cxxflags) const override { Q_UNUSED(cxxflags); return QByteArray(); }
+    Macros predefinedMacros(const QStringList &cxxflags) const override { Q_UNUSED(cxxflags); return Macros(); }
     CompilerFlags compilerFlags(const QStringList &cxxflags) const override { Q_UNUSED(cxxflags); return NoFlags; }
     WarningFlags warningFlags(const QStringList &cflags) const override { Q_UNUSED(cflags); return WarningFlags::NoWarnings; }
     SystemHeaderPathsRunner createSystemHeaderPathsRunner() const override { return SystemHeaderPathsRunner(); }
@@ -518,7 +518,7 @@ private:
         token(other.token)
     {}
 
-    bool m_valid;
+    bool m_valid = false;
 
     static QList<TTC *> m_toolChains;
 

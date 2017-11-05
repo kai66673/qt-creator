@@ -47,7 +47,7 @@ class ComponentViewController :
     class ComponentViewControllerPrivate;
 
 public:
-    explicit ComponentViewController(QObject *parent = 0);
+    explicit ComponentViewController(QObject *parent = nullptr);
     ~ComponentViewController();
 
     void setPxNodeUtilties(PxNodeUtilities *pxnodeUtilities);
@@ -58,6 +58,9 @@ public:
     void updateIncludeDependencies(qmt::MPackage *rootPackage);
 
 private:
+    void doCreateComponentModel(const ProjectExplorer::FolderNode *folderNode,
+                                qmt::MDiagram *diagram, const QString anchorFolder);
+
     ComponentViewControllerPrivate *d;
 };
 

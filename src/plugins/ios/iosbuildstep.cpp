@@ -60,17 +60,13 @@ const char BUILD_ARGUMENTS_KEY[] = "Ios.IosBuildStep.XcodeArguments";
 const char CLEAN_KEY[] = "Ios.IosBuildStep.Clean";
 
 IosBuildStep::IosBuildStep(BuildStepList *parent) :
-    AbstractProcessStep(parent, Id(IOS_BUILD_STEP_ID)),
-    m_useDefaultArguments(true),
-    m_clean(false)
+    AbstractProcessStep(parent, Id(IOS_BUILD_STEP_ID))
 {
     ctor();
 }
 
 IosBuildStep::IosBuildStep(BuildStepList *parent, const Id id) :
-    AbstractProcessStep(parent, id),
-    m_useDefaultArguments(true),
-    m_clean(false)
+    AbstractProcessStep(parent, id)
 {
     ctor();
 }
@@ -145,18 +141,18 @@ QVariantMap IosBuildStep::toMap() const
 {
     QVariantMap map(AbstractProcessStep::toMap());
 
-    map.insert(QLatin1String(BUILD_ARGUMENTS_KEY), m_baseBuildArguments);
-    map.insert(QLatin1String(BUILD_USE_DEFAULT_ARGS_KEY), m_useDefaultArguments);
-    map.insert(QLatin1String(CLEAN_KEY), m_clean);
+    map.insert(BUILD_ARGUMENTS_KEY, m_baseBuildArguments);
+    map.insert(BUILD_USE_DEFAULT_ARGS_KEY, m_useDefaultArguments);
+    map.insert(CLEAN_KEY, m_clean);
     return map;
 }
 
 bool IosBuildStep::fromMap(const QVariantMap &map)
 {
-    QVariant bArgs = map.value(QLatin1String(BUILD_ARGUMENTS_KEY));
+    QVariant bArgs = map.value(BUILD_ARGUMENTS_KEY);
     m_baseBuildArguments = bArgs.toStringList();
-    m_useDefaultArguments = map.value(QLatin1String(BUILD_USE_DEFAULT_ARGS_KEY)).toBool();
-    m_clean = map.value(QLatin1String(CLEAN_KEY)).toBool();
+    m_useDefaultArguments = map.value(BUILD_USE_DEFAULT_ARGS_KEY).toBool();
+    m_clean = map.value(CLEAN_KEY).toBool();
 
     return BuildStep::fromMap(map);
 }
@@ -173,11 +169,11 @@ QStringList IosBuildStep::defaultArguments() const
     ToolChain *tc = ToolChainKitInformation::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
     switch (target()->activeBuildConfiguration()->buildType()) {
     case BuildConfiguration::Debug :
-        res << QLatin1String("-configuration") << QLatin1String("Debug");
+        res << "-configuration" << "Debug";
         break;
     case BuildConfiguration::Release :
     case BuildConfiguration::Profile :
-        res << QLatin1String("-configuration") << QLatin1String("Release");
+        res << "-configuration" << "Release";
         break;
     case BuildConfiguration::Unknown :
         break;
@@ -191,14 +187,14 @@ QStringList IosBuildStep::defaultArguments() const
         res << gtc->platformCodeGenFlags();
     }
     if (!SysRootKitInformation::sysRoot(kit).isEmpty())
-        res << QLatin1String("-sdk") << SysRootKitInformation::sysRoot(kit).toString();
-    res << QLatin1String("SYMROOT=") + IosManager::resDirForTarget(target());
+        res << "-sdk" << SysRootKitInformation::sysRoot(kit).toString();
+    res << "SYMROOT=" + IosManager::resDirForTarget(target());
     return res;
 }
 
 QString IosBuildStep::buildCommand() const
 {
-    return QLatin1String("xcodebuild"); // add path?
+    return QString("xcodebuild"); // add path?
 }
 
 void IosBuildStep::run(QFutureInterface<bool> &fi)
@@ -264,7 +260,15 @@ IosBuildStepConfigWidget::IosBuildStepConfigWidget(IosBuildStep *buildStep)
             this, &IosBuildStepConfigWidget::updateDetails);
     connect(m_buildStep->target(), &Target::kitChanged,
             this, &IosBuildStepConfigWidget::updateDetails);
-    connect(pro, &Project::environmentChanged, this, &IosBuildStepConfigWidget::updateDetails);
+    pro->subscribeSignal(&BuildConfiguration::environmentChanged, this, [this]() {
+        if (static_cast<BuildConfiguration *>(sender())->isActive())
+            updateDetails();
+    });
+    connect(pro, &Project::activeProjectConfigurationChanged,
+            this, [this](ProjectConfiguration *pc) {
+        if (pc && pc->isActive())
+            updateDetails();
+    });
 }
 
 IosBuildStepConfigWidget::~IosBuildStepConfigWidget()
@@ -334,7 +338,7 @@ BuildStep *IosBuildStepFactory::create(BuildStepList *parent, const Id id)
     IosBuildStep *step = new IosBuildStep(parent);
     if (parent->id() == ProjectExplorer::Constants::BUILDSTEPS_CLEAN) {
         step->setClean(true);
-        step->setExtraArguments(QStringList(QLatin1String("clean")));
+        step->setExtraArguments(QStringList("clean"));
     } else if (parent->id() == ProjectExplorer::Constants::BUILDSTEPS_BUILD) {
         // nomal setup
     }

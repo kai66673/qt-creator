@@ -43,12 +43,14 @@ class IMode;
 class Id;
 } // namespace Core
 
-namespace Utils { class ProcessHandle; }
+namespace Utils {
+class ProcessHandle;
+class FileName;
+}
 
 namespace ProjectExplorer {
 class RunControl;
 class RunConfiguration;
-class IRunControlFactory;
 class Project;
 class Node;
 class FolderNode;
@@ -133,6 +135,7 @@ public:
     // internal public for FlatModel
     static void renameFile(Node *node, const QString &newFilePath);
     static QStringList projectFilePatterns();
+    static bool isProjectFile(const Utils::FileName &filePath);
     static QList<QPair<QString, QString> > recentProjects();
 
     static bool canRunStartupProject(Core::Id runMode, QString *whyNot = nullptr);
@@ -179,6 +182,15 @@ private:
 
 #ifdef WITH_TESTS
 private slots:
+    void testJsonWizardsEmptyWizard();
+    void testJsonWizardsEmptyPage();
+    void testJsonWizardsUnusedKeyAtFields_data();
+    void testJsonWizardsUnusedKeyAtFields();
+    void testJsonWizardsCheckBox();
+    void testJsonWizardsLineEdit();
+    void testJsonWizardsComboBox();
+    void testJsonWizardsIconList();
+
     void testAnsiFilterOutputParser_data();
     void testAnsiFilterOutputParser();
 

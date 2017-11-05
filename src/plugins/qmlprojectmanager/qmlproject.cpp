@@ -101,7 +101,7 @@ void QmlProject::addedRunConfiguration(RunConfiguration *rc)
     // they have been added to a project
     QmlProjectRunConfiguration *qmlrc = qobject_cast<QmlProjectRunConfiguration *>(rc);
     if (qmlrc)
-        qmlrc->updateEnabled();
+        qmlrc->updateEnabledState();
 }
 
 QDir QmlProject::projectDir() const
@@ -170,6 +170,7 @@ void QmlProject::parseProject(RefreshOptions options)
 
 void QmlProject::refresh(RefreshOptions options)
 {
+    emitParsingStarted();
     parseProject(options);
 
     if (options & Files)
@@ -187,7 +188,7 @@ void QmlProject::refresh(RefreshOptions options)
 
     modelManager->updateProjectInfo(projectInfo, this);
 
-    emit parsingFinished();
+    emitParsingFinished(true);
 }
 
 QString QmlProject::mainFile() const

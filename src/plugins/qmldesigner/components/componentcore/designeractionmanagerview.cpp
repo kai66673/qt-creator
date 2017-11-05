@@ -37,7 +37,6 @@ DesignerActionManagerView::DesignerActionManagerView()
       m_isInRewriterTransaction(false),
       m_setupContextDirty(false)
 {
-    m_designerActionManager.createDefaultDesignerActions();
 }
 
 void DesignerActionManagerView::modelAttached(Model *model)
@@ -159,6 +158,12 @@ DesignerActionManager &DesignerActionManagerView::designerActionManager()
 const DesignerActionManager &DesignerActionManagerView::designerActionManager() const
 {
     return m_designerActionManager;
+}
+
+void DesignerActionManagerView::emitSelectionChanged()
+{
+    if (model())
+        emit selectionChanged(!selectedModelNodes().isEmpty(), singleSelectedModelNode().isRootNode());
 }
 
 /* We should consider compressing this. */

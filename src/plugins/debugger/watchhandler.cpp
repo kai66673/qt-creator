@@ -46,6 +46,7 @@
 
 #include <texteditor/syntaxhighlighter.h>
 
+#include <app/app_version.h>
 #include <utils/algorithm.h>
 #include <utils/basetreeview.h>
 #include <utils/checkablemessagebox.h>
@@ -271,7 +272,7 @@ public:
         setTabsClosable(true);
         connect(this, &QTabWidget::tabCloseRequested, this, &SeparatedView::closeTab);
         setWindowFlags(windowFlags() | Qt::Window);
-        setWindowTitle(WatchHandler::tr("Debugger - Qt Creator"));
+        setWindowTitle(WatchHandler::tr("Debugger - %1").arg(Core::Constants::IDE_DISPLAY_NAME));
 
         QVariant geometry = sessionValue("DebuggerSeparateWidgetGeometry");
         if (geometry.isValid()) {
@@ -516,7 +517,7 @@ void WatchModel::reinitialize(bool includeInspectData)
 
 WatchItem *WatchModel::findItem(const QString &iname) const
 {
-    return findNonRooItem([iname](WatchItem *item) { return item->iname == iname; });
+    return findNonRootItem([iname](WatchItem *item) { return item->iname == iname; });
 }
 
 static QString parentName(const QString &iname)
@@ -1678,7 +1679,7 @@ bool WatchModel::contextMenuEvent(const ItemViewEvent &ev)
 
     addAction(menu, tr("Close Editor Tooltips"),
               DebuggerToolTipManager::hasToolTips(),
-              [this] { DebuggerToolTipManager::closeAllToolTips(); });
+              [] { DebuggerToolTipManager::closeAllToolTips(); });
 
     addAction(menu, tr("Copy View Contents to Clipboard"),
               true,
@@ -1686,7 +1687,7 @@ bool WatchModel::contextMenuEvent(const ItemViewEvent &ev)
 
     addAction(menu, tr("Copy Current Value to Clipboard"),
               item,
-              [this, item] { copyToClipboard(item->value); });
+              [item] { copyToClipboard(item->value); });
 
 //    addAction(menu, tr("Copy Selected Rows to Clipboard"),
 //              selectionModel()->hasSelection(),
@@ -1790,7 +1791,7 @@ QMenu *WatchModel::createMemoryMenu(WatchItem *item)
 
     addAction(menu, tr("Open Memory Editor Showing Stack Layout"),
               item && item->isLocal(),
-              [this, item, pos] { addStackLayoutMemoryView(false, pos); });
+              [this, pos] { addStackLayoutMemoryView(false, pos); });
 
     addAction(menu, tr("Open Memory Editor..."),
               true,
@@ -1834,8 +1835,6 @@ QMenu *WatchModel::createFormatMenu(WatchItem *item)
     addBaseChangeAction(tr("Show Unprintable Characters as Octal"), 8);
     addBaseChangeAction(tr("Show Unprintable Characters as Hexadecimal"), 16);
 
-    QAction *act = 0;
-
     const QString spacer = "     ";
     menu->addSeparator();
 
@@ -1857,7 +1856,7 @@ QMenu *WatchModel::createFormatMenu(WatchItem *item)
 
     for (int format : alternativeFormats) {
         addCheckableAction(menu, spacer + nameForFormat(format), true, format == individualFormat,
-                           [this, act, format, iname] {
+                           [this, format, iname] {
                                 setIndividualFormat(iname, format);
                                 m_engine->updateLocals();
                            });
@@ -1877,7 +1876,7 @@ QMenu *WatchModel::createFormatMenu(WatchItem *item)
 
     for (int format : alternativeFormats) {
         addCheckableAction(menu, spacer + nameForFormat(format), true, format == typeFormat,
-                           [this, act, format, item] {
+                           [this, format, item] {
                                 setTypeFormat(item->type, format);
                                 m_engine->updateLocals();
                            });
@@ -2093,7 +2092,7 @@ void WatchHandler::notifyUpdateStarted(const UpdateParameters &updateParameters)
 void WatchHandler::notifyUpdateFinished()
 {
     QList<WatchItem *> toRemove;
-    m_model->forSelectedItems([this, &toRemove](WatchItem *item) {
+    m_model->forSelectedItems([&toRemove](WatchItem *item) {
         if (item->outdated) {
             toRemove.append(item);
             return false;
@@ -2278,7 +2277,7 @@ void WatchModel::showEditValue(const WatchItem *item)
             str = QString::fromUtf8(ba.constData(), ba.size());
         else if (format == DisplayUtf16String)
             str = QString::fromUtf16((ushort *)ba.constData(), ba.size() / 2);
-        else if (format == DisplayUtf16String)
+        else if (format == DisplayUcs4String)
             str = QString::fromUcs4((uint *)ba.constData(), ba.size() / 4);
         m_separatedView->prepareObject<TextEdit>(item)->setPlainText(str);
     } else if (format == DisplayPlotData) {

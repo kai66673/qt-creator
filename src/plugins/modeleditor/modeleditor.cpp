@@ -107,30 +107,30 @@ static const double ZOOM_FACTOR = 1.05;
 class ModelEditor::ModelEditorPrivate
 {
 public:
-    UiController *uiController = 0;
-    ActionHandler *actionHandler = 0;
-    ModelDocument *document = 0;
-    qmt::PropertiesView *propertiesView = 0;
-    Core::MiniSplitter *rightSplitter = 0;
-    QWidget *leftGroup = 0;
-    QHBoxLayout *leftGroupLayout = 0;
-    QToolBox *leftToolBox = 0;
-    QStackedWidget *diagramStack = 0;
-    EditorDiagramView *diagramView = 0;
-    QLabel *noDiagramLabel = 0;
-    DiagramsViewManager *diagramsViewManager = 0;
-    Core::MiniSplitter *rightHorizSplitter = 0;
-    qmt::ModelTreeView *modelTreeView = 0;
-    qmt::TreeModelManager *modelTreeViewServant = 0;
-    QScrollArea *propertiesScrollArea = 0;
-    QWidget *propertiesGroupWidget = 0;
-    QWidget *toolbar = 0;
-    QComboBox *diagramSelector = 0;
+    UiController *uiController = nullptr;
+    ActionHandler *actionHandler = nullptr;
+    ModelDocument *document = nullptr;
+    qmt::PropertiesView *propertiesView = nullptr;
+    Core::MiniSplitter *rightSplitter = nullptr;
+    QWidget *leftGroup = nullptr;
+    QHBoxLayout *leftGroupLayout = nullptr;
+    QToolBox *leftToolBox = nullptr;
+    QStackedWidget *diagramStack = nullptr;
+    EditorDiagramView *diagramView = nullptr;
+    QLabel *noDiagramLabel = nullptr;
+    DiagramsViewManager *diagramsViewManager = nullptr;
+    Core::MiniSplitter *rightHorizSplitter = nullptr;
+    qmt::ModelTreeView *modelTreeView = nullptr;
+    qmt::TreeModelManager *modelTreeViewServant = nullptr;
+    QScrollArea *propertiesScrollArea = nullptr;
+    QWidget *propertiesGroupWidget = nullptr;
+    QWidget *toolbar = nullptr;
+    QComboBox *diagramSelector = nullptr;
     SelectedArea selectedArea = SelectedArea::Nothing;
     QString lastExportDirPath;
-    QAction *syncBrowserWithDiagramAction = 0;
-    QAction *syncDiagramWithBrowserAction = 0;
-    QAction *syncEachOtherAction = 0;
+    QAction *syncBrowserWithDiagramAction = nullptr;
+    QAction *syncDiagramWithBrowserAction = nullptr;
+    QAction *syncEachOtherAction = nullptr;
 };
 
 ModelEditor::ModelEditor(UiController *uiController, ActionHandler *actionHandler, QWidget *parent)
@@ -217,7 +217,7 @@ void ModelEditor::init(QWidget *parent)
 
     d->leftToolBox = new QToolBox(d->leftGroup);
     // Windows style does not truncate the tab label to a very small width (GTK+ does)
-    static QStyle *windowsStyle = QStyleFactory().create(QStringLiteral("Windows"));
+    static QStyle *windowsStyle = QStyleFactory().create("Windows");
     if (windowsStyle)
         d->leftToolBox->setStyle(windowsStyle);
     // TODO improve this (and the diagram colors) for use with dark theme
@@ -321,19 +321,19 @@ void ModelEditor::init(QWidget *parent)
 
     toolbarLayout->addWidget(
                 createToolbarCommandButton(Constants::ACTION_ADD_PACKAGE, [this]() { onAddPackage(); },
-    QIcon(QStringLiteral(":/modelinglib/48x48/package.png")),
+    QIcon(":/modelinglib/48x48/package.png"),
     tr("Add Package"), d->toolbar));
     toolbarLayout->addWidget(
                 createToolbarCommandButton(Constants::ACTION_ADD_COMPONENT, [this]() { onAddComponent(); },
-    QIcon(QStringLiteral(":/modelinglib/48x48/component.png")),
+    QIcon(":/modelinglib/48x48/component.png"),
     tr("Add Component"), d->toolbar));
     toolbarLayout->addWidget(
                 createToolbarCommandButton(Constants::ACTION_ADD_CLASS, [this]() { onAddClass(); },
-    QIcon(QStringLiteral(":/modelinglib/48x48/class.png")),
+    QIcon(":/modelinglib/48x48/class.png"),
     tr("Add Class"), d->toolbar));
     toolbarLayout->addWidget(
                 createToolbarCommandButton(Constants::ACTION_ADD_CANVAS_DIAGRAM, [this]() { onAddCanvasDiagram(); },
-    QIcon(QStringLiteral(":/modelinglib/48x48/canvas-diagram.png")),
+    QIcon(":/modelinglib/48x48/canvas-diagram.png"),
     tr("Add Canvas Diagram"), d->toolbar));
     toolbarLayout->addSpacing(20);
 
@@ -341,13 +341,13 @@ void ModelEditor::init(QWidget *parent)
     syncToggleButton->setDefaultAction(d->actionHandler->synchronizeBrowserAction());
     QMenu *syncMenu = new QMenu(syncToggleButton);
     QActionGroup *syncGroup = new QActionGroup(syncMenu);
-    d->syncBrowserWithDiagramAction = syncMenu->addAction(QStringLiteral("Synchronize Structure with Diagram"));
+    d->syncBrowserWithDiagramAction = syncMenu->addAction(tr("Synchronize Structure with Diagram"));
     d->syncBrowserWithDiagramAction->setCheckable(true);
     d->syncBrowserWithDiagramAction->setActionGroup(syncGroup);
-    d->syncDiagramWithBrowserAction = syncMenu->addAction(QStringLiteral("Synchronize Diagram with Structure"));
+    d->syncDiagramWithBrowserAction = syncMenu->addAction(tr("Synchronize Diagram with Structure"));
     d->syncDiagramWithBrowserAction->setCheckable(true);
     d->syncDiagramWithBrowserAction->setActionGroup(syncGroup);
-    d->syncEachOtherAction = syncMenu->addAction(QStringLiteral("Keep Synchronized"));
+    d->syncEachOtherAction = syncMenu->addAction(tr("Keep Synchronized"));
     d->syncEachOtherAction->setCheckable(true);
     d->syncEachOtherAction->setActionGroup(syncGroup);
     syncToggleButton->setMenu(syncMenu);
@@ -363,7 +363,7 @@ void ModelEditor::initDocument()
 
     d->diagramView->setPxNodeController(documentController->pxNodeController());
 
-    QTC_CHECK(!d->diagramsViewManager);
+    QMT_CHECK(!d->diagramsViewManager);
     d->diagramsViewManager = new DiagramsViewManager(this);
     //connect(diagramsViewManager, &DiagramsViewManager::someDiagramOpened,
     //        documentController->diagramsManager(), &qmt::DiagramsManager::someDiagramOpened);
@@ -578,13 +578,13 @@ void ModelEditor::exportDiagram()
             QString suffix = QFileInfo(fileName).suffix().toLower();
             // TODO use QFileDialog::selectedNameFilter() as fallback if no suffix is given
             if (suffix.isEmpty()) {
-                suffix = QStringLiteral("png");
-                fileName += QStringLiteral(".png");
+                suffix = "png";
+                fileName += ".png";
             }
-            if (suffix == QStringLiteral("pdf"))
+            if (suffix == "pdf")
                 success = sceneModel->exportPdf(fileName);
 #ifndef QT_NO_SVG
-            else if (suffix == QStringLiteral("svg"))
+            else if (suffix == "svg")
                 success = sceneModel->exportSvg(fileName);
 #endif // QT_NO_SVG
             else
@@ -622,7 +622,7 @@ void ModelEditor::resetZoom()
 
 qmt::MPackage *ModelEditor::guessSelectedPackage() const
 {
-    qmt::MPackage *package = 0;
+    qmt::MPackage *package = nullptr;
     switch (d->selectedArea) {
     case SelectedArea::Nothing:
         package = d->modelTreeViewServant->selectedPackage();
@@ -661,13 +661,13 @@ void ModelEditor::updateSelectedArea(SelectedArea selectedArea)
     bool canExportDiagram = false;
     QList<qmt::MElement *> propertiesModelElements;
     QList<qmt::DElement *> propertiesDiagramElements;
-    qmt::MDiagram *propertiesDiagram = 0;
+    qmt::MDiagram *propertiesDiagram = nullptr;
 
     qmt::MDiagram *activeDiagram = currentDiagram();
     switch (d->selectedArea) {
     case SelectedArea::Nothing:
         canSelectAll = activeDiagram && !activeDiagram->diagramElements().isEmpty();
-        canExportDiagram = activeDiagram != 0;
+        canExportDiagram = activeDiagram != nullptr;
         break;
     case SelectedArea::Diagram:
     {
@@ -696,7 +696,7 @@ void ModelEditor::updateSelectedArea(SelectedArea selectedArea)
     }
     case SelectedArea::TreeView:
     {
-        canExportDiagram = activeDiagram != 0;
+        canExportDiagram = activeDiagram != nullptr;
         bool hasSelection = !d->modelTreeViewServant->selectedObjects().isEmpty();
         bool hasSingleSelection = d->modelTreeViewServant->selectedObjects().indices().size() == 1;
         canCutCopyDelete = hasSelection && !d->modelTreeViewServant->isRootPackageSelected();
@@ -767,9 +767,9 @@ void ModelEditor::clearProperties()
     if (d->propertiesGroupWidget) {
         QWidget *scrollWidget = d->propertiesScrollArea->takeWidget();
         Q_UNUSED(scrollWidget); // avoid warning in release mode
-        QTC_CHECK(scrollWidget == d->propertiesGroupWidget);
+        QMT_CHECK(scrollWidget == d->propertiesGroupWidget);
         d->propertiesGroupWidget->deleteLater();
-        d->propertiesGroupWidget = 0;
+        d->propertiesGroupWidget = nullptr;
     }
 }
 
@@ -801,8 +801,8 @@ QToolButton *ModelEditor::createToolbarCommandButton(const Core::Id &id, const s
 
 bool ModelEditor::updateButtonIconByTheme(QAbstractButton *button, const QString &name)
 {
-    QTC_ASSERT(button, return false);
-    QTC_ASSERT(!name.isEmpty(), return false);
+    QMT_ASSERT(button, return false);
+    QMT_ASSERT(!name.isEmpty(), return false);
 
     if (QIcon::hasThemeIcon(name)) {
         button->setIcon(QIcon::fromTheme(name));
@@ -1003,7 +1003,7 @@ void ModelEditor::initToolbars()
                      [=](const qmt::Toolbar &lhs, const qmt::Toolbar &rhs) { return lhs.priority() > rhs.priority(); });
     foreach (const qmt::Toolbar &toolbar, toolbars) {
         QWidget *toolBar = toolBars.value(toolbar.id());
-        QLayout *toolBarLayout = 0;
+        QLayout *toolBarLayout = nullptr;
         if (!toolBar) {
             toolBar = new QWidget(d->leftToolBox);
             toolBar->setProperty(PROPERTYNAME_TOOLBARID, toolbar.id());
@@ -1015,7 +1015,7 @@ void ModelEditor::initToolbars()
             toolBars.insert(toolbar.id(), toolBar);
         } else {
             toolBarLayout = toolBar->layout();
-            QTC_ASSERT(toolBarLayout, continue);
+            QMT_ASSERT(toolBarLayout, continue);
         }
         foreach (const qmt::Toolbar::Tool &tool, toolbar.tools()) {
             switch (tool.m_toolType) {
@@ -1025,27 +1025,30 @@ void ModelEditor::initToolbars()
                 qmt::StereotypeIcon::Element stereotypeIconElement = qmt::StereotypeIcon::ElementAny;
                 qmt::StyleEngine::ElementType styleEngineElementType = qmt::StyleEngine::TypeOther;
                 if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_PACKAGE)) {
-                    iconPath = QStringLiteral(":/modelinglib/48x48/package.png");
+                    iconPath = ":/modelinglib/48x48/package.png";
                     stereotypeIconElement = qmt::StereotypeIcon::ElementPackage;
                     styleEngineElementType = qmt::StyleEngine::TypePackage;
                 } else if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_COMPONENT)) {
-                    iconPath = QStringLiteral(":/modelinglib/48x48/component.png");
+                    iconPath = ":/modelinglib/48x48/component.png";
                     stereotypeIconElement = qmt::StereotypeIcon::ElementComponent;
                     styleEngineElementType = qmt::StyleEngine::TypeComponent;
                 } else if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_CLASS)) {
-                    iconPath = QStringLiteral(":/modelinglib/48x48/class.png");
+                    iconPath = ":/modelinglib/48x48/class.png";
                     stereotypeIconElement = qmt::StereotypeIcon::ElementClass;
                     styleEngineElementType = qmt::StyleEngine::TypeClass;
                 } else if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_ITEM)) {
-                    iconPath = QStringLiteral(":/modelinglib/48x48/item.png");
+                    iconPath = ":/modelinglib/48x48/item.png";
                     stereotypeIconElement = qmt::StereotypeIcon::ElementItem;
                     styleEngineElementType = qmt::StyleEngine::TypeItem;
                 } else if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_ANNOTATION)) {
-                    iconPath = QStringLiteral(":/modelinglib/48x48/annotation.png");
+                    iconPath = ":/modelinglib/48x48/annotation.png";
                     styleEngineElementType = qmt::StyleEngine::TypeAnnotation;
                 } else if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_BOUNDARY)) {
-                    iconPath = QStringLiteral(":/modelinglib/48x48/boundary.png");
+                    iconPath = ":/modelinglib/48x48/boundary.png";
                     styleEngineElementType = qmt::StyleEngine::TypeBoundary;
+                } else if (tool.m_elementType == QLatin1String(qmt::ELEMENT_TYPE_SWIMLANE)) {
+                    iconPath = ":/modelinglib/48x48/swimlane.png";
+                    styleEngineElementType = qmt::StyleEngine::TypeSwimlane;
                 }
                 QIcon icon;
                 if (!tool.m_stereotype.isEmpty() && stereotypeIconElement != qmt::StereotypeIcon::ElementAny) {
@@ -1075,7 +1078,7 @@ void ModelEditor::initToolbars()
 
     // fallback if no toolbar was defined
     if (!toolBars.isEmpty()) {
-        QString generalId = QStringLiteral("General");
+        QString generalId = "General";
         auto toolBar = new QWidget(d->leftToolBox);
         toolBar->setProperty(PROPERTYNAME_TOOLBARID, generalId);
         auto toolBarLayout = new QVBoxLayout(toolBar);
@@ -1084,40 +1087,44 @@ void ModelEditor::initToolbars()
         d->leftToolBox->insertItem(0, toolBar, generalId);
         toolBars.insert(generalId, toolBar);
         toolBarLayout->addWidget(
-                    new DragTool(QIcon(QStringLiteral(":/modelinglib/48x48/package.png")),
+                    new DragTool(QIcon(":/modelinglib/48x48/package.png"),
                                  tr("Package"), QLatin1String(qmt::ELEMENT_TYPE_PACKAGE),
                                  QString(), toolBar));
         toolBarLayout->addWidget(
-                    new DragTool(QIcon(QStringLiteral(":/modelinglib/48x48/component.png")),
+                    new DragTool(QIcon(":/modelinglib/48x48/component.png"),
                                  tr("Component"), QLatin1String(qmt::ELEMENT_TYPE_COMPONENT),
                                  QString(), toolBar));
         toolBarLayout->addWidget(
-                    new DragTool(QIcon(QStringLiteral(":/modelinglib/48x48/class.png")),
+                    new DragTool(QIcon(":/modelinglib/48x48/class.png"),
                                  tr("Class"), QLatin1String(qmt::ELEMENT_TYPE_CLASS),
                                  QString(), toolBar));
         toolBarLayout->addWidget(
-                    new DragTool(QIcon(QStringLiteral(":/modelinglib/48x48/item.png")),
+                    new DragTool(QIcon(":/modelinglib/48x48/item.png"),
                                  tr("Item"), QLatin1String(qmt::ELEMENT_TYPE_ITEM),
                                  QString(), toolBar));
         auto horizLine1 = new QFrame(d->leftToolBox);
         horizLine1->setFrameShape(QFrame::HLine);
         toolBarLayout->addWidget(horizLine1);
         toolBarLayout->addWidget(
-                    new DragTool(QIcon(QStringLiteral(":/modelinglib/48x48/annotation.png")),
+                    new DragTool(QIcon(":/modelinglib/48x48/annotation.png"),
                                  tr("Annotation"), QLatin1String(qmt::ELEMENT_TYPE_ANNOTATION),
                                  QString(), toolBar));
         toolBarLayout->addWidget(
-                    new DragTool(QIcon(QStringLiteral(":/modelinglib/48x48/boundary.png")),
+                    new DragTool(QIcon(":/modelinglib/48x48/boundary.png"),
                                  tr("Boundary"), QLatin1String(qmt::ELEMENT_TYPE_BOUNDARY),
+                                 QString(), toolBar));
+        toolBarLayout->addWidget(
+                    new DragTool(QIcon(":/modelinglib/48x48/swimlane.png"),
+                                 tr("Swimlane"), QLatin1String(qmt::ELEMENT_TYPE_SWIMLANE),
                                  QString(), toolBar));
     }
 
     // add stretch to all layouts and calculate width of tool bar
     int maxWidth = 48;
     foreach (QWidget *toolBar, toolBars) {
-        QTC_ASSERT(toolBar, continue);
+        QMT_ASSERT(toolBar, continue);
         auto layout = qobject_cast<QBoxLayout *>(toolBar->layout());
-        QTC_ASSERT(layout, continue);
+        QMT_ASSERT(layout, continue);
         layout->addStretch(1);
         toolBar->adjustSize();
         if (maxWidth < toolBar->width())
@@ -1209,7 +1216,7 @@ void ModelEditor::addDiagramToSelector(const qmt::MDiagram *diagram)
     int i = d->diagramSelector->findData(diagramUid);
     if (i >= 0)
         d->diagramSelector->removeItem(i);
-    d->diagramSelector->insertItem(0, QIcon(QStringLiteral(":/modelinglib/48x48/canvas-diagram.png")), diagramLabel, diagramUid);
+    d->diagramSelector->insertItem(0, QIcon(":/modelinglib/48x48/canvas-diagram.png"), diagramLabel, diagramUid);
     d->diagramSelector->setCurrentIndex(0);
     while (d->diagramSelector->count() > 20)
         d->diagramSelector->removeItem(d->diagramSelector->count() - 1);
@@ -1257,7 +1264,7 @@ QString ModelEditor::buildDiagramLabel(const qmt::MDiagram *diagram)
         owner = owner->owner();
     }
     if (!path.isEmpty()) {
-        label += QStringLiteral(" [");
+        label += " [";
         label += path.last();
         for (int i = path.count() - 2; i >= 0; --i) {
             label += QLatin1Char('.');

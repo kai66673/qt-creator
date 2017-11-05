@@ -57,16 +57,13 @@
         \li \l{http://www.oracle.com/technetwork/java/javase/downloads/index.html}
             {Java SE Development Kit (JDK)} version 6, or later
 
-        \li A build tool for building application packages for Android devices:
+        \li \l{http://www.gradle.org}{Gradle} for building application packages
+            for Android devices (APK). Gradle is delivered with Qt 5.9, and
+            later. Because Gradle scripts are not delivered with Android SDK
+            Tools since version 26.0.0, they are delivered with Qt 5.9 and
+            5.6.3.
 
-            \list
-
-                \li \l{http://ant.apache.org/bindownload.cgi}{Apache Ant} 1.8.0,
-                    or later
-
-                \li \l{http://www.gradle.org}{Gradle}
-
-            \endlist
+            \note Using Ant to build APKs is no longer supported.
 
         \li A tool chain for building applications for Android devices provided
             by the \l{http://developer.android.com/tools/sdk/ndk/index.html}
@@ -74,20 +71,14 @@
 
         \li \l{http://developer.android.com/sdk/index.html}{Android SDK Tools}
 
-            After installing the Tools, update the Android SDK to get the API
-            and tools packages required for development. You can use the
-            \l{http://developer.android.com/tools/help/android.html}{android}
-            tool that comes with the SDK Tools package. For example, on Ubuntu
-            the following command starts the SDK update:
+            The following Android SDK packages and tools are required for
+            development:
 
-            \code
-            ./android update sdk
-            \endcode
-
-            \note The android tool is deprecated since SDK tools version 25.3.0.
-            Consider using
-            \l{https://developer.android.com/studio/command-line/sdkmanager.html}
-            {sdkmanager} instead.
+            \list
+                \li Platform tools
+                \li Build tools
+                \li At least one SDK platform
+            \endlist
 
         \li On Windows, you also need the following:
 
@@ -108,33 +99,37 @@
 
         \endlist
 
-    \section1 Selecting the APK Build Tool
+    \section1 Setting Up the Development Environment
 
-    On Android, applications are distributed in specially structured type of ZIP
-    packages called APK. You can use either Ant or Gradle to build APKs. Using
-    Gradle has the following benefits:
+    You must download and install the latest Android NDK and SDK, and then
+    update or install the tools and packages needed for development. The SDK
+    tool used to update and install the other SDK tools and packages depends on
+    the Android SDK Tools version that you have installed:
 
     \list
 
-        \li It is 25 to 50 percent faster than Ant when rebuilding packages.
+        \li Android SDK Tools version 25.2.5, or earlier
 
-        \li It is delivered with Qt 5.9.
+            Use the
+            \l{https://developer.android.com/studio/tools/help/android.html}
+            {android} tool that comes with the SDK Tools package. For example,
+            on  Ubuntu the following command starts the SDK update:
 
-        \li It supports easily adding Android Extras libraries, such as
-            Google Play services or Android extension files (.obb) to your
-            project.
+            \code
+            ./android update sdk
+            \endcode
+
+        \li Android SDK Tools version 25.3.0, or later
+
+            Use the
+            \l{https://developer.android.com/studio/command-line/sdkmanager.html}
+            {sdkmanager} command line tool for SDK package management and the
+            \l{https://developer.android.com/studio/command-line/avdmanager.html}
+            {avdmanager} tool for Android Virtual Device (AVD) management.
 
     \endlist
 
-    \note Android SDK tools version 25.3.0 onwards do not contain Ant scripts
-    anymore. Therefore, Gradle builds are forced and you must use Qt 5.9 or
-    later when using these tools versions.
-
-    \section1 Setting Up the Development Environment
-
-    You must download and install the latest Android NDK and SDK, and update the
-    SDK to get the API and tools packages needed for development. In addition,
-    you must install Qt for Android as part of Qt 5.2, or later.
+    In addition, you must install Qt for Android as part of Qt 5.2, or later.
 
     For more information, see \l{Qt for Android}.
 
@@ -154,18 +149,6 @@
         \li Select the \uicontrol {Automatically create kits for Android tool chains}
             check box to allow \QC to create the kits for you. \QC displays a
             warning if it cannot find a suitable Qt version.
-
-        \li Select the tool to use for building application packages:
-
-            \list
-
-                \li To use Gradle, select the \uicontrol {Use Gradle instead of Ant}
-                    check box.
-
-                \li To use Ant, add the path to the Ant executable in the
-                    \uicontrol {Ant executable} field.
-
-            \endlist
 
         \li Select \uicontrol File > \uicontrol {New File or Project} > \uicontrol Application >
             \uicontrol {Qt Quick Application} > \uicontrol Choose, and
@@ -213,7 +196,7 @@
 
     \image qtcreator-android-select-devices.png "Select Android Devices dialog"
 
-    Android Virtual Devices (AVD) are also listed. To create new AVDs, select
+    AVDs are also listed. To create new AVDs, select
     \uicontrol {Create Android Virtual Device}.
 
     To set a device as the default device for a particular Android architecture,

@@ -65,13 +65,18 @@ public:
     Utils::MacroExpander *macroExpander() { return &m_macroExpander; }
     const Utils::MacroExpander *macroExpander() const { return &m_macroExpander; }
 
+    virtual Project *project() const = 0;
+
+    virtual bool isActive() const = 0;
+
 signals:
     void displayNameChanged();
     void toolTipChanged();
 
 protected:
-    ProjectConfiguration(QObject *parent, Core::Id id);
-    ProjectConfiguration(QObject *parent, const ProjectConfiguration *source);
+    ProjectConfiguration(QObject *parent);
+    void initialize(Core::Id id);
+    void copyFrom(const ProjectConfiguration *source);
 
 private:
     Core::Id m_id;
@@ -79,6 +84,30 @@ private:
     QString m_defaultDisplayName;
     QString m_toolTip;
     Utils::MacroExpander m_macroExpander;
+};
+
+class PROJECTEXPLORER_EXPORT StatefulProjectConfiguration : public ProjectConfiguration
+{
+    Q_OBJECT
+
+public:
+    StatefulProjectConfiguration() = default;
+
+    bool isEnabled() const;
+
+    virtual QString disabledReason() const = 0;
+
+signals:
+    void enabledChanged();
+
+protected:
+    StatefulProjectConfiguration(QObject *parent);
+    void copyFrom(const StatefulProjectConfiguration *source);
+
+    void setEnabled(bool enabled);
+
+private:
+    bool m_isEnabled = false;
 };
 
 // helper functions:

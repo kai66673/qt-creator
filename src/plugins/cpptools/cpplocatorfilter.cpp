@@ -29,8 +29,7 @@
 #include <coreplugin/editormanager/editormanager.h>
 #include <utils/algorithm.h>
 
-#include <QRegExp>
-#include <QStringMatcher>
+#include <QRegularExpression>
 
 #include <algorithm>
 
@@ -72,34 +71,33 @@ QList<Core::LocatorFilterEntry> CppLocatorFilter::matchesFor(
 {
     QList<Core::LocatorFilterEntry> goodEntries;
     QList<Core::LocatorFilterEntry> betterEntries;
-    const Qt::CaseSensitivity cs = caseSensitivity(entry);
-    QStringMatcher matcher(entry, cs);
-    QRegExp regexp(entry, cs, QRegExp::Wildcard);
-    if (!regexp.isValid())
-        return goodEntries;
-    bool hasWildcard = containsWildcard(entry);
+    QList<Core::LocatorFilterEntry> bestEntries;
+    const Qt::CaseSensitivity caseSensitivityForPrefix = caseSensitivity(entry);
     bool hasColonColon = entry.contains(QLatin1String("::"));
     const IndexItem::ItemType wanted = matchTypes();
+
+    const QRegularExpression regexp = createRegExp(entry);
+    if (!regexp.isValid())
+        return goodEntries;
 
     m_data->filterAllFiles([&](const IndexItem::Ptr &info) -> IndexItem::VisitorResult {
         if (future.isCanceled())
             return IndexItem::Break;
         if (info->type() & wanted) {
-            const QString matchString = hasColonColon ? info->scopedSymbolName() : info->symbolName();
-            int index = hasWildcard ? regexp.indexIn(matchString) : matcher.indexIn(matchString);
-            if (index >= 0) {
-                const bool betterMatch = index == 0;
+            QString matchString = hasColonColon ? info->scopedSymbolName() : info->symbolName();
+            QRegularExpressionMatch match = regexp.match(matchString);
+            if (match.hasMatch()) {
                 Core::LocatorFilterEntry filterEntry = filterEntryFromIndexItem(info);
 
-                if (matchString != filterEntry.displayName) {
-                    index = hasWildcard ? regexp.indexIn(filterEntry.displayName)
-                                        : matcher.indexIn(filterEntry.displayName);
-                }
+                // Highlight the matched characters, therefore it may be necessary
+                // to update the match if the displayName is different from matchString
+                if (matchString != filterEntry.displayName)
+                    match = regexp.match(filterEntry.displayName);
+                filterEntry.highlightInfo = highlightInfo(match);
 
-                if (index >= 0)
-                    filterEntry.highlightInfo = {index, (hasWildcard ? regexp.matchedLength() : entry.length())};
-
-                if (betterMatch)
+                if (matchString.startsWith(entry, caseSensitivityForPrefix))
+                    bestEntries.append(filterEntry);
+                else if (matchString.contains(entry, caseSensitivityForPrefix))
                     betterEntries.append(filterEntry);
                 else
                     goodEntries.append(filterEntry);
@@ -116,13 +114,20 @@ QList<Core::LocatorFilterEntry> CppLocatorFilter::matchesFor(
         Utils::sort(goodEntries, Core::LocatorFilterEntry::compareLexigraphically);
     if (betterEntries.size() < 1000)
         Utils::sort(betterEntries, Core::LocatorFilterEntry::compareLexigraphically);
+    if (bestEntries.size() < 1000)
+        Utils::sort(bestEntries, Core::LocatorFilterEntry::compareLexigraphically);
 
-    betterEntries += goodEntries;
-    return betterEntries;
+    bestEntries += betterEntries;
+    bestEntries += goodEntries;
+    return bestEntries;
 }
 
-void CppLocatorFilter::accept(Core::LocatorFilterEntry selection) const
+void CppLocatorFilter::accept(Core::LocatorFilterEntry selection,
+                              QString *newText, int *selectionStart, int *selectionLength) const
 {
+    Q_UNUSED(newText)
+    Q_UNUSED(selectionStart)
+    Q_UNUSED(selectionLength)
     IndexItem::Ptr info = qvariant_cast<IndexItem::Ptr>(selection.internalData);
     Core::EditorManager::openEditorAt(info->fileName(), info->line(), info->column());
 }

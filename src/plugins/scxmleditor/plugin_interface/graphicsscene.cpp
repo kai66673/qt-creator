@@ -202,7 +202,7 @@ void GraphicsScene::removeSelectedItems()
 {
     QVector<ScxmlTag*> tags = SceneUtils::findRemovedTags(m_baseItems);
     if (tags.count() > 0) {
-        m_document->undoStack()->beginMacro(tr("Remove item(s)"));
+        m_document->undoStack()->beginMacro(tr("Remove items"));
 
         // Then remove found tags
         for (int i = tags.count(); i--;) {
@@ -368,7 +368,7 @@ void GraphicsScene::init()
 
 void GraphicsScene::runLayoutToSelectedStates()
 {
-    m_document->undoStack()->beginMacro(tr("Relayout"));
+    m_document->undoStack()->beginMacro(tr("Re-layout"));
 
     QVector<BaseItem*> selectedItems;
     foreach (BaseItem *node, m_baseItems) {
@@ -541,7 +541,7 @@ void GraphicsScene::endTagChange(ScxmlDocument::TagChange change, ScxmlTag *tag,
                 item->finalizeCreation();
         }
     }
-    // FIXME: intended fallthrough?
+    break;
     case ScxmlDocument::TagAddChild: {
         ScxmlTag *childTag = tag->child(value.toInt());
         if (childTag) {

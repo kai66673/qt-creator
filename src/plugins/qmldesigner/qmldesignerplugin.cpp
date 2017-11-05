@@ -286,8 +286,6 @@ void QmlDesignerPlugin::integrateIntoQtCreator(QWidget *modeWidget)
             }
         }
     });
-
-    d->viewManager.designerActionManager().polishActions();
 }
 
 void QmlDesignerPlugin::showDesigner()
@@ -415,7 +413,6 @@ void QmlDesignerPlugin::deactivateAutoSynchronization()
     viewManager().detachViewsExceptRewriterAndComponetView();
     viewManager().detachComponentView();
     viewManager().detachRewriterView();
-    emitCurrentTextEditorChanged(documentManager().currentDesignDocument()->textEditor());
     documentManager().currentDesignDocument()->resetToDocumentModel();
 }
 

@@ -21,6 +21,7 @@ HEADERS += projectexplorer.h \
     projectimporter.h \
     projectwindow.h \
     removetaskhandler.h \
+    subscription.h \
     targetsetuppage.h \
     targetsetupwidget.h \
     kit.h \
@@ -33,11 +34,11 @@ HEADERS += projectexplorer.h \
     kitmanagerconfigwidget.h \
     kitmodel.h \
     kitoptionspage.h \
+    projectconfigurationmodel.h \
     buildmanager.h \
     buildsteplist.h \
     compileoutputwindow.h \
     deployconfiguration.h \
-    deployconfigurationmodel.h \
     namedwidget.h \
     target.h \
     targetsettingspanel.h \
@@ -86,7 +87,6 @@ HEADERS += projectexplorer.h \
     toolchainconfigwidget.h \
     toolchainmanager.h \
     toolchainoptionspage.h \
-    cesdkhandler.h \
     gccparser.h \
     projectexplorersettingspage.h \
     baseprojectwizarddialog.h \
@@ -95,12 +95,9 @@ HEADERS += projectexplorer.h \
     ldparser.h \
     linuxiccparser.h \
     runconfigurationaspects.h \
-    runconfigurationmodel.h \
-    buildconfigurationmodel.h \
     processparameters.h \
     abstractprocessstep.h \
     taskhub.h \
-    localapplicationruncontrol.h \
     headerpath.h \
     gcctoolchainfactories.h \
     appoutputpane.h \
@@ -152,7 +149,8 @@ HEADERS += projectexplorer.h \
     projectexplorer_global.h \
     extracompiler.h \
     customexecutableconfigurationwidget.h \
-    customexecutablerunconfiguration.h
+    customexecutablerunconfiguration.h \
+    projectmacro.h
 
 SOURCES += projectexplorer.cpp \
     abi.cpp \
@@ -165,12 +163,14 @@ SOURCES += projectexplorer.cpp \
     environmentaspectwidget.cpp \
     gcctoolchain.cpp \
     importwidget.cpp \
+    projectconfigurationmodel.cpp \
     runnables.cpp \
     localenvironmentaspect.cpp \
     osparser.cpp \
     projectimporter.cpp \
     projectwindow.cpp \
     removetaskhandler.cpp \
+    subscription.cpp \
     targetsetuppage.cpp \
     targetsetupwidget.cpp \
     kit.cpp \
@@ -186,7 +186,6 @@ SOURCES += projectexplorer.cpp \
     buildsteplist.cpp \
     compileoutputwindow.cpp \
     deployconfiguration.cpp \
-    deployconfigurationmodel.cpp \
     namedwidget.cpp \
     target.cpp \
     targetsettingspanel.cpp \
@@ -232,7 +231,6 @@ SOURCES += projectexplorer.cpp \
     toolchainconfigwidget.cpp \
     toolchainmanager.cpp \
     toolchainoptionspage.cpp \
-    cesdkhandler.cpp \
     gccparser.cpp \
     projectexplorersettingspage.cpp \
     baseprojectwizarddialog.cpp \
@@ -241,11 +239,8 @@ SOURCES += projectexplorer.cpp \
     ldparser.cpp \
     linuxiccparser.cpp \
     runconfigurationaspects.cpp \
-    runconfigurationmodel.cpp \
-    buildconfigurationmodel.cpp \
     taskhub.cpp \
     processparameters.cpp \
-    localapplicationruncontrol.cpp \
     appoutputpane.cpp \
     codestylesettingspropertiespage.cpp \
     settingsaccessor.cpp \
@@ -290,7 +285,8 @@ SOURCES += projectexplorer.cpp \
     projectexplorericons.cpp \
     extracompiler.cpp \
     customexecutableconfigurationwidget.cpp \
-    customexecutablerunconfiguration.cpp
+    customexecutablerunconfiguration.cpp \
+    projectmacro.cpp
 
 FORMS += processstep.ui \
     editorsettingspropertiespage.ui \
@@ -308,14 +304,12 @@ FORMS += processstep.ui \
 WINSOURCES += \
     windebuginterface.cpp \
     msvctoolchain.cpp \
-    abstractmsvctoolchain.cpp \
-    wincetoolchain.cpp
+    abstractmsvctoolchain.cpp
 
 WINHEADERS += \
     windebuginterface.h \
     msvctoolchain.h \
-    abstractmsvctoolchain.h \
-    wincetoolchain.h
+    abstractmsvctoolchain.h
 
 win32|equals(TEST, 1) {
     SOURCES += $$WINSOURCES
@@ -335,8 +329,6 @@ journald {
     DEFINES += WITH_JOURNALD
     LIBS += -lsystemd
 }
-
-macx:LIBS += -framework Carbon
 
 RESOURCES += projectexplorer.qrc
 

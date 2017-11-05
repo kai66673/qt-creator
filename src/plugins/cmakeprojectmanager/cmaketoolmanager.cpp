@@ -146,26 +146,38 @@ static void readAndDeleteLegacyCMakeSettings ()
 
 static QList<CMakeTool *> autoDetectCMakeTools()
 {
-    FileNameList suspects;
-
     Utils::Environment env = Environment::systemEnvironment();
 
-    QStringList path = env.path();
-    path.removeDuplicates();
+    Utils::FileNameList path = env.path();
+    path = Utils::filteredUnique(path);
 
-    QStringList execs = env.appendExeExtensions(QLatin1String("cmake"));
+    if (HostOsInfo::isWindowsHost()) {
+        const QString progFiles = QLatin1String(qgetenv("ProgramFiles"));
+        path.append(Utils::FileName::fromString(progFiles + "/CMake"));
+        path.append(Utils::FileName::fromString(progFiles + "/CMake/bin"));
+        const QString progFilesX86 = QLatin1String(qgetenv("ProgramFiles(x86)"));
+        if (!progFilesX86.isEmpty()) {
+            path.append(Utils::FileName::fromString(progFilesX86 + "/CMake"));
+            path.append(Utils::FileName::fromString(progFilesX86 + "/CMake/bin"));
+        }
+    }
 
-    foreach (QString base, path) {
-        const QChar slash = QLatin1Char('/');
+    if (HostOsInfo::isMacHost()) {
+        path.append(Utils::FileName::fromString("/Applications/CMake.app/Contents/bin"));
+        path.append(Utils::FileName::fromString("/usr/local/bin"));
+        path.append(Utils::FileName::fromString("/opt/local/bin"));
+    }
+
+    const QStringList execs = env.appendExeExtensions(QLatin1String("cmake"));
+
+    FileNameList suspects;
+    foreach (const Utils::FileName &base, path) {
         if (base.isEmpty())
             continue;
-        // Avoid turning '/' into '//' on Windows which triggers Windows to check
-        // for network drives!
-        if (!base.endsWith(slash))
-            base += slash;
 
-        foreach (const QString &exec, execs) {
-            QFileInfo fi(base + exec);
+        QFileInfo fi;
+        for (const QString &exec : execs) {
+            fi.setFile(base.toString(), exec);
             if (fi.exists() && fi.isFile() && fi.isExecutable())
                 suspects << FileName::fromString(fi.absoluteFilePath());
         }

@@ -53,7 +53,6 @@ namespace VcsBase {
 }
 
 namespace DiffEditor {
-class DiffEditorDocument;
 class DiffEditorController;
 }
 
@@ -125,7 +124,9 @@ public:
     Utils::FileName vcsBinary() const override;
     unsigned gitVersion(QString *errorMessage = nullptr) const;
 
-    VcsBase::VcsCommand *vcsExecAbortable(const QString &workingDirectory, const QStringList &arguments);
+    VcsBase::VcsCommand *vcsExecAbortable(const QString &workingDirectory,
+                                          const QStringList &arguments,
+                                          bool createProgressParser = false);
 
     QString findRepositoryForDirectory(const QString &dir) const;
     QString findGitDirForRepository(const QString &repositoryDir) const;

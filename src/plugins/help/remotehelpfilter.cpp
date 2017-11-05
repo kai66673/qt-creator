@@ -143,8 +143,12 @@ QList<Core::LocatorFilterEntry> RemoteHelpFilter::matchesFor(QFutureInterface<Co
     return entries;
 }
 
-void RemoteHelpFilter::accept(Core::LocatorFilterEntry selection) const
+void RemoteHelpFilter::accept(Core::LocatorFilterEntry selection,
+                              QString *newText, int *selectionStart, int *selectionLength) const
 {
+    Q_UNUSED(newText)
+    Q_UNUSED(selectionStart)
+    Q_UNUSED(selectionLength)
     const QString &url = selection.displayName;
     if (!url.isEmpty())
         emit linkActivated(url);
@@ -166,7 +170,7 @@ QByteArray RemoteHelpFilter::saveState() const
     return value;
 }
 
-bool RemoteHelpFilter::restoreState(const QByteArray &state)
+void RemoteHelpFilter::restoreState(const QByteArray &state)
 {
     QDataStream in(state);
 
@@ -181,8 +185,6 @@ bool RemoteHelpFilter::restoreState(const QByteArray &state)
     bool defaultFilter;
     in >> defaultFilter;
     setIncludedByDefault(defaultFilter);
-
-    return true;
 }
 
 bool RemoteHelpFilter::openConfigDialog(QWidget *parent, bool &needsRefresh)

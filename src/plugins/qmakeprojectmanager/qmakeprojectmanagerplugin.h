@@ -36,7 +36,10 @@ namespace ProjectExplorer {
 class Project;
 class Target;
 }
-namespace Utils { class ParameterAction; }
+namespace Utils {
+class FileName;
+class ParameterAction;
+}
 
 namespace QmakeProjectManager {
 
@@ -65,10 +68,13 @@ private slots:
 private:
     void projectChanged();
     void activeTargetChanged();
+    void updateActions();
     void updateRunQMakeAction();
     void updateContextActions();
     void buildStateChanged(ProjectExplorer::Project *pro);
     void updateBuildFileAction();
+    void disableBuildFileMenus();
+    void enableBuildFileMenus(const Utils::FileName &file);
 
     QmakeManager *m_qmakeProjectManager = nullptr;
     QmakeProject *m_previousStartupProject = nullptr;

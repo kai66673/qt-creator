@@ -37,6 +37,7 @@
 #include <utils/icon.h>
 #include <utils/portlist.h>
 #include <utils/qtcassert.h>
+#include <utils/url.h>
 
 #include <QCoreApplication>
 #include <QStandardPaths>
@@ -278,6 +279,11 @@ DeviceTester *IDevice::createDeviceTester() const
     return 0;
 }
 
+Utils::OsType IDevice::osType() const
+{
+    return Utils::OsTypeOther;
+}
+
 DeviceProcess *IDevice::createProcess(QObject * /* parent */) const
 {
     QTC_CHECK(false);
@@ -340,8 +346,10 @@ void IDevice::fromMap(const QVariantMap &map)
     if (optionsVariant.isValid())  // false for QtC < 3.4
         d->sshParameters.options = QSsh::SshConnectionOptions(optionsVariant.toInt());
 
-    d->freePorts = Utils::PortList::fromString(map.value(QLatin1String(PortsSpecKey),
-        QLatin1String("10000-10100")).toString());
+    QString portsSpec = map.value(PortsSpecKey).toString();
+    if (portsSpec.isEmpty())
+        portsSpec = "10000-10100";
+    d->freePorts = Utils::PortList::fromString(portsSpec);
     d->machineType = static_cast<MachineType>(map.value(QLatin1String(MachineTypeKey), DefaultMachineType).toInt());
     d->version = map.value(QLatin1String(VersionKey), 0).toInt();
 
@@ -404,9 +412,12 @@ void IDevice::setSshParameters(const QSsh::SshConnectionParameters &sshParameter
     d->sshParameters.hostKeyDatabase = DeviceManager::instance()->hostKeyDatabase();
 }
 
-Connection IDevice::toolControlChannel(const ControlChannelHint &) const
+QUrl IDevice::toolControlChannel(const ControlChannelHint &) const
 {
-    return HostName(d->sshParameters.host);
+    QUrl url;
+    url.setScheme(Utils::urlTcpScheme());
+    url.setHost(d->sshParameters.host);
+    return url;
 }
 
 void IDevice::setFreePorts(const Utils::PortList &freePorts)
@@ -462,9 +473,5 @@ DeviceProcessSignalOperation::DeviceProcessSignalOperation()
 DeviceEnvironmentFetcher::DeviceEnvironmentFetcher()
 {
 }
-
-void *HostName::staticTypeId = &HostName::staticTypeId;
-
-void *UrlConnection::staticTypeId = &UrlConnection::staticTypeId;
 
 } // namespace ProjectExplorer

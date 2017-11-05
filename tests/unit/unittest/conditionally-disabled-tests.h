@@ -24,6 +24,9 @@
 ****************************************************************************/
 
 #include <QtGlobal>
+#include <clang-c/Index.h>
+
+#include <clangbackend_global.h>
 
 #ifdef Q_OS_WIN
 #  define DISABLED_ON_WINDOWS(x) DISABLED_##x

@@ -27,7 +27,9 @@
 #include "gtestconfiguration.h"
 #include "gtestparser.h"
 
+#include <cpptools/cppmodelmanager.h>
 #include <projectexplorer/session.h>
+#include <utils/algorithm.h>
 #include <utils/qtcassert.h>
 
 namespace Autotest {
@@ -56,6 +58,7 @@ QVariant GTestTreeItem::data(int column, int role) const
     }
     case Qt::CheckStateRole:
         switch (type()) {
+        case Root:
         case TestCase:
         case TestFunctionOrSet:
             return checked();
@@ -104,6 +107,8 @@ TestConfiguration *GTestTreeItem::testConfiguration() const
     default:
         return nullptr;
     }
+    if (config)
+        config->setInternalTargets(internalTargets());
     return config;
 }
 
@@ -111,7 +116,7 @@ TestConfiguration *GTestTreeItem::debugConfiguration() const
 {
     GTestConfiguration *config = static_cast<GTestConfiguration *>(testConfiguration());
     if (config)
-        config->setRunMode(DebuggableTestConfiguration::Debug);
+        config->setRunMode(TestRunMode::Debug);
     return config;
 }
 
@@ -124,6 +129,7 @@ QList<TestConfiguration *> GTestTreeItem::getAllTestConfigurations() const
         return result;
 
     QHash<QString, int> proFilesWithTestSets;
+    QHash<QString, QSet<QString> > proFilesWithInternalTargets;
     for (int row = 0, count = childCount(); row < count; ++row) {
         const GTestTreeItem *child = static_cast<const GTestTreeItem *>(childItem(row));
 
@@ -132,17 +138,22 @@ QList<TestConfiguration *> GTestTreeItem::getAllTestConfigurations() const
             const TestTreeItem *grandChild = child->childItem(grandChildRow);
             const QString &key = grandChild->proFile();
             proFilesWithTestSets.insert(key, proFilesWithTestSets[key] + 1);
+            proFilesWithInternalTargets[key].unite(grandChild->internalTargets());
         }
     }
 
     QHash<QString, int>::ConstIterator it = proFilesWithTestSets.begin();
     QHash<QString, int>::ConstIterator end = proFilesWithTestSets.end();
     for ( ; it != end; ++it) {
-        GTestConfiguration *tc = new GTestConfiguration;
-        tc->setTestCaseCount(it.value());
-        tc->setProjectFile(it.key());
-        tc->setProject(project);
-        result << tc;
+        const QSet<QString> &internalTargets = proFilesWithInternalTargets[it.key()];
+        for (const QString &target : internalTargets) {
+            GTestConfiguration *tc = new GTestConfiguration;
+            tc->setTestCaseCount(it.value());
+            tc->setProjectFile(it.key());
+            tc->setProject(project);
+            tc->setInternalTarget(target);
+            result << tc;
+        }
     }
 
     return result;
@@ -162,6 +173,7 @@ QList<TestConfiguration *> GTestTreeItem::getSelectedTestConfigurations() const
         return result;
 
     QHash<QString, TestCases> proFilesWithCheckedTestSets;
+    QHash<QString, QSet<QString> > proFilesWithInternalTargets;
     for (int row = 0, count = childCount(); row < count; ++row) {
         const GTestTreeItem *child = static_cast<const GTestTreeItem *>(childItem(row));
 
@@ -175,6 +187,8 @@ QList<TestConfiguration *> GTestTreeItem::getSelectedTestConfigurations() const
             auto &testCases = proFilesWithCheckedTestSets[child->childItem(0)->proFile()];
             testCases.filters.append(gtestFilter(child->state()).arg(child->name()).arg('*'));
             testCases.additionalTestCaseCount += grandChildCount - 1;
+            proFilesWithInternalTargets[child->childItem(0)->proFile()].unite(
+                        child->internalTargets());
             break;
         }
         case Qt::PartiallyChecked: {
@@ -183,6 +197,8 @@ QList<TestConfiguration *> GTestTreeItem::getSelectedTestConfigurations() const
                 if (grandChild->checked() == Qt::Checked) {
                     proFilesWithCheckedTestSets[grandChild->proFile()].filters.append(
                                 gtestFilter(child->state()).arg(child->name()).arg(grandChild->name()));
+                    proFilesWithInternalTargets[grandChild->proFile()].unite(
+                                grandChild->internalTargets());
                 }
             }
             break;
@@ -193,12 +209,16 @@ QList<TestConfiguration *> GTestTreeItem::getSelectedTestConfigurations() const
     QHash<QString, TestCases>::ConstIterator it = proFilesWithCheckedTestSets.begin();
     QHash<QString, TestCases>::ConstIterator end = proFilesWithCheckedTestSets.end();
     for ( ; it != end; ++it) {
-        GTestConfiguration *tc = new GTestConfiguration;
-        tc->setTestCases(it.value().filters);
-        tc->setTestCaseCount(tc->testCaseCount() + it.value().additionalTestCaseCount);
-        tc->setProjectFile(it.key());
-        tc->setProject(project);
-        result << tc;
+        const QSet<QString> &internalTargets = proFilesWithInternalTargets[it.key()];
+        for (const QString &target : internalTargets) {
+            GTestConfiguration *tc = new GTestConfiguration;
+            tc->setTestCases(it.value().filters);
+            tc->setTestCaseCount(tc->testCaseCount() + it.value().additionalTestCaseCount);
+            tc->setProjectFile(it.key());
+            tc->setProject(project);
+            tc->setInternalTarget(target);
+            result << tc;
+        }
     }
 
     return result;
@@ -239,7 +259,7 @@ bool GTestTreeItem::modify(const TestParseResult *result)
 
 bool GTestTreeItem::modifyTestSetContent(const GTestParseResult *result)
 {
-    bool hasBeenModified = modifyLineAndColumn(result->line, result->column);
+    bool hasBeenModified = modifyLineAndColumn(result);
     GTestTreeItem::TestStates states = result->disabled ? GTestTreeItem::Disabled
                                                         : GTestTreeItem::Enabled;
     if (m_state != states) {
@@ -273,6 +293,28 @@ QString GTestTreeItem::nameSuffix() const
     if (!suffix.isEmpty())
         suffix += ']';
     return suffix;
+}
+
+QSet<QString> GTestTreeItem::internalTargets() const
+{
+    QSet<QString> result;
+    const auto cppMM = CppTools::CppModelManager::instance();
+    const auto projectInfo = cppMM->projectInfo(ProjectExplorer::SessionManager::startupProject());
+    const QString file = filePath();
+    const QVector<CppTools::ProjectPart::Ptr> projectParts = projectInfo.projectParts();
+    if (projectParts.isEmpty())
+        return TestTreeItem::dependingInternalTargets(cppMM, file);
+    for (const CppTools::ProjectPart::Ptr projectPart : projectParts) {
+        if (projectPart->projectFile == proFile()
+                && Utils::anyOf(projectPart->files, [&file] (const CppTools::ProjectFile &pf) {
+                                return pf.path == file;
+        })) {
+            result.insert(projectPart->buildSystemTarget + '|' + projectPart->projectFile);
+            if (projectPart->buildTargetType != CppTools::ProjectPart::Executable)
+                result.unite(TestTreeItem::dependingInternalTargets(cppMM, file));
+        }
+    }
+    return result;
 }
 
 } // namespace Internal

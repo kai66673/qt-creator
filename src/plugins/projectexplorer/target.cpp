@@ -115,9 +115,10 @@ QList<DeployConfigurationFactory *> TargetPrivate::deployFactories() const
 }
 
 Target::Target(Project *project, Kit *k) :
-    ProjectConfiguration(project, k->id()),
+    ProjectConfiguration(project),
     d(new TargetPrivate(k))
 {
+    initialize(k->id());
     QTC_CHECK(d->m_kit);
     connect(DeviceManager::instance(), &DeviceManager::updated, this, &Target::updateDeviceState);
 
@@ -153,41 +154,6 @@ Target::~Target()
     delete d;
 }
 
-void Target::changeEnvironment()
-{
-    auto bc = qobject_cast<BuildConfiguration *>(sender());
-    if (bc == activeBuildConfiguration())
-        emit environmentChanged();
-}
-
-void Target::changeBuildConfigurationEnabled()
-{
-    auto bc = qobject_cast<BuildConfiguration *>(sender());
-    if (bc == activeBuildConfiguration())
-        emit buildConfigurationEnabledChanged();
-}
-
-void Target::changeDeployConfigurationEnabled()
-{
-    auto dc = qobject_cast<DeployConfiguration *>(sender());
-    if (dc == activeDeployConfiguration())
-        emit deployConfigurationEnabledChanged();
-}
-
-void Target::changeRunConfigurationEnabled()
-{
-    auto rc = qobject_cast<RunConfiguration *>(sender());
-    if (rc == activeRunConfiguration())
-        emit runConfigurationEnabledChanged();
-}
-
-void Target::onBuildDirectoryChanged()
-{
-    auto bc = qobject_cast<BuildConfiguration *>(sender());
-    if (bc && activeBuildConfiguration() == bc)
-        emit buildDirectoryChanged();
-}
-
 void Target::handleKitUpdates(Kit *k)
 {
     if (k != d->m_kit)
@@ -207,6 +173,11 @@ void Target::handleKitRemoval(Kit *k)
     if (k != d->m_kit)
         return;
     project()->removeTarget(this);
+}
+
+bool Target::isActive() const
+{
+    return project()->activeTarget() == this;
 }
 
 Project *Target::project() const
@@ -238,14 +209,8 @@ void Target::addBuildConfiguration(BuildConfiguration *bc)
     // add it
     d->m_buildConfigurations.push_back(bc);
 
+    emit addedProjectConfiguration(bc);
     emit addedBuildConfiguration(bc);
-
-    connect(bc, &BuildConfiguration::environmentChanged,
-            this, &Target::changeEnvironment);
-    connect(bc, &BuildConfiguration::enabledChanged,
-            this, &Target::changeBuildConfigurationEnabled);
-    connect(bc, &BuildConfiguration::buildDirectoryChanged,
-            this, &Target::onBuildDirectoryChanged);
 
     if (!activeBuildConfiguration())
         setActiveBuildConfiguration(bc);
@@ -261,8 +226,9 @@ bool Target::removeBuildConfiguration(BuildConfiguration *bc)
         return false;
 
     d->m_buildConfigurations.removeOne(bc);
+    emit aboutToRemoveProjectConfiguration(bc);
+    d->m_buildConfigurations.removeOne(bc);
 
-    emit removedBuildConfiguration(bc);
 
     if (activeBuildConfiguration() == bc) {
         if (d->m_buildConfigurations.isEmpty())
@@ -270,6 +236,9 @@ bool Target::removeBuildConfiguration(BuildConfiguration *bc)
         else
             SessionManager::setActiveBuildConfiguration(this, d->m_buildConfigurations.at(0), SetActive::Cascade);
     }
+
+    emit removedBuildConfiguration(bc);
+    emit removedProjectConfiguration(bc);
 
     delete bc;
     return true;
@@ -285,16 +254,14 @@ BuildConfiguration *Target::activeBuildConfiguration() const
     return d->m_activeBuildConfiguration;
 }
 
-void Target::setActiveBuildConfiguration(BuildConfiguration *configuration)
+void Target::setActiveBuildConfiguration(BuildConfiguration *bc)
 {
-    if ((!configuration && d->m_buildConfigurations.isEmpty()) ||
-        (configuration && d->m_buildConfigurations.contains(configuration) &&
-         configuration != d->m_activeBuildConfiguration)) {
-        d->m_activeBuildConfiguration = configuration;
+    if ((!bc && d->m_buildConfigurations.isEmpty()) ||
+        (bc && d->m_buildConfigurations.contains(bc) &&
+         bc != d->m_activeBuildConfiguration)) {
+        d->m_activeBuildConfiguration = bc;
+        emit activeProjectConfigurationChanged(d->m_activeBuildConfiguration);
         emit activeBuildConfigurationChanged(d->m_activeBuildConfiguration);
-        emit environmentChanged();
-        emit buildConfigurationEnabledChanged();
-        emit buildDirectoryChanged();
     }
 }
 
@@ -315,9 +282,7 @@ void Target::addDeployConfiguration(DeployConfiguration *dc)
     // add it
     d->m_deployConfigurations.push_back(dc);
 
-    connect(dc, &DeployConfiguration::enabledChanged,
-            this, &Target::changeDeployConfigurationEnabled);
-
+    emit addedProjectConfiguration(dc);
     emit addedDeployConfiguration(dc);
 
     if (!d->m_activeDeployConfiguration)
@@ -334,9 +299,8 @@ bool Target::removeDeployConfiguration(DeployConfiguration *dc)
     if (BuildManager::isBuilding(dc))
         return false;
 
+    emit aboutToRemoveProjectConfiguration(dc);
     d->m_deployConfigurations.removeOne(dc);
-
-    emit removedDeployConfiguration(dc);
 
     if (activeDeployConfiguration() == dc) {
         if (d->m_deployConfigurations.isEmpty())
@@ -345,6 +309,9 @@ bool Target::removeDeployConfiguration(DeployConfiguration *dc)
             SessionManager::setActiveDeployConfiguration(this, d->m_deployConfigurations.at(0),
                                                          SetActive::Cascade);
     }
+
+    emit removedProjectConfiguration(dc);
+    emit removedDeployConfiguration(dc);
 
     delete dc;
     return true;
@@ -366,8 +333,8 @@ void Target::setActiveDeployConfiguration(DeployConfiguration *dc)
         (dc && d->m_deployConfigurations.contains(dc) &&
          dc != d->m_activeDeployConfiguration)) {
         d->m_activeDeployConfiguration = dc;
+        emit activeProjectConfigurationChanged(d->m_activeDeployConfiguration);
         emit activeDeployConfigurationChanged(d->m_activeDeployConfiguration);
-        emit deployConfigurationEnabledChanged();
     }
     updateDeviceState();
 }
@@ -398,6 +365,15 @@ BuildTargetInfoList Target::applicationTargets() const
     return d->m_appTargets;
 }
 
+QList<ProjectConfiguration *> Target::projectConfigurations() const
+{
+    QList<ProjectConfiguration *> result;
+    result.append(Utils::transform(buildConfigurations(), [](BuildConfiguration *bc) { return qobject_cast<ProjectConfiguration *>(bc); }));
+    result.append(Utils::transform(deployConfigurations(), [](DeployConfiguration *dc) { return qobject_cast<ProjectConfiguration *>(dc); }));
+    result.append(Utils::transform(runConfigurations(), [](RunConfiguration *rc) { return qobject_cast<ProjectConfiguration *>(rc); }));
+    return result;
+}
+
 QList<RunConfiguration *> Target::runConfigurations() const
 {
     return d->m_runConfigurations;
@@ -416,9 +392,7 @@ void Target::addRunConfiguration(RunConfiguration *rc)
 
     d->m_runConfigurations.push_back(rc);
 
-    connect(rc, &RunConfiguration::enabledChanged,
-            this, &Target::changeRunConfigurationEnabled);
-
+    emit addedProjectConfiguration(rc);
     emit addedRunConfiguration(rc);
 
     if (!activeRunConfiguration())
@@ -429,6 +403,7 @@ void Target::removeRunConfiguration(RunConfiguration *rc)
 {
     QTC_ASSERT(rc && d->m_runConfigurations.contains(rc), return);
 
+    emit aboutToRemoveProjectConfiguration(rc);
     d->m_runConfigurations.removeOne(rc);
 
     if (activeRunConfiguration() == rc) {
@@ -439,6 +414,8 @@ void Target::removeRunConfiguration(RunConfiguration *rc)
     }
 
     emit removedRunConfiguration(rc);
+    emit removedProjectConfiguration(rc);
+
     delete rc;
 }
 
@@ -453,8 +430,8 @@ void Target::setActiveRunConfiguration(RunConfiguration *rc)
         (rc && d->m_runConfigurations.contains(rc) &&
          rc != d->m_activeRunConfiguration)) {
         d->m_activeRunConfiguration = rc;
+        emit activeProjectConfigurationChanged(d->m_activeRunConfiguration);
         emit activeRunConfigurationChanged(d->m_activeRunConfiguration);
-        emit runConfigurationEnabledChanged();
     }
     updateDeviceState();
 }

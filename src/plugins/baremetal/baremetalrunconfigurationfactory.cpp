@@ -60,8 +60,9 @@ bool BareMetalRunConfigurationFactory::canCreate(Target *parent, Core::Id id) co
 {
     if (!canHandle(parent))
         return false;
+    const QString targetName = QFileInfo(pathFromId(id)).fileName();
     return id == BareMetalCustomRunConfiguration::runConfigId()
-            || !parent->applicationTargets().targetForProject(pathFromId(id)).isEmpty();
+            || !parent->applicationTargets().targetFilePath(targetName).isEmpty();
 }
 
 bool BareMetalRunConfigurationFactory::canRestore(Target *parent, const QVariantMap &map) const
@@ -89,7 +90,7 @@ QList<Core::Id> BareMetalRunConfigurationFactory::availableCreationIds(Target *p
 
     const Core::Id base = Core::Id(BareMetalRunConfiguration::IdPrefix);
     foreach (const BuildTargetInfo &bti, parent->applicationTargets().list)
-        result << base.withSuffix(bti.projectFilePath.toString());
+        result << base.withSuffix(bti.projectFilePath.toString() + QLatin1Char('/') + bti.targetName);
     result << BareMetalCustomRunConfiguration::runConfigId();
     return result;
 }
@@ -99,14 +100,14 @@ QString BareMetalRunConfigurationFactory::displayNameForId(Core::Id id) const
     if (id == BareMetalCustomRunConfiguration::runConfigId())
         return BareMetalCustomRunConfiguration::runConfigDefaultDisplayName();
     return tr("%1 (on GDB server or hardware debugger)")
-        .arg(QFileInfo(pathFromId(id)).completeBaseName());
+        .arg(QFileInfo(pathFromId(id)).fileName());
 }
 
 RunConfiguration *BareMetalRunConfigurationFactory::doCreate(Target *parent, Core::Id id)
 {
     if (id == BareMetalCustomRunConfiguration::runConfigId())
         return new BareMetalCustomRunConfiguration(parent);
-    return new BareMetalRunConfiguration(parent, id, pathFromId(id));
+    return createHelper<BareMetalRunConfiguration>(parent, id, pathFromId(id));
 }
 
 RunConfiguration *BareMetalRunConfigurationFactory::doRestore(Target *parent, const QVariantMap &map)
@@ -119,10 +120,9 @@ RunConfiguration *BareMetalRunConfigurationFactory::doRestore(Target *parent, co
 RunConfiguration *BareMetalRunConfigurationFactory::clone(Target *parent, RunConfiguration *source)
 {
     QTC_ASSERT(canClone(parent, source), return 0);
-    if (BareMetalCustomRunConfiguration *old = qobject_cast<BareMetalCustomRunConfiguration *>(source))
-        return new BareMetalCustomRunConfiguration(parent, old);
-    BareMetalRunConfiguration *old = static_cast<BareMetalRunConfiguration*>(source);
-    return new BareMetalRunConfiguration(parent,old);
+    if (qobject_cast<BareMetalCustomRunConfiguration *>(source))
+        return cloneHelper<BareMetalCustomRunConfiguration>(parent, source);
+    return cloneHelper<BareMetalRunConfiguration>(parent, source);
 }
 
 bool BareMetalRunConfigurationFactory::canHandle(const Target *target) const

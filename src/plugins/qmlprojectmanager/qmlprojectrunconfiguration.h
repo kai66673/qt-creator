@@ -40,20 +40,17 @@ namespace QtSupport { class BaseQtVersion; }
 namespace QmlProjectManager {
 class QmlProject;
 
-namespace Internal {
-    class QmlProjectRunConfigurationFactory;
-    class QmlProjectRunConfigurationWidget;
-}
+namespace Internal { class QmlProjectRunConfigurationWidget; }
 
 class QMLPROJECTMANAGER_EXPORT QmlProjectRunConfiguration : public ProjectExplorer::RunConfiguration
 {
     Q_OBJECT
-    friend class Internal::QmlProjectRunConfigurationFactory;
+    friend class ProjectExplorer::IRunConfigurationFactory;
     friend class Internal::QmlProjectRunConfigurationWidget;
     friend class QmlProject; // to call updateEnabled()
 
 public:
-    QmlProjectRunConfiguration(ProjectExplorer::Target *parent, Core::Id id);
+    explicit QmlProjectRunConfiguration(ProjectExplorer::Target *target);
 
     ProjectExplorer::Runnable runnable() const override;
 
@@ -70,7 +67,6 @@ public:
     QString mainScript() const;
 
     // RunConfiguration
-    bool isEnabled() const override;
     QString disabledReason() const override;
     virtual QWidget *createConfigurationWidget() override;
     Utils::OutputFormatter *createOutputFormatter() const override;
@@ -80,17 +76,13 @@ public:
 signals:
     void scriptSourceChanged();
 
-protected:
-    QmlProjectRunConfiguration(ProjectExplorer::Target *parent,
-                               QmlProjectRunConfiguration *source);
-    virtual bool fromMap(const QVariantMap &map) override;
-    void setEnabled(bool value);
-
 private:
-    void ctor();
+    void initialize(Core::Id id);
+    void copyFrom(const QmlProjectRunConfiguration *source);
+    virtual bool fromMap(const QVariantMap &map) override;
 
     void changeCurrentFile(Core::IEditor* = 0);
-    void updateEnabled();
+    void updateEnabledState() final;
 
     QString executable() const;
     QString commandLineArguments() const;
@@ -106,8 +98,6 @@ private:
 
     QString m_scriptFile;
     QString m_qmlViewerArgs;
-
-    bool m_isEnabled;
 };
 
 } // namespace QmlProjectManager

@@ -32,9 +32,8 @@
 #include <QAbstractItemModel>
 #include <QFileInfo>
 #include <QMutexLocker>
-#include <QRegExp>
+#include <QRegularExpression>
 
-using namespace Core;
 using namespace Core;
 using namespace Core::Internal;
 using namespace Utils;
@@ -61,7 +60,8 @@ QList<LocatorFilterEntry> OpenDocumentsFilter::matchesFor(QFutureInterface<Locat
     QList<LocatorFilterEntry> goodEntries;
     QList<LocatorFilterEntry> betterEntries;
     const EditorManager::FilePathInfo fp = EditorManager::splitLineAndColumnNumber(entry);
-    QRegExp regexp(fp.filePath, caseSensitivity(fp.filePath), QRegExp::Wildcard);
+
+    const QRegularExpression regexp = createRegExp(fp.filePath);
     if (!regexp.isValid())
         return goodEntries;
 
@@ -72,13 +72,13 @@ QList<LocatorFilterEntry> OpenDocumentsFilter::matchesFor(QFutureInterface<Locat
         if (fileName.isEmpty())
             continue;
         QString displayName = editorEntry.displayName;
-        const int index = regexp.indexIn(displayName);
-        if (index >= 0) {
+        const QRegularExpressionMatch match = regexp.match(displayName);
+        if (match.hasMatch()) {
             LocatorFilterEntry filterEntry(this, displayName, QString(fileName + fp.postfix));
             filterEntry.extraInfo = FileUtils::shortNativePath(FileName::fromString(fileName));
             filterEntry.fileName = fileName;
-            filterEntry.highlightInfo = {index, regexp.matchedLength()};
-            if (index == 0)
+            filterEntry.highlightInfo = highlightInfo(match);
+            if (match.capturedStart() == 0)
                 betterEntries.append(filterEntry);
             else
                 goodEntries.append(filterEntry);
@@ -114,8 +114,12 @@ void OpenDocumentsFilter::refresh(QFutureInterface<void> &future)
     QMetaObject::invokeMethod(this, "refreshInternally", Qt::BlockingQueuedConnection);
 }
 
-void OpenDocumentsFilter::accept(LocatorFilterEntry selection) const
+void OpenDocumentsFilter::accept(LocatorFilterEntry selection,
+                                 QString *newText, int *selectionStart, int *selectionLength) const
 {
+    Q_UNUSED(newText)
+    Q_UNUSED(selectionStart)
+    Q_UNUSED(selectionLength)
     EditorManager::openEditor(selection.internalData.toString(), Id(),
                               EditorManager::CanContainLineAndColumnNumber);
 }

@@ -78,10 +78,13 @@ public:
     BuildStep *at(int position);
 
     Target *target() const;
+    Project *project() const override;
 
     virtual QVariantMap toMap() const override;
     virtual bool fromMap(const QVariantMap &map) override;
     void cloneSteps(BuildStepList *source);
+
+    bool isActive() const override;
 
 signals:
     void stepInserted(int position);

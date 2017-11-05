@@ -26,6 +26,8 @@
 #pragma once
 
 #include "baseeditordocumentparser.h"
+#include "cppcursorinfo.h"
+#include "cppsymbolinfo.h"
 #include "cppsemanticinfo.h"
 #include "cpptools_global.h"
 
@@ -65,12 +67,16 @@ public:
     virtual TextEditor::QuickFixOperations
     extraRefactoringOperations(const TextEditor::AssistInterface &assistInterface);
 
+    virtual void invalidateDiagnostics();
     virtual bool hasDiagnosticsAt(uint line, uint column) const;
     virtual void addDiagnosticToolTipToLayout(uint line, uint column, QLayout *layout) const;
 
     virtual void editorDocumentTimerRestarted();
 
     virtual void setParserConfig(const BaseEditorDocumentParser::Configuration config);
+
+    virtual QFuture<CursorInfo> cursorInfo(const CursorInfoParams &params) = 0;
+    virtual QFuture<SymbolInfo> requestFollowSymbol(int line, int column) = 0;
 
 public:
     using HeaderErrorDiagnosticWidgetCreator = std::function<QWidget*()>;

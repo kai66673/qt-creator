@@ -29,6 +29,7 @@
 #include "diffeditordocument.h"
 #include "diffutils.h"
 
+#include <QHash>
 #include <QMenu>
 #include <QPainter>
 #include <QScrollBar>
@@ -58,7 +59,6 @@ UnifiedDiffEditorWidget::UnifiedDiffEditorWidget(QWidget *parent)
     settings.m_textWrapping = false;
     settings.m_displayLineNumbers = true;
     settings.m_highlightCurrentLine = false;
-    settings.m_displayFoldingMarkers = true;
     settings.m_markTextChanges = false;
     settings.m_highlightBlocks = false;
     SelectableTextEditorWidget::setDisplaySettings(settings);
@@ -82,6 +82,7 @@ UnifiedDiffEditorWidget::UnifiedDiffEditorWidget(QWidget *parent)
     m_context->setWidget(this);
     m_context->setContext(Core::Context(Constants::UNIFIED_VIEW_ID));
     Core::ICore::addContextObject(m_context);
+    setCodeFoldingSupported(true);
 }
 
 UnifiedDiffEditorWidget::~UnifiedDiffEditorWidget()
@@ -131,6 +132,7 @@ void UnifiedDiffEditorWidget::setDisplaySettings(const DisplaySettings &ds)
 {
     DisplaySettings settings = displaySettings();
     settings.m_visualizeWhitespace = ds.m_visualizeWhitespace;
+    settings.m_displayFoldingMarkers = ds.m_displayFoldingMarkers;
     SelectableTextEditorWidget::setDisplaySettings(settings);
 }
 
@@ -159,6 +161,16 @@ void UnifiedDiffEditorWidget::mouseDoubleClickEvent(QMouseEvent *e)
         return;
     }
     SelectableTextEditorWidget::mouseDoubleClickEvent(e);
+}
+
+void UnifiedDiffEditorWidget::keyPressEvent(QKeyEvent *e)
+{
+    if (e->key() == Qt::Key_Enter || e->key() == Qt::Key_Return) {
+        jumpToOriginalFile(textCursor());
+        e->accept();
+        return;
+    }
+    SelectableTextEditorWidget::keyPressEvent(e);
 }
 
 void UnifiedDiffEditorWidget::contextMenuEvent(QContextMenuEvent *e)
@@ -325,13 +337,13 @@ QString UnifiedDiffEditorWidget::showChunk(const ChunkData &chunkData,
                                                      // could have been added
                     for (int k = 0; k < blockDelta; k++)
                         (*selections)[*blockNumber + blockCount + 1 + k].append(&m_controller.m_leftLineFormat);
-                    QMapIterator<int, int> itPos(lineData.changedPositions);
-                    while (itPos.hasNext()) {
-                        itPos.next();
-                        const int startPos = itPos.key() < 0
-                                ? 1 : itPos.key() + 1;
-                        const int endPos = itPos.value() < 0
-                                ? itPos.value() : itPos.value() + 1;
+
+                    for (auto it = lineData.changedPositions.cbegin(),
+                              end = lineData.changedPositions.cend(); it != end; ++it) {
+                        const int startPos = it.key() < 0
+                                ? 1 : it.key() + 1;
+                        const int endPos = it.value() < 0
+                                ? it.value() : it.value() + 1;
                         (*selections)[*blockNumber + blockCount + 1].append(
                                     DiffSelection(startPos, endPos, &m_controller.m_leftCharFormat));
                     }
@@ -365,13 +377,13 @@ QString UnifiedDiffEditorWidget::showChunk(const ChunkData &chunkData,
 
                     for (int k = 0; k < blockDelta; k++)
                         (*selections)[*blockNumber + blockCount + 1 + k].append(&m_controller.m_rightLineFormat);
-                    QMapIterator<int, int> itPos(lineData.changedPositions);
-                    while (itPos.hasNext()) {
-                        itPos.next();
-                        const int startPos = itPos.key() < 0
-                                ? 1 : itPos.key() + 1;
-                        const int endPos = itPos.value() < 0
-                                ? itPos.value() : itPos.value() + 1;
+
+                    for (auto it = lineData.changedPositions.cbegin(),
+                              end = lineData.changedPositions.cend(); it != end; ++it) {
+                        const int startPos = it.key() < 0
+                                ? 1 : it.key() + 1;
+                        const int endPos = it.value() < 0
+                                ? it.value() : it.value() + 1;
                         (*selections)[*blockNumber + blockCount + 1].append
                                 (DiffSelection(startPos, endPos, &m_controller.m_rightCharFormat));
                     }
@@ -446,17 +458,23 @@ void UnifiedDiffEditorWidget::showDiff()
     int blockNumber = 0;
     int charNumber = 0;
 
+    // 'foldingIndent' is populated with <block number> and folding indentation
+    // value where 1 indicates start of new file and 2 indicates a diff chunk.
+    // Remaining lines (diff contents) are assigned 3.
+    QHash<int, int> foldingIndent;
+
     QMap<int, QList<DiffSelection> > selections;
 
-    for (int i = 0; i < m_controller.m_contextFileData.count(); i++) {
-        const FileData &fileData = m_controller.m_contextFileData.at(i);
+    for (const FileData &fileData : m_controller.m_contextFileData) {
         const QString leftFileInfo = QLatin1String("--- ")
                 + fileData.leftFileInfo.fileName + QLatin1Char('\n');
         const QString rightFileInfo = QLatin1String("+++ ")
                 + fileData.rightFileInfo.fileName + QLatin1Char('\n');
         setFileInfo(blockNumber, fileData.leftFileInfo, fileData.rightFileInfo);
+        foldingIndent.insert(blockNumber, 1);
         selections[blockNumber].append(DiffSelection(&m_controller.m_fileLineFormat));
         blockNumber++;
+        foldingIndent.insert(blockNumber, 1);
         selections[blockNumber].append(DiffSelection(&m_controller.m_fileLineFormat));
         blockNumber++;
 
@@ -465,6 +483,7 @@ void UnifiedDiffEditorWidget::showDiff()
         charNumber += leftFileInfo.count() + rightFileInfo.count();
 
         if (fileData.binaryFiles) {
+            foldingIndent.insert(blockNumber, 2);
             selections[blockNumber].append(DiffSelection(&m_controller.m_chunkLineFormat));
             blockNumber++;
             const QString binaryLine = QLatin1String("Binary files ")
@@ -477,6 +496,7 @@ void UnifiedDiffEditorWidget::showDiff()
         } else {
             for (int j = 0; j < fileData.chunks.count(); j++) {
                 const int oldBlockNumber = blockNumber;
+                foldingIndent.insert(blockNumber, 2);
                 diffText += showChunk(fileData.chunks.at(j),
                                       (j == fileData.chunks.count() - 1)
                                       && fileData.lastChunkAtTheEndOfFile,
@@ -499,6 +519,11 @@ void UnifiedDiffEditorWidget::showDiff()
     const bool oldIgnore = m_controller.m_ignoreCurrentIndexChange;
     m_controller.m_ignoreCurrentIndexChange = true;
     setPlainText(diffText);
+
+    QTextBlock block = document()->firstBlock();
+    for (int b = 0; block.isValid(); block = block.next(), ++b)
+        setFoldingIndent(block, foldingIndent.value(b, 3));
+
     m_controller.m_ignoreCurrentIndexChange = oldIgnore;
 
     setSelections(selections);
@@ -509,28 +534,17 @@ int UnifiedDiffEditorWidget::blockNumberForFileIndex(int fileIndex) const
     if (fileIndex < 0 || fileIndex >= m_fileInfo.count())
         return -1;
 
-    QMap<int, QPair<DiffFileInfo, DiffFileInfo> >::const_iterator it
-            = m_fileInfo.constBegin();
-    for (int i = 0; i < fileIndex; i++)
-        ++it;
-
-    return it.key();
+    return (m_fileInfo.constBegin() + fileIndex).key();
 }
 
 int UnifiedDiffEditorWidget::fileIndexForBlockNumber(int blockNumber) const
 {
-    QMap<int, QPair<DiffFileInfo, DiffFileInfo> >::const_iterator it
-            = m_fileInfo.constBegin();
-    QMap<int, QPair<DiffFileInfo, DiffFileInfo> >::const_iterator itEnd
-            = m_fileInfo.constEnd();
-
     int i = -1;
-    while (it != itEnd) {
+    for (auto it = m_fileInfo.cbegin(), end = m_fileInfo.cend(); it != end; ++it, ++i) {
         if (it.key() > blockNumber)
             break;
-        ++it;
-        ++i;
     }
+
     return i;
 }
 
@@ -539,8 +553,7 @@ int UnifiedDiffEditorWidget::chunkIndexForBlockNumber(int blockNumber) const
     if (m_chunkInfo.isEmpty())
         return -1;
 
-    QMap<int, QPair<int, int> >::const_iterator it
-            = m_chunkInfo.upperBound(blockNumber);
+    auto it = m_chunkInfo.upperBound(blockNumber);
     if (it == m_chunkInfo.constBegin())
         return -1;
 
@@ -577,14 +590,12 @@ void UnifiedDiffEditorWidget::jumpToOriginalFile(const QTextCursor &cursor)
     const int leftLineNumber = m_leftLineNumbers.value(blockNumber, -1);
     if (leftLineNumber >= 0) {
         if (leftFileName == rightFileName) {
-            for (int i = 0; i < fileData.chunks.count(); i++) {
-                const ChunkData chunkData = fileData.chunks.at(i);
+            for (const ChunkData &chunkData : fileData.chunks) {
 
                 int newLeftLineNumber = chunkData.leftStartingLineNumber;
                 int newRightLineNumber = chunkData.rightStartingLineNumber;
 
-                for (int j = 0; j < chunkData.rows.count(); j++) {
-                    const RowData rowData = chunkData.rows.at(j);
+                for (const RowData &rowData : chunkData.rows) {
                     if (rowData.leftLine.textLineType == TextLineData::TextLine)
                         newLeftLineNumber++;
                     if (rowData.rightLine.textLineType == TextLineData::TextLine)

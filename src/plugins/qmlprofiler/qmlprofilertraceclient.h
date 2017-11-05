@@ -52,8 +52,9 @@ public:
     bool isRecording() const;
     void setRecording(bool);
     quint64 recordedFeatures() const;
+    virtual void messageReceived(const QByteArray &) override;
+    virtual void stateChanged(State status) override;
 
-public slots:
     void clearData();
     void sendRecordingStatus(int engineId = -1);
     void setRequestedFeatures(quint64 features);
@@ -68,10 +69,6 @@ signals:
     void recordedFeaturesChanged(quint64 features);
 
     void cleared();
-
-protected:
-    virtual void stateChanged(State status);
-    virtual void messageReceived(const QByteArray &);
 
 private:
     class QmlProfilerTraceClientPrivate *d;

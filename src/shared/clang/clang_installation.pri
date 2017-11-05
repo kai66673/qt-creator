@@ -3,10 +3,11 @@ LLVM_INSTALL_DIR = $$clean_path($$LLVM_INSTALL_DIR)
 isEmpty(LLVM_INSTALL_DIR): error("No LLVM_INSTALL_DIR provided")
 !exists($$LLVM_INSTALL_DIR): error("LLVM_INSTALL_DIR does not exist: $$LLVM_INSTALL_DIR")
 
-defineReplace(extractVersion)      { return($$replace(1, ^(\\d+\\.\\d+\\.\\d+)$, \\1)) }
-defineReplace(extractMajorVersion) { return($$replace(1, ^(\\d+)\\.\\d+\\.\\d+$, \\1)) }
-defineReplace(extractMinorVersion) { return($$replace(1, ^\\d+\\.(\\d+)\\.\\d+$, \\1)) }
-defineReplace(extractPatchVersion) { return($$replace(1, ^\\d+\\.\\d+\\.(\\d+)$, \\1)) }
+# Expected input: "3.9.1", "5.0.0svn", "5.0.1git-81029f14223"
+defineReplace(extractVersion)      { return($$replace(1, ^(\\d+\\.\\d+\\.\\d+).*$, \\1)) }
+defineReplace(extractMajorVersion) { return($$replace(1, ^(\\d+)\\.\\d+\\.\\d+.*$, \\1)) }
+defineReplace(extractMinorVersion) { return($$replace(1, ^\\d+\\.(\\d+)\\.\\d+.*$, \\1)) }
+defineReplace(extractPatchVersion) { return($$replace(1, ^\\d+\\.\\d+\\.(\\d+).*$, \\1)) }
 
 defineTest(versionIsAtLeast) {
     actual_major_version = $$extractMajorVersion($$1)
@@ -24,6 +25,21 @@ defineTest(versionIsAtLeast) {
         greaterThan(actual_minor_version, $$required_min_minor_version): return(true)
     }
     greaterThan(actual_major_version, $$required_min_major_version): return(true)
+
+    return(false)
+}
+
+defineTest(versionIsEqual) {
+    actual_major_version = $$extractMajorVersion($$1)
+    actual_minor_version = $$extractMinorVersion($$1)
+    required_min_major_version = $$2
+    required_min_minor_version = $$3
+
+    isEqual(actual_major_version, $$required_min_major_version) {
+        isEqual(actual_minor_version, $$required_min_minor_version) {
+            return(true)
+        }
+    }
 
     return(false)
 }
@@ -102,18 +118,24 @@ LIBCLANG_LIBS += $${CLANG_LIB}
 
 QTC_NO_CLANG_LIBTOOLING=$$(QTC_NO_CLANG_LIBTOOLING)
 isEmpty(QTC_NO_CLANG_LIBTOOLING) {
-    !contains(QMAKE_DEFAULT_LIBDIRS, $$LLVM_LIBDIR): LIBTOOLING_LIBS = -L$${LLVM_LIBDIR}
-    LIBTOOLING_LIBS += $$CLANGTOOLING_LIBS $$LLVM_STATIC_LIBS
-    contains(QMAKE_DEFAULT_INCDIRS, $$LLVM_INCLUDEPATH): LLVM_INCLUDEPATH =
+    QTC_FORCE_CLANG_LIBTOOLING = $$(QTC_FORCE_CLANG_LIBTOOLING)
+    versionIsEqual($$LLVM_VERSION, 5, 0)|!isEmpty(QTC_FORCE_CLANG_LIBTOOLING) {
+        !contains(QMAKE_DEFAULT_LIBDIRS, $$LLVM_LIBDIR): LIBTOOLING_LIBS = -L$${LLVM_LIBDIR}
+        LIBTOOLING_LIBS += $$CLANGTOOLING_LIBS $$LLVM_STATIC_LIBS
+        contains(QMAKE_DEFAULT_INCDIRS, $$LLVM_INCLUDEPATH): LLVM_INCLUDEPATH =
+    } else {
+        warning("Clang LibTooling is disabled because only version 5.0 is supported.")
+    }
 } else {
     warning("Clang LibTooling is disabled.")
 }
 
 isEmpty(LLVM_VERSION): error("Cannot determine clang version at $$LLVM_INSTALL_DIR")
-!versionIsAtLeast($$LLVM_VERSION, 3, 9, 0): {
-    error("LLVM/Clang version >= 3.9.0 required, version provided: $$LLVM_VERSION")
+!versionIsAtLeast($$LLVM_VERSION, 5, 0, 0): { # CLANG-UPGRADE-CHECK: Adapt minimum version numbers.
+    error("LLVM/Clang version >= 5.0.0 required, version provided: $$LLVM_VERSION")
 }
 
+# Remove unwanted flags. It is a workaround for linking. It is not intended for cross compiler linking.
 LLVM_CXXFLAGS = $$system($$llvm_config --cxxflags, lines)
 LLVM_CXXFLAGS ~= s,-fno-exceptions,
 LLVM_CXXFLAGS ~= s,-std=c++11,
@@ -126,6 +148,7 @@ LLVM_CXXFLAGS ~= s,-Werror=date-time,
 LLVM_CXXFLAGS ~= s,-Wcovered-switch-default,
 LLVM_CXXFLAGS ~= s,-fPIC,
 LLVM_CXXFLAGS ~= s,-pedantic,
+LLVM_CXXFLAGS ~= s,-Wstring-conversion,
 # split-dwarf needs objcopy which does not work via icecc out-of-the-box
 LLVM_CXXFLAGS ~= s,-gsplit-dwarf,
 

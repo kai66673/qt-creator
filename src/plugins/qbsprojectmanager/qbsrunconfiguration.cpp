@@ -30,11 +30,11 @@
 #include "qbsproject.h"
 
 #include <coreplugin/messagemanager.h>
+#include <coreplugin/variablechooser.h>
 #include <projectexplorer/buildmanager.h>
 #include <projectexplorer/buildstep.h>
 #include <projectexplorer/buildsteplist.h>
 #include <projectexplorer/deployconfiguration.h>
-#include <projectexplorer/localapplicationruncontrol.h>
 #include <projectexplorer/localenvironmentaspect.h>
 #include <projectexplorer/runconfigurationaspects.h>
 #include <projectexplorer/target.h>
@@ -45,11 +45,11 @@
 #include <utils/detailswidget.h>
 #include <utils/stringutils.h>
 #include <utils/persistentsettings.h>
+#include <utils/utilsicons.h>
 #include <qtsupport/qtoutputformatter.h>
 #include <qtsupport/qtsupportconstants.h>
 #include <qtsupport/qtkitinformation.h>
 #include <utils/hostosinfo.h>
-#include <utils/utilsicons.h>
 
 #include "api/runenvironment.h"
 
@@ -108,67 +108,26 @@ const qbs::ProductData findProduct(const qbs::ProjectData &pro, const QString &u
 // QbsRunConfiguration:
 // --------------------------------------------------------------------
 
-QbsRunConfiguration::QbsRunConfiguration(Target *parent, Core::Id id) :
-    RunConfiguration(parent, id),
-    m_uniqueProductName(uniqueProductNameFromId(id)),
-    m_currentInstallStep(0),
-    m_currentBuildStepList(0)
+QbsRunConfiguration::QbsRunConfiguration(Target *target)
+    : RunConfiguration(target)
 {
-    auto * const envAspect = new LocalEnvironmentAspect(this,
+    auto envAspect = new LocalEnvironmentAspect(this,
             [](RunConfiguration *rc, Environment &env) {
                 static_cast<QbsRunConfiguration *>(rc)->addToBaseEnvironment(env);
-            }
-    );
+            });
     addExtraAspect(envAspect);
-    connect(static_cast<QbsProject *>(parent->project()), &QbsProject::parsingFinished, this,
+    connect(static_cast<QbsProject *>(target->project()), &Project::parsingFinished, this,
             [envAspect]() { envAspect->buildEnvironmentHasChanged(); });
-    addExtraAspect(new ArgumentsAspect(this, QStringLiteral("Qbs.RunConfiguration.CommandLineArguments")));
-    addExtraAspect(new WorkingDirectoryAspect(this, QStringLiteral("Qbs.RunConfiguration.WorkingDirectory")));
+    addExtraAspect(new ArgumentsAspect(this, "Qbs.RunConfiguration.CommandLineArguments"));
+    addExtraAspect(new WorkingDirectoryAspect(this, "Qbs.RunConfiguration.WorkingDirectory"));
 
-    addExtraAspect(new TerminalAspect(this,
-                                      QStringLiteral("Qbs.RunConfiguration.UseTerminal"),
-                                      isConsoleApplication()));
+    addExtraAspect(new TerminalAspect(this, "Qbs.RunConfiguration.UseTerminal", isConsoleApplication()));
 
-    ctor();
-}
-
-QbsRunConfiguration::QbsRunConfiguration(Target *parent, QbsRunConfiguration *source) :
-    RunConfiguration(parent, source),
-    m_uniqueProductName(source->m_uniqueProductName),
-    m_currentInstallStep(0), // no need to copy this, we will get if from the DC anyway.
-    m_currentBuildStepList(0) // ditto
-{
-    ctor();
-}
-
-bool QbsRunConfiguration::isEnabled() const
-{
-    QbsProject *project = static_cast<QbsProject *>(target()->project());
-    return !project->isParsing() && project->hasParseResult();
-}
-
-QString QbsRunConfiguration::disabledReason() const
-{
-    QbsProject *project = static_cast<QbsProject *>(target()->project());
-    if (project->isParsing())
-        return tr("The .qbs files are currently being parsed.");
-
-    if (!project->hasParseResult())
-        return tr("Parsing of .qbs files has failed.");
-    return QString();
-}
-
-void QbsRunConfiguration::ctor()
-{
-    setDefaultDisplayName(defaultDisplayName());
-
-    QbsProject *project = static_cast<QbsProject *>(target()->project());
-    connect(project, &QbsProject::projectParsingStarted, this, &RunConfiguration::enabledChanged);
-    connect(project, &QbsProject::projectParsingDone, this, [this](bool success) {
+    QbsProject *project = static_cast<QbsProject *>(target->project());
+    connect(project, &Project::parsingFinished, this, [this](bool success) {
         auto terminalAspect = extraAspect<TerminalAspect>();
         if (success && !terminalAspect->isUserSet())
             terminalAspect->setUseTerminal(isConsoleApplication());
-        emit enabledChanged();
     });
     connect(BuildManager::instance(), &BuildManager::buildStateChanged, this,
             [this, project](Project *p) {
@@ -177,8 +136,30 @@ void QbsRunConfiguration::ctor()
             }
     );
 
-    connect(target(), &Target::activeDeployConfigurationChanged,
+    connect(target, &Target::activeDeployConfigurationChanged,
             this, &QbsRunConfiguration::installStepChanged);
+}
+
+void QbsRunConfiguration::initialize(Core::Id id)
+{
+    RunConfiguration::initialize(id);
+    m_uniqueProductName = uniqueProductNameFromId(id);
+    ctor();
+}
+
+void QbsRunConfiguration::copyFrom(const QbsRunConfiguration *source)
+{
+    RunConfiguration::copyFrom(source);
+    m_uniqueProductName = source->m_uniqueProductName;
+    m_currentInstallStep = nullptr; // no need to copy this, we will get if from the DC anyway.
+    m_currentBuildStepList = nullptr;  // ditto
+
+    ctor();
+}
+
+void QbsRunConfiguration::ctor()
+{
+    setDefaultDisplayName(defaultDisplayName());
     installStepChanged();
 }
 
@@ -302,6 +283,11 @@ void QbsRunConfiguration::addToBaseEnvironment(Utils::Environment &env) const
 
 QString QbsRunConfiguration::buildSystemTarget() const
 {
+    return productDisplayNameFromId(id());
+}
+
+QString QbsRunConfiguration::uniqueProductName() const
+{
     return m_uniqueProductName;
 }
 
@@ -328,17 +314,6 @@ QbsRunConfigurationWidget::QbsRunConfigurationWidget(QbsRunConfiguration *rc)
     auto vboxTopLayout = new QVBoxLayout(this);
     vboxTopLayout->setMargin(0);
 
-    auto hl = new QHBoxLayout();
-    hl->addStretch();
-    m_disabledIcon = new QLabel(this);
-    m_disabledIcon->setPixmap(Utils::Icons::WARNING.pixmap());
-    hl->addWidget(m_disabledIcon);
-    m_disabledReason = new QLabel(this);
-    m_disabledReason->setVisible(false);
-    hl->addWidget(m_disabledReason);
-    hl->addStretch();
-    vboxTopLayout->addLayout(hl);
-
     auto detailsContainer = new Utils::DetailsWidget(this);
     detailsContainer->setState(Utils::DetailsWidget::NoSummary);
     vboxTopLayout->addWidget(detailsContainer);
@@ -358,23 +333,14 @@ QbsRunConfigurationWidget::QbsRunConfigurationWidget(QbsRunConfiguration *rc)
 
     m_rc->extraAspect<TerminalAspect>()->addToMainConfigurationWidget(this, toplayout);
 
-    runConfigurationEnabledChange();
-
     connect(m_rc, &QbsRunConfiguration::targetInformationChanged,
             this, &QbsRunConfigurationWidget::targetInformationHasChanged, Qt::QueuedConnection);
 
     connect(m_rc, &RunConfiguration::enabledChanged,
-            this, &QbsRunConfigurationWidget::runConfigurationEnabledChange);
-}
-
-void QbsRunConfigurationWidget::runConfigurationEnabledChange()
-{
-    bool enabled = m_rc->isEnabled();
-    m_disabledIcon->setVisible(!enabled);
-    m_disabledReason->setVisible(!enabled);
-    m_disabledReason->setText(m_rc->disabledReason());
-
+            this, &QbsRunConfigurationWidget::targetInformationHasChanged);
     targetInformationHasChanged();
+
+    Core::VariableChooser::addSupportForChildWidgets(this, rc->macroExpander());
 }
 
 void QbsRunConfigurationWidget::targetInformationHasChanged()
@@ -415,7 +381,7 @@ bool QbsRunConfigurationFactory::canCreate(Target *parent, Core::Id id) const
 
 RunConfiguration *QbsRunConfigurationFactory::doCreate(Target *parent, Core::Id id)
 {
-    return new QbsRunConfiguration(parent, id);
+    return createHelper<QbsRunConfiguration>(parent, id);
 }
 
 bool QbsRunConfigurationFactory::canRestore(Target *parent, const QVariantMap &map) const
@@ -427,7 +393,7 @@ bool QbsRunConfigurationFactory::canRestore(Target *parent, const QVariantMap &m
 
 RunConfiguration *QbsRunConfigurationFactory::doRestore(Target *parent, const QVariantMap &map)
 {
-    return new QbsRunConfiguration(parent, idFromMap(map));
+    return createHelper<QbsRunConfiguration>(parent, idFromMap(map));
 }
 
 bool QbsRunConfigurationFactory::canClone(Target *parent, RunConfiguration *source) const
@@ -439,8 +405,7 @@ RunConfiguration *QbsRunConfigurationFactory::clone(Target *parent, RunConfigura
 {
     if (!canClone(parent, source))
         return 0;
-    QbsRunConfiguration *old = static_cast<QbsRunConfiguration *>(source);
-    return new QbsRunConfiguration(parent, old);
+    return cloneHelper<QbsRunConfiguration>(parent, source);
 }
 
 QList<Core::Id> QbsRunConfigurationFactory::availableCreationIds(Target *parent, CreationMode mode) const

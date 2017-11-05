@@ -25,16 +25,16 @@
 
 #include "cppquickfixes.h"
 
-#include "cppeditor.h"
+#include "cppeditorwidget.h"
 #include "cppeditordocument.h"
 #include "cppfunctiondecldeflink.h"
 #include "cppquickfixassistant.h"
-#include "cppvirtualfunctionassistprovider.h"
 #include "cppinsertvirtualmethods.h"
 
 #include <coreplugin/icore.h>
 #include <coreplugin/messagebox.h>
 
+#include <cpptools/cppvirtualfunctionassistprovider.h>
 #include <cpptools/baseeditordocumentprocessor.h>
 #include <cpptools/cppclassesfilter.h>
 #include <cpptools/cppcodestylesettings.h>
@@ -56,6 +56,7 @@
 
 #include <utils/fancylineedit.h>
 #include <utils/qtcassert.h>
+#include <utils/qtcfallthrough.h>
 
 #include <QApplication>
 #include <QComboBox>
@@ -824,9 +825,9 @@ public:
 
     ASTMatcher matcher;
     ASTPatternBuilder mk;
-    ConditionAST *condition;
-    IfStatementAST *pattern;
-    CoreDeclaratorAST *core;
+    ConditionAST *condition = nullptr;
+    IfStatementAST *pattern = nullptr;
+    CoreDeclaratorAST *core = nullptr;
 };
 
 } // anonymous namespace
@@ -901,9 +902,9 @@ public:
 
     ASTMatcher matcher;
     ASTPatternBuilder mk;
-    ConditionAST *condition;
-    WhileStatementAST *pattern;
-    CoreDeclaratorAST *core;
+    ConditionAST *condition = nullptr;
+    WhileStatementAST *pattern = nullptr;
+    CoreDeclaratorAST *core = nullptr;
 };
 
 } // anonymous namespace
@@ -1872,24 +1873,6 @@ QString templateNameAsString(const TemplateNameId *templateName)
     return QString::fromUtf8(id->chars(), id->size());
 }
 
-// For templates, simply the name is returned, without '<...>'.
-QString unqualifiedNameForLocator(const Name *name)
-{
-    QTC_ASSERT(name, return QString());
-
-    const Overview oo;
-    if (const QualifiedNameId *qualifiedName = name->asQualifiedNameId()) {
-        const Name *name = qualifiedName->name();
-        if (const TemplateNameId *templateName = name->asTemplateNameId())
-            return templateNameAsString(templateName);
-        return oo.prettyName(name);
-    } else if (const TemplateNameId *templateName = name->asTemplateNameId()) {
-        return templateNameAsString(templateName);
-    } else {
-        return oo.prettyName(name);
-    }
-}
-
 Snapshot forwardingHeaders(const CppQuickFixInterface &interface)
 {
     Snapshot result;
@@ -1909,6 +1892,44 @@ bool looksLikeAQtClass(const QString &identifier)
         && identifier.at(1).isUpper();
 }
 
+bool matchName(const Name *name, QList<Core::LocatorFilterEntry> *matches, QString *className) {
+    if (!name)
+        return false;
+
+    if (CppClassesFilter *classesFilter
+            = ExtensionSystem::PluginManager::getObject<CppClassesFilter>()) {
+        QFutureInterface<Core::LocatorFilterEntry> dummy;
+
+        const Overview oo;
+        if (const QualifiedNameId *qualifiedName = name->asQualifiedNameId()) {
+            const Name *name = qualifiedName->name();
+            if (const TemplateNameId *templateName = name->asTemplateNameId()) {
+                *className = templateNameAsString(templateName);
+            } else {
+                *className = oo.prettyName(name);
+                *matches = classesFilter->matchesFor(dummy, *className);
+                if (matches->empty()) {
+                    if (const Name *name = qualifiedName->base()) {
+                        if (const TemplateNameId *templateName = name->asTemplateNameId())
+                            *className = templateNameAsString(templateName);
+                        else
+                            *className = oo.prettyName(name);
+                    }
+                }
+            }
+        } else if (const TemplateNameId *templateName = name->asTemplateNameId()) {
+            *className = templateNameAsString(templateName);
+        } else {
+            *className = oo.prettyName(name);
+        }
+
+        if (matches->empty())
+            *matches = classesFilter->matchesFor(dummy, *className);
+    }
+
+    return !matches->empty();
+}
+
 } // anonymous namespace
 
 void AddIncludeForUndefinedIdentifier::match(const CppQuickFixInterface &interface,
@@ -1921,20 +1942,14 @@ void AddIncludeForUndefinedIdentifier::match(const CppQuickFixInterface &interfa
     if (canLookupDefinition(interface, nameAst))
         return;
 
-    const QString className = unqualifiedNameForLocator(nameAst->name);
-    if (className.isEmpty())
-        return;
-
+    QString className;
+    QList<Core::LocatorFilterEntry> matches;
     const QString currentDocumentFilePath = interface.semanticInfo().doc->fileName();
     const ProjectPartHeaderPaths headerPaths = relevantHeaderPaths(currentDocumentFilePath);
     bool qtHeaderFileIncludeOffered = false;
 
     // Find an include file through the locator
-    if (CppClassesFilter *classesFilter
-            = ExtensionSystem::PluginManager::getObject<CppClassesFilter>()) {
-        QFutureInterface<Core::LocatorFilterEntry> dummy;
-        const QList<Core::LocatorFilterEntry> matches = classesFilter->matchesFor(dummy, className);
-
+    if (matchName(nameAst->name, &matches, &className)) {
         const Snapshot forwardHeaders = forwardingHeaders(interface);
         foreach (const Core::LocatorFilterEntry &entry, matches) {
             IndexItem::Ptr info = entry.internalData.value<IndexItem::Ptr>();
@@ -1970,6 +1985,9 @@ void AddIncludeForUndefinedIdentifier::match(const CppQuickFixInterface &interfa
             }
         }
     }
+
+    if (className.isEmpty())
+        return;
 
     // The header file we are looking for might not be (yet) included in any file we have parsed.
     // As such, it will not be findable via locator. At least for Qt classes, check also for
@@ -2235,7 +2253,7 @@ public:
     }
 
     Overview prettyPrint;
-    bool foundCaseStatementLevel;
+    bool foundCaseStatementLevel = false;
     QStringList values;
     TypeOfExpression typeOfExpression;
     Document::Ptr document;
@@ -2916,8 +2934,6 @@ public:
         updateDescriptionAndPriority();
     }
 
-    void determineGetterSetterNames();
-
     // Clones "other" in order to prevent all the initial detection made in the ctor.
     GenerateGetterSetterOperation(const CppQuickFixInterface &interface,
                                   GenerateGetterSetterOperation *other, OperationType type)
@@ -2948,6 +2964,28 @@ public:
     bool generateSetter() const
     {
         return (m_type == GetterSetterType || m_type == SetterType);
+    }
+
+    void determineGetterSetterNames()
+    {
+        m_baseName = memberBaseName(m_variableString);
+        if (m_baseName.isEmpty())
+            m_baseName = QLatin1String("value");
+
+        // Getter Name
+        const CppCodeStyleSettings settings = CppCodeStyleSettings::currentProjectCodeStyle();
+        const bool hasValidBaseName = m_baseName != m_variableString;
+        const bool getPrefixIsAlreadyUsed = hasClassMemberWithGetPrefix(m_classSpecifier->symbol);
+        if (settings.preferGetterNameWithoutGetPrefix && hasValidBaseName && !getPrefixIsAlreadyUsed) {
+            m_getterName = m_baseName;
+        } else {
+            const QString baseNameWithCapital = m_baseName.left(1).toUpper() + m_baseName.mid(1);
+            m_getterName = QLatin1String("get") + baseNameWithCapital;
+        }
+
+        // Setter Name
+        const QString baseNameWithCapital = m_baseName.left(1).toUpper() + m_baseName.mid(1);
+        m_setterName = QLatin1String("set") + baseNameWithCapital;
     }
 
     void updateDescriptionAndPriority()
@@ -3352,7 +3390,7 @@ public:
         auto layout = new QFormLayout(&dlg);
 
         auto funcNameEdit = new Utils::FancyLineEdit;
-        funcNameEdit->setValidationFunction([this](Utils::FancyLineEdit *edit, QString *) {
+        funcNameEdit->setValidationFunction([](Utils::FancyLineEdit *edit, QString *) {
             return ExtractFunctionOptions::isValidFunctionName(edit->text());
         });
         layout->addRow(QCoreApplication::translate("QuickFix::ExtractFunction",
@@ -4102,7 +4140,7 @@ public:
             break;
         case FromReference:
             removeReferenceOperator(changes);
-            // fallthrough intended
+            Q_FALLTHROUGH();
         case FromVariable:
             convertToPointer(changes);
             break;
@@ -6000,27 +6038,7 @@ void ExtraRefactoringOperations::match(const CppQuickFixInterface &interface,
     }
 }
 
-void GenerateGetterSetterOperation::determineGetterSetterNames()
-{
-    m_baseName = memberBaseName(m_variableString);
-    if (m_baseName.isEmpty())
-        m_baseName = QLatin1String("value");
 
-    // Getter Name
-    const CppCodeStyleSettings settings = CppCodeStyleSettings::currentProjectCodeStyle();
-    const bool hasValidBaseName = m_baseName != m_variableString;
-    const bool getPrefixIsAlreadyUsed = hasClassMemberWithGetPrefix(m_classSpecifier->symbol);
-    if (settings.preferGetterNameWithoutGetPrefix && hasValidBaseName && !getPrefixIsAlreadyUsed) {
-        m_getterName = m_baseName;
-    } else {
-        const QString baseNameWithCapital = m_baseName.left(1).toUpper() + m_baseName.mid(1);
-        m_getterName = QLatin1String("get") + baseNameWithCapital;
-    }
-
-    // Setter Name
-    const QString baseNameWithCapital = m_baseName.left(1).toUpper() + m_baseName.mid(1);
-    m_setterName = QLatin1String("set") + baseNameWithCapital;
-}
 
 } // namespace Internal
 } // namespace CppEditor

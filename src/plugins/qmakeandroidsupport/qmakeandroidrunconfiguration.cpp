@@ -49,35 +49,35 @@ namespace Internal {
 
 static const char ANDROID_RC_ID_PREFIX[] = "Qt4ProjectManager.AndroidRunConfiguration:";
 
-static QString pathFromId(const Core::Id id)
+static Utils::FileName pathFromId(const Core::Id id)
 {
-    return id.suffixAfter(ANDROID_RC_ID_PREFIX);
+    return Utils::FileName::fromString(id.suffixAfter(ANDROID_RC_ID_PREFIX));
 }
 
-QmakeAndroidRunConfiguration::QmakeAndroidRunConfiguration(Target *parent, Core::Id id, const Utils::FileName &path)
-    : AndroidRunConfiguration(parent, id)
-    , m_proFilePath(path)
+QmakeAndroidRunConfiguration::QmakeAndroidRunConfiguration(Target *target)
+    : AndroidRunConfiguration(target)
+{}
+
+void QmakeAndroidRunConfiguration::initialize(Core::Id id)
 {
-    QmakeProject *project = static_cast<QmakeProject *>(parent->project());
-    m_parseSuccess = project->validParse(m_proFilePath);
-    m_parseInProgress = project->parseInProgress(m_proFilePath);
-    init();
+    AndroidRunConfiguration::initialize(id);
+    m_proFilePath = pathFromId(id);
+
+    ctor();
 }
 
-QmakeAndroidRunConfiguration::QmakeAndroidRunConfiguration(Target *parent, QmakeAndroidRunConfiguration *source)
-    : AndroidRunConfiguration(parent, source)
-    , m_proFilePath(source->m_proFilePath)
-    , m_parseSuccess(source->m_parseSuccess)
-    , m_parseInProgress(source->m_parseInProgress)
+void QmakeAndroidRunConfiguration::copyFrom(const QmakeAndroidRunConfiguration *source)
 {
-    init();
+    AndroidRunConfiguration::copyFrom(source);
+    m_proFilePath = source->m_proFilePath;
+
+    ctor();
 }
 
-void QmakeAndroidRunConfiguration::init()
+void QmakeAndroidRunConfiguration::ctor()
 {
     setDefaultDisplayName(defaultDisplayName());
-    connect(qmakeProject(), &QmakeProject::proFileUpdated,
-            this, &QmakeAndroidRunConfiguration::proFileUpdated);
+    QTC_CHECK(!m_proFilePath.isEmpty());
 }
 
 bool QmakeAndroidRunConfiguration::fromMap(const QVariantMap &map)
@@ -86,24 +86,17 @@ bool QmakeAndroidRunConfiguration::fromMap(const QVariantMap &map)
     QTC_ASSERT(project, return false);
     const QDir projectDir = QDir(project->projectDirectory().toString());
     m_proFilePath = Utils::FileName::fromUserInput(projectDir.filePath(map.value(PRO_FILE_KEY).toString()));
-    m_parseSuccess = project->validParse(m_proFilePath);
-    m_parseInProgress = project->parseInProgress(m_proFilePath);
 
-    return RunConfiguration::fromMap(map);
+    return AndroidRunConfiguration::fromMap(map);
 }
 
 QVariantMap QmakeAndroidRunConfiguration::toMap() const
 {
-    QmakeProject *project = qmakeProject();
-    if (m_proFilePath.isEmpty()) {
-        if (!project->rootProjectNode())
-            return QVariantMap();
-        m_proFilePath = project->rootProjectNode()->filePath();
-    }
+    QVariantMap map(AndroidRunConfiguration::toMap());
 
-    const QDir projectDir = QDir(project->projectDirectory().toString());
-    QVariantMap map(RunConfiguration::toMap());
+    const QDir projectDir = QDir(target()->project()->projectDirectory().toString());
     map.insert(PRO_FILE_KEY, projectDir.relativeFilePath(m_proFilePath.toString()));
+
     return map;
 }
 
@@ -117,21 +110,16 @@ QString QmakeAndroidRunConfiguration::defaultDisplayName()
             return node->displayName();
     }
 
-    return QFileInfo(pathFromId(id())).completeBaseName();
-}
-
-bool QmakeAndroidRunConfiguration::isEnabled() const
-{
-    return m_parseSuccess && !m_parseInProgress;
+    return displayNameForId(id());
 }
 
 QString QmakeAndroidRunConfiguration::disabledReason() const
 {
-    if (m_parseInProgress)
+    if (qmakeProject()->isParsing())
         return tr("The .pro file \"%1\" is currently being parsed.")
                 .arg(m_proFilePath.fileName());
 
-    if (!m_parseSuccess)
+    if (!qmakeProject()->hasParsingData())
         return qmakeProject()->disabledReasonForRunConfiguration(m_proFilePath);
     return QString();
 }
@@ -141,25 +129,9 @@ QString QmakeAndroidRunConfiguration::buildSystemTarget() const
     return qmakeProject()->mapProFilePathToTarget(m_proFilePath);
 }
 
-void QmakeAndroidRunConfiguration::proFileUpdated(QmakeProjectManager::QmakeProFile *pro,
-                                                  bool success, bool parseInProgress)
+QString QmakeAndroidRunConfiguration::displayNameForId(Core::Id id)
 {
-    QmakeProject *project = qmakeProject();
-    if (m_proFilePath.isEmpty() && project->rootProjectNode())
-        m_proFilePath = project->rootProjectNode()->filePath();
-
-    if (m_proFilePath != pro->filePath())
-        return;
-
-    bool enabled = isEnabled();
-    QString reason = disabledReason();
-    m_parseSuccess = success;
-    m_parseInProgress = parseInProgress;
-    if (enabled != isEnabled() || reason != disabledReason())
-        emit enabledChanged();
-
-    if (!parseInProgress)
-        setDefaultDisplayName(defaultDisplayName());
+    return pathFromId(id).toFileInfo().completeBaseName();
 }
 
 QmakeProject *QmakeAndroidRunConfiguration::qmakeProject() const

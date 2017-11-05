@@ -40,7 +40,7 @@ namespace Internal {
 
 class EditorDiagramView::EditorDiagramViewPrivate {
 public:
-    PxNodeController *pxNodeController = 0;
+    PxNodeController *pxNodeController = nullptr;
 };
 
 EditorDiagramView::EditorDiagramView(QWidget *parent)
@@ -49,7 +49,7 @@ EditorDiagramView::EditorDiagramView(QWidget *parent)
 {
     auto droputils = new Utils::DropSupport(
                 this,
-                [this](QDropEvent *event, Utils::DropSupport *dropSupport)
+                [](QDropEvent *event, Utils::DropSupport *dropSupport)
             -> bool { return dropSupport->isValueDrop(event); });
     connect(droputils, &Utils::DropSupport::valuesDropped,
             this, &EditorDiagramView::dropProjectExplorerNodes);

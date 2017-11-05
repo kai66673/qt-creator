@@ -25,7 +25,6 @@
 
 #include "textdocument.h"
 
-#include "convenience.h"
 #include "extraencodingsettings.h"
 #include "fontsettings.h"
 #include "indenter.h"
@@ -39,6 +38,7 @@
 #include <texteditor/generichighlighter/highlighter.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/editormanager/documentmodel.h>
+#include <utils/textutils.h>
 #include <utils/guard.h>
 #include <utils/mimetypes/mimedatabase.h>
 
@@ -303,7 +303,7 @@ QString TextDocument::plainText() const
 
 QString TextDocument::textAt(int pos, int length) const
 {
-    return Convenience::textAt(QTextCursor(document()), pos, length);
+    return Utils::Text::textAt(QTextCursor(document()), pos, length);
 }
 
 QChar TextDocument::characterAt(int pos) const
@@ -845,6 +845,13 @@ void TextDocument::modificationChanged(bool modified)
     emit changed();
 }
 
+void TextDocument::updateLayout() const
+{
+    auto documentLayout = qobject_cast<TextDocumentLayout*>(d->m_document.documentLayout());
+    QTC_ASSERT(documentLayout, return);
+    documentLayout->requestUpdate();
+}
+
 TextMarks TextDocument::marks() const
 {
     return d->m_marksCache;
@@ -952,15 +959,21 @@ void TextDocument::removeMark(TextMark *mark)
     }
 
     removeMarkFromMarksCache(mark);
+    emit markRemoved(mark);
     mark->setBaseTextDocument(0);
+    updateLayout();
 }
 
 void TextDocument::updateMark(TextMark *mark)
 {
-    Q_UNUSED(mark)
-    auto documentLayout = qobject_cast<TextDocumentLayout*>(d->m_document.documentLayout());
-    QTC_ASSERT(documentLayout, return);
-    documentLayout->requestUpdate();
+    QTextBlock block = d->m_document.findBlockByNumber(mark->lineNumber() - 1);
+    if (block.isValid()) {
+        TextBlockUserData *userData = TextDocumentLayout::userData(block);
+        // re-evaluate priority
+        userData->removeMark(mark);
+        userData->addMark(mark);
+    }
+    updateLayout();
 }
 
 void TextDocument::moveMark(TextMark *mark, int previousLine)

@@ -44,7 +44,7 @@ namespace Internal {
 
 class PxNodeUtilities::PxNodeUtilitiesPrivate {
 public:
-    qmt::DiagramSceneController *diagramSceneController = 0;
+    qmt::DiagramSceneController *diagramSceneController = nullptr;
 };
 
 PxNodeUtilities::PxNodeUtilities(QObject *parent)
@@ -100,7 +100,7 @@ qmt::MPackage *PxNodeUtilities::createBestMatchingPackagePath(
 
     int maxChainLength = -1;
     int minChainDepth = -1;
-    qmt::MPackage *bestParentPackage = 0;
+    qmt::MPackage *bestParentPackage = nullptr;
 
     while (!roots.isEmpty()) {
         qmt::MPackage *package = roots.first().first;
@@ -144,7 +144,7 @@ qmt::MPackage *PxNodeUtilities::createBestMatchingPackagePath(
         if (found)
             return package; // complete chain found, innermost package is already the result
 
-        QTC_CHECK(!(relativeIndex == maxChainLength && minChainDepth < 0));
+        QMT_CHECK(!(relativeIndex == maxChainLength && minChainDepth < 0));
         if (relativeIndex >= 1
                 && (relativeIndex > maxChainLength
                     || (relativeIndex == maxChainLength && depth < minChainDepth))) {
@@ -154,14 +154,14 @@ qmt::MPackage *PxNodeUtilities::createBestMatchingPackagePath(
         }
     }
 
-    QTC_CHECK(maxChainLength < relativeElements.size());
+    QMT_CHECK(maxChainLength < relativeElements.size());
     if (!bestParentPackage) {
-        QTC_CHECK(maxChainLength == -1);
-        QTC_CHECK(minChainDepth == -1);
+        QMT_CHECK(maxChainLength == -1);
+        QMT_CHECK(minChainDepth == -1);
         maxChainLength = 0;
         bestParentPackage = suggestedParentPackage;
     } else {
-        QTC_CHECK(maxChainLength >= 1);
+        QMT_CHECK(maxChainLength >= 1);
     }
 
     int i = maxChainLength;
@@ -215,7 +215,7 @@ qmt::MObject *PxNodeUtilities::findSameObject(const QStringList &relativeElement
         }
 
         if (found) {
-            QTC_CHECK(relativeIndex >= relativeElements.size());
+            QMT_CHECK(relativeIndex >= relativeElements.size());
             // chain was found so check for given object within deepest package
             QString objectSearchId = qmt::NameController::calcElementNameSearchId(object->name());
             foreach (const qmt::Handle<qmt::MObject> &handle, package->children()) {
@@ -231,7 +231,7 @@ qmt::MObject *PxNodeUtilities::findSameObject(const QStringList &relativeElement
     }
 
     // complete sub-package structure scanned but did not found the desired object
-    return 0;
+    return nullptr;
 }
 
 } // namespace Internal

@@ -80,6 +80,7 @@ public:
     static QString cleanTarget();
     static QString allTarget();
     static QString installTarget();
+    static QString testTarget();
     static QStringList specialTargets();
 
 signals:
@@ -103,12 +104,12 @@ private:
     void ctor(ProjectExplorer::BuildStepList *bsl);
 
     void runImpl(QFutureInterface<bool> &fi);
+    void handleProjectWasParsed(QFutureInterface<bool> &fi, bool success);
 
     void handleBuildTargetChanges();
     CMakeRunConfiguration *targetsActiveRunConfiguration() const;
 
     QMetaObject::Connection m_runTrigger;
-    QMetaObject::Connection m_errorTrigger;
 
     QRegExp m_percentProgress;
     QRegExp m_ninjaProgress;

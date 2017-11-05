@@ -35,11 +35,10 @@ class CMakeRunConfiguration : public ProjectExplorer::RunConfiguration
 {
     Q_OBJECT
     friend class CMakeRunConfigurationWidget;
-    friend class CMakeRunConfigurationFactory;
+    friend class ProjectExplorer::IRunConfigurationFactory;
 
 public:
-    CMakeRunConfiguration(ProjectExplorer::Target *parent, Core::Id id, const QString &target,
-                          const Utils::FileName &workingDirectory, const QString &title);
+    explicit CMakeRunConfiguration(ProjectExplorer::Target *target);
 
     ProjectExplorer::Runnable runnable() const override;
     QWidget *createConfigurationWidget() override;
@@ -51,26 +50,25 @@ public:
 
     QVariantMap toMap() const override;
 
-    void setEnabled(bool b);
-
-    bool isEnabled() const override;
     QString disabledReason() const override;
 
     QString buildSystemTarget() const final { return m_buildSystemTarget; }
 
-protected:
-    CMakeRunConfiguration(ProjectExplorer::Target *parent, CMakeRunConfiguration *source);
+private:
+    void initialize(Core::Id id, const QString &target,
+               const Utils::FileName &workingDirectory, const QString &title);
+    void copyFrom(const CMakeRunConfiguration *source);
+
     bool fromMap(const QVariantMap &map) override;
     QString defaultDisplayName() const;
 
-private:
-    QString baseWorkingDirectory() const;
-    void ctor();
+    void updateEnabledState() final;
 
-    const QString m_buildSystemTarget;
+    QString baseWorkingDirectory() const;
+
+    QString m_buildSystemTarget;
     QString m_executable;
     QString m_title;
-    bool m_enabled = true;
 };
 
 class CMakeRunConfigurationWidget : public QWidget

@@ -45,14 +45,16 @@ const char STEPS_PREFIX[] = "ProjectExplorer.BuildStepList.Step.";
 } // namespace
 
 BuildStepList::BuildStepList(QObject *parent, Core::Id id) :
-    ProjectConfiguration(parent, id)
+    ProjectConfiguration(parent)
 {
     Q_ASSERT(parent);
+    initialize(id);
 }
 
 BuildStepList::BuildStepList(QObject *parent, BuildStepList *source) :
-    ProjectConfiguration(parent, source)
+    ProjectConfiguration(parent)
 {
+    copyFrom(source);
     setDisplayName(source->displayName());
     Q_ASSERT(parent);
     // do not clone the steps here:
@@ -114,6 +116,11 @@ void BuildStepList::cloneSteps(BuildStepList *source)
             }
         }
     }
+}
+
+bool BuildStepList::isActive() const
+{
+    return qobject_cast<ProjectConfiguration *>(parent())->isActive();
 }
 
 bool BuildStepList::fromMap(const QVariantMap &map)
@@ -197,4 +204,9 @@ Target *BuildStepList::target() const
     if (dc)
         return dc->target();
     return 0;
+}
+
+Project *BuildStepList::project() const
+{
+    return target()->project();
 }

@@ -35,6 +35,7 @@
 #include "androidqtversion.h"
 #include "androidbuildapkstep.h"
 #include "androidavdmanager.h"
+#include "androidsdkmanager.h"
 
 #include <coreplugin/documentmanager.h>
 #include <coreplugin/messagemanager.h>
@@ -174,7 +175,8 @@ QString AndroidManager::buildTargetSDK(ProjectExplorer::Target *target)
     if (androidBuildApkStep)
         return androidBuildApkStep->buildTargetSdk();
 
-    QString fallback = AndroidConfig::apiLevelNameFor(AndroidConfigurations::currentConfig().highestAndroidSdk());
+    QString fallback = AndroidConfig::apiLevelNameFor(
+                AndroidConfigurations::sdkManager()->latestAndroidSdkPlatform());
     return fallback;
 }
 
@@ -224,7 +226,7 @@ bool AndroidManager::bundleQt(ProjectExplorer::Target *target)
     AndroidBuildApkStep *androidBuildApkStep
             = AndroidGlobal::buildStep<AndroidBuildApkStep>(target->activeBuildConfiguration());
     if (androidBuildApkStep)
-        return androidBuildApkStep->deployAction() == AndroidBuildApkStep::BundleLibrariesDeployment;
+        return !androidBuildApkStep->useMinistro();
 
     return false;
 }
@@ -241,7 +243,7 @@ void AndroidManager::setDeviceSerialNumber(ProjectExplorer::Target *target, cons
 
 QPair<int, int> AndroidManager::apiLevelRange()
 {
-    return qMakePair(9, 23);
+    return qMakePair(9, 26);
 }
 
 QString AndroidManager::androidNameForApiLevel(int x)
@@ -291,6 +293,8 @@ QString AndroidManager::androidNameForApiLevel(int x)
         return QLatin1String("Android 7.0");
     case 25:
         return QLatin1String("Android 7.1");
+    case 26:
+        return QLatin1String("Android 8.0");
     default:
         return tr("Unknown Android version. API Level: %1").arg(QString::number(x));
     }
@@ -339,7 +343,7 @@ void AndroidManager::cleanLibsOnDevice(ProjectExplorer::Target *target)
     if (targetArch.isEmpty())
         return;
     const int deviceAPILevel = AndroidManager::minimumSDK(target);
-    AndroidDeviceInfo info = AndroidConfigurations::showDeviceDialog(target->project(), deviceAPILevel, targetArch, AndroidConfigurations::None);
+    AndroidDeviceInfo info = AndroidConfigurations::showDeviceDialog(target->project(), deviceAPILevel, targetArch);
     if (!info.isValid()) // aborted
         return;
 
@@ -369,7 +373,7 @@ void AndroidManager::installQASIPackage(ProjectExplorer::Target *target, const Q
     if (targetArch.isEmpty())
         return;
     const int deviceAPILevel = AndroidManager::minimumSDK(target);
-    AndroidDeviceInfo info = AndroidConfigurations::showDeviceDialog(target->project(), deviceAPILevel, targetArch, AndroidConfigurations::None);
+    AndroidDeviceInfo info = AndroidConfigurations::showDeviceDialog(target->project(), deviceAPILevel, targetArch);
     if (!info.isValid()) // aborted
         return;
 
@@ -461,15 +465,6 @@ AndroidQtSupport *AndroidManager::androidQtSupport(ProjectExplorer::Target *targ
     return 0;
 }
 
-bool AndroidManager::useGradle(ProjectExplorer::Target *target)
-{
-    if (!target)
-        return false;
-    AndroidBuildApkStep *buildApkStep
-        = AndroidGlobal::buildStep<AndroidBuildApkStep>(target->activeBuildConfiguration());
-    return buildApkStep && buildApkStep->useGradle();
-}
-
 typedef QMap<QByteArray, QByteArray> GradleProperties;
 
 static GradleProperties readGradleProperties(const QString &path)
@@ -541,7 +536,7 @@ bool AndroidManager::updateGradleProperties(ProjectExplorer::Target *target)
     AndroidBuildApkStep *buildApkStep
         = AndroidGlobal::buildStep<AndroidBuildApkStep>(target->activeBuildConfiguration());
 
-    if (!buildApkStep || !buildApkStep->useGradle() || !buildApkStep->androidPackageSourceDir().appendPath(QLatin1String("gradlew")).exists())
+    if (!buildApkStep || !buildApkStep->androidPackageSourceDir().appendPath(QLatin1String("gradlew")).exists())
         return false;
 
     Utils::FileName wrapperProps(buildApkStep->androidPackageSourceDir());
@@ -568,16 +563,10 @@ bool AndroidManager::updateGradleProperties(ProjectExplorer::Target *target)
     gradleProperties["buildDir"] = ".build";
     gradleProperties["androidCompileSdkVersion"] = buildTargetSDK(target).split(QLatin1Char('-')).last().toLocal8Bit();
     if (gradleProperties["androidBuildToolsVersion"].isEmpty()) {
-        QVersionNumber maxVersion;
-        QDir buildToolsDir(AndroidConfigurations::currentConfig().sdkLocation().appendPath(QLatin1String("build-tools")).toString());
-        foreach (const QFileInfo &file, buildToolsDir.entryList(QDir::Dirs|QDir::NoDotAndDotDot)) {
-            QVersionNumber ver = QVersionNumber::fromString(file.fileName());
-            if (maxVersion < ver)
-                maxVersion = ver;
-        }
-        if (maxVersion.isNull())
+        QVersionNumber buildtoolVersion = AndroidConfigurations::currentConfig().buildToolsVersion();
+        if (buildtoolVersion.isNull())
             return false;
-        gradleProperties["androidBuildToolsVersion"] = maxVersion.toString().toLocal8Bit();
+        gradleProperties["androidBuildToolsVersion"] = buildtoolVersion.toString().toLocal8Bit();
     }
     return mergeGradleProperties(gradlePropertiesPath, gradleProperties);
 }

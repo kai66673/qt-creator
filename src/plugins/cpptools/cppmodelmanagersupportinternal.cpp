@@ -25,7 +25,10 @@
 
 #include "cppcompletionassist.h"
 #include "cppmodelmanagersupportinternal.h"
+#include "cppfollowsymbolundercursor.h"
 #include "builtineditordocumentprocessor.h"
+
+#include <app/app_version.h>
 
 #include <QCoreApplication>
 
@@ -40,7 +43,7 @@ QString ModelManagerSupportProviderInternal::id() const
 QString ModelManagerSupportProviderInternal::displayName() const
 {
     return QCoreApplication::translate("ModelManagerSupportInternal::displayName",
-                                       "Qt Creator Built-in");
+                                       "%1 Built-in").arg(Core::Constants::IDE_DISPLAY_NAME);
 }
 
 ModelManagerSupport::Ptr ModelManagerSupportProviderInternal::createModelManagerSupport()
@@ -49,7 +52,8 @@ ModelManagerSupport::Ptr ModelManagerSupportProviderInternal::createModelManager
 }
 
 ModelManagerSupportInternal::ModelManagerSupportInternal()
-    : m_completionAssistProvider(new InternalCompletionAssistProvider)
+    : m_completionAssistProvider(new InternalCompletionAssistProvider),
+      m_followSymbol(new FollowSymbolUnderCursor)
 {
 }
 
@@ -66,4 +70,9 @@ BaseEditorDocumentProcessor *ModelManagerSupportInternal::editorDocumentProcesso
 CppCompletionAssistProvider *ModelManagerSupportInternal::completionAssistProvider()
 {
     return m_completionAssistProvider.data();
+}
+
+FollowSymbolInterface &ModelManagerSupportInternal::followSymbolInterface()
+{
+    return *m_followSymbol;
 }

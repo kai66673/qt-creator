@@ -31,7 +31,9 @@
 #include <pchmanagerserver.h>
 #include <pchmanagerclientproxy.h>
 #include <projectparts.h>
-#include <stringcache.h>
+#include <filepathcaching.h>
+#include <refactoringdatabaseinitializer.h>
+#include <sqlitedatabase.h>
 
 #include <QCommandLineParser>
 #include <QCoreApplication>
@@ -50,7 +52,7 @@ using ClangBackEnd::PchGenerator;
 using ClangBackEnd::PchManagerClientProxy;
 using ClangBackEnd::PchManagerServer;
 using ClangBackEnd::ProjectParts;
-using ClangBackEnd::StringCache;
+using ClangBackEnd::FilePathCache;
 
 class ApplicationEnvironment : public ClangBackEnd::Environment
 {
@@ -103,15 +105,16 @@ int main(int argc, char *argv[])
 
     const QString connection =  processArguments(application);
 
-    StringCache<Utils::PathString> filePathCache;
+    Sqlite::Database database{Utils::PathString{QDir::tempPath() + "/symbol.db"}};
+    ClangBackEnd::RefactoringDatabaseInitializer<Sqlite::Database> databaseInitializer{database};
+    ClangBackEnd::FilePathCaching filePathCache{database};
     ClangPathWatcher<QFileSystemWatcher, QTimer> includeWatcher(filePathCache);
     ApplicationEnvironment environment;
     PchGenerator<QProcess> pchGenerator(environment);
     PchCreator pchCreator(environment, filePathCache);
     pchCreator.setGenerator(&pchGenerator);
     ProjectParts projectParts;
-    PchManagerServer clangPchManagerServer(filePathCache,
-                                           includeWatcher,
+    PchManagerServer clangPchManagerServer(includeWatcher,
                                            pchCreator,
                                            projectParts);
     includeWatcher.setNotifier(&clangPchManagerServer);

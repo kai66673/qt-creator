@@ -3,7 +3,6 @@ include(../../qtcreatorplugin.pri)
 
 HEADERS += \
     cppautocompleter.h \
-    cppcanonicalsymbol.h \
     cppcodemodelinspectordialog.h \
     cppdocumentationcommenthelper.h \
     cppeditor.h \
@@ -12,8 +11,8 @@ HEADERS += \
     cppeditorconstants.h \
     cppeditorenums.h \
     cppeditorplugin.h \
+    cppeditorwidget.h \
     cppelementevaluator.h \
-    cppfollowsymbolundercursor.h \
     cppfunctiondecldeflink.h \
     cpphighlighter.h \
     cpphoverhandler.h \
@@ -29,20 +28,17 @@ HEADERS += \
     cppquickfixes.h \
     cpptypehierarchy.h \
     cppuseselectionsupdater.h \
-    cppvirtualfunctionassistprovider.h \
-    cppvirtualfunctionproposalitem.h \
     resourcepreviewhoverhandler.h
 
 SOURCES += \
     cppautocompleter.cpp \
-    cppcanonicalsymbol.cpp \
     cppcodemodelinspectordialog.cpp \
     cppdocumentationcommenthelper.cpp \
     cppeditor.cpp \
     cppeditordocument.cpp \
     cppeditorplugin.cpp \
+    cppeditorwidget.cpp \
     cppelementevaluator.cpp \
-    cppfollowsymbolundercursor.cpp \
     cppfunctiondecldeflink.cpp \
     cpphighlighter.cpp \
     cpphoverhandler.cpp \
@@ -58,8 +54,6 @@ SOURCES += \
     cppquickfixes.cpp \
     cpptypehierarchy.cpp \
     cppuseselectionsupdater.cpp \
-    cppvirtualfunctionassistprovider.cpp \
-    cppvirtualfunctionproposalitem.cpp \
     resourcepreviewhoverhandler.cpp
 
 FORMS += \

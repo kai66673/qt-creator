@@ -29,11 +29,13 @@
 #include "projectexplorerconstants.h"
 
 #include <utils/algorithm.h>
+#include <utils/qtcfallthrough.h>
 #include <utils/synchronousprocess.h>
 #include <utils/winutils.h>
 #include <utils/qtcassert.h>
 #include <utils/hostosinfo.h>
 #include <utils/temporarydirectory.h>
+#include <utils/optional.h>
 
 #include <QDir>
 #include <QFileInfo>
@@ -102,7 +104,7 @@ static bool hostSupportsPlatform(MsvcToolChain::Platform platform)
         if (platform == MsvcToolChain::amd64 || platform == MsvcToolChain::amd64_arm
             || platform == MsvcToolChain::amd64_x86)
             return true;
-        // fall through (all x86 toolchains are also working on an amd64 host)
+        Q_FALLTHROUGH(); // all x86 toolchains are also working on an amd64 host
     case Utils::HostOsInfo::HostArchitectureX86:
         return platform == MsvcToolChain::x86 || platform == MsvcToolChain::x86_amd64
                 || platform == MsvcToolChain::x86_ia64 || platform == MsvcToolChain::x86_arm;
@@ -142,6 +144,33 @@ QDebug operator<<(QDebug d, const VisualStudioInstallation &i)
       << "\", vcVarsPath=\"" << QDir::toNativeSeparators(i.vcVarsPath)
       << "\", vcVarsAll=\"" << QDir::toNativeSeparators(i.vcVarsAll) << "\")";
     return d;
+}
+
+// Detect build tools introduced with MSVC2017
+static Utils::optional<VisualStudioInstallation> detectCppBuildTools2017()
+{
+#ifdef Q_OS_WIN64
+    const char programFilesC[] = "ProgramFiles(x86)";
+#else
+    const char programFilesC[] = "ProgramFiles";
+#endif
+
+    const QString installPath = QDir::fromNativeSeparators(QFile::decodeName(qgetenv(programFilesC)))
+                                + "/Microsoft Visual Studio/2017/BuildTools";
+    const QString vcVarsPath = installPath + "/VC/Auxiliary/Build";
+    const QString vcVarsAllPath = vcVarsPath + "/vcvarsall.bat";
+
+    if (!QFileInfo::exists(vcVarsAllPath))
+        return Utils::nullopt;
+
+    VisualStudioInstallation installation;
+    installation.path = installPath;
+    installation.vcVarsAll = vcVarsAllPath;
+    installation.vcVarsPath = vcVarsPath;
+    installation.version = QVersionNumber(15);
+    installation.vsName = "15.0";
+
+    return installation;
 }
 
 static QVector<VisualStudioInstallation> detectVisualStudio()
@@ -184,6 +213,12 @@ static QVector<VisualStudioInstallation> detectVisualStudio()
             }
         }
     }
+
+    // Detect VS 2017 Build Tools
+    auto installation = detectCppBuildTools2017();
+    if (installation)
+        result.append(*installation);
+
     return result;
 }
 
@@ -256,6 +291,12 @@ static QString generateDisplayName(const QString &name,
     vcName += name;
     vcName += QString::fromLatin1(" (%1)").arg(platformName(p));
     return vcName;
+}
+
+static QByteArray msvcCompilationDefine(const char *def)
+{
+    const QByteArray macro(def);
+    return "#if defined(" + macro + ")\n__PPOUT__(" + macro + ")\n#endif\n";
 }
 
 static QByteArray msvcCompilationFile()
@@ -340,11 +381,8 @@ static QByteArray msvcCompilationFile()
         0
     };
     QByteArray file = "#define __PPOUT__(x) V##x=x\n\n";
-    for (int i = 0; macros[i] != 0; ++i) {
-        const QByteArray macro(macros[i]);
-        file += "#if defined(" + macro + ")\n__PPOUT__("
-                + macro + ")\n#endif\n";
-    }
+    for (int i = 0; macros[i] != 0; ++i)
+        file += msvcCompilationDefine(macros[i]);
     file += "\nvoid main(){}\n\n";
     return file;
 }
@@ -406,31 +444,18 @@ static QByteArray msvcCompilationFile()
 //
 // [1] https://msdn.microsoft.com/en-us/library/b0084kay.aspx
 // [2] http://stackoverflow.com/questions/3665537/how-to-find-out-cl-exes-built-in-macros
-QByteArray MsvcToolChain::msvcPredefinedMacros(const QStringList cxxflags,
-                                               const Utils::Environment &env) const
+Macros MsvcToolChain::msvcPredefinedMacros(const QStringList cxxflags,
+                                           const Utils::Environment &env) const
 {
-    QByteArray predefinedMacros;
+    Macros predefinedMacros;
 
     QStringList toProcess;
-    foreach (const QString &arg, cxxflags) {
+    for (const QString &arg : cxxflags) {
         if (arg.startsWith(QLatin1String("/D"))) {
-            QString define = arg.mid(2);
-            int pos = define.indexOf(QLatin1Char('='));
-            if (pos < 0) {
-                predefinedMacros += "#define ";
-                predefinedMacros += define.toLocal8Bit();
-                predefinedMacros += '\n';
-            } else {
-                predefinedMacros += "#define ";
-                predefinedMacros += define.left(pos).toLocal8Bit();
-                predefinedMacros += ' ';
-                predefinedMacros += define.mid(pos + 1).toLocal8Bit();
-                predefinedMacros += '\n';
-            }
+            const QString define = arg.mid(2);
+            predefinedMacros.append(Macro::fromKeyValue(define));
         } else if (arg.startsWith(QLatin1String("/U"))) {
-            predefinedMacros += "#undef ";
-            predefinedMacros += arg.mid(2).toLocal8Bit();
-            predefinedMacros += '\n';
+            predefinedMacros.append({arg.mid(2).toLocal8Bit(), ProjectExplorer::MacroType::Undefine});
         } else if (arg.startsWith(QLatin1String("-I"))) {
             // Include paths should not have any effect on defines
         } else {
@@ -454,6 +479,8 @@ QByteArray MsvcToolChain::msvcPredefinedMacros(const QStringList cxxflags,
         return predefinedMacros;
     }
 
+    if (language() == ProjectExplorer::Constants::C_LANGUAGE_ID)
+        arguments << QLatin1String("/TC");
     arguments << toProcess << QLatin1String("/EP") << QDir::toNativeSeparators(saver.fileName());
     Utils::SynchronousProcessResponse response = cpp.runBlocking(binary.toString(), arguments);
     if (response.result != Utils::SynchronousProcessResponse::Finished ||
@@ -462,18 +489,8 @@ QByteArray MsvcToolChain::msvcPredefinedMacros(const QStringList cxxflags,
 
     const QStringList output = Utils::filtered(response.stdOut().split('\n'),
                                                [](const QString &s) { return s.startsWith('V'); });
-    foreach (const QString& line, output) {
-        QStringList split = line.split('=');
-        const QString key = split.at(0).mid(1);
-        QString value = split.at(1);
-        predefinedMacros += "#define ";
-        predefinedMacros += key.toUtf8();
-        predefinedMacros += ' ';
-        predefinedMacros += value.toUtf8();
-        predefinedMacros += '\n';
-    }
-    if (debug)
-        qDebug() << "msvcPredefinedMacros" << predefinedMacros;
+    for (const QString &line : output)
+        predefinedMacros.append(Macro::fromKeyValue(line.mid(1)));
     return predefinedMacros;
 }
 
@@ -524,23 +541,10 @@ QList<Utils::EnvironmentItem> MsvcToolChain::environmentModifications() const
         }
     }
 
-    QList<Utils::EnvironmentItem> diff = inEnv.diff(outEnv);
+    QList<Utils::EnvironmentItem> diff = inEnv.diff(outEnv, true);
     for (int i = diff.size() - 1; i >= 0; --i) {
         if (diff.at(i).name.startsWith(QLatin1Char('='))) { // Exclude "=C:", "=EXITCODE"
             diff.removeAt(i);
-        } else {
-            // Fix the append/prepend cases to "FOO=${FOO};newValue" (see Environment::modify)
-            Utils::EnvironmentItem &e = diff[i];
-            if (!e.unset) {
-                const auto oldIt = inEnv.constFind(e.name);
-                if (oldIt != inEnv.constEnd()) {
-                    const int index = e.value.indexOf(oldIt.value());
-                    if (index != -1) {
-                        e.value.replace(index, oldIt.value().size(),
-                                        QStringLiteral("${") + e.name + QLatin1Char('}'));
-                    }
-                }
-            }
         }
     }
 
@@ -624,7 +628,10 @@ Utils::FileNameList MsvcToolChain::suggestedMkspecList() const
             << Utils::FileName::fromLatin1("winrt-x64-msvc2015");
         break;
     case Abi::WindowsMsvc2017Flavor:
-        result << Utils::FileName::fromLatin1("win32-msvc2017");
+        result << Utils::FileName::fromLatin1("win32-msvc2017")
+               << Utils::FileName::fromLatin1("winrt-arm-msvc2017")
+               << Utils::FileName::fromLatin1("winrt-x86-msvc2017")
+               << Utils::FileName::fromLatin1("winrt-x64-msvc2017");
         break;
     default:
         result.clear();
@@ -863,7 +870,7 @@ static QList<ToolChain *> findOrCreateToolChain(
 }
 
 // Detect build tools introduced with MSVC2015
-static void detectCppBuildTools(QList<ToolChain *> *list)
+static void detectCppBuildTools2015(QList<ToolChain *> *list)
 {
     struct Entry {
         const char *postFix;
@@ -1016,7 +1023,7 @@ QList<ToolChain *> MsvcToolChainFactory::autoDetect(const QList<ToolChain *> &al
         }
     }
 
-    detectCppBuildTools(&results);
+    detectCppBuildTools2015(&results);
 
     detectClangClToolChain(&results);
 

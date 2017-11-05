@@ -66,7 +66,6 @@ using namespace ExtensionSystem;
 
 enum { OptionIndent = 4, DescriptionIndent = 34 };
 
-const char appNameC[] = "Qt Creator";
 const char corePluginNameC[] = "Core";
 const char fixedOptionsC[] =
 " [OPTION]... [FILE]...\n"
@@ -110,7 +109,7 @@ static inline QString toHtml(const QString &t)
 static void displayHelpText(const QString &t)
 {
     if (Utils::HostOsInfo::isWindowsHost())
-        QMessageBox::information(0, QLatin1String(appNameC), toHtml(t));
+        QMessageBox::information(0, QLatin1String(Core::Constants::IDE_DISPLAY_NAME), toHtml(t));
     else
         qWarning("%s", qPrintable(t));
 }
@@ -118,7 +117,7 @@ static void displayHelpText(const QString &t)
 static void displayError(const QString &t)
 {
     if (Utils::HostOsInfo::isWindowsHost())
-        QMessageBox::critical(0, QLatin1String(appNameC), t);
+        QMessageBox::critical(0, QLatin1String(Core::Constants::IDE_DISPLAY_NAME), t);
     else
         qCritical("%s", qPrintable(t));
 }
@@ -127,7 +126,7 @@ static void printVersion(const PluginSpec *coreplugin)
 {
     QString version;
     QTextStream str(&version);
-    str << '\n' << appNameC << ' ' << coreplugin->version()<< " based on Qt " << qVersion() << "\n\n";
+    str << '\n' << Core::Constants::IDE_DISPLAY_NAME << ' ' << coreplugin->version()<< " based on Qt " << qVersion() << "\n\n";
     PluginManager::formatPluginVersions(str);
     str << '\n' << coreplugin->copyright() << '\n';
     displayHelpText(version);
@@ -157,18 +156,16 @@ static inline int askMsgSendFailed()
                                  QMessageBox::Retry);
 }
 
-static const char *setHighDpiEnvironmentVariable()
+static void setHighDpiEnvironmentVariable()
 {
-    const char* envVarName = 0;
     static const char ENV_VAR_QT_DEVICE_PIXEL_RATIO[] = "QT_DEVICE_PIXEL_RATIO";
-    if (!Utils::HostOsInfo().isMacHost()
+    if (Utils::HostOsInfo().isWindowsHost()
             && !qEnvironmentVariableIsSet(ENV_VAR_QT_DEVICE_PIXEL_RATIO) // legacy in 5.6, but still functional
             && !qEnvironmentVariableIsSet("QT_AUTO_SCREEN_SCALE_FACTOR")
             && !qEnvironmentVariableIsSet("QT_SCALE_FACTOR")
             && !qEnvironmentVariableIsSet("QT_SCREEN_SCALE_FACTORS")) {
         QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     }
-    return envVarName;
 }
 
 // taken from utils/fileutils.cpp. We can not use utils here since that depends app_version.h.
@@ -213,7 +210,9 @@ static inline QStringList getPluginPaths()
     pluginPath += QLatin1Char('/')
             + QLatin1String(Core::Constants::IDE_SETTINGSVARIANT_STR)
             + QLatin1Char('/');
-    pluginPath += QLatin1String(Utils::HostOsInfo::isMacHost() ? "Qt Creator" : "qtcreator");
+    pluginPath += QLatin1String(Utils::HostOsInfo::isMacHost() ?
+                                    Core::Constants::IDE_DISPLAY_NAME :
+                                    Core::Constants::IDE_ID);
     pluginPath += QLatin1String("/plugins/");
     pluginPath += QLatin1String(Core::Constants::IDE_VERSION_LONG);
     rc.push_back(pluginPath);
@@ -230,7 +229,7 @@ static void setupInstallSettings()
                        QCoreApplication::applicationDirPath() + '/' + RELATIVE_DATA_PATH);
     QSettings installSettings(QSettings::IniFormat, QSettings::UserScope,
                               QLatin1String(Core::Constants::IDE_SETTINGSVARIANT_STR),
-                              QLatin1String("QtCreator"));
+                              QLatin1String(Core::Constants::IDE_CASED_ID));
     if (installSettings.contains(kInstallSettingsKey)) {
         QString installSettingsPath = installSettings.value(kInstallSettingsKey).toString();
         if (QDir::isRelativePath(installSettingsPath))
@@ -243,7 +242,7 @@ static QSettings *createUserSettings()
 {
     return new QSettings(QSettings::IniFormat, QSettings::UserScope,
                          QLatin1String(Core::Constants::IDE_SETTINGSVARIANT_STR),
-                         QLatin1String("QtCreator"));
+                         QLatin1String(Core::Constants::IDE_CASED_ID));
 }
 
 static inline QSettings *userSettings()
@@ -278,9 +277,9 @@ static inline QSettings *userSettings()
                 || lowerFile.startsWith(QLatin1String("qtversion.xml"))
                 || lowerFile.startsWith(QLatin1String("devices.xml"))
                 || lowerFile.startsWith(QLatin1String("debuggers.xml"))
-                || lowerFile.startsWith(QLatin1String("qtcreator.")))
+                || lowerFile.startsWith(QLatin1String(Core::Constants::IDE_ID) + "."))
             QFile::copy(srcDir.absoluteFilePath(file), destDir.absoluteFilePath(file));
-        if (file == QLatin1String("qtcreator"))
+        if (file == QLatin1String(Core::Constants::IDE_ID))
             copyRecursively(srcDir.absoluteFilePath(file), destDir.absoluteFilePath(file));
     }
 
@@ -299,12 +298,14 @@ void loadFonts()
 
 int main(int argc, char **argv)
 {
-    if (Utils::HostOsInfo::isLinuxHost())
+    if (qEnvironmentVariableIsSet("QTCREATOR_DISABLE_NATIVE_MENUBAR")
+            || qgetenv("XDG_CURRENT_DESKTOP").startsWith("Unity")) {
         QApplication::setAttribute(Qt::AA_DontUseNativeMenuBar);
+    }
 
-    Utils::TemporaryDirectory::setMasterTemporaryDirectory(QDir::tempPath() + "/QtCreator-XXXXXX");
+    Utils::TemporaryDirectory::setMasterTemporaryDirectory(QDir::tempPath() + "/" + Core::Constants::IDE_CASED_ID + "-XXXXXX");
 
-    const char *highDpiEnvironmentVariable = setHighDpiEnvironmentVariable();
+    setHighDpiEnvironmentVariable();
 
     QLoggingCategory::setFilterRules(QLatin1String("qtc.*.debug=false\nqtc.*.info=false"));
 
@@ -318,12 +319,9 @@ int main(int argc, char **argv)
 #endif
 
     SharedTools::QtSingleApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-    SharedTools::QtSingleApplication app((QLatin1String(appNameC)), argc, argv);
+    SharedTools::QtSingleApplication app((QLatin1String(Core::Constants::IDE_DISPLAY_NAME)), argc, argv);
 
     loadFonts();
-
-    if (highDpiEnvironmentVariable)
-        qunsetenv(highDpiEnvironmentVariable);
 
     if (Utils::HostOsInfo().isWindowsHost()
             && !qFuzzyCompare(qApp->devicePixelRatio(), 1.0)
@@ -334,13 +332,14 @@ int main(int argc, char **argv)
     const int threadCount = QThreadPool::globalInstance()->maxThreadCount();
     QThreadPool::globalInstance()->setMaxThreadCount(qMax(4, 2 * threadCount));
 
-    // Display a backtrace once a serious signal is delivered (Linux only).
     const QString libexecPath = QCoreApplication::applicationDirPath()
             + '/' + RELATIVE_LIBEXEC_PATH;
-    CrashHandlerSetup setupCrashHandler(appNameC, CrashHandlerSetup::EnableRestart, libexecPath);
-
 #ifdef ENABLE_QT_BREAKPAD
-    QtSystemExceptionHandler systemExceptionHandler;
+    QtSystemExceptionHandler systemExceptionHandler(libexecPath);
+#else
+    // Display a backtrace once a serious signal is delivered (Linux only).
+    CrashHandlerSetup setupCrashHandler(Core::Constants::IDE_DISPLAY_NAME,
+                                        CrashHandlerSetup::EnableRestart, libexecPath);
 #endif
 
     app.setAttribute(Qt::AA_UseHighDpiPixmaps);
@@ -389,7 +388,7 @@ int main(int argc, char **argv)
 
     QSettings *globalSettings = new QSettings(QSettings::IniFormat, QSettings::SystemScope,
                                               QLatin1String(Core::Constants::IDE_SETTINGSVARIANT_STR),
-                                              QLatin1String("QtCreator"));
+                                              QLatin1String(Core::Constants::IDE_CASED_ID));
     PluginManager pluginManager;
     PluginManager::setPluginIID(QLatin1String("org.qt-project.Qt.QtCreatorPlugin"));
     PluginManager::setGlobalSettings(globalSettings);
@@ -406,7 +405,7 @@ int main(int argc, char **argv)
             + '/' + RELATIVE_DATA_PATH + "/translations";
     foreach (QString locale, uiLanguages) {
         locale = QLocale(locale).name();
-        if (translator.load(QLatin1String("qtcreator_") + locale, creatorTrPath)) {
+        if (translator.load(QString::fromLatin1(Core::Constants::IDE_ID) + "_" + locale, creatorTrPath)) {
             const QString &qtTrPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
             const QString &qtTrFile = QLatin1String("qt_") + locale;
             // Binary installer puts Qt tr files into creatorTrPath

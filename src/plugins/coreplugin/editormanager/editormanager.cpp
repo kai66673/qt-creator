@@ -34,6 +34,8 @@
 #include "documentmodel_p.h"
 #include "ieditor.h"
 
+#include <app/app_version.h>
+
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
 #include <coreplugin/actionmanager/command.h>
@@ -46,6 +48,7 @@
 #include <coreplugin/editortoolbar.h>
 #include <coreplugin/fileutils.h>
 #include <coreplugin/findplaceholder.h>
+#include <coreplugin/find/searchresultitem.h>
 #include <coreplugin/icore.h>
 #include <coreplugin/imode.h>
 #include <coreplugin/infobar.h>
@@ -248,6 +251,11 @@ void EditorManagerPrivate::init()
     DocumentModel::init();
     connect(ICore::instance(), &ICore::contextAboutToChange,
             this, &EditorManagerPrivate::handleContextChange);
+    connect(qApp, &QApplication::applicationStateChanged,
+            this, [](Qt::ApplicationState state) {
+                if (state == Qt::ApplicationActive)
+                    EditorManager::updateWindowTitles();
+            });
 
     const Context editManagerContext(Constants::C_EDITORMANAGER);
     // combined context for edit & design modes
@@ -380,7 +388,7 @@ void EditorManagerPrivate::init()
     cmd = ActionManager::registerAction(m_splitAction, Constants::SPLIT, editManagerContext);
     cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,2") : tr("Ctrl+E,2")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
-    connect(m_splitAction, &QAction::triggered, this, [this]() { split(Qt::Vertical); });
+    connect(m_splitAction, &QAction::triggered, this, []() { split(Qt::Vertical); });
 
     m_splitSideBySideAction = new QAction(Utils::Icons::SPLIT_VERTICAL.icon(),
                                           tr("Split Side by Side"), this);
@@ -394,7 +402,7 @@ void EditorManagerPrivate::init()
     cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,4") : tr("Ctrl+E,4")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_splitNewWindowAction, &QAction::triggered,
-            this, [this]() { splitNewWindow(currentEditorView()); });
+            this, []() { splitNewWindow(currentEditorView()); });
 
     m_removeCurrentSplitAction = new QAction(tr("Remove Current Split"), this);
     cmd = ActionManager::registerAction(m_removeCurrentSplitAction, Constants::REMOVE_CURRENT_SPLIT, editManagerContext);
@@ -1758,7 +1766,7 @@ void EditorManagerPrivate::updateWindowTitleForDocument(IDocument *document, QWi
     if (!documentName.isEmpty())
         windowTitle.append(documentName);
 
-    QString filePath = document ? document->filePath().toFileInfo().absoluteFilePath()
+    const QString filePath = document ? document->filePath().toFileInfo().absoluteFilePath()
                               : QString();
     const QString windowTitleAddition = d->m_titleAdditionHandler
             ? d->m_titleAdditionHandler(filePath)
@@ -1789,7 +1797,7 @@ void EditorManagerPrivate::updateWindowTitleForDocument(IDocument *document, QWi
 
     if (!windowTitle.isEmpty())
         windowTitle.append(dashSep);
-    windowTitle.append(tr("Qt Creator"));
+    windowTitle.append(Core::Constants::IDE_DISPLAY_NAME);
     window->window()->setWindowTitle(windowTitle);
     window->window()->setWindowFilePath(filePath);
 
@@ -2637,6 +2645,17 @@ IEditor *EditorManager::openEditorAt(const QString &fileName, int line, int colu
 
     return EditorManagerPrivate::openEditorAt(EditorManagerPrivate::currentEditorView(),
                                               fileName, line, column, editorId, flags, newEditor);
+}
+
+void EditorManager::openEditorAtSearchResult(const SearchResultItem &item, OpenEditorFlags flags)
+{
+    if (item.path.empty()) {
+        openEditor(QDir::fromNativeSeparators(item.text), Id(), flags);
+        return;
+    }
+
+    openEditorAt(QDir::fromNativeSeparators(item.path.first()), item.mainRange.begin.line,
+                 item.mainRange.begin.column, Id(), flags);
 }
 
 EditorManager::FilePathInfo EditorManager::splitLineAndColumnNumber(const QString &fullFilePath)

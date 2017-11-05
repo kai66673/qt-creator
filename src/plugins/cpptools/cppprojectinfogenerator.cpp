@@ -143,7 +143,7 @@ private:
         if (!m_tcInfo.predefinedMacrosRunner)
             return; // No compiler set in kit.
 
-        m_projectPart.toolchainDefines = m_tcInfo.predefinedMacrosRunner(m_flags.commandLineFlags);
+        m_projectPart.toolChainMacros = m_tcInfo.predefinedMacrosRunner(m_flags.commandLineFlags);
     }
 
 private:
@@ -186,8 +186,9 @@ static ProjectPart::Ptr projectPartFromRawProjectPart(const RawProjectPart &rawP
     part->projectFileColumn = rawProjectPart.projectFileColumn;
     part->callGroupId = rawProjectPart.callGroupId;
     part->buildSystemTarget = rawProjectPart.buildSystemTarget;
+    part->buildTargetType = rawProjectPart.buildTargetType;
     part->qtVersion = rawProjectPart.qtVersion;
-    part->projectDefines = rawProjectPart.projectDefines;
+    part->projectMacros = rawProjectPart.projectMacros;
     part->headerPaths = rawProjectPart.headerPaths;
     part->precompiledHeaders = rawProjectPart.precompiledHeaders;
     part->selectedForBuilding = rawProjectPart.selectedForBuilding;
@@ -205,12 +206,15 @@ void ProjectInfoGenerator::createProjectParts(const RawProjectPart &rawProjectPa
         const ProjectPart::Ptr part = projectPartFromRawProjectPart(rawProjectPart,
                                                                     m_projectUpdateInfo.project);
 
+        ProjectPart::LanguageVersion defaultVersion = ProjectPart::LatestCxxVersion;
+        if (rawProjectPart.qtVersion == ProjectPart::Qt4_8_6AndOlder)
+            defaultVersion = ProjectPart::CXX11;
         if (cat.hasCxxSources()) {
             createProjectPart(rawProjectPart,
                               part,
                               cat.cxxSources(),
                               cat.partName("C++"),
-                              ProjectPart::LatestCxxVersion,
+                              defaultVersion,
                               ProjectPart::NoExtensions);
         }
 
@@ -219,7 +223,7 @@ void ProjectInfoGenerator::createProjectParts(const RawProjectPart &rawProjectPa
                               part,
                               cat.objcxxSources(),
                               cat.partName("Obj-C++"),
-                              ProjectPart::LatestCxxVersion,
+                              defaultVersion,
                               ProjectPart::ObjectiveCExtensions);
         }
 

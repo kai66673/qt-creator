@@ -27,6 +27,7 @@
 
 #include "cpptools_global.h"
 
+#include "refactoringengineinterface.h"
 #include "projectinfo.h"
 #include "projectpart.h"
 #include "projectpartheaderpath.h"
@@ -53,7 +54,7 @@ class CppCompletionAssistProvider;
 class CppEditorDocumentHandle;
 class CppIndexingSupport;
 class ModelManagerSupportProvider;
-class RefactoringEngineInterface;
+class FollowSymbolInterface;
 class SymbolFinder;
 class WorkingCopy;
 
@@ -66,7 +67,15 @@ namespace Tests {
 class ModelManagerTestHelper;
 }
 
-class CPPTOOLS_EXPORT CppModelManager : public CPlusPlus::CppModelManagerBase
+enum class RefactoringEngineType : int
+{
+    BuiltIn = 0,
+    ClangCodeModel = 1,
+    ClangRefactoring = 2
+};
+
+class CPPTOOLS_EXPORT CppModelManager final : public CPlusPlus::CppModelManagerBase,
+        public RefactoringEngineInterface
 {
     Q_OBJECT
 
@@ -139,6 +148,14 @@ public:
 
     QList<int> references(CPlusPlus::Symbol *symbol, const CPlusPlus::LookupContext &context);
 
+    void startLocalRenaming(const CursorInEditor &data,
+                            CppTools::ProjectPart *projectPart,
+                            RenameCallback &&renameSymbolsCallback) final;
+    void globalRename(const CursorInEditor &data, UsagesCallback &&renameCallback,
+                      const QString &replacement) final;
+    void findUsages(const CppTools::CursorInEditor &data,
+                    UsagesCallback &&showUsagesCallback) const final;
+
     void renameUsages(CPlusPlus::Symbol *symbol, const CPlusPlus::LookupContext &context,
                       const QString &replacement = QString());
     void findUsages(CPlusPlus::Symbol *symbol, const CPlusPlus::LookupContext &context);
@@ -152,6 +169,7 @@ public:
     CppCompletionAssistProvider *completionAssistProvider() const;
     BaseEditorDocumentProcessor *editorDocumentProcessor(
         TextEditor::TextDocument *baseTextDocument) const;
+    FollowSymbolInterface &followSymbolInterface() const;
 
     void setIndexingSupport(CppIndexingSupport *indexingSupport);
     CppIndexingSupport *indexingSupport();
@@ -163,7 +181,7 @@ public:
     // Use this *only* for auto tests
     void setHeaderPaths(const ProjectPartHeaderPaths &headerPaths);
 
-    QByteArray definedMacros();
+    ProjectExplorer::Macros definedMacros();
 
     void enableGarbageCollector(bool enable);
 
@@ -177,8 +195,9 @@ public:
     static QString configurationFileName();
     static QString editorConfigurationFileName();
 
-    static void setRefactoringEngine(RefactoringEngineInterface *refactoringEngine);
-    static RefactoringEngineInterface *refactoringEngine();
+    static void addRefactoringEngine(RefactoringEngineType type,
+                                     RefactoringEngineInterface *refactoringEngine);
+    static void removeRefactoringEngine(RefactoringEngineType type);
 
     void renameIncludes(const QString &oldFileName, const QString &newFileName);
 
@@ -229,7 +248,7 @@ private:
     void ensureUpdated();
     QStringList internalProjectFiles() const;
     ProjectPartHeaderPaths internalHeaderPaths() const;
-    QByteArray internalDefinedMacros() const;
+    ProjectExplorer::Macros internalDefinedMacros() const;
 
     void dumpModelManagerConfiguration(const QString &logFileId);
 

@@ -30,23 +30,14 @@
 
 #include <projectexplorer/devicesupport/idevice.h>
 
-#include <QSharedPointer>
-#include <QProcess>
-#include <QMap>
-#include <QVariant>
 #include <QTime>
 
-#include <functional>
-
-namespace Utils { class ConsoleProcess; }
 namespace Debugger {
 namespace Internal {
 
-class DisassemblerAgent;
 class CdbCommand;
 struct MemoryViewCookie;
 class StringInputStream;
-class GdbMi;
 
 class CdbEngine : public DebuggerEngine
 {
@@ -70,7 +61,7 @@ public:
     void runEngine() override;
     void shutdownInferior() override;
     void shutdownEngine() override;
-    void abortDebugger() override;
+    void abortDebuggerProcess() override;
     void detachDebugger() override;
     bool hasCapability(unsigned cap) const override;
     void watchPoint(const QPoint &) override;
@@ -123,10 +114,6 @@ private:
     void runCommand(const DebuggerCommand &cmd) override;
     void operateByInstructionTriggered(bool);
 
-    void consoleStubError(const QString &);
-    void consoleStubProcessStarted();
-    void consoleStubExited();
-
     void createFullBacktrace();
 
     void handleDoInterruptInferior(const QString &errorMessage);
@@ -161,7 +148,6 @@ private:
         ScriptCommand
     };
 
-    bool startConsole(const DebuggerRunParameters &sp, QString *errorMessage);
     void init();
     unsigned examineStopReason(const GdbMi &stopReason, QString *message,
                                QString *exceptionBoxMessage,
@@ -170,7 +156,6 @@ private:
     bool commandsPending() const;
     void handleExtensionMessage(char t, int token, const QString &what, const QString &message);
     bool doSetupEngine(QString *errorMessage);
-    bool launchCDB(const DebuggerRunParameters &sp, QString *errorMessage);
     void handleSessionAccessible(unsigned long cdbExState);
     void handleSessionInaccessible(unsigned long cdbExState);
     void handleSessionIdle(const QString &message);
@@ -221,43 +206,43 @@ private:
     void mergeStartParametersSourcePathMap();
 
     const QString m_tokenPrefix;
+    void handleSetupFailure(const QString &errorMessage);
 
     QProcess m_process;
-    QScopedPointer<Utils::ConsoleProcess> m_consoleStub;
-    DebuggerStartMode m_effectiveStartMode;
+    DebuggerStartMode m_effectiveStartMode = NoStartMode;
     QByteArray m_outputBuffer;
     //! Debugger accessible (expecting commands)
-    bool m_accessible;
-    SpecialStopMode m_specialStopMode;
+    bool m_accessible = false;
+    SpecialStopMode m_specialStopMode = NoSpecialStop;
     ProjectExplorer::DeviceProcessSignalOperation::Ptr m_signalOperation;
-    int m_nextCommandToken;
+    int m_nextCommandToken = 0;
     QHash<int, DebuggerCommand> m_commandForToken;
     QString m_currentBuiltinResponse;
-    int m_currentBuiltinResponseToken;
+    int m_currentBuiltinResponseToken = -1;
     QMap<QString, NormalizedSourceFileName> m_normalizedFileCache;
     const QString m_extensionCommandPrefix; //!< Library name used as prefix
-    bool m_operateByInstructionPending; //!< Creator operate by instruction action changed.
-    bool m_operateByInstruction;
-    bool m_hasDebuggee;
+    bool m_operateByInstructionPending = true; //!< Creator operate by instruction action changed.
+    bool m_operateByInstruction = true; // Default CDB setting.
+    bool m_hasDebuggee = false;
     enum Wow64State {
         wow64Uninitialized,
         noWow64Stack,
         wow64Stack32Bit,
         wow64Stack64Bit
-    } m_wow64State;
+    } m_wow64State = wow64Uninitialized;
     QTime m_logTime;
-    mutable int m_elapsedLogTime;
+    mutable int m_elapsedLogTime = 0;
     QString m_extensionMessageBuffer;
-    bool m_sourceStepInto;
-    int m_watchPointX;
-    int m_watchPointY;
+    bool m_sourceStepInto = false;
+    int m_watchPointX = 0;
+    int m_watchPointY = 0;
     PendingBreakPointMap m_pendingBreakpointMap;
     PendingBreakPointMap m_insertSubBreakpointMap;
     PendingBreakPointMap m_pendingSubBreakpointMap;
-    bool m_autoBreakPointCorrection;
+    bool m_autoBreakPointCorrection = false;
     QHash<QString, QString> m_fileNameModuleHash;
     QMultiHash<QString, quint64> m_symbolAddressCache;
-    bool m_ignoreCdbOutput;
+    bool m_ignoreCdbOutput = false;
     QVariantList m_customSpecialStopData;
     QList<SourcePathMapping> m_sourcePathMappings;
     QScopedPointer<GdbMi> m_coreStopReason;

@@ -69,8 +69,8 @@ public:
     ManagedModel() = default;
     ManagedModel(ExtDocumentController *m_documentController,ModelDocument *m_modelDocument);
 
-    ExtDocumentController *m_documentController = 0;
-    ModelDocument *m_modelDocument = 0;
+    ExtDocumentController *m_documentController = nullptr;
+    ModelDocument *m_modelDocument = nullptr;
 };
 
 ModelsManager::ManagedModel::ManagedModel(ExtDocumentController *documentController,
@@ -88,11 +88,11 @@ public:
     }
 
     QList<ModelsManager::ManagedModel> managedModels;
-    ModelIndexer *modelIndexer = 0;
+    ModelIndexer *modelIndexer = nullptr;
     QList<Core::IDocument *> documentsToBeClosed;
 
-    QAction *openDiagramContextMenuItem = 0;
-    ProjectExplorer::Node *contextMenuOwnerNode = 0;
+    QAction *openDiagramContextMenuItem = nullptr;
+    ProjectExplorer::Node *contextMenuOwnerNode = nullptr;
 };
 
 ModelsManager::ModelsManager(QObject *parent)
@@ -123,7 +123,7 @@ ModelsManager::ModelsManager(QObject *parent)
 
 ModelsManager::~ModelsManager()
 {
-    QTC_CHECK(d->managedModels.isEmpty());
+    QMT_CHECK(d->managedModels.isEmpty());
     delete d->modelIndexer;
     delete d;
 }
@@ -150,7 +150,7 @@ void ModelsManager::releaseModel(ExtDocumentController *documentController)
             return;
         }
     }
-    QTC_CHECK(false);
+    QMT_CHECK(false);
 }
 
 void ModelsManager::openDiagram(const qmt::Uid &modelUid, const qmt::Uid &diagramUid)
@@ -158,7 +158,7 @@ void ModelsManager::openDiagram(const qmt::Uid &modelUid, const qmt::Uid &diagra
     foreach (const ManagedModel &managedModel, d->managedModels) {
         if (managedModel.m_documentController->projectController()->project()->uid() == modelUid) {
             qmt::MDiagram *diagram = managedModel.m_documentController->modelController()->findObject<qmt::MDiagram>(diagramUid);
-            QTC_ASSERT(diagram, continue);
+            QMT_ASSERT(diagram, continue);
             openDiagram(managedModel.m_documentController, diagram);
             return;
         }
@@ -182,14 +182,14 @@ void ModelsManager::onAboutToShowContextMenu(ProjectExplorer::Project *project,
     if (canOpenDiagram)
         d->contextMenuOwnerNode = node;
     else
-        d->contextMenuOwnerNode = 0;
+        d->contextMenuOwnerNode = nullptr;
     d->openDiagramContextMenuItem->setVisible(canOpenDiagram);
 }
 
 void ModelsManager::onOpenDiagramFromProjectExplorer()
 {
-    if (ProjectExplorer::ProjectTree::instance()->currentNode() == d->contextMenuOwnerNode) {
-        qmt::MDiagram *diagram = 0;
+    if (ProjectExplorer::ProjectTree::findCurrentNode() == d->contextMenuOwnerNode) {
+        qmt::MDiagram *diagram = nullptr;
         foreach (const ManagedModel &managedModel, d->managedModels) {
             if ((diagram = managedModel.m_documentController->pxNodeController()->findDiagramForExplorerNode(d->contextMenuOwnerNode))) {
                 openDiagram(managedModel.m_documentController, diagram);

@@ -65,7 +65,7 @@ private:
     class FindDiagramsVisitor;
 
 public:
-    explicit DiagramController(QObject *parent = 0);
+    explicit DiagramController(QObject *parent = nullptr);
     ~DiagramController() override;
 
 signals:
@@ -167,8 +167,8 @@ private:
     void verifyDiagramsIntegrity();
     void verifyDiagramIntegrity(const MDiagram *diagram);
 
-    ModelController *m_modelController;
-    UndoController *m_undoController;
+    ModelController *m_modelController = nullptr;
+    UndoController *m_undoController = nullptr;
     QList<MDiagram *> m_allDiagrams;
 };
 

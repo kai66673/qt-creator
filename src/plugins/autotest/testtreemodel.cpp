@@ -110,6 +110,7 @@ bool TestTreeModel::setData(const QModelIndex &index, const QVariant &value, int
         emit dataChanged(index, index);
         if (role == Qt::CheckStateRole) {
             switch (item->type()) {
+            case TestTreeItem::Root:
             case TestTreeItem::TestCase:
                 if (item->childCount() > 0)
                     emit dataChanged(index.child(0, 0), index.child(item->childCount() - 1, 0));
@@ -228,6 +229,7 @@ bool TestTreeModel::sweepChildren(TestTreeItem *item)
 
         if (child->type() != TestTreeItem::Root && child->markedForRemoval()) {
             destroyItem(child);
+            item->revalidateCheckState();
             hasChanged = true;
         } else if (child->hasChildren()) {
             hasChanged |= sweepChildren(child);
@@ -266,12 +268,22 @@ void TestTreeModel::handleParseResult(const TestParseResult *result, TestTreeIte
     TestTreeItem *newItem = result->createTestTreeItem();
     QTC_ASSERT(newItem, return);
     parentNode->appendChild(newItem);
+    // new items are checked by default - revalidation of parents might be necessary
+    if (parentNode->checked() != Qt::Checked) {
+        parentNode->revalidateCheckState();
+        const QModelIndex &idx = indexForItem(parentNode);
+        emit dataChanged(idx, idx);
+    }
 }
 
 void TestTreeModel::removeAllTestItems()
 {
-    for (Utils::TreeItem *item : *rootItem())
+    for (Utils::TreeItem *item : *rootItem()) {
         item->removeChildren();
+        TestTreeItem *testTreeItem = static_cast<TestTreeItem *>(item);
+        if (testTreeItem->checked() == Qt::PartiallyChecked)
+            testTreeItem->setChecked(Qt::Checked);
+    }
     emit testTreeModelChanged();
 }
 

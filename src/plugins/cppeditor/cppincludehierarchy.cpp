@@ -26,6 +26,7 @@
 #include "cppincludehierarchy.h"
 
 #include "cppeditor.h"
+#include "cppeditorwidget.h"
 #include "cppeditorconstants.h"
 #include "cppeditorplugin.h"
 #include "cppelementevaluator.h"
@@ -314,7 +315,7 @@ public:
     {}
 
 private:
-    Result findIncremental(const QString &txt, FindFlags findFlags)
+    Result findIncremental(const QString &txt, FindFlags findFlags) override
     {
         m_model->setSearching(true);
         Result result = ItemViewFind::findIncremental(txt, findFlags);
@@ -407,7 +408,7 @@ void CppIncludeHierarchyWidget::perform()
     m_inspectedFile->setText(m_editor->textDocument()->displayName());
     m_inspectedFile->setLink(TextEditorWidget::Link(document));
 
-    // expand "Includes" adn "Included by"
+    // expand "Includes" and "Included by"
     m_treeView->expand(m_model.index(0, 0));
     m_treeView->expand(m_model.index(1, 0));
 

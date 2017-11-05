@@ -54,7 +54,7 @@ static const qreal BODY_HORIZ_BORDER = 4.0;
 static const qreal BODY_VERT_BORDER = 4.0;
 
 DiagramItem::DiagramItem(DDiagram *diagram, DiagramSceneModel *diagramSceneModel, QGraphicsItem *parent)
-    : ObjectItem(diagram, diagramSceneModel, parent)
+    : ObjectItem("diagram", diagram, diagramSceneModel, parent)
 {
 }
 
@@ -81,7 +81,7 @@ void DiagramItem::update()
     } else if (m_customIcon) {
         m_customIcon->scene()->removeItem(m_customIcon);
         delete m_customIcon;
-        m_customIcon = 0;
+        m_customIcon = nullptr;
     }
 
     // shape
@@ -100,12 +100,12 @@ void DiagramItem::update()
         if (m_fold) {
             m_fold->scene()->removeItem(m_fold);
             delete m_fold;
-            m_fold = 0;
+            m_fold = nullptr;
         }
         if (m_body) {
             m_body->scene()->removeItem(m_body);
             delete m_body;
-            m_body = 0;
+            m_body = nullptr;
         }
     }
 

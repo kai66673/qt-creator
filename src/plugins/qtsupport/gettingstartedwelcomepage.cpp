@@ -28,6 +28,7 @@
 #include "exampleslistmodel.h"
 #include "screenshotcropper.h"
 
+#include <utils/fileutils.h>
 #include <utils/pathchooser.h>
 #include <utils/winutils.h>
 
@@ -123,7 +124,7 @@ QString ExamplesWelcomePage::copyToAlternativeLocation(const QFileInfo& proFileI
     chooser->setHistoryCompleter(QLatin1String("Qt.WritableExamplesDir.History"));
     QSettings *settings = ICore::settings();
     chooser->setPath(settings->value(QString::fromLatin1(C_FALLBACK_ROOT),
-                                     DocumentManager::projectsDirectory()).toString());
+                                     DocumentManager::projectsDirectory().toString()).toString());
     lay->addWidget(txt, 1, 0);
     lay->addWidget(chooser, 1, 1);
     enum { Copy = QDialog::Accepted + 1, Keep = QDialog::Accepted + 2 };
@@ -199,13 +200,16 @@ void ExamplesWelcomePage::openProject(const ExampleItem &item)
     if (!proFileInfo.exists())
         return;
 
-    QFileInfo pathInfo(proFileInfo.path());
     // If the Qt is a distro Qt on Linux, it will not be writable, hence compilation will fail
-    if (!proFileInfo.isWritable()
-            || !pathInfo.isWritable() /* path of .pro file */
-            || !QFileInfo(pathInfo.path()).isWritable() /* shadow build directory */) {
+    // Same if it is installed in non-writable location for other reasons
+    const bool needsCopy = withNTFSPermissions<bool>([proFileInfo] {
+        QFileInfo pathInfo(proFileInfo.path());
+        return !proFileInfo.isWritable()
+                || !pathInfo.isWritable() /* path of .pro file */
+                || !QFileInfo(pathInfo.path()).isWritable() /* shadow build directory */;
+    });
+    if (needsCopy)
         proFile = copyToAlternativeLocation(proFileInfo, filesToOpen, item.dependencies);
-    }
 
     // don't try to load help and files if loading the help request is being cancelled
     if (proFile.isEmpty())
@@ -594,7 +598,7 @@ public:
 
         auto hbox = new QHBoxLayout;
         if (m_isExamples) {
-            m_searcher->setPlaceholderText(tr("Search in Examples..."));
+            m_searcher->setPlaceholderText(ExamplesWelcomePage::tr("Search in Examples..."));
 
             auto exampleSetSelector = new QComboBox(this);
             exampleSetSelector->setMinimumWidth(itemWidth);
@@ -610,7 +614,7 @@ public:
             hbox->setSpacing(17);
             hbox->addWidget(exampleSetSelector);
         } else {
-            m_searcher->setPlaceholderText(tr("Search in Tutorials..."));
+            m_searcher->setPlaceholderText(ExamplesWelcomePage::tr("Search in Tutorials..."));
         }
         hbox->addWidget(searchBox);
         hbox->addSpacing(sideMargin);

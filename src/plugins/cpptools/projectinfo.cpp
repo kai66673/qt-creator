@@ -40,9 +40,7 @@ ToolChainInfo::ToolChainInfo(const ProjectExplorer::ToolChain *toolChain,
         isMsvc2015ToolChain
                 = toolChain->targetAbi().osFlavor() == ProjectExplorer::Abi::WindowsMsvc2015Flavor;
         wordWidth = toolChain->targetAbi().wordWidth();
-        targetTriple = type == ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID
-            ? QLatin1String("i686-pc-windows-msvc")
-            : toolChain->originalTargetTriple(); // OK, compiler run is already cached.
+        targetTriple = toolChain->originalTargetTriple();
 
         // ...and save the potentially expensive operations for later so that
         // they can be run from a worker thread.
@@ -162,13 +160,10 @@ void ProjectInfo::finish()
             m_sourceFiles.insert(file.path);
 
         // Update defines
-        m_defines.append(part->toolchainDefines);
-        m_defines.append(part->projectDefines);
-        if (!part->projectConfigFile.isEmpty()) {
-            m_defines.append('\n');
-            m_defines += ProjectPart::readProjectConfigFile(part);
-            m_defines.append('\n');
-        }
+        m_defines.append(part->toolChainMacros);
+        m_defines.append(part->projectMacros);
+        if (!part->projectConfigFile.isEmpty())
+            m_defines += ProjectExplorer::Macro::toMacros(ProjectPart::readProjectConfigFile(part));
     }
 }
 

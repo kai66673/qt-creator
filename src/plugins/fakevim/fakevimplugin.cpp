@@ -137,14 +137,15 @@ public:
                      int messageLevel, FakeVimHandler *eventFilter)
     {
         if (cursorPos != -1) {
-            m_edit->blockSignals(true);
-            m_label->clear();
-            m_edit->setText(contents);
-            if (anchorPos != -1 && anchorPos != cursorPos)
-                m_edit->setSelection(anchorPos, cursorPos - anchorPos);
-            else
-                m_edit->setCursorPosition(cursorPos);
-            m_edit->blockSignals(false);
+            {
+                QSignalBlocker blocker(m_edit);
+                m_label->clear();
+                m_edit->setText(contents);
+                if (anchorPos != -1 && anchorPos != cursorPos)
+                    m_edit->setSelection(anchorPos, cursorPos - anchorPos);
+                else
+                    m_edit->setCursorPosition(cursorPos);
+            }
             setCurrentWidget(m_edit);
             m_edit->setFocus();
         } else {
@@ -863,11 +864,6 @@ void FakeVimUserCommandsPage::apply()
 class FakeVimCompletionAssistProvider : public CompletionAssistProvider
 {
 public:
-    bool supportsEditor(Id ) const
-    {
-        return false;
-    }
-
     IAssistProcessor *createProcessor() const;
 
     void setActive(const QString &needle, bool forward, FakeVimHandler *handler)
@@ -1806,6 +1802,11 @@ void FakeVimPluginPrivate::editorOpened(IEditor *editor)
 
     connect(ICore::instance(), &ICore::saveSettingsRequested,
             this, &FakeVimPluginPrivate::writeSettings);
+
+    connect(handler, &FakeVimHandler::tabNextRequested,
+            this, [this] { triggerAction(Core::Constants::GOTONEXTINHISTORY); });
+    connect(handler, &FakeVimHandler::tabPreviousRequested,
+            this, [this] { triggerAction(Core::Constants::GOTOPREVINHISTORY); });
 
     handler->setCurrentFileName(editor->document()->filePath().toString());
     handler->installEventFilter();

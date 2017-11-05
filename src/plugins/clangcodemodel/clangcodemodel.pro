@@ -9,7 +9,10 @@ SOURCES += \
     clangassistproposal.cpp \
     clangassistproposalitem.cpp \
     clangassistproposalmodel.cpp \
-    clangbackendipcintegration.cpp \
+    clangbackendcommunicator.cpp \
+    clangbackendlogging.cpp \
+    clangbackendreceiver.cpp \
+    clangbackendsender.cpp \
     clangcodemodelplugin.cpp \
     clangcompletionassistinterface.cpp \
     clangcompletionassistprocessor.cpp \
@@ -23,6 +26,7 @@ SOURCES += \
     clangeditordocumentprocessor.cpp \
     clangfixitoperation.cpp \
     clangfixitoperationsextractor.cpp \
+    clangfollowsymbol.cpp \
     clangfunctionhintmodel.cpp \
     clanghighlightingmarksreporter.cpp \
     clangmodelmanagersupport.cpp \
@@ -39,7 +43,10 @@ HEADERS += \
     clangassistproposal.h \
     clangassistproposalitem.h \
     clangassistproposalmodel.h \
-    clangbackendipcintegration.h \
+    clangbackendcommunicator.h \
+    clangbackendlogging.h \
+    clangbackendreceiver.h \
+    clangbackendsender.h \
     clangcodemodelplugin.h \
     clangcompletionassistinterface.h \
     clangcompletionassistprocessor.h \
@@ -54,6 +61,7 @@ HEADERS += \
     clangeditordocumentprocessor.h \
     clangfixitoperation.h \
     clangfixitoperationsextractor.h \
+    clangfollowsymbol.h \
     clangfunctionhintmodel.h \
     clanghighlightingmarksreporter.h \
     clangisdiagnosticrelatedtolocation.h \

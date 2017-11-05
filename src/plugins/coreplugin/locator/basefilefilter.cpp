@@ -30,8 +30,7 @@
 #include <utils/qtcassert.h>
 
 #include <QDir>
-#include <QRegExp>
-#include <QStringMatcher>
+#include <QRegularExpression>
 #include <QTimer>
 
 using namespace Core;
@@ -100,16 +99,14 @@ QList<LocatorFilterEntry> BaseFileFilter::matchesFor(QFutureInterface<LocatorFil
     QList<LocatorFilterEntry> goodEntries;
     const QString entry = QDir::fromNativeSeparators(origEntry);
     const EditorManager::FilePathInfo fp = EditorManager::splitLineAndColumnNumber(entry);
-    const Qt::CaseSensitivity cs = caseSensitivity(fp.filePath);
-    QStringMatcher matcher(fp.filePath, cs);
-    QRegExp regexp(fp.filePath, cs, QRegExp::Wildcard);
+
+    const QRegularExpression regexp = createRegExp(fp.filePath);
     if (!regexp.isValid()) {
         d->m_current.clear(); // free memory
         return betterEntries;
     }
     const QChar pathSeparator(QLatin1Char('/'));
     const bool hasPathSeparator = fp.filePath.contains(pathSeparator);
-    const bool hasWildcard = containsWildcard(fp.filePath);
     const bool containsPreviousEntry = !d->m_current.previousEntry.isEmpty()
             && fp.filePath.contains(d->m_current.previousEntry);
     const bool pathSeparatorAdded = !d->m_current.previousEntry.contains(pathSeparator)
@@ -136,27 +133,22 @@ QList<LocatorFilterEntry> BaseFileFilter::matchesFor(QFutureInterface<LocatorFil
         QString path = d->m_current.iterator->filePath();
         QString name = d->m_current.iterator->fileName();
         QString matchText = hasPathSeparator ? path : name;
-        int index = hasWildcard ? regexp.indexIn(matchText) : matcher.indexIn(matchText);
+        QRegularExpressionMatch match = regexp.match(matchText);
 
-        if (index >= 0) {
+        if (match.hasMatch()) {
             QFileInfo fi(path);
             LocatorFilterEntry filterEntry(this, fi.fileName(), QString(path + fp.postfix));
             filterEntry.fileName = path;
             filterEntry.extraInfo = FileUtils::shortNativePath(FileName(fi));
 
-            LocatorFilterEntry::HighlightInfo::DataType hDataType = LocatorFilterEntry::HighlightInfo::DisplayName;
-            int length = hasWildcard ? regexp.matchedLength() : fp.filePath.length();
-            const bool betterMatch = index == 0;
+            const bool betterMatch = match.capturedStart() == 0;
             if (hasPathSeparator) {
-                const int indexCandidate = index + filterEntry.extraInfo.length() - path.length();
-                const int cutOff = indexCandidate < 0 ? -indexCandidate : 0;
-                index = qMax(indexCandidate, 0);
-                length = qMax(length - cutOff, 1);
-                hDataType = LocatorFilterEntry::HighlightInfo::ExtraInfo;
+                match = regexp.match(filterEntry.extraInfo);
+                filterEntry.highlightInfo =
+                        highlightInfo(match, LocatorFilterEntry::HighlightInfo::ExtraInfo);
+            } else {
+                filterEntry.highlightInfo = highlightInfo(match);
             }
-
-            if (index >= 0)
-                filterEntry.highlightInfo = LocatorFilterEntry::HighlightInfo(index, length, hDataType);
 
             if (betterMatch)
                 betterEntries.append(filterEntry);
@@ -180,8 +172,12 @@ QList<LocatorFilterEntry> BaseFileFilter::matchesFor(QFutureInterface<LocatorFil
     return betterEntries;
 }
 
-void BaseFileFilter::accept(LocatorFilterEntry selection) const
+void BaseFileFilter::accept(LocatorFilterEntry selection,
+                            QString *newText, int *selectionStart, int *selectionLength) const
 {
+    Q_UNUSED(newText)
+    Q_UNUSED(selectionStart)
+    Q_UNUSED(selectionLength)
     EditorManager::openEditor(selection.internalData.toString(), Id(),
                               EditorManager::CanContainLineAndColumnNumber);
 }

@@ -36,11 +36,11 @@ class BareMetalCustomRunConfiguration : public BareMetalRunConfiguration
 {
     Q_OBJECT
 public:
-    BareMetalCustomRunConfiguration(ProjectExplorer::Target *parent);
-    BareMetalCustomRunConfiguration(ProjectExplorer::Target *parent,
-                                    BareMetalCustomRunConfiguration *source);
+    explicit BareMetalCustomRunConfiguration(ProjectExplorer::Target *parent);
 
-    bool isEnabled() const override { return true; }
+    void initialize();
+    void copyFrom(const BareMetalCustomRunConfiguration *source);
+
     bool isConfigured() const override;
     ConfigurationState ensureConfigured(QString *errorMessage) override;
     QWidget *createConfigurationWidget() override;

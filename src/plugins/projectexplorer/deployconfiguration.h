@@ -59,6 +59,9 @@ public:
     virtual QString disabledReason() const;
 
     Target *target() const;
+    Project *project() const override;
+
+    bool isActive() const override;
 
 signals:
     void enabledChanged();

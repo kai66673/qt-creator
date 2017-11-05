@@ -71,7 +71,7 @@ static inline bool isSupportedAttachedProperties(const QString &propertyName)
 static inline QStringList supportedVersionsList()
 {
     static const QStringList list = {
-        "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8"
+        "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10"
     };
     return list;
 }
@@ -792,7 +792,6 @@ static bool isBlacklistImport(const ImportKey &importKey)
             || importKey.libraryQualifiedPath() == QStringLiteral("Qt.WebSockets")
             || importKey.libraryQualifiedPath() == QStringLiteral("QtWebkit")
             || importKey.libraryQualifiedPath() == QStringLiteral("QtLocation")
-            || importKey.libraryQualifiedPath() == QStringLiteral("QtWebEngine")
             || importKey.libraryQualifiedPath() == QStringLiteral("QtWebChannel")
             || importKey.libraryQualifiedPath() == QStringLiteral("QtWinExtras")
             || importKey.libraryQualifiedPath() == QStringLiteral("QtPurchasing")
@@ -1381,7 +1380,7 @@ void TextToModelMerger::syncExpressionProperty(AbstractProperty &modelProperty,
     if (modelProperty.isBindingProperty()) {
         BindingProperty bindingProperty = modelProperty.toBindingProperty();
         if (bindingProperty.expression() != javascript
-                || !astType.isEmpty() != bindingProperty.isDynamic()
+                || astType.isEmpty() == bindingProperty.isDynamic()
                 || astType != bindingProperty.dynamicTypeName()) {
             differenceHandler.bindingExpressionsDiffer(bindingProperty, javascript, astType);
         }
@@ -1450,7 +1449,7 @@ void TextToModelMerger::syncVariantProperty(AbstractProperty &modelProperty,
         VariantProperty modelVariantProperty = modelProperty.toVariantProperty();
 
         if (!equals(modelVariantProperty.value(), astValue)
-                || !astType.isEmpty() != modelVariantProperty.isDynamic()
+                || astType.isEmpty() == modelVariantProperty.isDynamic()
                 || astType != modelVariantProperty.dynamicTypeName()) {
             differenceHandler.variantValuesDiffer(modelVariantProperty,
                                                   astValue,

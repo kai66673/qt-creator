@@ -125,9 +125,26 @@ class Dumper(DumperBase):
 
     def fromNativeValue(self, nativeValue):
         self.check(isinstance(nativeValue, lldb.SBValue))
-        nativeValue.SetPreferSyntheticValue(False)
         nativeType = nativeValue.GetType()
+        typeName = nativeType.GetName()
         code = nativeType.GetTypeClass()
+
+        # Display the result of GetSummary() for Core Foundation string
+        # and string-like types.
+        summary = None
+        if self.useFancy:
+            if (typeName.startswith('CF')
+                    or typeName.startswith('__CF')
+                    or typeName.startswith('NS')
+                    or typeName.startswith('__NSCF')):
+                if code == lldb.eTypeClassPointer:
+                    summary = nativeValue.Dereference().GetSummary()
+                elif code == lldb.eTypeClassReference:
+                    summary = nativeValue.Dereference().GetSummary()
+                else:
+                    summary = nativeValue.GetSummary()
+
+        nativeValue.SetPreferSyntheticValue(False)
 
         if code == lldb.eTypeClassReference:
             nativeTargetType = nativeType.GetDereferencedType()
@@ -196,6 +213,7 @@ class Dumper(DumperBase):
             #elif code == lldb.eTypeClassVector:
             #    val.type.ltarget = self.fromNativeType(nativeType.GetVectorElementType())
 
+        val.summary = summary
         val.lIsInScope = nativeValue.IsInScope()
         val.name = nativeValue.GetName()
         return val
@@ -255,7 +273,8 @@ class Dumper(DumperBase):
                 isBitfield = False
 
             if isBitfield: # Bit fields
-                fieldType = self.createBitfieldType(self.typeName(nativeFieldType), fieldBitsize)
+                fieldType = self.createBitfieldType(
+                    self.createType(self.typeName(nativeFieldType)), fieldBitsize)
                 yield self.Field(self, name=fieldName, type=fieldType,
                                  bitsize=fieldBitsize, bitpos=fieldBitpos)
 
@@ -499,9 +518,6 @@ class Dumper(DumperBase):
         if hasattr(nativeType, 'GetDisplayTypeName'):
             return nativeType.GetDisplayTypeName()  # Xcode 6 (lldb-320)
         return nativeType.GetName()             # Xcode 5 (lldb-310)
-
-    def nativeTypeId(self, nativeType):
-        name = self.typeName(nativeType)
 
     def nativeTypeId(self, nativeType):
         name = self.typeName(nativeType)
@@ -758,6 +774,9 @@ class Dumper(DumperBase):
             if typeobj is not None:
                 return typeobj
 
+        return self.lookupNativeTypeInAllModules(name)
+
+    def lookupNativeTypeInAllModules(self, name):
         needle = self.canonicalTypeName(name)
         #warn('NEEDLE: %s ' % needle)
         warn('Searching for type %s across all target modules, this could be very slow' % name)
@@ -1242,9 +1261,7 @@ class Dumper(DumperBase):
             if not skipEventReporting:
                 self.eventState = state
             if state == lldb.eStateExited:
-                if self.isShuttingDown_:
-                    self.reportState("inferiorshutdownok")
-                else:
+                if not self.isShuttingDown_:
                     self.reportState("inferiorexited")
                 self.report('exited={status="%s",desc="%s"}'
                     % (self.process.GetExitStatus(), self.process.GetExitDescription()))
@@ -1274,7 +1291,7 @@ class Dumper(DumperBase):
                             return
                 if self.isInterrupting_:
                     self.isInterrupting_ = False
-                    self.reportState("stopped")
+                    self.reportState("inferiorstopok")
                 elif self.ignoreStops > 0:
                     self.ignoreStops -= 1
                     self.process.Continue()
@@ -1560,7 +1577,8 @@ class Dumper(DumperBase):
             self.target.BreakpointDelete(bp.GetID())
             res = frame.SetPC(loc.GetLoadAddress())
             status = 'Jumped.' if res else 'Cannot jump.'
-        self.reportResult(self.describeStatus(status) + self.describeLocation(frame), args)
+        self.report(self.describeLocation(frame))
+        self.reportResult(self.describeStatus(status), args)
 
     def breakList(self):
         result = lldb.SBCommandReturnObject()
@@ -1650,7 +1668,7 @@ class Dumper(DumperBase):
                     result += '{line="%s"' % lineNumber
                     result += ',file="%s"' % fileName
                     if 0 < lineNumber and lineNumber <= len(source):
-                        result += ',data="%s"' % source[lineNumber - 1]
+                        result += ',hexdata="%s"' % self.hexencode(source[lineNumber - 1])
                     result += ',hunk="%s"}' % hunk
             result += '{address="%s"' % loadAddr
             result += ',data="%s %s"' % (insn.GetMnemonic(self.target),
@@ -1862,6 +1880,10 @@ class SummaryDumper(Dumper, LogMixin):
 
     def report(self, stuff):
         return # Don't mess up lldb output
+
+    def lookupNativeTypeInAllModules(self, name):
+        warn('Failed to resolve type %s' % name)
+        return None
 
     def dump_summary(self, valobj, expanded = False):
         try:

@@ -27,6 +27,8 @@
 
 #include "qbsprojectmanager_global.h"
 
+#include "qbsproject.h"
+
 #include <projectexplorer/buildconfiguration.h>
 #include <qtsupport/baseqtversion.h>
 
@@ -56,7 +58,7 @@ public:
     QbsBuildStep *qbsStep() const;
     QVariantMap qbsConfiguration() const;
 
-    Internal::QbsProject *project() const;
+    Internal::QbsProject *project() const override;
 
     ProjectExplorer::IOutputParser *createOutputParser() const;
 
@@ -76,6 +78,7 @@ public:
 
     void emitBuildTypeChanged();
 
+    void setConfigurationName(const QString &configName);
     QString configurationName() const;
 
     QString equivalentCommandLine(const ProjectExplorer::BuildStep *buildStep) const;
@@ -87,6 +90,7 @@ protected:
     QbsBuildConfiguration(ProjectExplorer::Target *target, QbsBuildConfiguration *source);
     QbsBuildConfiguration(ProjectExplorer::Target *target, Core::Id id);
     bool fromMap(const QVariantMap &map) override;
+    QVariantMap toMap() const override;
 
 private:
     void buildStepInserted(int pos);
@@ -102,6 +106,7 @@ private:
     QStringList m_changedFiles;
     QStringList m_activeFileTags;
     QStringList m_products;
+    QString m_configurationName;
 
     friend class QbsBuildConfigurationFactory;
     friend class QbsBuildConfigurationWidget;

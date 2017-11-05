@@ -77,13 +77,13 @@ struct FileContent
 
 struct UnsavedFileContent
 {
-    UnsavedFileContent(Utils::SmallString &&filePath,
+    UnsavedFileContent(Utils::PathString &&filePath,
                        Utils::SmallString &&content)
         : filePath(std::move(filePath)),
           content(std::move(content))
     {}
 
-    Utils::SmallString filePath;
+    Utils::PathString filePath;
     Utils::SmallString content;
 };
 
@@ -104,10 +104,17 @@ public:
     clang::tooling::ClangTool createTool() const;
 
 private:
-    RefactoringCompilationDatabase compilationDatabase;
-    std::vector<FileContent> fileContents;
-    std::vector<std::string> sourceFilePaths;
-    std::vector<UnsavedFileContent> unsavedFileContents;
+    RefactoringCompilationDatabase m_compilationDatabase;
+    std::vector<FileContent> m_fileContents;
+    std::vector<std::string> m_sourceFilePaths;
+    std::vector<UnsavedFileContent> m_unsavedFileContents;
 };
+
+extern template
+void ClangTool::addFiles<Utils::SmallStringVector>(const Utils::SmallStringVector &filePaths,
+                                                   const Utils::SmallStringVector &arguments);
+extern template
+void ClangTool::addFiles<Utils::PathStringVector>(const Utils::PathStringVector &filePaths,
+                                                  const Utils::SmallStringVector &arguments);
 
 } // namespace ClangBackEnd
