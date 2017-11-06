@@ -41,8 +41,8 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent, Core::Id id)
-    : RunConfiguration(parent, id)
+GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent)
+    : RunConfiguration(parent)
     , m_buildConfiguration(nullptr)
     , m_workingDirectoryAspect(new WorkingDirectoryAspect(this, Constants::C_GORUNCONFIGURATION_WORKINGDIRECTORYASPECT_ID))
     , m_argumentAspect(new ArgumentsAspect(this, Constants::C_GORUNCONFIGURATION_ARGUMENTASPECT_ID))

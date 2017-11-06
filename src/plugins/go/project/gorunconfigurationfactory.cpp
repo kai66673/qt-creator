@@ -69,31 +69,32 @@ bool GoRunConfigurationFactory::canClone(ProjectExplorer::Target *parent, Projec
 {
     QTC_ASSERT(parent, return false);
     QTC_ASSERT(product, return false);
-    return true;
+    return canHandle(parent);
 }
 
 ProjectExplorer::RunConfiguration *GoRunConfigurationFactory::clone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *product)
 {
     QTC_ASSERT(parent, return nullptr);
     QTC_ASSERT(product, return nullptr);
-    std::unique_ptr<GoRunConfiguration> result(new GoRunConfiguration(parent, Constants::C_GORUNCONFIGURATION_ID));
+    std::unique_ptr<GoRunConfiguration> result(createHelper<GoRunConfiguration>(parent, Constants::C_GORUNCONFIGURATION_ID));
     return result->fromMap(product->toMap()) ? result.release() : nullptr;
 }
 
 bool GoRunConfigurationFactory::canHandle(ProjectExplorer::Target *parent) const
 {
+    if (!parent->project()->supportsKit(parent->kit()))
+        return false;
     return qobject_cast<GoProject *>(parent->project());
 }
 
 ProjectExplorer::RunConfiguration *GoRunConfigurationFactory::doCreate(ProjectExplorer::Target *parent, Core::Id id)
 {
-    auto result = new GoRunConfiguration(parent, id);
-    return result;
+    return createHelper<GoRunConfiguration>(parent, id);
 }
 
 ProjectExplorer::RunConfiguration *GoRunConfigurationFactory::doRestore(ProjectExplorer::Target *parent, const QVariantMap &map)
 {
-    auto result = new GoRunConfiguration(parent, ProjectExplorer::idFromMap(map));
+    auto result = createHelper<GoRunConfiguration>(parent, ProjectExplorer::idFromMap(map));
     result->fromMap(map);
     return result;
 }

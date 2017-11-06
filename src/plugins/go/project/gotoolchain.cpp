@@ -332,8 +332,8 @@ bool GoToolChain::isValid() const
 ToolChain::PredefinedMacrosRunner GoToolChain::createPredefinedMacrosRunner() const
 { return ToolChain::PredefinedMacrosRunner(); }
 
-QByteArray GoToolChain::predefinedMacros(const QStringList &) const
-{ return QByteArray(); }
+Macros GoToolChain::predefinedMacros(const QStringList &) const
+{ return Macros(); }
 
 ToolChain::CompilerFlags GoToolChain::compilerFlags(const QStringList &) const
 { return NoFlags; }

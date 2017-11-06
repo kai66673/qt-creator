@@ -33,7 +33,7 @@ GoProjectNode::GoProjectNode(GoProject &project, const Utils::FileName &projectF
     , m_project(project)
 { }
 
-bool GoProjectNode::supportsAction(ProjectExplorer::ProjectAction action, ProjectExplorer::Node *node) const
+bool GoProjectNode::supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const
 {
     switch (node->nodeType()) {
     case ProjectExplorer::NodeType::File:

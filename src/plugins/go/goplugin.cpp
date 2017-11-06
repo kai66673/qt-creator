@@ -43,6 +43,7 @@
 #include "goproject.h"
 #include "gooutlinewidgetfactory.h"
 #include "goeditorconstants.h"
+#include "gorunconfiguration.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -114,6 +115,10 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     ProjectExplorer::ToolChainManager::registerLanguage(GoLang::Constants::C_GOLANGUAGE_ID,
                                                         GoLang::Constants::C_GOLANGUAGE_NAME);
+
+    ProjectExplorer::RunControl::registerWorker<GoLang::GoRunConfiguration, ProjectExplorer::SimpleTargetRunner>
+            (ProjectExplorer::Constants::NORMAL_RUN_MODE);
+
     TextEditor::SnippetProvider::registerGroup(Go::Constants::GO_SNIPPETS_GROUP_ID,
                                                tr("Go", "GoEditor::GoSnippetProvider"),
                                                &::GoEditor::Internal::GoEditor::decorateEditor);

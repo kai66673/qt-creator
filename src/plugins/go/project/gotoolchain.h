@@ -53,7 +53,7 @@ public:
     QString originalTargetTriple() const override;
     bool isValid() const override;
     PredefinedMacrosRunner createPredefinedMacrosRunner() const override;
-    QByteArray predefinedMacros(const QStringList &) const override;
+    ProjectExplorer::Macros predefinedMacros(const QStringList &) const override;
     CompilerFlags compilerFlags(const QStringList &) const override;
     ProjectExplorer::WarningFlags warningFlags(const QStringList &) const override;
     SystemHeaderPathsRunner createSystemHeaderPathsRunner() const override;

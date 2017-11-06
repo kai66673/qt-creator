@@ -1420,12 +1420,11 @@ protected:
 class FuncTypeAST: public TypeAST
 {
 public:
-    TupleTypeAST *_callType;     // 0 is void type
-
-public:
     unsigned t_func;
     FieldGroupAST *params;
     FieldGroupAST *results;
+
+    TupleTypeAST *_callType;     // 0 is void type
 
 public:
     FuncTypeAST(unsigned t_func_ = 0, FieldGroupAST *params_ = 0, FieldGroupAST *results_ = 0, TupleTypeAST *callType_ = 0)

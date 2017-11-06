@@ -43,7 +43,7 @@ class GoRunConfiguration : public ProjectExplorer::RunConfiguration
     Q_OBJECT
 
 public:
-    GoRunConfiguration(ProjectExplorer::Target *parent, Core::Id id);
+    GoRunConfiguration(ProjectExplorer::Target *parent);
 
     QWidget *createConfigurationWidget() override;
     ProjectExplorer::Runnable runnable() const override;

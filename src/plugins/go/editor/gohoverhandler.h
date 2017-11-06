@@ -34,7 +34,6 @@ namespace GoEditor {
 
 class GoHoverHandler : public TextEditor::BaseHoverHandler
 {
-    Q_OBJECT
 public:
     explicit GoHoverHandler();
 

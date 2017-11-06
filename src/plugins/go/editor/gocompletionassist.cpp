@@ -178,9 +178,6 @@ GoCompletionAssistProvider::GoCompletionAssistProvider(QObject *parent)
     : TextEditor::CompletionAssistProvider(parent)
 { }
 
-bool GoCompletionAssistProvider::supportsEditor(Core::Id editorId) const
-{ return editorId == Constants::GOEDITOR_ID; }
-
 TextEditor::IAssistProcessor *GoCompletionAssistProvider::createProcessor() const
 { return new GoCompletionAssistProcessor; }
 

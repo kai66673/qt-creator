@@ -164,6 +164,8 @@ void GoProject::collectProjectFiles()
 
 void GoProject::updateProject()
 {
+    emitParsingStarted();
+
     const QStringList oldFiles = m_files;
     m_files.clear();
 
@@ -191,7 +193,8 @@ void GoProject::updateProject()
     newRoot->setDisplayName(displayName());
     newRoot->addNestedNodes(fileNodes);
     setRootProjectNode(newRoot);
-    emit parsingFinished();
+
+    emitParsingFinished(true);
 
     QSet<QString> oldFilesSet = oldFiles.toSet();
     QSet<QString> newFilesSet = m_files.toSet();
