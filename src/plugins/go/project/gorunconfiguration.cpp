@@ -55,9 +55,6 @@ GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent)
     addExtraAspect(m_terminalAspect);
     addExtraAspect(m_localEnvironmentAspect);
 
-    setDisplayName(tr(Constants::C_GORUNCONFIGURATION_DISPLAY));
-    setDefaultDisplayName(tr(Constants::C_GORUNCONFIGURATION_DEFAULT_DISPLAY));
-
     // Connect target signals
     connect(this->target(), &Target::activeBuildConfigurationChanged,
             this, &GoRunConfiguration::updateConfiguration);
@@ -118,6 +115,9 @@ void GoRunConfiguration::updateConfiguration()
     const QFileInfo outFileInfo = buildConfiguration->outFilePath().toFileInfo();
     setExecutable(outFileInfo.absoluteFilePath());
     setWorkingDirectory(outFileInfo.absoluteDir().absolutePath());
+
+    setDisplayName(outFileInfo.absoluteFilePath());
+    setDefaultDisplayName(outFileInfo.absoluteFilePath());
 }
 
 void GoRunConfiguration::setActiveBuildConfiguration(GoBuildConfiguration *activeBuildConfiguration)

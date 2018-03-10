@@ -1,7 +1,6 @@
 include(../../qtcreatorplugin.pri)
 
 DEFINES += GOEDITOR_LIBRARY
-CONFIG += c++11
 
 INCLUDEPATH += $$PWD
 INCLUDEPATH += $$PWD/editor
