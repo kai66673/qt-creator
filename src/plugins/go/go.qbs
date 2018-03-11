@@ -86,6 +86,7 @@ QtcPlugin {
             "gogeneralsettingspage.cpp", "gogeneralsettingspage.h",
             "gogeneralsettingspagewidget.cpp", "gogeneralsettingspagewidget.h", "gogeneralsettingspagewidget.ui",
             "gosettings.cpp", "gosettings.h",
+            "goconfigurations.cpp", "goconfigurations.h", 
             "gotoolssettings.cpp", "gotoolssettings.h",
             "gotoolssettingspage.cpp", "gotoolssettingspage.h",
             "gotoolssettingspagewidget.cpp", "gotoolssettingspagewidget.h", "gotoolssettingspagewidget.ui"

@@ -58,6 +58,7 @@ signals:
 
 private:
     void createActions();
+    void kitsRestored();
 
     static GoPlugin *m_instance;
     GoPluginPrivate *d;

@@ -44,6 +44,7 @@
 #include "gooutlinewidgetfactory.h"
 #include "goeditorconstants.h"
 #include "gorunconfiguration.h"
+#include "goconfigurations.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -51,6 +52,7 @@
 #include <coreplugin/icore.h>
 #include <coreplugin/jsexpander.h>
 #include <coreplugin/iwizardfactory.h>
+#include <projectexplorer/kitmanager.h>
 #include <projectexplorer/projectmanager.h>
 #include <projectexplorer/toolchainmanager.h>
 #include <texteditor/texteditorconstants.h>
@@ -111,6 +113,8 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     Q_UNUSED(arguments)
     Q_UNUSED(errorMessage)
 
+    GoLang::GoConfigurations::initialize();
+
     qRegisterMetaType<GoTools::GoSource::Ptr>("GoTools::GoSource::Ptr");
 
     ProjectExplorer::ToolChainManager::registerLanguage(GoLang::Constants::C_GOLANGUAGE_ID,
@@ -157,7 +161,11 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 }
 
 void GoPlugin::extensionsInitialized()
-{ GoTools::GoCodeModelManager::instance()->indexPackageDirs();}
+{
+    GoTools::GoCodeModelManager::instance()->indexPackageDirs();
+    connect(ProjectExplorer::KitManager::instance(), &ProjectExplorer::KitManager::kitsLoaded,
+            this, &GoPlugin::kitsRestored);
+}
 
 ExtensionSystem::IPlugin::ShutdownFlag GoPlugin::aboutToShutdown()
 {
@@ -236,6 +244,13 @@ void GoPlugin::createActions()
     connect(d->m_renameSymbolUnderCursorAction, &QAction::triggered, this, &GoPlugin::renameSymbolUnderCursor);
     contextMenu->addAction(cmd);
     goToolsMenu->addAction(cmd);
+}
+
+void GoPlugin::kitsRestored()
+{
+    disconnect(ProjectExplorer::KitManager::instance(), &ProjectExplorer::KitManager::kitsLoaded,
+               this, &GoPlugin::kitsRestored);
+    GoLang::GoConfigurations::updateAutomaticKitList();
 }
 
 }   // namespace Internal
