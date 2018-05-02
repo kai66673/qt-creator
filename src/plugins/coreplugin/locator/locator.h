@@ -26,24 +26,18 @@
 #pragma once
 
 #include "ilocatorfilter.h"
-#include "directoryfilter.h"
-#include "executefilter.h"
 #include "locatorconstants.h"
 
 #include <coreplugin/actionmanager/command.h>
 
-#include <QFutureWatcher>
 #include <QObject>
 #include <QTimer>
 
 namespace Core {
 namespace Internal {
 
-class CorePlugin;
-class OpenDocumentsFilter;
-class FileSystemFilter;
+class LocatorData;
 class LocatorSettingsPage;
-class ExternalToolsFilter;
 
 class Locator : public QObject
 {
@@ -55,7 +49,7 @@ public:
 
     static Locator *instance();
 
-    void initialize(CorePlugin *corePlugin, const QStringList &arguments, QString *errorMessage);
+    void initialize();
     void extensionsInitialized();
     bool delayedInitialize();
 
@@ -63,7 +57,7 @@ public:
     QList<ILocatorFilter *> customFilters();
     void setFilters(QList<ILocatorFilter *> f);
     void setCustomFilters(QList<ILocatorFilter *> f);
-    int refreshInterval();
+    int refreshInterval() const;
     void setRefreshInterval(int interval);
 
 signals:
@@ -71,26 +65,21 @@ signals:
 
 public slots:
     void refresh(QList<ILocatorFilter *> filters = QList<ILocatorFilter *>());
-    void saveSettings();
+    void saveSettings() const;
 
 private:
     void loadSettings();
     void updateFilterActions();
     void updateEditorManagerPlaceholderText();
 
-    LocatorSettingsPage *m_settingsPage;
+    LocatorSettingsPage *m_settingsPage = nullptr;
+    LocatorData *m_locatorData = nullptr;
 
     bool m_settingsInitialized = false;
     QList<ILocatorFilter *> m_filters;
     QList<ILocatorFilter *> m_customFilters;
     QMap<Id, QAction *> m_filterActionMap;
-    int m_refreshInterval;
     QTimer m_refreshTimer;
-    OpenDocumentsFilter *m_openDocumentsFilter;
-    FileSystemFilter *m_fileSystemFilter;
-    ExecuteFilter *m_executeFilter;
-    CorePlugin *m_corePlugin = nullptr;
-    ExternalToolsFilter *m_externalToolsFilter;
 };
 
 } // namespace Internal

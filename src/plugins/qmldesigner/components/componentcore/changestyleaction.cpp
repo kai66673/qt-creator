@@ -38,9 +38,9 @@ static QString styleConfigFileName(const QString &qmlFileName)
     ProjectExplorer::Project *currentProject = ProjectExplorer::SessionManager::projectForFile(Utils::FileName::fromString(qmlFileName));
 
     if (currentProject)
-        foreach (const QString &fileName, currentProject->files(ProjectExplorer::Project::SourceFiles))
+        foreach (const Utils::FileName &fileName, currentProject->files(ProjectExplorer::Project::SourceFiles))
             if (fileName.endsWith("qtquickcontrols2.conf"))
-                return fileName;
+                return fileName.toString();
 
     return QString();
 }
@@ -64,6 +64,8 @@ QWidget *ChangeStyleWidgetAction::createWidget(QWidget *parent)
     QComboBox *comboBox = new QComboBox(parent);
     comboBox->setToolTip(tr(enabledTooltip));
     comboBox->addItem("Default");
+    comboBox->addItem("Fusion");
+    comboBox->addItem("Imagine");
     comboBox->addItem("Material");
     comboBox->addItem("Universal");
     comboBox->setEditable(true);

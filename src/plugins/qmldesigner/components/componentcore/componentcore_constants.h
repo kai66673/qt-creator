@@ -35,6 +35,7 @@ const char rootCategory[] = "";
 
 const char selectionCategory[] = "Selection";
 const char stackCategory[] = "Stack (z)";
+const char qmlPreviewCategory[] = "QmlPreview";
 const char editCategory[] = "Edit";
 const char anchorsCategory[] = "Anchors";
 const char positionCategory[] = "Position";
@@ -136,7 +137,7 @@ const char lowerToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Lower s
 const char resetSizeToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Reset size and use implicit size.");
 const char resetPositionTooltip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Reset position and use implicit position.");
 
-const char anchorsFillToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Fill selected item to parent. ");
+const char anchorsFillToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Fill selected item to parent.");
 const char anchorsResetToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Reset anchors for selected item.");
 
 const char layoutColumnLayoutToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Layout selected items in column layout.");
@@ -147,8 +148,9 @@ const char increaseIndexOfStackedContainerToolTip[] = QT_TRANSLATE_NOOP("QmlDesi
 const char decreaseIndexOfStackedContainerToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Decrease index of stacked container.");
 const char addItemToStackedContainerToolTip[] = QT_TRANSLATE_NOOP("QmlDesignerContextMenu", "Add item to stacked container.");
 
-const int priorityFirst = 220;
-const int prioritySelectionCategory = 200;
+const int priorityFirst = 240;
+const int prioritySelectionCategory = 220;
+const int priorityQmlPreviewCategory = 200;
 const int priorityStackCategory = 180;
 const int priorityEditCategory = 160;
 const int priorityAnchorsCategory = 140;
@@ -161,6 +163,8 @@ const int priorityRefactoring = 60;
 const int priorityGoIntoComponent = 40;
 const int priorityGenericToolBar = 50;
 const int priorityLast = 60;
+
+const char addImagesDisplayString[] = QT_TRANSLATE_NOOP("QmlDesignerAddResources", "Image Files");
 
 } //ComponentCoreConstants
 

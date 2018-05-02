@@ -110,7 +110,7 @@ class ToolChainOptionsWidget : public QWidget
 public:
     ToolChainOptionsWidget()
     {
-        m_factories = ExtensionSystem::PluginManager::getObjects<ToolChainFactory>(
+        m_factories = Utils::filtered(ToolChainFactory::allToolChainFactories(),
                     [](ToolChainFactory *factory) { return factory->canCreate();});
 
         m_model.setHeader({ToolChainOptionsPage::tr("Name"), ToolChainOptionsPage::tr("Type")});
@@ -432,10 +432,10 @@ ToolChainOptionsPage::ToolChainOptionsPage()
 {
     setId(Constants::TOOLCHAIN_SETTINGS_PAGE_ID);
     setDisplayName(tr("Compilers"));
-    setCategory(Constants::PROJECTEXPLORER_SETTINGS_CATEGORY);
+    setCategory(Constants::KITS_SETTINGS_CATEGORY);
     setDisplayCategory(QCoreApplication::translate("ProjectExplorer",
-        Constants::PROJECTEXPLORER_SETTINGS_TR_CATEGORY));
-    setCategoryIcon(Utils::Icon(Constants::PROJECTEXPLORER_SETTINGS_CATEGORY_ICON));
+        Constants::KITS_SETTINGS_TR_CATEGORY));
+    setCategoryIcon(Utils::Icon(Constants::KITS_SETTINGS_CATEGORY_ICON));
 }
 
 QWidget *ToolChainOptionsPage::widget()

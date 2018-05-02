@@ -77,14 +77,14 @@ MessageEnvelop ReadMessageBlock::read()
     return message;
 }
 
-QVector<MessageEnvelop> ReadMessageBlock::readAll()
+std::vector<MessageEnvelop> ReadMessageBlock::readAll()
 {
-    QVector<MessageEnvelop> messages;
+    std::vector<MessageEnvelop> messages;
 
     while (true) {
-        const MessageEnvelop message = read();
+        MessageEnvelop message = read();
         if (message.isValid())
-            messages.append(message);
+            messages.push_back(std::move(message));
         else
             return messages;
     }
@@ -92,9 +92,14 @@ QVector<MessageEnvelop> ReadMessageBlock::readAll()
     Q_UNREACHABLE();
 }
 
-void ReadMessageBlock::resetCounter()
+void ReadMessageBlock::resetState()
 {
     m_messageCounter = 0;
+}
+
+void ReadMessageBlock::setIoDevice(QIODevice *ioDevice)
+{
+    m_ioDevice = ioDevice;
 }
 
 bool ReadMessageBlock::isTheWholeMessageReadable(QDataStream &in)

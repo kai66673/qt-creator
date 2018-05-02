@@ -35,17 +35,16 @@ public:
     ClangCodeModelConnectionClient(ClangCodeModelClientInterface *client);
     ~ClangCodeModelConnectionClient();
 
-
     ClangCodeModelServerProxy &serverProxy();
 
 protected:
     void sendEndCommand() override;
-    void resetCounter() override;
-    QString connectionName() const override;
+    void resetState() override;
     QString outputName() const override;
+    void newConnectedServer(QIODevice *ioDevice) override;
 
 private:
-    ClangCodeModelServerProxy serverProxy_;
+    ClangCodeModelServerProxy m_serverProxy;
 };
 
 } // namespace ClangBackEnd

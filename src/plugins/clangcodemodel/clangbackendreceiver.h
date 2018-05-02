@@ -27,6 +27,7 @@
 
 #include <cpptools/cppcursorinfo.h>
 #include <cpptools/cppsymbolinfo.h>
+#include <cpptools/baseeditordocumentprocessor.h>
 
 #include <clangsupport/clangcodemodelclientinterface.h>
 
@@ -55,9 +56,10 @@ public:
 
     QFuture<CppTools::CursorInfo>
     addExpectedReferencesMessage(quint64 ticket,
-                                 QTextDocument *textDocument,
-                                 const CppTools::SemanticInfo::LocalUseMap &localUses);
+                                 const CppTools::SemanticInfo::LocalUseMap &localUses
+                                     = CppTools::SemanticInfo::LocalUseMap());
     QFuture<CppTools::SymbolInfo> addExpectedRequestFollowSymbolMessage(quint64 ticket);
+    QFuture<CppTools::ToolTipInfo> addExpectedToolTipMessage(quint64 ticket);
     bool isExpectingCodeCompletedMessage() const;
 
     void reset();
@@ -69,6 +71,7 @@ private:
 
     void documentAnnotationsChanged(const ClangBackEnd::DocumentAnnotationsChangedMessage &message) override;
     void references(const ClangBackEnd::ReferencesMessage &message) override;
+    void tooltip(const ClangBackEnd::ToolTipMessage &message) override;
     void followSymbol(const ClangBackEnd::FollowSymbolMessage &message) override;
 
 private:
@@ -78,17 +81,14 @@ private:
     struct ReferencesEntry {
         ReferencesEntry() = default;
         ReferencesEntry(QFutureInterface<CppTools::CursorInfo> futureInterface,
-                        QTextDocument *textDocument,
                         const CppTools::SemanticInfo::LocalUseMap &localUses)
             : futureInterface(futureInterface)
-            , textDocument(textDocument)
             , localUses(localUses) {}
         QFutureInterface<CppTools::CursorInfo> futureInterface;
-        QPointer<QTextDocument> textDocument;
         CppTools::SemanticInfo::LocalUseMap localUses;
     };
     QHash<quint64, ReferencesEntry> m_referencesTable;
-
+    QHash<quint64, QFutureInterface<CppTools::ToolTipInfo>> m_toolTipsTable;
     QHash<quint64, QFutureInterface<CppTools::SymbolInfo>> m_followTable;
 };
 

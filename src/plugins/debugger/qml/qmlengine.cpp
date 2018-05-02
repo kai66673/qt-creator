@@ -87,6 +87,7 @@
 # define XSDEBUG(s) qDebug() << s
 
 #define CB(callback) [this](const QVariantMap &r) { callback(r); }
+#define CHECK_STATE(s) do { checkState(s, __FILE__, __LINE__); } while (0)
 
 using namespace Core;
 using namespace ProjectExplorer;
@@ -222,7 +223,7 @@ public:
     bool contextEvaluate = false;
 
     QTimer connectionTimer;
-    QmlDebug::QDebugMessageClient *msgClient = 0;
+    QmlDebug::QDebugMessageClient *msgClient = nullptr;
 
     QHash<int, QmlCallback> callbackForToken;
     QMetaObject::Connection startupMessageFilterConnection;
@@ -321,16 +322,6 @@ void QmlEngine::setState(DebuggerState state, bool forced)
     updateCurrentContext();
 }
 
-void QmlEngine::setupInferior()
-{
-    QTC_ASSERT(state() == InferiorSetupRequested, qDebug() << state());
-
-    notifyInferiorSetupOk();
-
-    if (d->automaticConnect)
-        beginConnection();
-}
-
 void QmlEngine::handleLauncherStarted()
 {
     // FIXME: The QmlEngine never calls notifyInferiorPid() triggering the
@@ -357,12 +348,9 @@ void QmlEngine::tryToConnect()
     showMessage("QML Debugger: Trying to connect ...", LogStatus);
     d->retryOnConnectFail = true;
     if (state() == EngineRunRequested) {
-        if (isSlaveEngine()) {
+        if (isDying()) {
             // Probably cpp is being debugged and hence we did not get the output yet.
-            if (!masterEngine()->isDying())
-                beginConnection();
-            else
-                appStartupFailed(tr("No application output received in time"));
+            appStartupFailed(tr("No application output received in time"));
         } else {
             beginConnection();
         }
@@ -559,6 +547,7 @@ void QmlEngine::stopApplicationLauncher()
 
 void QmlEngine::shutdownInferior()
 {
+    CHECK_STATE(InferiorShutdownRequested);
     // End session.
     //    { "seq"     : <number>,
     //      "type"    : "request",
@@ -571,7 +560,7 @@ void QmlEngine::shutdownInferior()
     stopApplicationLauncher();
     closeConnection();
 
-    notifyInferiorShutdownOk();
+    notifyInferiorShutdownFinished();
 }
 
 void QmlEngine::shutdownEngine()
@@ -583,7 +572,7 @@ void QmlEngine::shutdownEngine()
    // double check (ill engine?):
     stopApplicationLauncher();
 
-    notifyEngineShutdownOk();
+    notifyEngineShutdownFinished();
     if (!isSlaveEngine())
         showMessage(QString(), StatusBar);
 }
@@ -591,6 +580,9 @@ void QmlEngine::shutdownEngine()
 void QmlEngine::setupEngine()
 {
     notifyEngineSetupOk();
+
+    if (d->automaticConnect)
+        beginConnection();
 }
 
 void QmlEngine::continueInferior()
@@ -784,7 +776,7 @@ void QmlEngine::attemptBreakpointSynchronization()
 
     BreakHandler *handler = breakHandler();
 
-    DebuggerEngine *bpOwner = isSlaveEngine() ? masterEngine() : this;
+    DebuggerEngine *bpOwner = masterEngine();
     foreach (Breakpoint bp, handler->unclaimedBreakpoints()) {
         // Take ownership of the breakpoint. Requests insertion.
         if (acceptsBreakpoint(bp))
@@ -946,7 +938,7 @@ static ConsoleItem *constructLogItemTree(const QVariant &result,
         return 0;
 
     QString text;
-    ConsoleItem *item = 0;
+    ConsoleItem *item = nullptr;
     if (result.type() == QVariant::Map) {
         if (key.isEmpty())
             text = "Object";
@@ -1030,7 +1022,8 @@ void QmlEngine::quitDebugger()
 {
     d->automaticConnect = false;
     d->retryOnConnectFail = false;
-    shutdownInferior();
+    stopApplicationLauncher();
+    closeConnection();
 }
 
 void QmlEngine::doUpdateLocals(const UpdateParameters &params)
@@ -1117,7 +1110,7 @@ void QmlEngine::executeDebuggerCommand(const QString &command, DebuggerLanguages
 void QmlEnginePrivate::updateScriptSource(const QString &fileName, int lineOffset, int columnOffset,
                                           const QString &source)
 {
-    QTextDocument *document = 0;
+    QTextDocument *document = nullptr;
     if (sourceDocuments.contains(fileName)) {
         document = sourceDocuments.value(fileName);
     } else {
@@ -1326,7 +1319,7 @@ void QmlEnginePrivate::handleEvaluateExpression(const QVariantMap &response,
     }
     insertSubItems(item, body.properties);
     watchHandler->insertItem(item);
-    watchHandler->updateWatchersWindow();
+    watchHandler->updateLocalsWindow();
 }
 
 void QmlEnginePrivate::lookup(const LookupItems &items)

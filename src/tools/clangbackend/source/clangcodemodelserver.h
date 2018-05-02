@@ -42,6 +42,12 @@
 
 namespace ClangBackEnd {
 
+struct DocumentResetInfo {
+    Document documentToRemove;
+    FileContainer fileContainer;
+};
+using DocumentResetInfos = QVector<DocumentResetInfo>;
+
 class ClangCodeModelServer : public ClangCodeModelServerInterface,
                              public IpcClientProvider<ClangCodeModelClientInterface>
 {
@@ -61,6 +67,7 @@ public:
     void requestDocumentAnnotations(const RequestDocumentAnnotationsMessage &message) override;
     void requestReferences(const RequestReferencesMessage &message) override;
     void requestFollowSymbol(const RequestFollowSymbolMessage &message) override;
+    void requestToolTip(const RequestToolTipMessage &message) override;
 
 public: // for tests
     const Documents &documentsForTestOnly() const;
@@ -72,14 +79,16 @@ public: // for tests
     DocumentProcessors &documentProcessors();
 
 private:
-    void startDocumentAnnotationsTimerIfFileIsNotOpenAsDocument(const Utf8String &filePath);
-
     void processInitialJobsForDocuments(const std::vector<Document> &documents);
     void processJobsForDirtyAndVisibleDocuments();
     void processJobsForDirtyCurrentDocument();
     void processTimerForVisibleButNotCurrentDocuments();
-    void processJobsForDirtyAndVisibleButNotCurrentDocuments();
     void processSuspendResumeJobs(const std::vector<Document> &documents);
+
+    void categorizeFileContainers(const QVector<FileContainer> &fileContainers,
+                                  QVector<FileContainer> &toCreate,
+                                  DocumentResetInfos &toReset) const;
+    std::vector<Document> resetDocuments(const DocumentResetInfos &infos);
 
     void addAndRunUpdateJobs(std::vector<Document> documents);
 

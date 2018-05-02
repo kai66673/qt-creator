@@ -460,7 +460,6 @@ int ServerModeReader::calculateProgress(const int minRange, const int min, const
 void ServerModeReader::extractCodeModelData(const QVariantMap &data)
 {
     const QVariantList configs = data.value("configurations").toList();
-    QTC_CHECK(configs.count() == 1); // FIXME: Support several configurations!
     for (const QVariant &c : configs) {
         const QVariantMap &cData = c.toMap();
         extractConfigurationData(cData);
@@ -813,7 +812,7 @@ void ServerModeReader::addTargets(const QHash<Utils::FileName, ProjectExplorer::
                 if (cr->type != CrossReference::TARGET) {
                     if (path == targetPath) {
                         if (bt->line >= 0)
-                            dn = tr("%1 in line %3").arg(btName).arg(bt->line);
+                            dn = tr("%1 in line %2").arg(btName).arg(bt->line);
                         else
                             dn = tr("%1").arg(btName);
                     } else {
@@ -842,6 +841,11 @@ void ServerModeReader::addFileGroups(ProjectNode *targetRoot,
 {
     QList<FileNode *> toList;
     QSet<Utils::FileName> alreadyListed;
+    // Files already added by other configurations:
+    targetRoot->forEachGenericNode([&alreadyListed](const Node *n) {
+        alreadyListed.insert(n->filePath());
+    });
+
     for (const FileGroup *f : fileGroups) {
         const QList<FileName> newSources = Utils::filtered(f->sources, [&alreadyListed](const Utils::FileName &fn) {
             const int count = alreadyListed.count();

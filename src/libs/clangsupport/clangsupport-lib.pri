@@ -16,6 +16,8 @@ SOURCES += \
     $$PWD/clangcodemodelconnectionclient.cpp \
     $$PWD/clangcodemodelserverinterface.cpp \
     $$PWD/clangcodemodelserverproxy.cpp \
+    $$PWD/clangpathwatcherinterface.cpp \
+    $$PWD/clangpathwatchernotifier.cpp \
     $$PWD/cmbalivemessage.cpp \
     $$PWD/cmbcodecompletedmessage.cpp \
     $$PWD/cmbcompletecodemessage.cpp \
@@ -39,7 +41,6 @@ SOURCES += \
     $$PWD/filepath.cpp \
     $$PWD/fixitcontainer.cpp \
     $$PWD/followsymbolmessage.cpp \
-    $$PWD/highlightingmarkcontainer.cpp \
     $$PWD/ipcclientinterface.cpp \
     $$PWD/ipcinterface.cpp \
     $$PWD/ipcserverinterface.cpp \
@@ -67,26 +68,37 @@ SOURCES += \
     $$PWD/requestsourcelocationforrenamingmessage.cpp \
     $$PWD/requestsourcerangesanddiagnosticsforquerymessage.cpp \
     $$PWD/requestsourcerangesforquerymessage.cpp \
+    $$PWD/requesttooltipmessage.cpp \
     $$PWD/sourcelocationcontainer.cpp \
     $$PWD/sourcelocationcontainerv2.cpp \
     $$PWD/sourcelocationscontainer.cpp \
     $$PWD/sourcelocationsforrenamingmessage.cpp \
     $$PWD/sourcerangecontainer.cpp \
+    $$PWD/processcreator.cpp \
+    $$PWD/processexception.cpp \
+    $$PWD/processstartedevent.cpp \
     $$PWD/sourcerangecontainerv2.cpp \
     $$PWD/sourcerangesanddiagnosticsforquerymessage.cpp \
     $$PWD/sourcerangescontainer.cpp \
     $$PWD/sourcerangesforquerymessage.cpp \
     $$PWD/sourcerangewithtextcontainer.cpp \
+    $$PWD/tokeninfocontainer.cpp \
+    $$PWD/tooltipmessage.cpp \
+    $$PWD/tooltipinfo.cpp \
     $$PWD/unregisterunsavedfilesforeditormessage.cpp \
     $$PWD/updatepchprojectpartsmessage.cpp \
     $$PWD/updatetranslationunitsforeditormessage.cpp \
     $$PWD/updatevisibletranslationunitsmessage.cpp \
     $$PWD/writemessageblock.cpp \
     $$PWD/filepathcaching.cpp \
-    $$PWD/filepathid.cpp
+    $$PWD/filepathid.cpp \
+    $$PWD/baseserverproxy.cpp
 
 HEADERS += \
     $$PWD/cancelmessage.h \
+    $$PWD/clangpathwatcher.h \
+    $$PWD/clangpathwatcherinterface.h \
+    $$PWD/clangpathwatchernotifier.h \
     $$PWD/clangsupportdebugutils.h \
     $$PWD/clangsupport_global.h \
     $$PWD/clangcodemodelclientinterface.h \
@@ -120,10 +132,9 @@ HEADERS += \
     $$PWD/dynamicmatcherdiagnostics.h \
     $$PWD/filecontainer.h \
     $$PWD/filecontainerv2.h \
-    $$PWD/filepath.h \
     $$PWD/fixitcontainer.h \
     $$PWD/followsymbolmessage.h \
-    $$PWD/highlightingmarkcontainer.h \
+    $$PWD/idpaths.h \
     $$PWD/ipcclientinterface.h \
     $$PWD/ipcinterface.h \
     $$PWD/ipcserverinterface.h \
@@ -151,17 +162,26 @@ HEADERS += \
     $$PWD/requestsourcelocationforrenamingmessage.h \
     $$PWD/requestsourcerangesanddiagnosticsforquerymessage.h \
     $$PWD/requestsourcerangesforquerymessage.h \
+    $$PWD/requesttooltipmessage.h \
     $$PWD/sourcelocationcontainer.h \
     $$PWD/sourcelocationcontainerv2.h \
     $$PWD/sourcelocationscontainer.h \
     $$PWD/sourcelocationsforrenamingmessage.h \
     $$PWD/sourcerangecontainer.h \
+    $$PWD/filepath.h \
+    $$PWD/processcreator.h \
+    $$PWD/processexception.h \
+    $$PWD/processhandle.h \
+    $$PWD/processstartedevent.h \
     $$PWD/sourcerangecontainerv2.h \
     $$PWD/sourcerangesanddiagnosticsforquerymessage.h \
     $$PWD/sourcerangescontainer.h \
     $$PWD/sourcerangesforquerymessage.h \
     $$PWD/sourcerangewithtextcontainer.h \
     $$PWD/stringcache.h \
+    $$PWD/tokeninfocontainer.h \
+    $$PWD/tooltipmessage.h \
+    $$PWD/tooltipinfo.h \
     $$PWD/unregisterunsavedfilesforeditormessage.h \
     $$PWD/updatepchprojectpartsmessage.h \
     $$PWD/updatetranslationunitsforeditormessage.h \
@@ -181,6 +201,11 @@ HEADERS += \
     $$PWD/filepathexceptions.h \
     $$PWD/filepathcachinginterface.h \
     $$PWD/filepathcaching.h \
-    $$PWD/filepathcachingfwd.h
+    $$PWD/filepathcachingfwd.h \
+    $$PWD/baseserverproxy.h \
+    $$PWD/filepath.h \
+    $$PWD/nativefilepath.h \
+    $$PWD/filepathview.h \
+    $$PWD/compilermacro.h
 
 contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols

@@ -45,6 +45,7 @@ public:
     virtual ~CompilerOptionsBuilder() {}
 
     virtual void addTargetTriple();
+    virtual void addExtraCodeModelFlags();
     virtual void enableExceptions();
     virtual void addPredefinedHeaderPathsOptions();
     virtual void addLanguageOption(ProjectFile::Kind fileKind);
@@ -64,11 +65,12 @@ public:
     void addWordWidth();
     void addHeaderPathOptions();
     void addPrecompiledHeaderOptions(PchUsage pchUsage);
-    void addToolchainAndProjectMacros();
+    virtual void addToolchainAndProjectMacros();
     void addMacros(const ProjectExplorer::Macros &macros);
 
     void addMsvcCompatibilityVersion();
     void undefineCppLanguageFeatureMacrosForMsvc2015();
+    void addDefineFunctionMacrosMsvc();
 
     void addProjectConfigFileInclude();
     void undefineClangVersionMacrosForMsvc();
@@ -89,10 +91,17 @@ private:
     QByteArray toDefineOption(const ProjectExplorer::Macro &macro) const;
     QString defineDirectiveToDefineOption(const ProjectExplorer::Macro &marco) const;
     QString clangIncludeDirectory() const;
+    void addClangIncludeFolder();
 
     QStringList m_options;
     QString m_clangVersion;
     QString m_clangResourceDirectory;
 };
+
+template<class T>
+T clangIncludePath(const T &clangVersion)
+{
+    return "/lib/clang/" + clangVersion + "/include";
+}
 
 } // namespace CppTools

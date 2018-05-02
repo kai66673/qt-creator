@@ -32,6 +32,7 @@
 #include <cpptools/cppmodelmanager.h>
 #include <cpptools/cpptoolsreuse.h>
 #include <texteditor/texteditor.h>
+#include <utils/utilsicons.h>
 
 #include <QIcon>
 
@@ -43,21 +44,31 @@ TestTreeItem::TestTreeItem(const QString &name, const QString &filePath, Type ty
       m_filePath(filePath),
       m_type(type)
 {
-    m_checked = (m_type == TestCase || m_type == TestFunctionOrSet || m_type == Root)
-            ? Qt::Checked : Qt::Unchecked;
+    switch (m_type) {
+    case Root:
+    case GroupNode:
+    case TestCase:
+    case TestFunctionOrSet:
+        m_checked = Qt::Checked;
+        break;
+    default:
+        m_checked = Qt::Unchecked;
+        break;
+    }
 }
 
 static QIcon testTreeIcon(TestTreeItem::Type type)
 {
     static QIcon icons[] = {
         QIcon(),
+        Utils::Icons::OPENFILE.icon(),
         CPlusPlus::Icons::iconForType(CPlusPlus::Icons::ClassIconType),
         CPlusPlus::Icons::iconForType(CPlusPlus::Icons::SlotPrivateIconType),
         QIcon(":/images/data.png")
     };
 
     if (int(type) >= int(sizeof icons / sizeof *icons))
-        return icons[2];
+        return icons[3];
     return icons[type];
 }
 
@@ -76,8 +87,10 @@ QVariant TestTreeItem::data(int /*column*/, int role) const
     case Qt::CheckStateRole:
         return QVariant();
     case LinkRole: {
+        if (m_type == GroupNode)
+            return QVariant();
         QVariant itemLink;
-        itemLink.setValue(TextEditor::TextEditorWidget::Link(m_filePath, m_line, m_column));
+        itemLink.setValue(Utils::Link(m_filePath, m_line, m_column));
         return itemLink;
     }
     case ItalicRole:
@@ -93,9 +106,9 @@ QVariant TestTreeItem::data(int /*column*/, int role) const
 bool TestTreeItem::setData(int /*column*/, const QVariant &data, int role)
 {
     if (role == Qt::CheckStateRole) {
-        Qt::CheckState old = checked();
-        setChecked((Qt::CheckState)data.toInt());
-        return checked() != old;
+        Qt::CheckState old = m_checked;
+        m_checked = (Qt::CheckState)data.toInt();
+        return m_checked != old;
     }
     return false;
 }
@@ -105,6 +118,7 @@ Qt::ItemFlags TestTreeItem::flags(int /*column*/) const
     static const Qt::ItemFlags defaultFlags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
     switch (m_type) {
     case Root:
+    case GroupNode:
         return Qt::ItemIsEnabled | Qt::ItemIsAutoTristate | Qt::ItemIsUserCheckable;
     case TestCase:
         return defaultFlags | Qt::ItemIsAutoTristate | Qt::ItemIsUserCheckable;
@@ -154,37 +168,11 @@ bool TestTreeItem::modifyLineAndColumn(const TestParseResult *result)
     return hasBeenModified;
 }
 
-void TestTreeItem::setChecked(const Qt::CheckState checkState)
-{
-    switch (m_type) {
-    case TestDataTag: {
-        m_checked = (checkState == Qt::Unchecked ? Qt::Unchecked : Qt::Checked);
-        if (auto parent = parentItem())
-            parent->revalidateCheckState();
-        break;
-    }
-    case Root:
-    case TestFunctionOrSet:
-    case TestCase: {
-        Qt::CheckState usedState = (checkState == Qt::Unchecked ? Qt::Unchecked : Qt::Checked);
-        for (int row = 0, count = childCount(); row < count; ++row)
-            childItem(row)->setChecked(usedState);
-        m_checked = usedState;
-        if (m_type != Root) {
-            if (auto parent = parentItem())
-                parent->revalidateCheckState();
-        }
-        break;
-    }
-    default:
-        return;
-    }
-}
-
 Qt::CheckState TestTreeItem::checked() const
 {
     switch (m_type) {
     case Root:
+    case GroupNode:
     case TestCase:
     case TestFunctionOrSet:
     case TestDataTag:
@@ -268,10 +256,11 @@ bool TestTreeItem::lessThan(const TestTreeItem *other, SortMode mode) const
             return index().row() > other->index().row();
         return lhs > rhs;
     case Naturally: {
-        const TextEditor::TextEditorWidget::Link &leftLink =
-                data(0, LinkRole).value<TextEditor::TextEditorWidget::Link>();
-        const TextEditor::TextEditorWidget::Link &rightLink =
-                other->data(0, LinkRole).value<TextEditor::TextEditorWidget::Link>();
+        if (m_type == GroupNode && other->type() == GroupNode)
+            return m_filePath > other->filePath();
+
+        const Utils::Link &leftLink = data(0, LinkRole).value<Utils::Link>();
+        const Utils::Link &rightLink = other->data(0, LinkRole).value<Utils::Link>();
         if (leftLink.targetFileName == rightLink.targetFileName) {
             return leftLink.targetLine == rightLink.targetLine
                     ? leftLink.targetColumn > rightLink.targetColumn
@@ -282,6 +271,16 @@ bool TestTreeItem::lessThan(const TestTreeItem *other, SortMode mode) const
     default:
         return true;
     }
+}
+
+bool TestTreeItem::isGroupNodeFor(const TestTreeItem *other) const
+{
+    QTC_ASSERT(other, return false);
+    if (type() != TestTreeItem::GroupNode)
+        return false;
+
+    // for now there's only the possibility to have 'Folder' nodes
+    return QFileInfo(other->filePath()).absolutePath() == filePath();
 }
 
 QSet<QString> TestTreeItem::internalTargets() const
@@ -298,41 +297,6 @@ QSet<QString> TestTreeItem::internalTargets() const
             targets.unite(TestTreeItem::dependingInternalTargets(cppMM, m_filePath));
     }
     return targets;
-}
-
-void TestTreeItem::revalidateCheckState()
-{
-    const Type ttiType = type();
-    if (ttiType != TestCase && ttiType != TestFunctionOrSet && ttiType != Root)
-        return;
-    if (childCount() == 0) // can this happen? (we're calling revalidateCS() on parentItem()
-        return;
-    bool foundChecked = false;
-    bool foundUnchecked = false;
-    bool foundPartiallyChecked = false;
-    for (int row = 0, count = childCount(); row < count; ++row) {
-        TestTreeItem *child = childItem(row);
-        switch (child->type()) {
-        case TestDataFunction:
-        case TestSpecialFunction:
-            continue;
-        default:
-            break;
-        }
-
-        foundChecked |= (child->checked() == Qt::Checked);
-        foundUnchecked |= (child->checked() == Qt::Unchecked);
-        foundPartiallyChecked |= (child->checked() == Qt::PartiallyChecked);
-        if (foundPartiallyChecked || (foundChecked && foundUnchecked)) {
-            m_checked = Qt::PartiallyChecked;
-            if (ttiType == TestFunctionOrSet || ttiType == TestCase)
-                parentItem()->revalidateCheckState();
-            return;
-        }
-    }
-    m_checked = (foundUnchecked ? Qt::Unchecked : Qt::Checked);
-    if (ttiType == TestFunctionOrSet || ttiType == TestCase)
-        parentItem()->revalidateCheckState();
 }
 
 inline bool TestTreeItem::modifyFilePath(const QString &filePath)

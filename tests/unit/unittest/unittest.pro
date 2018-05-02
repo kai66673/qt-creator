@@ -42,17 +42,21 @@ SOURCES += \
     clangpathwatcher-test.cpp \
     clangqueryexamplehighlightmarker-test.cpp \
     clangqueryhighlightmarker-test.cpp \
+    classesfilter-test.cpp \
     clientserverinprocess-test.cpp \
     clientserveroutsideprocess-test.cpp \
     cppprojectfilecategorizer-test.cpp \
     cppprojectinfogenerator-test.cpp \
     cppprojectpartchooser-test.cpp \
     fakeprocess.cpp \
-    faketimer.cpp \
     filepath-test.cpp \
+    filepathview-test.cpp \
+    functionsfilter-test.cpp \
     gtest-creator-printing.cpp \
     gtest-qt-printing.cpp \
+    includesfilter-test.cpp \
     lineprefixer-test.cpp \
+    locatorfilter-test.cpp \
     matchingtext-test.cpp \
     mimedatabase-utilities.cpp \
     pchgenerator-test.cpp \
@@ -68,7 +72,9 @@ SOURCES += \
     sourcerangefilter-test.cpp \
     spydummy.cpp \
     symbolindexer-test.cpp \
+    symbolsfindfilter-test.cpp \
     stringcache-test.cpp \
+    eventspy.cpp \
     unittests-main.cpp \
     utf8-test.cpp \
     symbolstorage-test.cpp \
@@ -80,7 +86,15 @@ SOURCES += \
     refactoringdatabaseinitializer-test.cpp \
     filepathcache-test.cpp \
     filepathstorage-test.cpp \
-    filepathstoragesqlitestatementfactory-test.cpp
+    filepathstoragesqlitestatementfactory-test.cpp \
+    processcreator-test.cpp \
+    nativefilepath-test.cpp \
+    nativefilepathview-test.cpp \
+    mocktimer.cpp \
+    tokenprocessor-test.cpp \
+    projectpartartefact-test.cpp \
+    filestatuscache-test.cpp \
+    highlightingresultreporter-test.cpp
 
 !isEmpty(LIBCLANG_LIBS) {
 SOURCES += \
@@ -113,6 +127,7 @@ SOURCES += \
     clangstring-test.cpp \
     clangsupportivetranslationunitinitializer-test.cpp \
     clangsuspenddocumentjob-test.cpp \
+    clangtooltipinfo-test.cpp \
     clangtranslationunits-test.cpp \
     clangtranslationunit-test.cpp \
     clangupdatedocumentannotationsjob-test.cpp \
@@ -124,8 +139,6 @@ SOURCES += \
     diagnosticset-test.cpp \
     diagnostic-test.cpp \
     fixit-test.cpp \
-    highlightingmarksreporter-test.cpp \
-    highlightingmarks-test.cpp \
     projectpart-test.cpp \
     senddocumenttracker-test.cpp \
     skippedsourceranges-test.cpp \
@@ -173,14 +186,13 @@ HEADERS += \
     conditionally-disabled-tests.h \
     dummyclangipcclient.h \
     dynamicastmatcherdiagnosticcontainer-matcher.h \
+    eventspy.h \
     fakeprocess.h \
-    faketimer.h \
     filesystem-utilities.h \
     googletest.h \
     gtest-creator-printing.h \
     gtest-qt-printing.h \
     mimedatabase-utilities.h \
-    mockchangedfilepathcompressor.h \
     mockclangcodemodelclient.h \
     mockclangcodemodelserver.h \
     mockclangpathwatcher.h \
@@ -213,8 +225,11 @@ HEADERS += \
     mockfilepathcaching.h \
     mocksqlitestatement.h \
     unittest-utility-functions.h \
-    mocksymbolquery.h
-
+    mocksymbolquery.h \
+    runprojectcreateorupdate-utility.h \
+    rundocumentparse-utility.h \
+    mocktimer.h \
+    mocksqlitetransactionbackend.h
 !isEmpty(LIBCLANG_LIBS) {
 HEADERS += \
     chunksreportedmonitor.h \
@@ -226,7 +241,6 @@ HEADERS += \
 !isEmpty(LIBTOOLING_LIBS) {
 HEADERS += \
     gtest-clang-printing.h \
-    mockrefactoringclientcallback.h \
     mockrefactoringclient.h \
     mockrefactoringserver.h \
     testclangtool.h \

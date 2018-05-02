@@ -70,11 +70,9 @@ static QString backendProcessPath()
 namespace ClangCodeModel {
 namespace Internal {
 
-class DummyBackendSender : public BackendSender
+class DummyBackendSender : public ClangBackEnd::ClangCodeModelServerInterface
 {
 public:
-    DummyBackendSender() : BackendSender(nullptr) {}
-
     void end() override {}
     void registerTranslationUnitsForEditor(const RegisterTranslationUnitForEditorMessage &) override {}
     void updateTranslationUnitsForEditor(const UpdateTranslationUnitsForEditorMessage &) override {}
@@ -87,9 +85,9 @@ public:
     void requestDocumentAnnotations(const RequestDocumentAnnotationsMessage &) override {}
     void requestReferences(const RequestReferencesMessage &) override {}
     void requestFollowSymbol(const RequestFollowSymbolMessage &) override {}
+    void requestToolTip(const RequestToolTipMessage &) override {}
     void updateVisibleTranslationUnits(const UpdateVisibleTranslationUnitsMessage &) override {}
 };
-
 
 BackendCommunicator::BackendCommunicator()
     : m_connection(&m_receiver)
@@ -370,24 +368,40 @@ QFuture<CppTools::CursorInfo> BackendCommunicator::requestReferences(
         const FileContainer &fileContainer,
         quint32 line,
         quint32 column,
-        QTextDocument *textDocument,
         const CppTools::SemanticInfo::LocalUseMap &localUses)
 {
     const RequestReferencesMessage message(fileContainer, line, column);
     m_sender->requestReferences(message);
 
-    return m_receiver.addExpectedReferencesMessage(message.ticketNumber(), textDocument,
-                                                      localUses);
+    return m_receiver.addExpectedReferencesMessage(message.ticketNumber(), localUses);
+}
+
+QFuture<CppTools::CursorInfo> BackendCommunicator::requestLocalReferences(
+        const FileContainer &fileContainer,
+        quint32 line,
+        quint32 column)
+{
+    const RequestReferencesMessage message(fileContainer, line, column, true);
+    m_sender->requestReferences(message);
+
+    return m_receiver.addExpectedReferencesMessage(message.ticketNumber());
+}
+
+QFuture<CppTools::ToolTipInfo> BackendCommunicator::requestToolTip(
+        const FileContainer &fileContainer, quint32 line, quint32 column)
+{
+    const RequestToolTipMessage message(fileContainer, line, column);
+    m_sender->requestToolTip(message);
+
+    return m_receiver.addExpectedToolTipMessage(message.ticketNumber());
 }
 
 QFuture<CppTools::SymbolInfo> BackendCommunicator::requestFollowSymbol(
         const FileContainer &curFileContainer,
-        const QVector<Utf8String> &dependentFiles,
         quint32 line,
         quint32 column)
 {
     const RequestFollowSymbolMessage message(curFileContainer,
-                                             dependentFiles,
                                              line,
                                              column);
     m_sender->requestFollowSymbol(message);
@@ -502,20 +516,6 @@ void BackendCommunicator::initializeBackendWithCurrentData()
     registerCurrentCodeModelUiHeaders();
     restoreCppEditorDocuments();
     updateTranslationUnitVisiblity();
-
-    emit backendReinitialized();
-}
-
-BackendSender *BackendCommunicator::setBackendSender(BackendSender *sender)
-{
-    BackendSender *previousSender = m_sender.take();
-    m_sender.reset(sender);
-    return previousSender;
-}
-
-void BackendCommunicator::killBackendProcess()
-{
-    m_connection.processForTestOnly()->kill();
 }
 
 void BackendCommunicator::registerTranslationUnitsForEditor(const FileContainers &fileContainers)

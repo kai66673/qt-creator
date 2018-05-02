@@ -48,6 +48,7 @@ namespace ProjectExplorer {
 class BuildInfo;
 class ContainerNode;
 class EditorConfiguration;
+class FolderNode;
 class NamedWidget;
 class Node;
 class ProjectConfiguration;
@@ -98,6 +99,8 @@ public:
     QString displayName() const;
     Core::Id id() const;
 
+    QString mimeType() const;
+
     Core::IDocument *document() const;
     Utils::FileName projectFilePath() const;
     Utils::FileName projectDirectory() const;
@@ -120,7 +123,7 @@ public:
     Target *activeTarget() const;
     Target *target(Core::Id id) const;
     Target *target(Kit *k) const;
-    virtual bool supportsKit(Kit *k, QString *errorMessage = nullptr) const;
+    virtual bool supportsKit(const Kit *k, QString *errorMessage = nullptr) const;
 
     Target *createTarget(Kit *k);
     static bool copySteps(Target *sourceTarget, Target *newTarget);
@@ -130,14 +133,14 @@ public:
     enum class RestoreResult { Ok, Error, UserAbort };
     RestoreResult restoreSettings(QString *errorMessage);
 
-    enum FilesMode {
-        SourceFiles    = 0x1,
-        GeneratedFiles = 0x2,
-        AllFiles       = SourceFiles | GeneratedFiles
-    };
-    QStringList files(FilesMode fileMode,
-                      const std::function<bool(const Node *)> &filter = {}) const;
+    using NodeMatcher = std::function<bool(const Node*)>;
+    static const NodeMatcher AllFiles;
+    static const NodeMatcher SourceFiles;
+    static const NodeMatcher GeneratedFiles;
+
+    Utils::FileNameList files(const NodeMatcher &matcher) const;
     virtual QStringList filesGeneratedFrom(const QString &sourceFile) const;
+    bool isKnownFile(const Utils::FileName &filename) const;
 
     static QString makeUnique(const QString &preferredName, const QStringList &usedNames);
 
@@ -152,7 +155,6 @@ public:
     virtual bool needsConfiguration() const;
     virtual void configureAsExampleProject(const QSet<Core::Id> &platforms);
 
-    virtual bool requiresTargetPanel() const;
     virtual ProjectImporter *projectImporter() const;
 
     Kit::Predicate requiredKitPredicate() const;
@@ -210,7 +212,6 @@ signals:
     void settingsLoaded();
     void aboutToSaveSettings();
 
-    void projectContextUpdated();
     void projectLanguagesUpdated();
 
     void parsingStarted();
@@ -228,12 +229,12 @@ protected:
     void emitParsingFinished(bool success);
 
     void setDisplayName(const QString &name);
-    void setRequiredKitPredicate(const Kit::Predicate &predicate);
+    // Used to pre-check kits in the TargetSetupPage. RequiredKitPredicate
+    // is used to select kits available in the TargetSetupPage
     void setPreferredKitPredicate(const Kit::Predicate &predicate);
 
     void setId(Core::Id id);
     void setRootProjectNode(ProjectNode *root); // takes ownership!
-    void setProjectContext(Core::Context context);
     void setProjectLanguages(Core::Context language);
     void addProjectLanguage(Core::Id id);
     void removeProjectLanguage(Core::Id id);
@@ -241,10 +242,15 @@ protected:
     virtual void projectLoaded(); // Called when the project is fully loaded.
 
 private:
+    // The predicate used to select kits available in TargetSetupPage.
+    void setRequiredKitPredicate(const Kit::Predicate &predicate);
+
+    void handleSubTreeChanged(FolderNode *node);
     void setActiveTarget(Target *target);
     ProjectPrivate *d;
 
     friend class Session;
+    friend class ContainerNode;
 };
 
 } // namespace ProjectExplorer

@@ -186,17 +186,6 @@ static void setFocusToEditorViewAndUnmaximizePanes(EditorView *view)
     }
 }
 
-/* For something that has a 'QString id' (IEditorFactory
- * or IExternalEditor), find the one matching a id. */
-template <class EditorFactoryLike>
-EditorFactoryLike *findById(Id id)
-{
-    return ExtensionSystem::PluginManager::getObject<EditorFactoryLike>(
-        [&id](EditorFactoryLike *efl) {
-            return id == efl->id();
-        });
-}
-
 EditorManagerPrivate::EditorManagerPrivate(QObject *parent) :
     QObject(parent),
     m_revertToSavedAction(new QAction(EditorManager::tr("Revert to Saved"), this)),
@@ -222,7 +211,8 @@ EditorManagerPrivate::EditorManagerPrivate(QObject *parent) :
     m_closeAllEditorsExceptVisibleContextAction(new QAction(EditorManager::tr("Close All Except Visible"), this)),
     m_openGraphicalShellAction(new QAction(FileUtils::msgGraphicalShellAction(), this)),
     m_openTerminalAction(new QAction(FileUtils::msgTerminalAction(), this)),
-    m_findInDirectoryAction(new QAction(FileUtils::msgFindInDirectory(), this))
+    m_findInDirectoryAction(new QAction(FileUtils::msgFindInDirectory(), this)),
+    m_filePropertiesAction(new QAction(tr("Properties..."), this))
 {
     d = this;
 }
@@ -355,79 +345,84 @@ void EditorManagerPrivate::init()
     connect(m_openTerminalAction, &QAction::triggered, this, &EditorManagerPrivate::openTerminal);
     connect(m_findInDirectoryAction, &QAction::triggered,
             this, &EditorManagerPrivate::findInDirectory);
+    connect(m_filePropertiesAction, &QAction::triggered, []() {
+        if (!d->m_contextMenuEntry || d->m_contextMenuEntry->fileName().isEmpty())
+            return;
+        DocumentManager::showFilePropertiesDialog(d->m_contextMenuEntry->fileName());
+    });
 
     // Goto Previous In History Action
     cmd = ActionManager::registerAction(m_gotoPreviousDocHistoryAction, Constants::GOTOPREVINHISTORY, editDesignContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Alt+Tab") : tr("Ctrl+Tab")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Alt+Tab") : tr("Ctrl+Tab")));
     mwindow->addAction(cmd, Constants::G_WINDOW_NAVIGATE);
     connect(m_gotoPreviousDocHistoryAction, &QAction::triggered,
             this, &EditorManagerPrivate::gotoPreviousDocHistory);
 
     // Goto Next In History Action
     cmd = ActionManager::registerAction(m_gotoNextDocHistoryAction, Constants::GOTONEXTINHISTORY, editDesignContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Alt+Shift+Tab") : tr("Ctrl+Shift+Tab")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Alt+Shift+Tab") : tr("Ctrl+Shift+Tab")));
     mwindow->addAction(cmd, Constants::G_WINDOW_NAVIGATE);
     connect(m_gotoNextDocHistoryAction, &QAction::triggered,
             this, &EditorManagerPrivate::gotoNextDocHistory);
 
     // Go back in navigation history
     cmd = ActionManager::registerAction(m_goBackAction, Constants::GO_BACK, editDesignContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Ctrl+Alt+Left") : tr("Alt+Left")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Ctrl+Alt+Left") : tr("Alt+Left")));
     mwindow->addAction(cmd, Constants::G_WINDOW_NAVIGATE);
     connect(m_goBackAction, &QAction::triggered,
             m_instance, &EditorManager::goBackInNavigationHistory);
 
     // Go forward in navigation history
     cmd = ActionManager::registerAction(m_goForwardAction, Constants::GO_FORWARD, editDesignContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Ctrl+Alt+Right") : tr("Alt+Right")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Ctrl+Alt+Right") : tr("Alt+Right")));
     mwindow->addAction(cmd, Constants::G_WINDOW_NAVIGATE);
     connect(m_goForwardAction, &QAction::triggered,
             m_instance, &EditorManager::goForwardInNavigationHistory);
 
     m_splitAction = new QAction(Utils::Icons::SPLIT_HORIZONTAL.icon(), tr("Split"), this);
     cmd = ActionManager::registerAction(m_splitAction, Constants::SPLIT, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,2") : tr("Ctrl+E,2")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,2") : tr("Ctrl+E,2")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_splitAction, &QAction::triggered, this, []() { split(Qt::Vertical); });
 
     m_splitSideBySideAction = new QAction(Utils::Icons::SPLIT_VERTICAL.icon(),
                                           tr("Split Side by Side"), this);
     cmd = ActionManager::registerAction(m_splitSideBySideAction, Constants::SPLIT_SIDE_BY_SIDE, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,3") : tr("Ctrl+E,3")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,3") : tr("Ctrl+E,3")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_splitSideBySideAction, &QAction::triggered, m_instance, &EditorManager::splitSideBySide);
 
     m_splitNewWindowAction = new QAction(tr("Open in New Window"), this);
     cmd = ActionManager::registerAction(m_splitNewWindowAction, Constants::SPLIT_NEW_WINDOW, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,4") : tr("Ctrl+E,4")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,4") : tr("Ctrl+E,4")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_splitNewWindowAction, &QAction::triggered,
             this, []() { splitNewWindow(currentEditorView()); });
 
     m_removeCurrentSplitAction = new QAction(tr("Remove Current Split"), this);
     cmd = ActionManager::registerAction(m_removeCurrentSplitAction, Constants::REMOVE_CURRENT_SPLIT, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,0") : tr("Ctrl+E,0")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,0") : tr("Ctrl+E,0")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_removeCurrentSplitAction, &QAction::triggered,
             this, &EditorManagerPrivate::removeCurrentSplit);
 
     m_removeAllSplitsAction = new QAction(tr("Remove All Splits"), this);
     cmd = ActionManager::registerAction(m_removeAllSplitsAction, Constants::REMOVE_ALL_SPLITS, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,1") : tr("Ctrl+E,1")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,1") : tr("Ctrl+E,1")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_removeAllSplitsAction, &QAction::triggered,
             this, &EditorManagerPrivate::removeAllSplits);
 
     m_gotoPreviousSplitAction = new QAction(tr("Go to Previous Split or Window"), this);
     cmd = ActionManager::registerAction(m_gotoPreviousSplitAction, Constants::GOTO_PREV_SPLIT, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,i") : tr("Ctrl+E,i")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,i") : tr("Ctrl+E,i")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_gotoPreviousSplitAction, &QAction::triggered,
             this, &EditorManagerPrivate::gotoPreviousSplit);
 
     m_gotoNextSplitAction = new QAction(tr("Go to Next Split or Window"), this);
     cmd = ActionManager::registerAction(m_gotoNextSplitAction, Constants::GOTO_NEXT_SPLIT, editManagerContext);
-    cmd->setDefaultKeySequence(QKeySequence(UseMacShortcuts ? tr("Meta+E,o") : tr("Ctrl+E,o")));
+    cmd->setDefaultKeySequence(QKeySequence(useMacShortcuts ? tr("Meta+E,o") : tr("Ctrl+E,o")));
     mwindow->addAction(cmd, Constants::G_WINDOW_SPLIT);
     connect(m_gotoNextSplitAction, &QAction::triggered, this, &EditorManagerPrivate::gotoNextSplit);
 
@@ -606,7 +601,9 @@ IEditor *EditorManagerPrivate::openEditor(EditorView *view, const QString &fileN
         return 0;
     }
     if (editorId.isValid()) {
-        if (IEditorFactory *factory = findById<IEditorFactory>(editorId)) {
+        IEditorFactory *factory = Utils::findOrDefault(IEditorFactory::allEditorFactories(),
+                                                       Utils::equal(&IEditorFactory::id, editorId));
+        if (factory) {
             factories.removeOne(factory);
             factories.push_front(factory);
         }
@@ -1139,7 +1136,9 @@ EditorManager::EditorFactoryList EditorManagerPrivate::findFactories(Id editorId
         factories = EditorManager::editorFactories(mimeType, false);
     } else {
         // Find by editor id
-        if (IEditorFactory *factory = findById<IEditorFactory>(editorId))
+        IEditorFactory *factory = Utils::findOrDefault(IEditorFactory::allEditorFactories(),
+                                                       Utils::equal(&IEditorFactory::id, editorId));
+        if (factory)
             factories.push_back(factory);
     }
     if (factories.empty()) {
@@ -1250,11 +1249,8 @@ IEditor *EditorManagerPrivate::activateEditor(EditorView *view, IEditor *editor,
 {
     Q_ASSERT(view);
 
-    if (!editor) {
-        if (!d->m_currentEditor)
-            setCurrentEditor(0, (flags & EditorManager::IgnoreNavigationHistory));
-        return 0;
-    }
+    if (!editor)
+        return nullptr;
 
     editor = placeEditor(view, editor);
 
@@ -2180,7 +2176,7 @@ void EditorManagerPrivate::revertToSaved(IDocument *document)
         msgBox.button(QMessageBox::No)->setText(tr("Cancel"));
 
         QPushButton *diffButton = nullptr;
-        auto diffService = ExtensionSystem::PluginManager::getObject<DiffService>();
+        auto diffService = DiffService::instance();
         if (diffService)
             diffButton = msgBox.addButton(tr("Cancel && &Diff"), QMessageBox::RejectRole);
 
@@ -2435,9 +2431,11 @@ void EditorManager::addNativeDirAndOpenWithActions(QMenu *contextMenu, DocumentM
     d->m_openGraphicalShellAction->setEnabled(enabled);
     d->m_openTerminalAction->setEnabled(enabled);
     d->m_findInDirectoryAction->setEnabled(enabled);
+    d->m_filePropertiesAction->setEnabled(enabled);
     contextMenu->addAction(d->m_openGraphicalShellAction);
     contextMenu->addAction(d->m_openTerminalAction);
     contextMenu->addAction(d->m_findInDirectoryAction);
+    contextMenu->addAction(d->m_filePropertiesAction);
     QMenu *openWith = contextMenu->addMenu(tr("Open With"));
     openWith->setEnabled(enabled);
     if (enabled)
@@ -2609,7 +2607,7 @@ EditorManager::EditorFactoryList
     EditorManager::editorFactories(const Utils::MimeType &mimeType, bool bestMatchOnly)
 {
     EditorFactoryList rc;
-    const EditorFactoryList allFactories = ExtensionSystem::PluginManager::getObjects<IEditorFactory>();
+    const EditorFactoryList allFactories = IEditorFactory::allEditorFactories();
     mimeTypeFactoryLookup(mimeType, allFactories, bestMatchOnly, &rc);
     if (debugEditorManager)
         qDebug() << Q_FUNC_INFO << mimeType.name() << " returns " << rc;
@@ -2620,7 +2618,7 @@ EditorManager::ExternalEditorList
         EditorManager::externalEditors(const Utils::MimeType &mimeType, bool bestMatchOnly)
 {
     ExternalEditorList rc;
-    const ExternalEditorList allEditors = ExtensionSystem::PluginManager::getObjects<IExternalEditor>();
+    const ExternalEditorList allEditors = IExternalEditor::allExternalEditors();
     mimeTypeFactoryLookup(mimeType, allEditors, bestMatchOnly, &rc);
     if (debugEditorManager)
         qDebug() << Q_FUNC_INFO << mimeType.name() << " returns " << rc;
@@ -2695,7 +2693,8 @@ bool EditorManager::isAutoSaveFile(const QString &fileName)
 
 bool EditorManager::openExternalEditor(const QString &fileName, Id editorId)
 {
-    IExternalEditor *ee = findById<IExternalEditor>(editorId);
+    IExternalEditor *ee = Utils::findOrDefault(IExternalEditor::allExternalEditors(),
+                                               Utils::equal(&IExternalEditor::id, editorId));
     if (!ee)
         return false;
     QString errorMessage;
@@ -2726,7 +2725,7 @@ void EditorManager::addCloseEditorListener(const std::function<bool (IEditor *)>
 QStringList EditorManager::getOpenFileNames()
 {
     QString selectedFilter;
-    const QString &fileFilters = Utils::allFiltersString(&selectedFilter);
+    const QString &fileFilters = DocumentManager::allDocumentFactoryFiltersString(&selectedFilter);
     return DocumentManager::getOpenFileNames(fileFilters, QString(), &selectedFilter);
 }
 

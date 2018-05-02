@@ -32,12 +32,16 @@
 #include <QAction>
 #include <QObject>
 
+namespace ProjectExplorer { class RunControl; }
+
 namespace QmlProfiler {
 
-class QmlProfilerRunner;
+class QmlProfilerModelManager;
+class QmlProfilerStateManager;
 
 namespace Internal {
 
+class QmlProfilerRunner;
 class QmlProfilerClientManager;
 
 class QMLPROFILER_EXPORT QmlProfilerTool : public QObject
@@ -45,15 +49,13 @@ class QMLPROFILER_EXPORT QmlProfilerTool : public QObject
     Q_OBJECT
 
 public:
-    explicit QmlProfilerTool(QObject *parent);
+    QmlProfilerTool();
     ~QmlProfilerTool();
-
-    static QmlProfilerTool *instance();
 
     void finalizeRunControl(QmlProfilerRunner *runWorker);
 
     bool prepareTool();
-    void attachToWaitingApplication();
+    ProjectExplorer::RunControl *attachToWaitingApplication();
 
     static QList <QAction *> profilerContextMenuActions();
 
@@ -62,7 +64,9 @@ public:
     static void logError(const QString &msg);
     static void showNonmodalWarning(const QString &warningMsg);
 
-    static QmlProfilerClientManager *clientManager();
+    QmlProfilerClientManager *clientManager();
+    QmlProfilerModelManager *modelManager();
+    QmlProfilerStateManager *stateManager();
 
     void profilerStateChanged();
     void serverRecordingChanged();
@@ -74,6 +78,7 @@ public:
     void gotoSourceLocation(const QString &fileUrl, int lineNumber, int columnNumber);
 
 private:
+    void clearEvents();
     void clearData();
     void showErrorDialog(const QString &error);
     void profilerDataModelStateChanged();

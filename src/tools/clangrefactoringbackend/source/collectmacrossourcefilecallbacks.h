@@ -25,6 +25,14 @@
 
 #pragma once
 
+#include "filestatus.h"
+#include "sourcedependency.h"
+#include "sourcelocationentry.h"
+#include "symbolentry.h"
+#include "usedmacro.h"
+
+#include <filepathcachinginterface.h>
+
 #include <clang/Tooling/Tooling.h>
 
 namespace ClangBackEnd {
@@ -32,7 +40,57 @@ namespace ClangBackEnd {
 class CollectMacrosSourceFileCallbacks : public clang::tooling::SourceFileCallbacks
 {
 public:
-    CollectMacrosSourceFileCallbacks();
+    CollectMacrosSourceFileCallbacks(SymbolEntries &symbolEntries,
+                                     SourceLocationEntries &sourceLocationEntries,
+                                     FilePathCachingInterface &filePathCache)
+        : m_symbolEntries(symbolEntries),
+          m_sourceLocationEntries(sourceLocationEntries),
+          m_filePathCache(filePathCache)
+    {
+    }
+
+    bool handleBeginSource(clang::CompilerInstance &compilerInstance) override;
+
+    const FilePathIds &sourceFiles() const
+    {
+        return m_sourceFiles;
+    }
+
+    void addSourceFiles(const FilePathIds &filePathIds)
+    {
+        m_sourceFiles = filePathIds;
+    }
+
+    void clear()
+    {
+        m_sourceFiles.clear();
+        m_usedMacros.clear();
+        m_fileStatuses.clear();
+    }
+
+    const UsedMacros &usedMacros() const
+    {
+        return m_usedMacros;
+    }
+
+    const FileStatuses &fileStatuses() const
+    {
+        return m_fileStatuses;
+    }
+
+    const SourceDependencies &sourceDependencies() const
+    {
+        return m_sourceDependencies;
+    }
+
+private:
+    FilePathIds m_sourceFiles;
+    UsedMacros m_usedMacros;
+    FileStatuses m_fileStatuses;
+    SourceDependencies m_sourceDependencies;
+    SymbolEntries &m_symbolEntries;
+    SourceLocationEntries &m_sourceLocationEntries;
+    FilePathCachingInterface &m_filePathCache;
 };
 
 } // namespace ClangBackEnd

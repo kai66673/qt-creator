@@ -31,16 +31,18 @@
 
 #include <utils/smallstringfwd.h>
 
-#ifdef UNIT_TESTS
-#include <gtest/gtest.h>
-#endif
-
 #if defined(CLANGSUPPORT_BUILD_LIB)
 #  define CLANGSUPPORT_EXPORT Q_DECL_EXPORT
 #elif defined(CLANGSUPPORT_BUILD_STATIC_LIB)
 #  define CLANGSUPPORT_EXPORT
 #else
 #  define CLANGSUPPORT_EXPORT Q_DECL_IMPORT
+#endif
+
+#ifdef Q_CC_GNU
+#  define CLANGSUPPORT_GCCEXPORT __attribute__((visibility("default")))
+#else
+#  define CLANGSUPPORT_GCCEXPORT
 #endif
 
 #ifndef CLANGBACKENDPROCESSPATH
@@ -84,8 +86,43 @@ enum class HighlightingType : quint8
     PreprocessorDefinition,
     PreprocessorExpansion,
     Label,
+    Declaration,
+    FunctionDefinition,
     OutputArgument,
-    Declaration
+    Namespace,
+    Class,
+    Struct,
+    Enum,
+    Union,
+    TypeAlias,
+    Typedef,
+    QtProperty,
+    ObjectiveCClass,
+    ObjectiveCCategory,
+    ObjectiveCProtocol,
+    ObjectiveCInterface,
+    ObjectiveCImplementation,
+    ObjectiveCProperty,
+    ObjectiveCMethod
+};
+
+enum class StorageClass : quint8
+{
+    Invalid,
+    None,
+    Extern,
+    Static,
+    PrivateExtern,
+    Auto,
+    Register
+};
+
+enum class AccessSpecifier : quint8
+{
+    Invalid,
+    Public,
+    Protected,
+    Private
 };
 
 enum class CompletionCorrection : quint32
@@ -118,6 +155,9 @@ enum class MessageType : quint8 {
 
     RequestFollowSymbolMessage,
     FollowSymbolMessage,
+
+    RequestToolTipMessage,
+    ToolTipMessage,
 
     UpdateVisibleTranslationUnitsMessage,
 

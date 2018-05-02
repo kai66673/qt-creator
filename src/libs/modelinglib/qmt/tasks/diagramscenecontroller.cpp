@@ -60,12 +60,15 @@
 #include "qmt/tasks/alignonrastervisitor.h"
 #include "qmt/tasks/isceneinspector.h"
 #include "qmt/tasks/voidelementtasks.h"
+#include "utils/asconst.h"
 
 #include <QMenu>
 #include <QFileInfo>
 #include <QDir>
 #include <QQueue>
 #include <QPair>
+
+#include <QtMath>
 
 namespace qmt {
 
@@ -397,28 +400,23 @@ void DiagramSceneController::dropNewElement(const QString &newElementId, const Q
     } else {
         MPackage *parentPackage = findSuitableParentPackage(topMostElementAtPos, diagram);
         MObject *newObject = nullptr;
-        QString newName;
         if (newElementId == QLatin1String(ELEMENT_TYPE_PACKAGE)) {
             auto package = new MPackage();
-            newName = tr("New Package");
             if (!stereotype.isEmpty())
                 package->setStereotypes({stereotype});
             newObject = package;
         } else if (newElementId == QLatin1String(ELEMENT_TYPE_COMPONENT)) {
             auto component = new MComponent();
-            newName = tr("New Component");
             if (!stereotype.isEmpty())
                 component->setStereotypes({stereotype});
             newObject = component;
         } else if (newElementId == QLatin1String(ELEMENT_TYPE_CLASS)) {
             auto klass = new MClass();
-            newName = tr("New Class");
             if (!stereotype.isEmpty())
                 klass->setStereotypes({stereotype});
             newObject = klass;
         } else if (newElementId == QLatin1String(ELEMENT_TYPE_ITEM)) {
             auto item = new MItem();
-            newName = tr("New Item");
             if (!stereotype.isEmpty()) {
                 item->setVariety(stereotype);
                 item->setVarietyEditable(false);
@@ -426,9 +424,7 @@ void DiagramSceneController::dropNewElement(const QString &newElementId, const Q
             newObject = item;
         }
         if (newObject) {
-            if (!name.isEmpty())
-                newName = tr("New %1").arg(name);
-            newObject->setName(newName);
+            newObject->setName(name);
             dropNewModelElement(newObject, parentPackage, pos, diagram);
         }
     }
@@ -443,6 +439,49 @@ void DiagramSceneController::dropNewModelElement(MObject *modelObject, MPackage 
     m_modelController->undoController()->endMergeSequence();
     if (element)
         emit newElementCreated(element, diagram);
+}
+
+void DiagramSceneController::addRelatedElements(const DSelection &selection, MDiagram *diagram)
+{
+    m_diagramController->undoController()->beginMergeSequence(tr("Add Related Element"));
+    foreach (const DSelection::Index &index, selection.indices()) {
+        DElement *delement = m_diagramController->findElement(index.elementKey(), diagram);
+        QMT_ASSERT(delement, return);
+        DObject *dobject = dynamic_cast<DObject *>(delement);
+        if (dobject && dobject->modelUid().isValid()) {
+            MObject *mobject = m_modelController->findElement<MObject>(delement->modelUid());
+            if (mobject) {
+                qreal dAngle = 360.0 / 11.5;
+                qreal dRadius = 100.0;
+                const QList<MRelation *> relations = m_modelController->findRelationsOfObject(mobject);
+                int count = 0;
+                for (MRelation *relation : relations) {
+                    if (relation->endAUid() != mobject->uid() || relation->endBUid() != mobject->uid())
+                        ++count;
+                }
+                if (count <= 12) {
+                    dAngle = 360.0 / 12.0;
+                    dRadius = 0.0;
+                }
+                qreal radius = 200.0;
+                qreal angle = 0.0;
+                for (MRelation *relation : relations) {
+                    QPointF pos(dobject->pos());
+                    pos += QPointF(radius * sin(angle / 180 * M_PI), -radius * cos(angle / 180 * M_PI));
+                    bool added = false;
+                    if (relation->endAUid() != mobject->uid())
+                        added = addModelElement(relation->endAUid(), pos, diagram) != nullptr;
+                    else if (relation->endBUid() != mobject->uid())
+                        added = addModelElement(relation->endBUid(), pos, diagram) != nullptr;
+                    if (added) {
+                        radius += dRadius / (360.0 / dAngle);
+                        angle += dAngle;
+                    }
+                }
+            }
+        }
+    }
+    m_diagramController->undoController()->endMergeSequence();
 }
 
 MPackage *DiagramSceneController::findSuitableParentPackage(DElement *topmostDiagramElement, MDiagram *diagram)
@@ -465,7 +504,7 @@ MPackage *DiagramSceneController::findSuitableParentPackage(DElement *topmostDia
 MDiagram *DiagramSceneController::findDiagramBySearchId(MPackage *package, const QString &diagramName)
 {
     QString diagramSearchId = NameController::calcElementNameSearchId(diagramName);
-    foreach (const Handle<MObject> &handle, package->children()) {
+    for (const Handle<MObject> &handle : package->children()) {
         if (handle.hasTarget()) {
             if (auto diagram = dynamic_cast<MDiagram *>(handle.target())) {
                 if (NameController::calcElementNameSearchId(diagram->name()) == diagramSearchId)
@@ -706,7 +745,7 @@ DObject *DiagramSceneController::addObject(MObject *modelObject, const QPointF &
             if (dobject) {
                 MObject *mobject = m_modelController->findObject(dobject->modelUid());
                 if (mobject) {
-                    foreach (const Handle<MRelation> &handle, mobject->relations()) {
+                    for (const Handle<MRelation> &handle : mobject->relations()) {
                         if (handle.hasTarget()
                                 && ((handle.target()->endAUid() == modelObject->uid()
                                      && handle.target()->endBUid() == mobject->uid())
@@ -715,7 +754,7 @@ DObject *DiagramSceneController::addObject(MObject *modelObject, const QPointF &
                             addRelation(handle.target(), QList<QPointF>(), diagram);
                         }
                     }
-                    foreach (const Handle<MRelation> &handle, modelObject->relations()) {
+                    for (const Handle<MRelation> &handle : modelObject->relations()) {
                         if (handle.hasTarget()
                                 && ((handle.target()->endAUid() == modelObject->uid()
                                      && handle.target()->endBUid() == mobject->uid())
@@ -730,7 +769,7 @@ DObject *DiagramSceneController::addObject(MObject *modelObject, const QPointF &
     }
 
     // add all self relations
-    foreach (const Handle<MRelation> &handle, modelObject->relations()) {
+    for (const Handle<MRelation> &handle : modelObject->relations()) {
         if (handle.hasTarget ()
                 && handle.target()->endAUid() == modelObject->uid()
                 && handle.target()->endBUid() == modelObject->uid()) {

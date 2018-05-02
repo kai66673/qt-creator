@@ -80,17 +80,11 @@ void QmlJSCodeStylePreferencesWidget::setPreferences(ICodeStylePreferences *pref
     updatePreview();
 }
 
-
 void QmlJSCodeStylePreferencesWidget::decorateEditor(const FontSettings &fontSettings)
 {
-    const SnippetProvider *provider = ExtensionSystem::PluginManager::getObject<SnippetProvider>(
-        [](SnippetProvider *current) {
-            return current->groupId() == QLatin1String(QmlJSEditor::Constants::QML_SNIPPETS_GROUP_ID);
-        });
-
     m_ui->previewTextEdit->textDocument()->setFontSettings(fontSettings);
-    if (provider)
-        provider->decorateEditor(m_ui->previewTextEdit);
+    SnippetProvider::decorateEditor(m_ui->previewTextEdit,
+                                    QmlJSEditor::Constants::QML_SNIPPETS_GROUP_ID);
 }
 
 void QmlJSCodeStylePreferencesWidget::setVisualizeWhitespace(bool on)

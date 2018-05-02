@@ -34,6 +34,8 @@
 
 #include <nodeinstanceview.h>
 
+#include <app/app_version.h>
+
 #include <projectexplorer/kit.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorerconstants.h>
@@ -150,10 +152,9 @@ QString PuppetCreator::getStyleConfigFileName() const
 {
 #ifndef QMLDESIGNER_TEST
     if (m_currentProject) {
-        for (const QString &fileName : m_currentProject->files(ProjectExplorer::Project::SourceFiles)) {
-            QFileInfo fileInfo(fileName);
-            if (fileInfo.fileName() == "qtquickcontrols2.conf")
-                return  fileName;
+        for (const Utils::FileName &fileName : m_currentProject->files(ProjectExplorer::Project::SourceFiles)) {
+            if (fileName.fileName() == "qtquickcontrols2.conf")
+                return  fileName.toString();
         }
     }
 #endif
@@ -226,7 +227,7 @@ QProcess *PuppetCreator::puppetProcess(const QString &puppetPath,
 #endif
     if (debugPuppet == puppetMode || debugPuppet == "all") {
         QMessageBox::information(Core::ICore::dialogParent(),
-            QCoreApplication::translate("PuppetCreator", "Puppet is starting ..."),
+            QCoreApplication::translate("PuppetCreator", "Puppet is starting..."),
             QCoreApplication::translate("PuppetCreator", "You can now attach your debugger to the %1 puppet with process id: %2.")
                                  .arg(puppetMode, QString::number(puppetProcess->processId())));
     }
@@ -316,9 +317,9 @@ static void warnAboutInvalidKit()
                                            QCoreApplication::translate("PuppetCreator",
                                                                        "The QML emulation layer (QML Puppet) cannot be built because the kit is not configured correctly. "
                                                                        "For example the compiler can be misconfigured. "
-                                                                       "Fix the kit configuration and restart Qt Creator. "
+                                                                       "Fix the kit configuration and restart %1. "
                                                                        "Otherwise, the fallback emulation layer, which does not support all features, will be used."
-                                                                       ));
+                                                                       ).arg(Core::Constants::IDE_DISPLAY_NAME));
 }
 
 void PuppetCreator::createQml2PuppetExecutableIfMissing()

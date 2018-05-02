@@ -25,26 +25,50 @@
 
 #pragma once
 
+#include "filestatuscache.h"
 #include "symbolscollectorinterface.h"
 #include "symbolstorageinterface.h"
+#include "clangpathwatcher.h"
 
 #include <projectpartcontainerv2.h>
 #include <filecontainerv2.h>
 
 namespace ClangBackEnd {
 
-class SymbolIndexer
+class SymbolIndexer : public ClangPathWatcherNotifier
 {
 public:
     SymbolIndexer(SymbolsCollectorInterface &symbolsCollector,
-                  SymbolStorageInterface &symbolStorage);
+                  SymbolStorageInterface &symbolStorage,
+                  ClangPathWatcherInterface &pathWatcher,
+                  FilePathCachingInterface &filePathCache,
+                  FileStatusCache &fileStatusCache,
+                  Sqlite::TransactionInterface &transactionInterface);
 
     void updateProjectParts(V2::ProjectPartContainers &&projectParts,
                             V2::FileContainers &&generatedFiles);
+    void updateProjectPart(V2::ProjectPartContainer &&projectPart,
+                           const V2::FileContainers &generatedFiles);
+
+    void pathsWithIdsChanged(const Utils::SmallStringVector &ids) override;
+    void pathsChanged(const FilePathIds &filePathIds) override;
+    void updateChangedPath(FilePathId filePath);
+
+    bool compilerMacrosOrIncludeSearchPathsAreDifferent(
+            const V2::ProjectPartContainer &projectPart) const;
+
+    FilePathIds filterChangedFiles(
+            const V2::ProjectPartContainer &projectPart) const;
+
+    FilePathIds updatableFilePathIds(const V2::ProjectPartContainer &projectPart) const;
 
 private:
     SymbolsCollectorInterface &m_symbolsCollector;
     SymbolStorageInterface &m_symbolStorage;
+    ClangPathWatcherInterface &m_pathWatcher;
+    FilePathCachingInterface &m_filePathCache;
+    FileStatusCache &m_fileStatusCache;
+    Sqlite::TransactionInterface &m_transactionInterface;
 };
 
 } // namespace ClangBackEnd

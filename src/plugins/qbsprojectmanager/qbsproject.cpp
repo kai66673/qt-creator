@@ -125,14 +125,11 @@ QbsProject::QbsProject(const FileName &fileName) :
     m_parsingScheduled(false),
     m_cancelStatus(CancelStatusNone),
     m_cppCodeModelUpdater(new CppTools::CppProjectUpdater(this)),
-    m_currentBc(0),
     m_extraCompilersPending(false)
 {
     m_parsingDelay.setInterval(1000); // delay parsing by 1s.
 
     setId(Constants::PROJECT_ID);
-
-    setProjectContext(Context(Constants::PROJECT_ID));
     setProjectLanguages(Context(ProjectExplorer::Constants::CXX_LANGUAGE_ID));
 
     rebuildProjectTree();
@@ -143,11 +140,12 @@ QbsProject::QbsProject(const FileName &fileName) :
     connect(this, &Project::removedTarget,
             this, [this](Target *t) {m_qbsProjects.remove(t); });
     auto delayedParsing = [this]() {
-        if (static_cast<BuildConfiguration *>(sender())->isActive())
+        if (static_cast<ProjectConfiguration *>(sender())->isActive())
             delayParsing();
     };
     subscribeSignal(&BuildConfiguration::environmentChanged, this, delayedParsing);
     subscribeSignal(&BuildConfiguration::buildDirectoryChanged, this, delayedParsing);
+    subscribeSignal(&QbsBuildConfiguration::qbsConfigurationChanged, this, delayedParsing);
     subscribeSignal(&Target::activeBuildConfigurationChanged, this, delayedParsing);
 
     connect(&m_parsingDelay, &QTimer::timeout, this, &QbsProject::startParsing);
@@ -172,11 +170,6 @@ QbsProject::~QbsProject()
     qDeleteAll(m_extraCompilers);
     std::for_each(m_qbsDocuments.cbegin(), m_qbsDocuments.cend(),
                   [](Core::IDocument *doc) { doc->deleteLater(); });
-}
-
-QbsRootProjectNode *QbsProject::rootProjectNode() const
-{
-    return static_cast<QbsRootProjectNode *>(Project::rootProjectNode());
 }
 
 void QbsProject::projectLoaded()
@@ -275,7 +268,7 @@ bool QbsProject::addFilesToProduct(const QStringList &filePaths,
     }
     if (notAdded->count() != filePaths.count()) {
         m_projectData = m_qbsProject.projectData();
-        rebuildProjectTree();
+        delayedUpdateAfterParse();
     }
     return notAdded->isEmpty();
 }
@@ -302,8 +295,7 @@ bool QbsProject::removeFilesFromProduct(const QStringList &filePaths,
     }
     if (notRemoved->count() != filePaths.count()) {
         m_projectData = m_qbsProject.projectData();
-        rebuildProjectTree();
-        emit fileListChanged();
+        delayedUpdateAfterParse();
     }
     return notRemoved->isEmpty();
 }
@@ -337,11 +329,6 @@ bool QbsProject::renameFileInProduct(const QString &oldPath, const QString &newP
         return false;
 
     return addFilesToProduct(QStringList() << newPath, newProductData, newGroupData, &dummy);
-}
-
-void QbsProject::invalidate()
-{
-    prepareForParsing();
 }
 
 static qbs::AbstractJob *doBuildOrClean(const qbs::Project &project,
@@ -413,11 +400,6 @@ QString QbsProject::profileForTarget(const Target *t) const
     return QbsManager::profileForKit(t->kit());
 }
 
-bool QbsProject::isParsing() const
-{
-    return m_qbsUpdateFutureInterface;
-}
-
 bool QbsProject::hasParseResult() const
 {
     return qbsProject().isValid();
@@ -470,6 +452,11 @@ void QbsProject::updateAfterParse()
     updateCppCodeModel();
     updateQmlJsCodeModel();
     emit fileListChanged();
+}
+
+void QbsProject::delayedUpdateAfterParse()
+{
+    QTimer::singleShot(0, this, &QbsProject::updateAfterParse);
 }
 
 void QbsProject::updateProjectNodes()
@@ -542,28 +529,10 @@ void QbsProject::handleRuleExecutionDone()
 
 void QbsProject::changeActiveTarget(Target *t)
 {
-    BuildConfiguration *bc = 0;
     if (t) {
         m_qbsProject = m_qbsProjects.value(t);
-        if (t->kit())
-            bc = t->activeBuildConfiguration();
-    }
-    buildConfigurationChanged(bc);
-}
-
-void QbsProject::buildConfigurationChanged(BuildConfiguration *bc)
-{
-    if (m_currentBc)
-        disconnect(m_currentBc, &QbsBuildConfiguration::qbsConfigurationChanged,
-                   this, &QbsProject::delayParsing);
-
-    m_currentBc = qobject_cast<QbsBuildConfiguration *>(bc);
-    if (m_currentBc) {
-        connect(m_currentBc, &QbsBuildConfiguration::qbsConfigurationChanged,
-                this, &QbsProject::delayParsing);
-        delayParsing();
-    } else {
-        invalidate();
+        if (t->isActive())
+            delayParsing();
     }
 }
 
@@ -671,18 +640,9 @@ void QbsProject::generateErrors(const qbs::ErrorInfo &e)
 
 }
 
-QString QbsProject::productDisplayName(const qbs::Project &project,
-                                       const qbs::ProductData &product)
-{
-    QString displayName = product.name();
-    if (product.profile() != project.profile())
-        displayName.append(QLatin1String(" [")).append(product.profile()).append(QLatin1Char(']'));
-    return displayName;
-}
-
 QString QbsProject::uniqueProductName(const qbs::ProductData &product)
 {
-    return product.name() + QLatin1Char('.') + product.profile();
+    return product.name() + QLatin1Char('.') + product.multiplexConfigurationId();
 }
 
 void QbsProject::configureAsExampleProject(const QSet<Id> &platforms)
@@ -718,7 +678,7 @@ void QbsProject::parse(const QVariantMap &config, const Environment &env, const 
 
     registerQbsProjectParser(new QbsProjectParser(this, m_qbsUpdateFutureInterface));
 
-    QbsManager::instance()->updateProfileIfNecessary(activeTarget()->kit());
+    QbsManager::updateProfileIfNecessary(activeTarget()->kit());
     m_qbsProjectParser->parse(config, env, dir, configName);
     emitParsingStarted();
 }
@@ -1144,7 +1104,7 @@ void QbsProject::updateApplicationTargets()
     foreach (const qbs::ProductData &productData, m_projectData.allProducts()) {
         if (!productData.isEnabled() || !productData.isRunnable())
             continue;
-        const QString displayName = productDisplayName(m_qbsProject, productData);
+        const QString displayName = productData.fullDisplayName();
         if (productData.targetArtifacts().isEmpty()) { // No build yet.
             applications.list << BuildTargetInfo(displayName,
                     FileName(),

@@ -78,8 +78,9 @@ public:
     void switchDeclarationDefinition(bool inNextSplit);
     void showPreProcessorWidget() override;
 
-    void findUsages();
-    void renameUsages(const QString &replacement = QString());
+    void findUsages(QTextCursor cursor = QTextCursor());
+    void renameUsages(const QString &replacement = QString(),
+                      QTextCursor cursor = QTextCursor());
     void renameSymbolUnderCursor();
 
     bool selectBlockUp() override;
@@ -99,8 +100,8 @@ protected:
     void keyPressEvent(QKeyEvent *e) override;
     bool handleStringSplitting(QKeyEvent *e) const;
 
-    Link findLinkAt(const QTextCursor &, bool resolveTarget = true,
-                    bool inNextSplit = false) override;
+    Utils::Link findLinkAt(const QTextCursor &, bool resolveTarget = true,
+                           bool inNextSplit = false) override;
 
     void onRefactorMarkerClicked(const TextEditor::RefactorMarker &marker) override;
 

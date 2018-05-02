@@ -100,6 +100,7 @@ public:
     virtual Abi targetAbi() const = 0;
     virtual QList<Abi> supportedAbis() const;
     virtual QString originalTargetTriple() const { return QString(); }
+    virtual QStringList extraCodeModelFlags() const { return QStringList(); }
 
     virtual bool isValid() const = 0;
 
@@ -158,7 +159,7 @@ protected:
     explicit ToolChain(Core::Id typeId, Detection d);
     explicit ToolChain(const ToolChain &);
 
-    void toolChainUpdated();
+    virtual void toolChainUpdated();
 
     // Make sure to call this function when deriving!
     virtual bool fromMap(const QVariantMap &data);
@@ -177,6 +178,11 @@ class PROJECTEXPLORER_EXPORT ToolChainFactory : public QObject
     Q_OBJECT
 
 public:
+    ToolChainFactory();
+    ~ToolChainFactory();
+
+    static const QList<ToolChainFactory *> allToolChainFactories();
+
     QString displayName() const { return m_displayName; }
 
     virtual QList<ToolChain *> autoDetect(const QList<ToolChain *> &alreadyKnown);

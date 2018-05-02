@@ -85,6 +85,18 @@ QString PxNodeUtilities::calcRelativePath(const ProjectExplorer::Node *node,
     return qmt::NameController::calcRelativePath(nodePath, anchorFolder);
 }
 
+QString PxNodeUtilities::calcRelativePath(const QString &filePath, const QString &anchorFolder)
+{
+    QString path;
+
+    QFileInfo fileInfo(filePath);
+    if (fileInfo.exists() && fileInfo.isFile())
+        path = fileInfo.path();
+    else
+        path = filePath;
+    return qmt::NameController::calcRelativePath(path, anchorFolder);
+}
+
 qmt::MPackage *PxNodeUtilities::createBestMatchingPackagePath(
         qmt::MPackage *suggestedParentPackage, const QStringList &relativeElements)
 {
@@ -108,7 +120,7 @@ qmt::MPackage *PxNodeUtilities::createBestMatchingPackagePath(
         roots.takeFirst();
 
         // append all sub-packages of the same level as next root packages
-        foreach (const qmt::Handle<qmt::MObject> &handle, package->children()) {
+        for (const qmt::Handle<qmt::MObject> &handle : package->children()) {
             if (handle.hasTarget()) {
                 if (auto childPackage = dynamic_cast<qmt::MPackage *>(handle.target())) {
                     // only accept root packages in the same path as the suggested parent package
@@ -127,7 +139,7 @@ qmt::MPackage *PxNodeUtilities::createBestMatchingPackagePath(
             QString relativeSearchId = qmt::NameController::calcElementNameSearchId(
                         relativeElements.at(relativeIndex));
             found = false;
-            foreach (const qmt::Handle<qmt::MObject> &handle, package->children()) {
+            for (const qmt::Handle<qmt::MObject> &handle : package->children()) {
                 if (handle.hasTarget()) {
                     if (auto childPackage = dynamic_cast<qmt::MPackage *>(handle.target())) {
                         if (qmt::NameController::calcElementNameSearchId(childPackage->name()) == relativeSearchId) {
@@ -186,7 +198,7 @@ qmt::MObject *PxNodeUtilities::findSameObject(const QStringList &relativeElement
         qmt::MPackage *package = roots.takeFirst();
 
         // append all sub-packages of the same level as next root packages
-        foreach (const qmt::Handle<qmt::MObject> &handle, package->children()) {
+        for (const qmt::Handle<qmt::MObject> &handle : package->children()) {
             if (handle.hasTarget()) {
                 if (auto childPackage = dynamic_cast<qmt::MPackage *>(handle.target()))
                     roots.append(childPackage);
@@ -200,7 +212,7 @@ qmt::MObject *PxNodeUtilities::findSameObject(const QStringList &relativeElement
             QString relativeSearchId = qmt::NameController::calcElementNameSearchId(
                         relativeElements.at(relativeIndex));
             found = false;
-            foreach (const qmt::Handle<qmt::MObject> &handle, package->children()) {
+            for (const qmt::Handle<qmt::MObject> &handle : package->children()) {
                 if (handle.hasTarget()) {
                     if (auto childPackage = dynamic_cast<qmt::MPackage *>(handle.target())) {
                         if (qmt::NameController::calcElementNameSearchId(childPackage->name()) == relativeSearchId) {
@@ -218,7 +230,7 @@ qmt::MObject *PxNodeUtilities::findSameObject(const QStringList &relativeElement
             QMT_CHECK(relativeIndex >= relativeElements.size());
             // chain was found so check for given object within deepest package
             QString objectSearchId = qmt::NameController::calcElementNameSearchId(object->name());
-            foreach (const qmt::Handle<qmt::MObject> &handle, package->children()) {
+            for (const qmt::Handle<qmt::MObject> &handle : package->children()) {
                 if (handle.hasTarget()) {
                     qmt::MObject *target = handle.target();
                     if (typeid(*target) == typeid(*object)

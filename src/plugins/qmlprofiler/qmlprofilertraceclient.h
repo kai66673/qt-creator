@@ -55,7 +55,8 @@ public:
     virtual void messageReceived(const QByteArray &) override;
     virtual void stateChanged(State status) override;
 
-    void clearData();
+    void clearEvents();
+    void clear();
     void sendRecordingStatus(int engineId = -1);
     void setRequestedFeatures(quint64 features);
     void setFlushInterval(quint32 flushInterval);

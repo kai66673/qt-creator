@@ -331,7 +331,7 @@ void f14()
 
 using IntegerAlias = int;
 using SecondIntegerAlias = IntegerAlias;
-using IntegerTypedef = int;
+typedef int IntegerTypedef;
 using Function = void (*)();
 
 
@@ -582,3 +582,20 @@ void f32()
 
 namespace N { template <typename T> void SizeIs(); }
 using N::SizeIs;
+
+void BaseClass::VirtualFunction() {}
+
+class WithVirtualFunctionDefined {
+  virtual void VirtualFunctionDefinition() {};
+};
+
+namespace NFoo { namespace NBar { namespace NTest { class NamespaceTypeSpelling; } } }
+
+Undeclared u;
+
+#include "../../../../share/qtcreator/cplusplus/wrappedQtHeaders/QtCore/qobjectdefs.h"
+
+class Property {
+    Q_PROPERTY(const volatile unsigned long long * prop READ getProp WRITE setProp NOTIFY propChanged)
+    Q_PROPERTY(const QString str READ getStr)
+};

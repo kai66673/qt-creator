@@ -74,23 +74,13 @@ const char InterpreterKey[] = "PythonEditor.RunConfiguation.Interpreter";
 const char MainScriptKey[] = "PythonEditor.RunConfiguation.MainScript";
 const char PythonMimeType[] = "text/x-python-project"; // ### FIXME
 const char PythonProjectId[] = "PythonProject";
-const char PythonProjectContext[] = "PythonProjectContext";
 
 class PythonRunConfiguration;
 class PythonProjectFile;
 
-static QString scriptFromId(Core::Id id)
-{
-    return id.suffixAfter(PythonRunConfigurationPrefix);
-}
-
-static Core::Id idFromScript(const QString &target)
-{
-    return Core::Id(PythonRunConfigurationPrefix).withSuffix(target);
-}
-
 class PythonProject : public Project
 {
+    Q_OBJECT
 public:
     explicit PythonProject(const Utils::FileName &filename);
 
@@ -166,8 +156,6 @@ public:
 
 private:
     friend class ProjectExplorer::IRunConfigurationFactory;
-    void initialize(Core::Id id);
-    void copyFrom(const PythonRunConfiguration *source);
 
     QString defaultDisplayName() const;
 
@@ -178,31 +166,17 @@ private:
 ////////////////////////////////////////////////////////////////
 
 PythonRunConfiguration::PythonRunConfiguration(Target *target)
-    : RunConfiguration(target)
+    : RunConfiguration(target, PythonRunConfigurationPrefix)
 {
     addExtraAspect(new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier()));
     addExtraAspect(new ArgumentsAspect(this, "PythonEditor.RunConfiguration.Arguments"));
     addExtraAspect(new TerminalAspect(this, "PythonEditor.RunConfiguration.UseTerminal"));
-    setDefaultDisplayName(defaultDisplayName());
-}
-
-void PythonRunConfiguration::initialize(Core::Id id)
-{
-    RunConfiguration::initialize(id);
-
-    m_mainScript = scriptFromId(id);
-    setDisplayName(defaultDisplayName());
 
     Environment sysEnv = Environment::systemEnvironment();
     const QString exec = sysEnv.searchInPath("python").toString();
     m_interpreter = exec.isEmpty() ? "python" : exec;
-}
 
-void PythonRunConfiguration::copyFrom(const PythonRunConfiguration *source)
-{
-    RunConfiguration::copyFrom(source);
-    m_interpreter = source->interpreter();
-    m_mainScript = source->m_mainScript;
+    setDefaultDisplayName(defaultDisplayName());
 }
 
 QVariantMap PythonRunConfiguration::toMap() const
@@ -215,9 +189,16 @@ QVariantMap PythonRunConfiguration::toMap() const
 
 bool PythonRunConfiguration::fromMap(const QVariantMap &map)
 {
+    if (!RunConfiguration::fromMap(map))
+        return false;
     m_mainScript = map.value(MainScriptKey).toString();
     m_interpreter = map.value(InterpreterKey).toString();
-    return RunConfiguration::fromMap(map);
+    // FIXME: The following three lines can be removed once there is no id mangling anymore.
+    if (m_mainScript.isEmpty()) {
+        m_mainScript = ProjectExplorer::idFromMap(map).suffixAfter(id());
+        setDefaultDisplayName(defaultDisplayName());
+    }
+    return true;
 }
 
 QString PythonRunConfiguration::defaultDisplayName() const
@@ -286,69 +267,24 @@ public:
     PythonRunConfigurationFactory()
     {
         setObjectName("PythonRunConfigurationFactory");
+        registerRunConfiguration<PythonRunConfiguration>(PythonRunConfigurationPrefix);
+        addSupportedProjectType(PythonProjectId);
     }
 
-    QList<Core::Id> availableCreationIds(Target *parent, CreationMode mode) const override
+    QList<RunConfigurationCreationInfo> availableCreators(Target *parent) const override
     {
-        Q_UNUSED(mode);
-        if (!canHandle(parent))
-            return {};
-        //return { Core::Id(PythonExecutableId) };
+        return Utils::transform(parent->project()->files(Project::AllFiles),[this](const FileName &fn) {
+            return convert(fn.toString(), fn.toString());
+        });
+    }
 
+    bool canCreateHelper(Target *parent, const QString &buildTarget) const override
+    {
         PythonProject *project = static_cast<PythonProject *>(parent->project());
-        QList<Core::Id> allIds;
-        foreach (const QString &file, project->files(ProjectExplorer::Project::AllFiles))
-            allIds.append(idFromScript(file));
-        return allIds;
-    }
-
-    QString displayNameForId(Core::Id id) const override
-    {
-        return scriptFromId(id);
-    }
-
-    bool canCreate(Target *parent, Core::Id id) const override
-    {
-        if (!canHandle(parent))
-            return false;
-        PythonProject *project = static_cast<PythonProject *>(parent->project());
-        const QString script = scriptFromId(id);
+        const QString script = buildTarget;
         if (script.endsWith(".pyqtc"))
             return false;
-        return project->files(ProjectExplorer::Project::AllFiles).contains(script);
-    }
-
-    bool canRestore(Target *parent, const QVariantMap &map) const override
-    {
-        Q_UNUSED(parent);
-        return idFromMap(map).name().startsWith(PythonRunConfigurationPrefix);
-    }
-
-    bool canClone(Target *parent, RunConfiguration *source) const override
-    {
-        if (!canHandle(parent))
-            return false;
-        return source->id().name().startsWith(PythonRunConfigurationPrefix);
-    }
-
-    RunConfiguration *clone(Target *parent, RunConfiguration *source) override
-    {
-        if (!canClone(parent, source))
-            return 0;
-        return cloneHelper<PythonRunConfiguration>(parent, source);
-    }
-
-private:
-    bool canHandle(Target *parent) const { return dynamic_cast<PythonProject *>(parent->project()); }
-
-    RunConfiguration *doCreate(Target *parent, Core::Id id) override
-    {
-        return createHelper<PythonRunConfiguration>(parent, id);
-    }
-
-    RunConfiguration *doRestore(Target *parent, const QVariantMap &map) override
-    {
-        return createHelper<PythonRunConfiguration>(parent, idFromMap(map));
+        return project->files(ProjectExplorer::Project::AllFiles).contains(FileName::fromString(script));
     }
 };
 
@@ -356,7 +292,6 @@ PythonProject::PythonProject(const FileName &fileName) :
     Project(Constants::C_PY_MIMETYPE, fileName, [this]() { refresh(); })
 {
     setId(PythonProjectId);
-    setProjectContext(Context(PythonProjectContext));
     setProjectLanguages(Context(ProjectExplorer::Constants::CXX_LANGUAGE_ID));
     setDisplayName(fileName.toFileInfo().completeBaseName());
 }
@@ -634,16 +569,19 @@ void PythonRunConfigurationWidget::setInterpreter(const QString &interpreter)
 //
 ////////////////////////////////////////////////////////////////////////////////////
 
-static PythonEditorPlugin *m_instance = 0;
-
-PythonEditorPlugin::PythonEditorPlugin()
+class PythonEditorPluginPrivate
 {
-    m_instance = this;
-}
+public:
+    PythonEditorFactory editorFactory;
+    PythonRunConfigurationFactory runConfigFactory;
+};
+
+static PythonEditorPluginPrivate *dd = nullptr;
 
 PythonEditorPlugin::~PythonEditorPlugin()
 {
-    m_instance = 0;
+    delete dd;
+    dd = nullptr;
 }
 
 bool PythonEditorPlugin::initialize(const QStringList &arguments, QString *errorMessage)
@@ -651,10 +589,9 @@ bool PythonEditorPlugin::initialize(const QStringList &arguments, QString *error
     Q_UNUSED(arguments)
     Q_UNUSED(errorMessage)
 
-    ProjectManager::registerProjectType<PythonProject>(PythonMimeType);
+    dd = new PythonEditorPluginPrivate;
 
-    addAutoReleasedObject(new PythonEditorFactory);
-    addAutoReleasedObject(new PythonRunConfigurationFactory);
+    ProjectManager::registerProjectType<PythonProject>(PythonMimeType);
 
     auto constraint = [](RunConfiguration *runConfiguration) {
         auto rc = dynamic_cast<PythonRunConfiguration *>(runConfiguration);

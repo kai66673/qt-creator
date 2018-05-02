@@ -25,8 +25,6 @@ HEADERS += \
     abstractuploadandinstallpackageservice.h \
     genericdirectuploadservice.h \
     remotelinuxdeployconfiguration.h \
-    remotelinuxdeployconfigurationfactory.h \
-    genericremotelinuxdeploystepfactory.h \
     abstractpackagingstep.h \
     tarpackagecreationstep.h \
     remotelinuxpackageinstaller.h \
@@ -42,6 +40,8 @@ HEADERS += \
     genericlinuxdeviceconfigurationwidget.h \
     remotelinuxcheckforfreediskspaceservice.h \
     remotelinuxcheckforfreediskspacestep.h \
+    remotelinuxkillappservice.h \
+    remotelinuxkillappstep.h \
     remotelinuxqmltoolingsupport.h \
     linuxdeviceprocess.h \
     remotelinuxcustomrunconfiguration.h \
@@ -70,8 +70,6 @@ SOURCES += \
     abstractuploadandinstallpackageservice.cpp \
     genericdirectuploadservice.cpp \
     remotelinuxdeployconfiguration.cpp \
-    remotelinuxdeployconfigurationfactory.cpp \
-    genericremotelinuxdeploystepfactory.cpp \
     abstractpackagingstep.cpp \
     tarpackagecreationstep.cpp \
     remotelinuxpackageinstaller.cpp \
@@ -86,6 +84,8 @@ SOURCES += \
     genericlinuxdeviceconfigurationwidget.cpp \
     remotelinuxcheckforfreediskspaceservice.cpp \
     remotelinuxcheckforfreediskspacestep.cpp \
+    remotelinuxkillappservice.cpp \
+    remotelinuxkillappstep.cpp \
     remotelinuxqmltoolingsupport.cpp \
     linuxdeviceprocess.cpp \
     remotelinuxcustomrunconfiguration.cpp \

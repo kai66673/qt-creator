@@ -30,6 +30,7 @@
 
 #include "../nimconstants.h"
 
+#include <coreplugin/icontext.h>
 #include <coreplugin/progressmanager/progressmanager.h>
 #include <coreplugin/iversioncontrol.h>
 #include <coreplugin/vcsmanager.h>
@@ -60,6 +61,8 @@ NimProject::NimProject(const FileName &fileName) : Project(Constants::C_NIM_MIME
 {
     setId(Constants::C_NIMPROJECT_ID);
     setDisplayName(fileName.toFileInfo().completeBaseName());
+    // ensure debugging is enabled (Nim plugin translates nim code to C code)
+    setProjectLanguages(Core::Context(ProjectExplorer::Constants::CXX_LANGUAGE_ID));
 
     m_projectScanTimer.setSingleShot(true);
     connect(&m_projectScanTimer, &QTimer::timeout, this, &NimProject::collectProjectFiles);
@@ -156,7 +159,7 @@ void NimProject::updateProject()
     emitParsingFinished(true);
 }
 
-bool NimProject::supportsKit(Kit *k, QString *errorMessage) const
+bool NimProject::supportsKit(const Kit *k, QString *errorMessage) const
 {
     auto tc = dynamic_cast<NimToolChain*>(ToolChainKitInformation::toolChain(k, Constants::C_NIMLANGUAGE_ID));
     if (!tc) {
@@ -174,10 +177,7 @@ bool NimProject::supportsKit(Kit *k, QString *errorMessage) const
 
 FileNameList NimProject::nimFiles() const
 {
-    const QStringList nim = files(AllFiles, [](const ProjectExplorer::Node *n) {
-        return n->filePath().endsWith(".nim");
-    });
-    return Utils::transform(nim, [](const QString &fp) { return Utils::FileName::fromString(fp); });
+    return files([](const ProjectExplorer::Node *n) { return AllFiles(n) && n->filePath().endsWith(".nim"); });
 }
 
 QVariantMap NimProject::toMap() const

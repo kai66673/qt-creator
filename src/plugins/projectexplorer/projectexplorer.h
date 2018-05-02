@@ -127,7 +127,7 @@ public:
     ShutdownFlag aboutToShutdown() override;
 
     static void setProjectExplorerSettings(const Internal::ProjectExplorerSettings &pes);
-    static Internal::ProjectExplorerSettings projectExplorerSettings();
+    static const Internal::ProjectExplorerSettings &projectExplorerSettings();
 
     static void startRunControl(RunControl *runControl);
     static void showRunErrorMessage(const QString &errorMessage);
@@ -170,7 +170,6 @@ signals:
     // or the file list of a specific project has changed.
     void fileListChanged();
 
-    void aboutToExecuteProject(ProjectExplorer::Project *project, Core::Id runMode);
     void recentProjectsChanged();
 
     void settingsChanged();
@@ -233,6 +232,20 @@ private slots:
 
     void testToolChainManager_data();
     void testToolChainManager();
+
+    void testUserFileAccessor_prepareToReadSettings();
+    void testUserFileAccessor_prepareToReadSettingsObsoleteVersion();
+    void testUserFileAccessor_prepareToReadSettingsObsoleteVersionNewVersion();
+    void testUserFileAccessor_prepareToWriteSettings();
+    void testUserFileAccessor_mergeSettings();
+    void testUserFileAccessor_mergeSettingsEmptyUser();
+    void testUserFileAccessor_mergeSettingsEmptyShared();
+
+    void testProject_setup();
+    void testProject_changeDisplayName();
+    void testProject_parsingSuccess();
+    void testProject_parsingFail();
+    void testProject_projectTree();
 #endif // WITH_TESTS
 };
 

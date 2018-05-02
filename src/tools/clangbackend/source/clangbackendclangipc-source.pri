@@ -29,16 +29,19 @@ HEADERS += \
     $$PWD/clangreparsesupportivetranslationunitjob.h \
     $$PWD/clangrequestdocumentannotationsjob.h \
     $$PWD/clangrequestreferencesjob.h \
+    $$PWD/clangrequesttooltipjob.h \
     $$PWD/clangresumedocumentjob.h \
     $$PWD/clangstring.h \
     $$PWD/clangsupportivetranslationunitinitializer.h \
     $$PWD/clangsuspenddocumentjob.h \
+    $$PWD/clangtooltipinfocollector.h \
     $$PWD/clangtranslationunit.h \
     $$PWD/clangtranslationunits.h \
     $$PWD/clangtranslationunitupdater.h \
     $$PWD/clangtype.h \
     $$PWD/clangunsavedfilesshallowarguments.h \
     $$PWD/clangupdatedocumentannotationsjob.h \
+    $$PWD/clangupdateextradocumentannotationsjob.h \
     $$PWD/codecompleter.h \
     $$PWD/codecompletionchunkconverter.h \
     $$PWD/codecompletionsextractor.h \
@@ -48,14 +51,15 @@ HEADERS += \
     $$PWD/diagnosticset.h \
     $$PWD/diagnosticsetiterator.h \
     $$PWD/fixit.h \
-    $$PWD/highlightingmark.h \
-    $$PWD/highlightingmarks.h \
-    $$PWD/highlightingmarksiterator.h \
+    $$PWD/fulltokeninfo.h \
     $$PWD/projectpart.h \
     $$PWD/projects.h \
     $$PWD/skippedsourceranges.h \
     $$PWD/sourcelocation.h \
     $$PWD/sourcerange.h \
+    $$PWD/tokeninfo.h \
+    $$PWD/tokenprocessor.h \
+    $$PWD/tokenprocessoriterator.h \
     $$PWD/unsavedfile.h \
     $$PWD/unsavedfiles.h \
     $$PWD/utf8positionfromlinecolumn.h
@@ -86,14 +90,17 @@ SOURCES += \
     $$PWD/clangreparsesupportivetranslationunitjob.cpp \
     $$PWD/clangrequestdocumentannotationsjob.cpp \
     $$PWD/clangrequestreferencesjob.cpp \
+    $$PWD/clangrequesttooltipjob.cpp \
     $$PWD/clangsuspenddocumentjob.cpp  \
     $$PWD/clangsupportivetranslationunitinitializer.cpp \
+    $$PWD/clangtooltipinfocollector.cpp \
     $$PWD/clangtranslationunit.cpp \
     $$PWD/clangtranslationunits.cpp \
     $$PWD/clangtranslationunitupdater.cpp \
     $$PWD/clangtype.cpp \
     $$PWD/clangunsavedfilesshallowarguments.cpp \
     $$PWD/clangupdatedocumentannotationsjob.cpp \
+    $$PWD/clangupdateextradocumentannotationsjob.cpp \
     $$PWD/codecompleter.cpp \
     $$PWD/codecompletionchunkconverter.cpp \
     $$PWD/codecompletionsextractor.cpp \
@@ -102,13 +109,13 @@ SOURCES += \
     $$PWD/diagnostic.cpp \
     $$PWD/diagnosticset.cpp \
     $$PWD/fixit.cpp \
-    $$PWD/highlightingmark.cpp \
-    $$PWD/highlightingmarks.cpp \
+    $$PWD/fulltokeninfo.cpp \
     $$PWD/projectpart.cpp \
     $$PWD/projects.cpp \
     $$PWD/skippedsourceranges.cpp \
     $$PWD/sourcelocation.cpp \
     $$PWD/sourcerange.cpp \
+    $$PWD/tokeninfo.cpp \
     $$PWD/unsavedfile.cpp \
     $$PWD/unsavedfiles.cpp \
     $$PWD/utf8positionfromlinecolumn.cpp

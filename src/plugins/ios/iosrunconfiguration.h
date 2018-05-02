@@ -32,8 +32,6 @@
 #include <projectexplorer/runconfiguration.h>
 #include <utils/fileutils.h>
 
-namespace QmakeProjectManager { class QmakeProFile; }
-
 namespace Ios {
 namespace Internal {
 
@@ -70,9 +68,7 @@ signals:
     void localExecutableChanged();
 
 private:
-    friend class ProjectExplorer::IRunConfigurationFactory;
-    void initialize(Core::Id id, const Utils::FileName &path);
-    void copyFrom(const IosRunConfiguration *source);
+    QString extraId() const final;
 
     void deviceChanges();
     friend class IosRunConfigurationWidget;

@@ -908,7 +908,10 @@ class Dumper(DumperBase):
         elif self.startMode_ == AttachCore:
             coreFile = args.get('coreFile', '');
             self.process = self.target.LoadCore(coreFile)
-            self.reportState('enginerunokandinferiorunrunnable')
+            if self.process.IsValid():
+                self.reportState('enginerunokandinferiorunrunnable')
+            else:
+                self.reportState('enginerunfailed')
         else:
             launchInfo = lldb.SBLaunchInfo(self.processArgs_)
             launchInfo.SetWorkingDirectory(self.workingDirectory_)
@@ -1151,7 +1154,7 @@ class Dumper(DumperBase):
         #    values = [frame.FindVariable(partialVariable)]
         #else:
         if True:
-            values = list(frame.GetVariables(True, True, False, False))
+            values = list(frame.GetVariables(True, True, False, True))
             values.reverse() # To get shadowed vars numbered backwards.
 
         variables = []
@@ -1511,17 +1514,15 @@ class Dumper(DumperBase):
 
     def shutdownInferior(self, args):
         self.isShuttingDown_ = True
-        if self.process is None:
-            self.reportState('inferiorshutdownok')
-        else:
+        if self.process is not None:
             state = self.process.GetState()
             if state == lldb.eStateStopped:
                 self.process.Kill()
-            self.reportState('inferiorshutdownok')
+        self.reportState('inferiorshutdownfinished')
         self.reportResult('', args)
 
     def quit(self, args):
-        self.reportState('engineshutdownok')
+        self.reportState('engineshutdownfinished')
         self.process.Kill()
         self.reportResult('', args)
 

@@ -53,7 +53,13 @@ public:
 
     QString revisionFromDescription() const;
 
-    QString makePatch(bool revert, bool addPrefix = false) const;
+    enum PatchOption {
+        NoOption = 0,
+        Revert = 1,
+        AddPrefix = 2
+    };
+    Q_DECLARE_FLAGS(PatchOptions, PatchOption)
+    QString makePatch(PatchOptions options) const;
 
     static Core::IDocument *findOrCreateDocument(const QString &vcsId,
                                                  const QString &displayName);
@@ -85,9 +91,9 @@ private:
 
     Internal::DiffEditorDocument *const m_document;
 
-    bool m_isReloading;
-    int m_diffFileIndex;
-    int m_chunkIndex;
+    bool m_isReloading = false;
+    int m_diffFileIndex = -1;
+    int m_chunkIndex = -1;
 
     friend class Internal::DiffEditorDocument;
 };

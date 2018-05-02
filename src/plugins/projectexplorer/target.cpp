@@ -87,8 +87,6 @@ class TargetPrivate
 public:
     TargetPrivate(Kit *k);
 
-    QList<DeployConfigurationFactory *> deployFactories() const;
-
     bool m_isEnabled = true;
     QIcon m_overlayIcon;
 
@@ -109,16 +107,10 @@ TargetPrivate::TargetPrivate(Kit *k) :
     m_kit(k)
 { }
 
-QList<DeployConfigurationFactory *> TargetPrivate::deployFactories() const
-{
-    return ExtensionSystem::PluginManager::getObjects<DeployConfigurationFactory>();
-}
-
 Target::Target(Project *project, Kit *k) :
-    ProjectConfiguration(project),
+    ProjectConfiguration(project, k->id()),
     d(new TargetPrivate(k))
 {
-    initialize(k->id());
     QTC_CHECK(d->m_kit);
     connect(DeviceManager::instance(), &DeviceManager::updated, this, &Target::updateDeviceState);
 
@@ -269,9 +261,6 @@ void Target::addDeployConfiguration(DeployConfiguration *dc)
 {
     QTC_ASSERT(dc && !d->m_deployConfigurations.contains(dc), return);
     Q_ASSERT(dc->target() == this);
-
-    if (d->deployFactories().isEmpty())
-        return;
 
     // Check that we don't have a configuration with the same displayName
     QString configurationDisplayName = dc->displayName();
@@ -547,7 +536,7 @@ void Target::updateDefaultDeployConfigurations()
 
 void Target::updateDefaultRunConfigurations()
 {
-    QList<IRunConfigurationFactory *> rcFactories = IRunConfigurationFactory::find(this);
+    const QList<IRunConfigurationFactory *> rcFactories = IRunConfigurationFactory::find(this);
     if (rcFactories.isEmpty()) {
         qWarning("No run configuration factory found for target id '%s'.", qPrintable(id().toString()));
         return;
@@ -565,42 +554,51 @@ void Target::updateDefaultRunConfigurations()
     int configuredCount = existingConfigured.count();
 
     // find all RC ids that can get created:
-    QList<Core::Id> availableFactoryIds;
-    foreach (IRunConfigurationFactory *rcFactory, rcFactories)
-        availableFactoryIds.append(rcFactory->availableCreationIds(this));
+    QList<RunConfigurationCreationInfo> allAvailableFactories;
+    QList<RunConfigurationCreationInfo> autoCreateFactories;
 
-    QList<Core::Id> autoCreateFactoryIds;
-    foreach (IRunConfigurationFactory *rcFactory, rcFactories)
-        autoCreateFactoryIds.append(rcFactory->availableCreationIds(this,
-                                                                    IRunConfigurationFactory::AutoCreate));
+    for (IRunConfigurationFactory *rcFactory : rcFactories) {
+        if (rcFactory->canHandle(this)) {
+            const QList<RunConfigurationCreationInfo> creators = rcFactory->availableCreators(this);
+            for (const RunConfigurationCreationInfo &creator : creators) {
+                allAvailableFactories.append(creator); // Manual and Auto
+                if (creator.creationMode == RunConfigurationCreationInfo::AlwaysCreate)
+                    autoCreateFactories.append(creator);  // Auto only.
+            }
+        }
+    }
 
     // Put outdated RCs into toRemove, do not bother with factories
     // that produce already existing RCs
     QList<RunConfiguration *> toRemove;
-    QList<Core::Id> toIgnore;
+    QList<RunConfigurationCreationInfo> existing;
     foreach (RunConfiguration *rc, existingConfigured) {
-        if (availableFactoryIds.contains(rc->id()))
-            toIgnore.append(rc->id()); // Already there
-        else if (project()->knowsAllBuildExecutables())
-            toRemove << rc;
+        bool present = false;
+        for (const RunConfigurationCreationInfo &item : allAvailableFactories) {
+            if (item.id == rc->id() && item.extra == rc->extraId()) {
+                existing.append(item);
+                present = true;
+            }
+        }
+        if (!present && project()->knowsAllBuildExecutables())
+            toRemove.append(rc);
     }
-    foreach (Core::Id i, toIgnore)
-        autoCreateFactoryIds.removeAll(i);
     configuredCount -= toRemove.count();
 
     // Create new RCs and put them into newConfigured/newUnconfigured
-    foreach (Core::Id id, autoCreateFactoryIds) {
-        IRunConfigurationFactory *factory = Utils::findOrDefault(rcFactories,
-                                                          [this, id] (IRunConfigurationFactory *i) {
-                                                                return i->canCreate(this, id);
-                                                          });
-        if (!factory)
+    foreach (const RunConfigurationCreationInfo &item, autoCreateFactories) {
+        bool exists = false;
+        for (const RunConfigurationCreationInfo &ex : existing) {
+            if (ex.id == item.id && ex.extra == item.extra)
+                exists = true;
+        }
+        if (exists)
             continue;
 
-        RunConfiguration *rc = factory->create(this, id);
+        RunConfiguration *rc = item.factory->create(this, item.id, item.extra);
         if (!rc)
             continue;
-        QTC_CHECK(rc->id() == id);
+        QTC_CHECK(rc->id() == item.id);
         if (!rc->isConfigured())
             newUnconfigured << rc;
         else
@@ -643,7 +641,7 @@ void Target::updateDefaultRunConfigurations()
 
     // Make sure a configured RC will be active after we delete the RCs:
     RunConfiguration *active = activeRunConfiguration();
-    if (removalList.contains(active) || !active->isEnabled()) {
+    if (active && (removalList.contains(active) || !active->isEnabled())) {
         RunConfiguration *newConfiguredDefault = newConfigured.isEmpty() ? nullptr : newConfigured.at(0);
 
         RunConfiguration *rc
@@ -796,7 +794,7 @@ bool Target::fromMap(const QVariantMap &map)
             qWarning("Factory '%s' failed to restore deployment configuration!", qPrintable(factory->objectName()));
             continue;
         }
-        QTC_CHECK(dc->id() == ProjectExplorer::idFromMap(valueMap));
+        QTC_CHECK(dc->id().withSuffix(dc->extraId()) == ProjectExplorer::idFromMap(valueMap));
         addDeployConfiguration(dc);
         if (i == activeConfiguration)
             setActiveDeployConfiguration(dc);
@@ -824,7 +822,7 @@ bool Target::fromMap(const QVariantMap &map)
         RunConfiguration *rc = factory->restore(this, valueMap);
         if (!rc)
             continue;
-        QTC_CHECK(rc->id() == ProjectExplorer::idFromMap(valueMap));
+        QTC_CHECK(rc->id().withSuffix(rc->extraId()) == ProjectExplorer::idFromMap(valueMap));
         addRunConfiguration(rc);
         if (i == activeConfiguration)
             setActiveRunConfiguration(rc);

@@ -26,14 +26,16 @@
 #include "qmakeandroidrunfactories.h"
 #include "qmakeandroidrunconfiguration.h"
 
-#include <android/androidmanager.h>
+#include <android/androidconstants.h>
 
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/target.h>
-#include <debugger/debuggerconstants.h>
-#include <qmakeprojectmanager/qmakeproject.h>
+
 #include <qmakeprojectmanager/qmakenodes.h>
+#include <qmakeprojectmanager/qmakeproject.h>
+#include <qmakeprojectmanager/qmakeprojectmanagerconstants.h>
+
 #include <qtsupport/qtkitinformation.h>
 #include <qtsupport/qtsupportconstants.h>
 
@@ -49,79 +51,15 @@ static const char ANDROID_RC_ID_PREFIX[] = "Qt4ProjectManager.AndroidRunConfigur
 QmakeAndroidRunConfigurationFactory::QmakeAndroidRunConfigurationFactory(QObject *parent)
     : IRunConfigurationFactory(parent)
 {
+    registerRunConfiguration<QmakeAndroidRunConfiguration>(ANDROID_RC_ID_PREFIX);
+    addSupportedProjectType(QmakeProjectManager::Constants::QMAKEPROJECT_ID);
+    setSupportedTargetDeviceTypes({Android::Constants::ANDROID_DEVICE_TYPE});
 }
 
-QString QmakeAndroidRunConfigurationFactory::displayNameForId(Core::Id id) const
+QList<RunConfigurationCreationInfo> QmakeAndroidRunConfigurationFactory::availableCreators(Target *parent) const
 {
-    return QmakeAndroidRunConfiguration::displayNameForId(id);
-}
-
-bool QmakeAndroidRunConfigurationFactory::canCreate(Target *parent, Core::Id id) const
-{
-    if (!canHandle(parent))
-        return false;
-    return availableCreationIds(parent).contains(id);
-}
-
-bool QmakeAndroidRunConfigurationFactory::canRestore(Target *parent, const QVariantMap &map) const
-{
-    if (!canHandle(parent))
-        return false;
-    return ProjectExplorer::idFromMap(map).name().startsWith(ANDROID_RC_ID_PREFIX);
-}
-
-bool QmakeAndroidRunConfigurationFactory::canClone(Target *parent, RunConfiguration *source) const
-{
-    return canCreate(parent, source->id());
-}
-
-QList<Core::Id> QmakeAndroidRunConfigurationFactory::availableCreationIds(Target *parent, CreationMode mode) const
-{
-    if (!canHandle(parent))
-        return QList<Core::Id>();
-
     auto project = static_cast<QmakeProject *>(parent->project());
-    return project->creationIds(ANDROID_RC_ID_PREFIX, mode,
-                                {ProjectType::ApplicationTemplate, ProjectType::SharedLibraryTemplate});
-}
-
-RunConfiguration *QmakeAndroidRunConfigurationFactory::doCreate(Target *parent, Core::Id id)
-{
-    return createHelper<QmakeAndroidRunConfiguration>(parent, id);
-}
-
-RunConfiguration *QmakeAndroidRunConfigurationFactory::doRestore(Target *parent,
-                                                            const QVariantMap &map)
-{
-    Core::Id id = ProjectExplorer::idFromMap(map);
-    return createHelper<QmakeAndroidRunConfiguration>(parent, id);
-}
-
-RunConfiguration *QmakeAndroidRunConfigurationFactory::clone(Target *parent, RunConfiguration *source)
-{
-    if (!canClone(parent, source))
-        return 0;
-    return cloneHelper<QmakeAndroidRunConfiguration>(parent, source);
-}
-
-bool QmakeAndroidRunConfigurationFactory::canHandle(Target *t) const
-{
-    return t->project()->supportsKit(t->kit())
-            && AndroidManager::supportsAndroid(t)
-            && qobject_cast<QmakeProject *>(t->project());
-}
-
-#ifdef Q_CC_GCC
-#  warning FIX ME !!!
-#endif
-QList<RunConfiguration *> QmakeAndroidRunConfigurationFactory::runConfigurationsForNode(Target *t, Node *n)
-{
-    QList<RunConfiguration *> result;
-    foreach (RunConfiguration *rc, t->runConfigurations())
-        if (QmakeAndroidRunConfiguration *qt4c = qobject_cast<QmakeAndroidRunConfiguration *>(rc))
-                if (qt4c->proFilePath() == n->filePath())
-                    result << rc;
-    return result;
+    return project->runConfigurationCreators(this, {ProjectType::ApplicationTemplate, ProjectType::SharedLibraryTemplate});
 }
 
 } // namespace Internal

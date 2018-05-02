@@ -26,24 +26,23 @@
 #include "cppcurrentdocumentfilter.h"
 
 #include "cppmodelmanager.h"
+#include "cpptoolsconstants.h"
 
-#include <coreplugin/idocument.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/editormanager/ieditor.h>
+#include <coreplugin/idocument.h>
 
 #include <QRegularExpression>
 
 using namespace CppTools::Internal;
 using namespace CPlusPlus;
 
-CppCurrentDocumentFilter::CppCurrentDocumentFilter(CppTools::CppModelManager *manager,
-                                                   StringTable &stringTable)
+CppCurrentDocumentFilter::CppCurrentDocumentFilter(CppTools::CppModelManager *manager)
     : m_modelManager(manager)
-    , search(stringTable)
 {
-    setId("Methods in current Document");
-    setDisplayName(tr("C++ Symbols in Current Document"));
-    setShortcutString(QString(QLatin1Char('.')));
+    setId(Constants::CURRENT_DOCUMENT_FILTER_ID);
+    setDisplayName(Constants::CURRENT_DOCUMENT_FILTER_DISPLAY_NAME);
+    setShortcutString(".");
     setPriority(High);
     setIncludedByDefault(false);
 
@@ -70,7 +69,8 @@ QList<Core::LocatorFilterEntry> CppCurrentDocumentFilter::matchesFor(
     if (!regexp.isValid())
         return goodEntries;
 
-    foreach (IndexItem::Ptr info, itemsOfCurrentDocument()) {
+    const QList<IndexItem::Ptr> items = itemsOfCurrentDocument();
+    for (IndexItem::Ptr info : items) {
         if (future.isCanceled())
             break;
 

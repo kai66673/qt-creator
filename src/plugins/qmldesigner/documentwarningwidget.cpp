@@ -63,7 +63,8 @@ DocumentWarningWidget::DocumentWarningWidget(QWidget *parent)
     m_messageLabel->setForegroundRole(QPalette::ToolTipText);
     m_messageLabel->setWordWrap(true);
 
-    m_ignoreWarningsCheckBox->setText(tr("Ignore always these unsupported Qt Quick Designer warnings."));
+    m_ignoreWarningsCheckBox->setText(tr("Always ignore these warnings about features "
+                                         "not supported by Qt Quick Designer."));
 
     connect(m_navigateLabel, &QLabel::linkActivated, this, [=](const QString &link) {
         if (link == QLatin1String("goToCode")) {
@@ -126,7 +127,7 @@ void DocumentWarningWidget::refreshContent()
     }
 
     QString messageString;
-    DocumentMessage message = m_messages.at(m_currentMessage);
+    DocumentMessage message = m_messages.value(m_currentMessage);
     if (message.type() == DocumentMessage::ParseError) {
         messageString += errorToString(message);
         m_navigateLabel->setText(generateNavigateLinks());

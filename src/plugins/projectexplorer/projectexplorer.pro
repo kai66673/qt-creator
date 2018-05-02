@@ -15,6 +15,7 @@ HEADERS += projectexplorer.h \
     gcctoolchain.h \
     importwidget.h \
     runnables.h \
+    userfileaccessor.h \
     localenvironmentaspect.h \
     osparser.h \
     projectexplorer_export.h \
@@ -102,7 +103,6 @@ HEADERS += projectexplorer.h \
     gcctoolchainfactories.h \
     appoutputpane.h \
     codestylesettingspropertiespage.h \
-    settingsaccessor.h \
     deployablefile.h \
     devicesupport/idevice.h \
     devicesupport/desktopdevice.h \
@@ -165,6 +165,7 @@ SOURCES += projectexplorer.cpp \
     importwidget.cpp \
     projectconfigurationmodel.cpp \
     runnables.cpp \
+    userfileaccessor.cpp \
     localenvironmentaspect.cpp \
     osparser.cpp \
     projectimporter.cpp \
@@ -243,7 +244,6 @@ SOURCES += projectexplorer.cpp \
     processparameters.cpp \
     appoutputpane.cpp \
     codestylesettingspropertiespage.cpp \
-    settingsaccessor.cpp \
     devicesupport/idevice.cpp \
     devicesupport/desktopdevice.cpp \
     devicesupport/desktopdevicefactory.cpp \
@@ -331,12 +331,5 @@ journald {
 }
 
 RESOURCES += projectexplorer.qrc
-
-# Some way to override the architecture used in Abi:
-!isEmpty($$(QTC_CPU)) {
-    DEFINES += QTC_CPU=$$(QTC_CPU)
-} else {
-    DEFINES += QTC_CPU=X86Architecture
-}
 
 DEFINES += PROJECTEXPLORER_LIBRARY

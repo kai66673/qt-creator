@@ -27,6 +27,8 @@
 
 #include <QtGlobal>
 
+#include <vector>
+
 QT_BEGIN_NAMESPACE
 class QDataStream;
 class QIODevice;
@@ -42,9 +44,11 @@ public:
     ReadMessageBlock(QIODevice *ioDevice = nullptr);
 
     MessageEnvelop read();
-    QVector<MessageEnvelop> readAll();
+    std::vector<MessageEnvelop> readAll();
 
-    void resetCounter();
+    void resetState();
+
+    void setIoDevice(QIODevice *ioDevice);
 
 private:
     bool isTheWholeMessageReadable(QDataStream &in);

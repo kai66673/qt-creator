@@ -197,6 +197,7 @@ private: ////////// General Interface //////////
     void insertBreakpoint(Breakpoint bp) final;
     void removeBreakpoint(Breakpoint bp) final;
     void changeBreakpoint(Breakpoint bp) final;
+    void enableSubBreakpoint(const QString &locId, bool on) final;
 
     void executeStep() final;
     void executeStepOut() final;
@@ -405,7 +406,6 @@ private: ////////// General Interface //////////
     bool isTermEngine() const;
 
     void setupEngine() final;
-    void setupInferior() final;
     void runEngine() final;
     void shutdownEngine() final;
 
@@ -438,6 +438,7 @@ private: ////////// General Interface //////////
     QString coreFileName() const;
 
     QString mainFunction() const;
+    void setupInferior();
 
     Utils::QtcProcess m_gdbProc;
     OutputCollector m_outputCollector;

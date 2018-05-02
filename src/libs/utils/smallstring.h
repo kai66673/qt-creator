@@ -69,7 +69,7 @@ public:
                 ? sizeof(Internal::StringDataLayout<Size>) == Size + 1
                 : sizeof(Internal::StringDataLayout<Size>) == Size + 2,
                   "Size is wrong");
-
+    constexpr
     BasicSmallString() noexcept
         : m_data(Internal::StringDataLayout<Size>())
     {
@@ -126,12 +126,16 @@ public:
         : BasicSmallString(BasicSmallString::fromQString(qString))
     {}
 
-    template<typename Type,
-             typename = std::enable_if_t<std::is_same<std::decay_t<Type>, std::string>::value>
-             >
-    BasicSmallString(Type &&string)
-        : BasicSmallString(string.data(), string.size())
+    BasicSmallString(const QByteArray &qByteArray)
+        : BasicSmallString(qByteArray.constData(), qByteArray.size())
     {}
+
+    template<typename String,
+             typename Utils::enable_if_has_char_data_pointer<String> = 0>
+    BasicSmallString(const String &string)
+        : BasicSmallString(string.data(), string.size())
+    {
+    }
 
     template<typename BeginIterator,
              typename EndIterator,
@@ -217,7 +221,7 @@ public:
         return QString::fromUtf8(data(), int(size()));
     }
 
-    SmallStringView toView() const
+    SmallStringView toStringView() const
     {
         return SmallStringView(data(), size());
     }
@@ -926,13 +930,7 @@ clone(const std::unordered_map<Key, Value, Hash, KeyEqual, Allocator> &map)
 template <typename Type>
 std::vector<Type> clone(const std::vector<Type> &vector)
 {
-    std::vector<Type> clonedVector;
-    clonedVector.reserve(vector.size());
-
-    for (auto &&entry : vector)
-        clonedVector.push_back(entry.clone());
-
-    return clonedVector;
+    return vector;
 }
 
 using SmallString = BasicSmallString<31>;

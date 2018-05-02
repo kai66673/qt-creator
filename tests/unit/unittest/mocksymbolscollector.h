@@ -36,15 +36,30 @@ public:
                  void());
 
     MOCK_METHOD2(addFiles,
-                 void(const Utils::PathStringVector &filePaths,
+                 void(const ClangBackEnd::FilePathIds &filePathIds,
                       const Utils::SmallStringVector &arguments));
 
     MOCK_METHOD1(addUnsavedFiles,
                  void(const ClangBackEnd::V2::FileContainers &unsavedFiles));
+
+    MOCK_METHOD0(clear,
+                 void());
 
     MOCK_CONST_METHOD0(symbols,
                        const ClangBackEnd::SymbolEntries &());
 
     MOCK_CONST_METHOD0(sourceLocations,
                        const ClangBackEnd::SourceLocationEntries &());
+
+    MOCK_CONST_METHOD0(sourceFiles,
+                       const ClangBackEnd::FilePathIds &());
+
+    MOCK_CONST_METHOD0(usedMacros,
+                       const ClangBackEnd::UsedMacros &());
+
+    MOCK_CONST_METHOD0(fileStatuses,
+                       const ClangBackEnd::FileStatuses &());
+
+   MOCK_CONST_METHOD0(sourceDependencies,
+                      const ClangBackEnd::SourceDependencies &());
 };

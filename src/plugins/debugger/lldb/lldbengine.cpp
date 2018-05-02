@@ -157,6 +157,15 @@ void LldbEngine::debugLastCommand()
     runCommand(m_lastDebuggableCommand);
 }
 
+void LldbEngine::handleAttachedToCore()
+{
+    QTC_ASSERT(state() == InferiorUnrunnable, qDebug() << state();return);
+    showMessage("Attached to core.");
+    reloadFullStack();
+    reloadModules();
+    updateLocals();
+}
+
 void LldbEngine::shutdownInferior()
 {
     QTC_ASSERT(state() == InferiorShutdownRequested, qDebug() << state());
@@ -167,7 +176,7 @@ void LldbEngine::shutdownEngine()
 {
     QTC_ASSERT(state() == EngineShutdownRequested, qDebug() << state());
     m_lldbProc.kill();
-    notifyEngineShutdownOk();
+    notifyEngineShutdownFinished();
 }
 
 void LldbEngine::abortDebuggerProcess()
@@ -199,13 +208,7 @@ void LldbEngine::setupEngine()
         return;
     }
     m_lldbProc.waitForReadyRead(1000);
-    m_lldbProc.write("sc print('@\\nlldbstartupok@\\n')\n");
-}
 
-// FIXME: splitting of startLldb() necessary to support LLDB <= 310 - revert asap
-void LldbEngine::startLldbStage2()
-{
-    showMessage("ADAPTER STARTED");
     showStatusMessage(tr("Setting up inferior..."));
 
     const QByteArray dumperSourcePath =
@@ -216,13 +219,11 @@ void LldbEngine::startLldbStage2()
     m_lldbProc.write("script print(dir())\n");
     m_lldbProc.write("script theDumper = Dumper()\n"); // This triggers reportState("enginesetupok")
 
-    const QString commands = nativeStartupCommands();
+    QString commands = nativeStartupCommands();
     if (!commands.isEmpty())
         m_lldbProc.write(commands.toLocal8Bit() + '\n');
-}
 
-void LldbEngine::setupInferior()
-{
+
     const QString path = stringSetting(ExtraDumperFile);
     if (!path.isEmpty() && QFileInfo(path).isReadable()) {
         DebuggerCommand cmd("addDumperModule");
@@ -230,7 +231,7 @@ void LldbEngine::setupInferior()
         runCommand(cmd);
     }
 
-    const QString commands = stringSetting(ExtraDumperCommands);
+    commands = stringSetting(ExtraDumperCommands);
     if (!commands.isEmpty()) {
         DebuggerCommand cmd("executeDebuggerCommand");
         cmd.arg("command", commands);
@@ -261,7 +262,6 @@ void LldbEngine::setupInferior()
     cmd2.arg("processargs", args.toUnixArgs());
 
     if (terminal()) {
-        QTC_ASSERT(state() == InferiorSetupRequested, qDebug() << state());
         const qint64 attachedPID = terminal()->applicationPid();
         const qint64 attachedMainThreadID = terminal()->applicationMainThreadId();
         const QString msg = (attachedMainThreadID != -1)
@@ -301,9 +301,8 @@ void LldbEngine::setupInferior()
                                 .arg(bp.id().toString()).arg(bp.state()));
                 }
             }
-            notifyInferiorSetupOk();
         } else {
-            notifyInferiorSetupFailed();
+            notifyEngineSetupFailed();
         }
     };
 
@@ -467,7 +466,7 @@ void LldbEngine::selectThread(ThreadId threadId)
 bool LldbEngine::stateAcceptsBreakpointChanges() const
 {
     switch (state()) {
-    case InferiorSetupRequested:
+    case EngineSetupRequested:
     case InferiorRunRequested:
     case InferiorRunOk:
     case InferiorStopRequested:
@@ -809,10 +808,7 @@ void LldbEngine::readLldbStandardOutput()
             break;
         QString response = m_inbuffer.left(pos).trimmed();
         m_inbuffer = m_inbuffer.mid(pos + 2);
-        if (response == "lldbstartupok")
-            startLldbStage2();
-        else
-            emit outputReady(response);
+        emit outputReady(response);
     }
 }
 
@@ -864,16 +860,14 @@ void LldbEngine::handleStateNotification(const GdbMi &reportedState)
     } else if (newState == "enginerunandinferiorstopok") {
         notifyEngineRunAndInferiorStopOk();
         continueInferior();
-    } else if (newState == "enginerunokandinferiorunrunnable")
+    } else if (newState == "enginerunokandinferiorunrunnable") {
         notifyEngineRunOkAndInferiorUnrunnable();
-    else if (newState == "inferiorshutdownok")
-        notifyInferiorShutdownOk();
-    else if (newState == "inferiorshutdownfailed")
-        notifyInferiorShutdownFailed();
-    else if (newState == "engineshutdownok")
-        notifyEngineShutdownOk();
-    else if (newState == "engineshutdownfailed")
-        notifyEngineShutdownFailed();
+        if (runParameters().startMode == AttachCore)
+            handleAttachedToCore();
+    } else if (newState == "inferiorshutdownfinished")
+        notifyInferiorShutdownFinished();
+    else if (newState == "engineshutdownfinished")
+        notifyEngineShutdownFinished();
     else if (newState == "inferiorexited")
         notifyInferiorExited();
 }

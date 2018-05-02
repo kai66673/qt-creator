@@ -28,6 +28,7 @@ SOURCES += \
     $$PWD/environmentdialog.cpp \
     $$PWD/qtcprocess.cpp \
     $$PWD/reloadpromptutils.cpp \
+    $$PWD/settingsaccessor.cpp \
     $$PWD/shellcommand.cpp \
     $$PWD/shellcommandpage.cpp \
     $$PWD/settingsselector.cpp \
@@ -49,7 +50,6 @@ SOURCES += \
     $$PWD/codegeneration.cpp \
     $$PWD/newclasswidget.cpp \
     $$PWD/classnamevalidatinglineedit.cpp \
-    $$PWD/linecolumnlabel.cpp \
     $$PWD/fancylineedit.cpp \
     $$PWD/qtcolorbutton.cpp \
     $$PWD/savedaction.cpp \
@@ -118,7 +118,10 @@ SOURCES += \
     $$PWD/highlightingitemdelegate.cpp \
     $$PWD/fuzzymatcher.cpp \
     $$PWD/textutils.cpp \
-    $$PWD/url.cpp
+    $$PWD/url.cpp \
+    $$PWD/filecrumblabel.cpp \
+    $$PWD/fixedsizeclicklabel.cpp \
+    $$PWD/removefiledialog.cpp
 
 win32:SOURCES += $$PWD/consoleprocess_win.cpp
 else:SOURCES += $$PWD/consoleprocess_unix.cpp
@@ -131,6 +134,7 @@ HEADERS += \
     $$PWD/qtcprocess.h \
     $$PWD/utils_global.h \
     $$PWD/reloadpromptutils.h \
+    $$PWD/settingsaccessor.h \
     $$PWD/settingsselector.h \
     $$PWD/shellcommand.h \
     $$PWD/shellcommandpage.h \
@@ -153,7 +157,6 @@ HEADERS += \
     $$PWD/codegeneration.h \
     $$PWD/newclasswidget.h \
     $$PWD/classnamevalidatinglineedit.h \
-    $$PWD/linecolumnlabel.h \
     $$PWD/fancylineedit.h \
     $$PWD/qtcolorbutton.h \
     $$PWD/savedaction.h \
@@ -230,7 +233,6 @@ HEADERS += \
     $$PWD/port.h \
     $$PWD/functiontraits.h \
     $$PWD/mapreduce.h \
-    $$PWD/objectpool.h \
     $$PWD/declarationmacros.h \
     $$PWD/smallstring.h \
     $$PWD/smallstringiterator.h \
@@ -245,17 +247,25 @@ HEADERS += \
     $$PWD/smallstringfwd.h \
     $$PWD/optional.h \
     $$PWD/../3rdparty/optional/optional.hpp \
+    $$PWD/variant.h \
+    $$PWD/../3rdparty/variant/variant.hpp \
     $$PWD/qtcfallthrough.h \
     $$PWD/highlightingitemdelegate.h \
     $$PWD/fuzzymatcher.h \
     $$PWD/textutils.h \
     $$PWD/predicates.h \
-    $$PWD/url.h
+    $$PWD/url.h \
+    $$PWD/filecrumblabel.h \
+    $$PWD/linecolumn.h \
+    $$PWD/link.h \
+    $$PWD/fixedsizeclicklabel.h \
+    $$PWD/removefiledialog.h
 
 FORMS += $$PWD/filewizardpage.ui \
-    $$PWD/projectintropage.ui \
     $$PWD/newclasswidget.ui \
-    $$PWD/proxycredentialsdialog.ui
+    $$PWD/projectintropage.ui \
+    $$PWD/proxycredentialsdialog.ui \
+    $$PWD/removefiledialog.ui
 
 RESOURCES += $$PWD/utils.qrc
 

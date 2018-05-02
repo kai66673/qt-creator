@@ -101,7 +101,7 @@ TestNavigationWidget::TestNavigationWidget(QWidget *parent) :
     connect(m_model->parser(), &TestCodeParser::parsingFailed,
             this, &TestNavigationWidget::onParsingFinished);
     connect(m_model, &TestTreeModel::updatedActiveFrameworks,
-            [this] (int numberOfActive) {
+            this, [this] (int numberOfActive) {
         m_missingFrameworksWidget->setVisible(numberOfActive == 0);
     });
     connect(m_progressTimer, &QTimer::timeout,
@@ -236,8 +236,7 @@ QList<QToolButton *> TestNavigationWidget::createToolButtons()
 
 void TestNavigationWidget::onItemActivated(const QModelIndex &index)
 {
-    const TextEditor::TextEditorWidget::Link link
-            = index.data(LinkRole).value<TextEditor::TextEditorWidget::Link>();
+    const Utils::Link link = index.data(LinkRole).value<Utils::Link>();
     if (link.hasValidTarget()) {
         Core::EditorManager::openEditorAt(link.targetFileName, link.targetLine,
             link.targetColumn);

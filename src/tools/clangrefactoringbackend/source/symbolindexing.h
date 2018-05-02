@@ -39,6 +39,8 @@
 #include <sqlitereadstatement.h>
 #include <sqlitewritestatement.h>
 
+#include <QFileSystemWatcher>
+
 namespace ClangBackEnd {
 
 class SymbolIndexing final : public SymbolIndexingInterface
@@ -72,7 +74,14 @@ private:
     SymbolsCollector m_collector{m_filePathCache};
     StatementFactory m_statementFactory;
     Storage m_symbolStorage{m_statementFactory, m_filePathCache};
-    SymbolIndexer m_indexer{m_collector, m_symbolStorage};
+    ClangPathWatcher<QFileSystemWatcher, QTimer> m_sourceWatcher{m_filePathCache};
+    FileStatusCache m_fileStatusCache{m_filePathCache};
+    SymbolIndexer m_indexer{m_collector,
+                            m_symbolStorage,
+                            m_sourceWatcher,
+                            m_filePathCache,
+                            m_fileStatusCache,
+                            m_statementFactory.database};
 };
 
 } // namespace ClangBackEnd

@@ -25,6 +25,7 @@
 
 #include "baremetalrunconfiguration.h"
 
+#include "baremetalcustomrunconfiguration.h"
 #include "baremetalrunconfigurationwidget.h"
 
 #include <debugger/debuggerrunconfigurationaspect.h>
@@ -44,9 +45,8 @@ namespace Internal {
 const char ProFileKey[] = "Qt4ProjectManager.MaemoRunConfiguration.ProFile";
 const char WorkingDirectoryKey[] = "BareMetal.RunConfig.WorkingDirectory";
 
-
 BareMetalRunConfiguration::BareMetalRunConfiguration(Target *target)
-    : RunConfiguration(target)
+    : RunConfiguration(target, IdPrefix)
 {
     addExtraAspect(new ArgumentsAspect(this, "Qt4ProjectManager.MaemoRunConfiguration.Arguments"));
     connect(target, &Target::deploymentDataChanged,
@@ -57,21 +57,9 @@ BareMetalRunConfiguration::BareMetalRunConfiguration(Target *target)
             this, &BareMetalRunConfiguration::handleBuildSystemDataUpdated); // Handles device changes, etc.
 }
 
-void BareMetalRunConfiguration::copyFrom(const BareMetalRunConfiguration *other)
+QString BareMetalRunConfiguration::extraId() const
 {
-    RunConfiguration::copyFrom(other);
-    m_projectFilePath = other->m_projectFilePath;
-    m_workingDirectory = other->m_workingDirectory;
-
-    setDefaultDisplayName(defaultDisplayName());
-}
-
-void BareMetalRunConfiguration::initialize(const Core::Id id, const QString &projectFilePath)
-{
-    RunConfiguration::initialize(id);
-    m_projectFilePath = projectFilePath;
-
-    setDefaultDisplayName(defaultDisplayName());
+    return m_projectFilePath;
 }
 
 QWidget *BareMetalRunConfiguration::createConfigurationWidget()
@@ -103,8 +91,11 @@ bool BareMetalRunConfiguration::fromMap(const QVariantMap &map)
             = QDir::cleanPath(dir.filePath(map.value(QLatin1String(ProFileKey)).toString()));
     m_workingDirectory = map.value(QLatin1String(WorkingDirectoryKey)).toString();
 
-    setDefaultDisplayName(defaultDisplayName());
+    // Hack for old-style mangled ids. FIXME: Remove.
+    if (m_projectFilePath.isEmpty())
+        m_projectFilePath = ProjectExplorer::idFromMap(map).suffixAfter(id());
 
+    setDefaultDisplayName(defaultDisplayName());
     return true;
 }
 

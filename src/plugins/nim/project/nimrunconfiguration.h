@@ -50,17 +50,7 @@ public:
     QVariantMap toMap() const override;
     bool fromMap(const QVariantMap &map) override;
 
-signals:
-    void executableChanged(const QString &args);
-    void runModeChanged(ProjectExplorer::ApplicationLauncher::Mode);
-    void workingDirectoryChanged(const QString &workingDirectory);
-    void commandLineArgumentsChanged(const QString &args);
-    void runInTerminalChanged(bool);
-
 private:
-    void setExecutable(const QString &path);
-    void setWorkingDirectory(const QString &path);
-    void setCommandLineArguments(const QString &args);
     void updateConfiguration();
     void setActiveBuildConfiguration(NimBuildConfiguration *activeBuildConfiguration);
 
@@ -72,4 +62,10 @@ private:
     ProjectExplorer::LocalEnvironmentAspect* m_localEnvironmentAspect;
 };
 
-}
+class NimRunConfigurationFactory : public ProjectExplorer::FixedRunConfigurationFactory
+{
+public:
+    NimRunConfigurationFactory();
+};
+
+} // Nim

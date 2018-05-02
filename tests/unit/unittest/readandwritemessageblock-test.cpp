@@ -29,7 +29,7 @@
 #include <clangcodemodelservermessages.h>
 
 #include <diagnosticcontainer.h>
-#include <highlightingmarkcontainer.h>
+#include <tokeninfocontainer.h>
 #include <messageenvelop.h>
 #include <readmessageblock.h>
 #include <writemessageblock.h>
@@ -119,7 +119,65 @@ TEST_F(ReadAndWriteMessageBlock, ReadThreeMessagesAndTestCount)
     writeMessageBlock.write(ClangBackEnd::EndMessage());
     buffer.seek(0);
 
-    ASSERT_EQ(3, readMessageBlock.readAll().count());
+    ASSERT_THAT(readMessageBlock.readAll(), SizeIs(3));
+}
+
+TEST_F(ReadAndWriteMessageBlock, WriteMessagesToWriteBlockWithoutIoDeviceAndNoMessagesAreSent)
+{
+    ClangBackEnd::WriteMessageBlock writeMessageBlock;
+
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+    buffer.seek(0);
+
+    ASSERT_THAT(readMessageBlock.readAll(), IsEmpty());
+}
+
+TEST_F(ReadAndWriteMessageBlock, WriteMessagesToWriteBlockWithoutIoDeviceAndSetIoDeviceToNullPointerLater)
+{
+    ClangBackEnd::WriteMessageBlock writeMessageBlock;
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+
+    writeMessageBlock.setIoDevice(nullptr);
+    buffer.seek(0);
+
+    ASSERT_THAT(readMessageBlock.readAll(), IsEmpty());
+}
+
+TEST_F(ReadAndWriteMessageBlock, WriteMessagesToWriteBlockWithoutIoDeviceAndSetIoDeviceLater)
+{
+    ClangBackEnd::WriteMessageBlock writeMessageBlock;
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+
+    writeMessageBlock.setIoDevice(&buffer);
+    buffer.seek(0);
+
+    ASSERT_THAT(readMessageBlock.readAll(), SizeIs(2));
+}
+
+TEST_F(ReadAndWriteMessageBlock, ResetStateResetsCounter)
+{
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+    buffer.seek(0);
+
+    writeMessageBlock.resetState();
+
+    ASSERT_THAT(writeMessageBlock.counter(), 0);
+}
+
+TEST_F(ReadAndWriteMessageBlock, ResetStateResetsWritingBlock)
+{
+    ClangBackEnd::WriteMessageBlock writeMessageBlock;
+    writeMessageBlock.write(ClangBackEnd::EndMessage());
+
+    writeMessageBlock.resetState();
+
+    writeMessageBlock.setIoDevice(&buffer);
+    buffer.seek(0);
+    ASSERT_THAT(readMessageBlock.readAll(), IsEmpty());
 }
 
 TEST_F(ReadAndWriteMessageBlock, CompareEndMessage)
@@ -174,12 +232,12 @@ TEST_F(ReadAndWriteMessageBlock, CompareDocumentAnnotationsChangedMessage)
                                                 {},
                                                 {});
 
-    ClangBackEnd::HighlightingMarkContainer highlightingMark(1, 1, 1, ClangBackEnd::HighlightingType::Keyword);
+    ClangBackEnd::TokenInfoContainer tokenInfo(1, 1, 1, {ClangBackEnd::HighlightingType::Keyword, {}});
 
     CompareMessage(ClangBackEnd::DocumentAnnotationsChangedMessage(fileContainer,
                                                                    {diagnostic},
                                                                    {},
-                                                                   {highlightingMark},
+                                                                   {tokenInfo},
                                                                    QVector<ClangBackEnd::SourceRangeContainer>()));
 }
 
@@ -205,10 +263,7 @@ TEST_F(ReadAndWriteMessageBlock, CompareRequestReferences)
 
 TEST_F(ReadAndWriteMessageBlock, CompareRequestFollowSymbol)
 {
-    QVector<Utf8String> dependentFiles;
-    dependentFiles.push_back(QString("somefile.cpp"));
-    dependentFiles.push_back(QString("otherfile.cpp"));
-    CompareMessage(ClangBackEnd::RequestFollowSymbolMessage{fileContainer, dependentFiles, 13, 37});
+    CompareMessage(ClangBackEnd::RequestFollowSymbolMessage{fileContainer, 13, 37});
 }
 
 TEST_F(ReadAndWriteMessageBlock, CompareReferences)

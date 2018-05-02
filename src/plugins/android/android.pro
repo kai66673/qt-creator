@@ -28,7 +28,7 @@ HEADERS += \
     androiddevicefactory.h \
     androiddevice.h \
     androidgdbserverkitinformation.h \
-    androidanalyzesupport.h \
+    androidqmltoolingsupport.h \
     androidmanifesteditorfactory.h \
     androidmanifesteditor.h \
     androidmanifesteditorwidget.h \
@@ -53,7 +53,8 @@ HEADERS += \
     adbcommandswidget.h \
     androidsdkpackage.h \
     androidsdkmodel.h \
-    androidsdkmanagerwidget.h
+    androidsdkmanagerwidget.h \
+    androidpackageinstallationstep.h
 
 SOURCES += \
     androidconfigurations.cpp \
@@ -75,7 +76,7 @@ SOURCES += \
     androiddevicefactory.cpp \
     androiddevice.cpp \
     androidgdbserverkitinformation.cpp \
-    androidanalyzesupport.cpp \
+    androidqmltoolingsupport.cpp \
     androidmanifesteditorfactory.cpp \
     androidmanifesteditor.cpp \
     androidmanifesteditorwidget.cpp \
@@ -100,7 +101,8 @@ SOURCES += \
     adbcommandswidget.cpp \
     androidsdkpackage.cpp \
     androidsdkmodel.cpp \
-    androidsdkmanagerwidget.cpp
+    androidsdkmanagerwidget.cpp \
+    androidpackageinstallationstep.cpp
 
 FORMS += \
     androidsettingswidget.ui \

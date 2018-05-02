@@ -64,8 +64,10 @@ int positionInText(QTextDocument *textDocument,
 {
     auto textBlock = textDocument->findBlockByNumber(
                 static_cast<int>(sourceLocationContainer.line()) - 1);
-    int column = static_cast<int>(sourceLocationContainer.column()) - 1;
-    column -= ClangCodeModel::Utils::extraUtf8CharsShift(textBlock.text(), column);
+    // 'sourceLocationContainer' already has the CppEditor column converted from
+    // the utf8 byte offset from the beginning of the line provided by clang.
+    // - 1 is required for 0-based columns.
+    const int column = static_cast<int>(sourceLocationContainer.column()) - 1;
     return textBlock.position() + column;
 }
 

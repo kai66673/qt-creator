@@ -33,22 +33,11 @@ QDebug operator<<(QDebug debug, const ProjectPartContainer &container)
     debug.nospace() << "ProjectPartContainer("
                     << container.projectPartId() << ","
                     << container.arguments() << ", "
-                    << container.headerPaths() << ", "
-                    << container.sourcePaths()
+                    << container.headerPathIds() << ", "
+                    << container.sourcePathIds()
                     << ")";
 
     return debug;
-}
-
-std::ostream &operator<<(std::ostream &out, const ProjectPartContainer &container)
-{
-    out << "("
-        << container.projectPartId() << ", "
-        << container.arguments() << ", "
-        << container.headerPaths() << ", "
-        << container.sourcePaths()<< ")";
-
-    return out;
 }
 
 } // namespace V2

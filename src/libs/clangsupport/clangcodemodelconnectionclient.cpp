@@ -25,6 +25,8 @@
 
 #include "clangcodemodelconnectionclient.h"
 
+#include <utils/temporarydirectory.h>
+
 #include <QCoreApplication>
 
 namespace ClangBackEnd {
@@ -40,8 +42,14 @@ QString currentProcessId()
 
 ClangCodeModelConnectionClient::ClangCodeModelConnectionClient(
         ClangCodeModelClientInterface *client)
-    : serverProxy_(client, ioDevice())
+    : ConnectionClient(Utils::TemporaryDirectory::masterDirectoryPath()
+                       + QStringLiteral("/ClangBackEnd-")
+                       + currentProcessId()),
+      m_serverProxy(client, nullptr)
 {
+    m_processCreator.setTemporaryDirectoryPattern("clangbackend-XXXXXX");
+    m_processCreator.setArguments({connectionName()});
+
     stdErrPrefixer().setPrefix("clangbackend.stderr: ");
     stdOutPrefixer().setPrefix("clangbackend.stdout: ");
 }
@@ -53,27 +61,27 @@ ClangCodeModelConnectionClient::~ClangCodeModelConnectionClient()
 
 ClangCodeModelServerProxy &ClangCodeModelConnectionClient::serverProxy()
 {
-    return serverProxy_;
+    return m_serverProxy;
 }
 
 void ClangCodeModelConnectionClient::sendEndCommand()
 {
-    serverProxy_.end();
+    m_serverProxy.end();
 }
 
-void ClangCodeModelConnectionClient::resetCounter()
+void ClangCodeModelConnectionClient::resetState()
 {
-    serverProxy_.resetCounter();
-}
-
-QString ClangCodeModelConnectionClient::connectionName() const
-{
-    return temporaryDirectory().path() + QStringLiteral("/ClangBackEnd-") + currentProcessId();
+    m_serverProxy.resetState();
 }
 
 QString ClangCodeModelConnectionClient::outputName() const
 {
     return QStringLiteral("ClangCodeModelConnectionClient");
+}
+
+void ClangCodeModelConnectionClient::newConnectedServer(QIODevice *ioDevice)
+{
+    m_serverProxy.setIoDevice(ioDevice);
 }
 
 } // namespace ClangBackEnd

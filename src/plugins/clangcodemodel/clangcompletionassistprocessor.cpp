@@ -54,6 +54,7 @@
 #include <utils/textutils.h>
 #include <utils/mimetypes/mimedatabase.h>
 #include <utils/qtcassert.h>
+#include <utils/qtcfallthrough.h>
 
 #include <QDirIterator>
 #include <QTextDocument>
@@ -242,7 +243,7 @@ IAssistProposal *ClangCompletionAssistProcessor::startCompletionHelper()
     case ClangCompletionContextAnalyzer::CompleteSlot:
         modifiedFileContent = modifyInput(m_interface->textDocument(),
                                           analyzer.positionEndOfExpression());
-        // Fall through!
+        Q_FALLTHROUGH();
     case ClangCompletionContextAnalyzer::PassThroughToLibClang: {
         m_addSnippets = m_completionOperator == T_EOF_SYMBOL;
         m_sentRequestType = NormalCompletion;
@@ -557,8 +558,8 @@ ClangCompletionAssistProcessor::extractLineColumn(int position)
 
     int line = -1, column = -1;
     ::Utils::Text::convertPosition(m_interface->textDocument(), position, &line, &column);
-    const QTextBlock block = m_interface->textDocument()->findBlock(position);
-    column += ClangCodeModel::Utils::extraUtf8CharsShift(block.text(), column) + 1;
+
+    column = Utils::clangColumn(m_interface->textDocument()->findBlock(position), column);
     return {line, column};
 }
 

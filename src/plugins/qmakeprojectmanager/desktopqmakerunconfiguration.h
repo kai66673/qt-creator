@@ -52,7 +52,6 @@ class DesktopQmakeRunConfiguration : public ProjectExplorer::RunConfiguration
     Q_OBJECT
     // to change the display name and arguments and set the userenvironmentchanges
     friend class DesktopQmakeRunConfigurationWidget;
-    friend class ProjectExplorer::IRunConfigurationFactory;
 
 public:
     explicit DesktopQmakeRunConfiguration(ProjectExplorer::Target *target);
@@ -87,13 +86,10 @@ signals:
     void effectiveTargetInformationChanged();
 
 protected:
-    void initialize(Core::Id id);
-    void copyFrom(const DesktopQmakeRunConfiguration *source);
-
     bool fromMap(const QVariantMap &map) override;
+    QString extraId() const override;
 
 private:
-    void proFileEvaluated();
     void updateTargetInformation();
 
     QPair<QString, QString> extractWorkingDirAndExecutable(const QmakeProFile *proFile) const;
@@ -102,8 +98,6 @@ private:
     bool isConsoleApplication() const;
     QmakeProject *qmakeProject() const;
     QmakeProFile *proFile() const;
-
-    void ctor();
 
     void updateTarget();
     Utils::FileName m_proFilePath; // Full path to the Application Pro File
@@ -144,24 +138,12 @@ class DesktopQmakeRunConfigurationFactory : public QmakeRunConfigurationFactory
 public:
     explicit DesktopQmakeRunConfigurationFactory(QObject *parent = 0);
 
-    bool canCreate(ProjectExplorer::Target *parent, Core::Id id) const override;
-    bool canRestore(ProjectExplorer::Target *parent, const QVariantMap &map) const override;
-    bool canClone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *source) const override;
-    ProjectExplorer::RunConfiguration *clone(ProjectExplorer::Target *parent,
-                                             ProjectExplorer::RunConfiguration *source) override;
+    bool canCreateHelper(ProjectExplorer::Target *parent, const QString &suffix) const override;
 
-    QList<Core::Id> availableCreationIds(ProjectExplorer::Target *parent, CreationMode mode) const override;
-    QString displayNameForId(Core::Id id) const override;
+    QList<ProjectExplorer::RunConfigurationCreationInfo>
+    availableCreators(ProjectExplorer::Target *parent) const override;
 
-    QList<ProjectExplorer::RunConfiguration *> runConfigurationsForNode(ProjectExplorer::Target *t,
-                                                                        const ProjectExplorer::Node *n) override;
-
-private:
-    bool canHandle(ProjectExplorer::Target *t) const override;
-
-    ProjectExplorer::RunConfiguration *doCreate(ProjectExplorer::Target *parent, Core::Id id) override;
-    ProjectExplorer::RunConfiguration *doRestore(ProjectExplorer::Target *parent,
-                                                 const QVariantMap &map) override;
+    bool hasRunConfigForProFile(ProjectExplorer::RunConfiguration *rc, const Utils::FileName &n) const override;
 };
 
 } // namespace Internal

@@ -1,5 +1,6 @@
 SOURCES += \
     $$PWD/debugmessagesmodel_test.cpp \
+    $$PWD/fakedebugserver.cpp \
     $$PWD/flamegraphmodel_test.cpp \
     $$PWD/flamegraphview_test.cpp \
     $$PWD/inputeventsmodel_test.cpp \
@@ -16,10 +17,13 @@ SOURCES += \
     $$PWD/qmlprofilerclientmanager_test.cpp \
     $$PWD/qmlprofilerconfigwidget_test.cpp \
     $$PWD/qmlprofilerdetailsrewriter_test.cpp \
+    $$PWD/qmlprofilertool_test.cpp \
+    $$PWD/qmlprofilertraceclient_test.cpp \
     $$PWD/qmlprofilertraceview_test.cpp
 
 HEADERS += \
     $$PWD/debugmessagesmodel_test.h \
+    $$PWD/fakedebugserver.h \
     $$PWD/flamegraphmodel_test.h \
     $$PWD/flamegraphview_test.h \
     $$PWD/inputeventsmodel_test.h \
@@ -36,6 +40,8 @@ HEADERS += \
     $$PWD/qmlprofilerclientmanager_test.h \
     $$PWD/qmlprofilerconfigwidget_test.h \
     $$PWD/qmlprofilerdetailsrewriter_test.h \
+    $$PWD/qmlprofilertool_test.h \
+    $$PWD/qmlprofilertraceclient_test.h \
     $$PWD/qmlprofilertraceview_test.h
 
 RESOURCES += \

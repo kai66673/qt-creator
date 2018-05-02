@@ -35,6 +35,8 @@
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
 
+#include <QFileInfo>
+
 namespace ClangBackEnd {
 
 class DocumentProcessorData
@@ -47,7 +49,7 @@ public:
                           ClangCodeModelClientInterface &client)
         : document(document)
         , documents(documents)
-        , jobs(documents, unsavedFiles, projects, client)
+        , jobs(documents, unsavedFiles, projects, client, QFileInfo(document.filePath()).fileName())
         , supportiveTranslationUnitInitializer(document, jobs)
     {
         const auto isDocumentClosedChecker = [this](const Utf8String &filePath,
@@ -98,6 +100,12 @@ void DocumentProcessor::addJob(JobRequest::Type type, PreferredTranslationUnit p
 JobRequests DocumentProcessor::process()
 {
     return d->jobs.process();
+}
+
+JobRequests DocumentProcessor::stop()
+{
+    d->supportiveTranslationUnitInitializer.abort();
+    return d->jobs.stop();
 }
 
 Document DocumentProcessor::document() const

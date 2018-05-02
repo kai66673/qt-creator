@@ -76,20 +76,21 @@ private:
     QTemporaryDir temporaryDirectory;
 };
 
-QString processArguments(QCoreApplication &application)
+QStringList processArguments(QCoreApplication &application)
 {
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Qt Creator Clang PchManager Backend"));
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument(QStringLiteral("connection"), QStringLiteral("Connection"));
+    parser.addPositionalArgument(QStringLiteral("databasepath"), QStringLiteral("Database path"));
 
     parser.process(application);
 
     if (parser.positionalArguments().isEmpty())
         parser.showHelp(1);
 
-    return parser.positionalArguments().first();
+    return parser.positionalArguments();
 }
 
 int main(int argc, char *argv[])
@@ -103,9 +104,11 @@ int main(int argc, char *argv[])
 
     QCoreApplication application(argc, argv);
 
-    const QString connection =  processArguments(application);
+    const QStringList arguments = processArguments(application);
+    const QString connectionName = arguments[0];
+    const QString databasePath = arguments[1];
 
-    Sqlite::Database database{Utils::PathString{QDir::tempPath() + "/symbol.db"}};
+    Sqlite::Database database{Utils::PathString{databasePath}};
     ClangBackEnd::RefactoringDatabaseInitializer<Sqlite::Database> databaseInitializer{database};
     ClangBackEnd::FilePathCaching filePathCache{database};
     ClangPathWatcher<QFileSystemWatcher, QTimer> includeWatcher(filePathCache);
@@ -120,9 +123,9 @@ int main(int argc, char *argv[])
     includeWatcher.setNotifier(&clangPchManagerServer);
     pchGenerator.setNotifier(&clangPchManagerServer);
 
-    ConnectionServer<PchManagerServer, PchManagerClientProxy> connectionServer(connection);
-    connectionServer.start();
+    ConnectionServer<PchManagerServer, PchManagerClientProxy> connectionServer;
     connectionServer.setServer(&clangPchManagerServer);
+    connectionServer.start(connectionName);
 
     return application.exec();
 }

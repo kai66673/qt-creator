@@ -29,30 +29,39 @@
 #include "collectmacrossourcefilecallbacks.h"
 #include "collectsymbolsaction.h"
 #include "symbolscollectorinterface.h"
-#include "symbolentry.h"
 
 #include <filepathcachingfwd.h>
 
 namespace ClangBackEnd {
 
-class SymbolsCollector : public ClangTool, public SymbolsCollectorInterface
+class SymbolsCollector : public SymbolsCollectorInterface
 {
 public:
     SymbolsCollector(FilePathCachingInterface &filePathCache);
 
-    void addFiles(const Utils::PathStringVector &filePaths,
+    void addFiles(const FilePathIds &filePathIds,
                   const Utils::SmallStringVector &arguments) override;
 
     void addUnsavedFiles(const V2::FileContainers &unsavedFiles) override;
+
+    void clear() override;
 
     void collectSymbols() override;
 
     const SymbolEntries &symbols() const override;
     const SourceLocationEntries &sourceLocations() const override;
+    const FilePathIds &sourceFiles() const override;
+    const UsedMacros &usedMacros() const override;
+    const FileStatuses &fileStatuses() const override;
+    const SourceDependencies &sourceDependencies() const override;
 
 private:
+    ClangTool m_clangTool;
+    SymbolEntries m_symbolEntries;
+    SourceLocationEntries m_sourceLocationEntries;
     CollectSymbolsAction m_collectSymbolsAction;
     CollectMacrosSourceFileCallbacks m_collectMacrosSourceFileCallbacks;
+    FilePathCachingInterface &m_filePathCache;
 };
 
 } // namespace ClangBackEnd

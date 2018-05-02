@@ -41,13 +41,17 @@ public:
     virtual ~ModelManagerSupportInternal();
 
     CppCompletionAssistProvider *completionAssistProvider() final;
-    BaseEditorDocumentProcessor *editorDocumentProcessor(
+    TextEditor::BaseHoverHandler *createHoverHandler() final;
+    BaseEditorDocumentProcessor *createEditorDocumentProcessor(
             TextEditor::TextDocument *baseTextDocument) final;
     FollowSymbolInterface &followSymbolInterface() final;
+    RefactoringEngineInterface &refactoringEngineInterface() final;
+    std::unique_ptr<AbstractOverviewModel> createOverviewModel() final;
 
 private:
     QScopedPointer<CppCompletionAssistProvider> m_completionAssistProvider;
     QScopedPointer<FollowSymbolInterface> m_followSymbol;
+    QScopedPointer<RefactoringEngineInterface> m_refactoringEngine;
 };
 
 class ModelManagerSupportProviderInternal : public ModelManagerSupportProvider

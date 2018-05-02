@@ -24,8 +24,8 @@
 ****************************************************************************/
 
 #include "qmlprofilerclientmanager_test.h"
+#include "fakedebugserver.h"
 #include <qmlprofiler/qmlprofilerruncontrol.h>
-#include <qmldebug/qpacketprotocol.h>
 #include <projectexplorer/applicationlauncher.h>
 #include <utils/url.h>
 
@@ -115,6 +115,7 @@ void softAssertMessageHandler(QtMsgType type, const QMessageLogContext &context,
 
 void QmlProfilerClientManagerTest::testConnectionFailure()
 {
+    clientManager.setRetryParams(1, 2);
     // This triggers a lot of soft asserts. We test that it still doesn't crash and stays in a
     // consistent state.
     QByteArray fatalAsserts =  qgetenv("QTC_FATAL_ASSERTS");
@@ -152,6 +153,7 @@ void QmlProfilerClientManagerTest::testConnectionFailure()
     clientManager.disconnectFromServer();
 
     qputenv("QTC_FATAL_ASSERTS", fatalAsserts);
+    clientManager.setRetryParams(10, 10);
 }
 
 void QmlProfilerClientManagerTest::testUnresponsiveTcp()
@@ -220,24 +222,6 @@ void responsiveTestData()
 void QmlProfilerClientManagerTest::testResponsiveTcp_data()
 {
     responsiveTestData();
-}
-
-void fakeDebugServer(QIODevice *socket)
-{
-    QmlDebug::QPacketProtocol *protocol = new QmlDebug::QPacketProtocol(socket, socket);
-    QObject::connect(protocol, &QmlDebug::QPacketProtocol::readyRead, [protocol]() {
-        QmlDebug::QPacket packet(QDataStream::Qt_4_7);
-        const int messageId = 0;
-        const int protocolVersion = 1;
-        const QStringList pluginNames({"CanvasFrameRate", "EngineControl", "DebugMessages"});
-        const QList<float> pluginVersions({1.0f, 1.0f, 1.0f});
-
-        packet << QString::fromLatin1("QDeclarativeDebugClient") << messageId << protocolVersion
-               << pluginNames << pluginVersions << QDataStream::Qt_DefaultCompiledVersion;
-        protocol->send(packet.data());
-        protocol->disconnect();
-        protocol->deleteLater();
-    });
 }
 
 void QmlProfilerClientManagerTest::testResponsiveTcp()
@@ -428,6 +412,30 @@ void QmlProfilerClientManagerTest::testStopRecording()
     }
 
     // Delete while still connected, for added fun
+}
+
+void QmlProfilerClientManagerTest::testConnectionDrop()
+{
+    QUrl socketUrl = Utils::urlFromLocalSocket();
+    QmlProfilerClientManager clientManager;
+
+    {
+        clientManager.setRetryParams(10, 10);
+        clientManager.setProfilerStateManager(&stateManager);
+        clientManager.setModelManager(&modelManager);
+        clientManager.connectToServer(socketUrl);
+
+        QScopedPointer<QLocalSocket> socket(new QLocalSocket(this));
+        socket->connectToServer(socketUrl.path());
+        QVERIFY(socket->isOpen());
+        fakeDebugServer(socket.data());
+
+        // Fake a trace. We want to test that this is reset when the connection drops.
+        stateManager.setServerRecording(true);
+        QTRY_VERIFY(clientManager.isConnected());
+    }
+
+    QTRY_VERIFY(!stateManager.serverRecording());
 }
 
 } // namespace Internal

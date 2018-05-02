@@ -26,6 +26,9 @@
 #include "cppcompletionassist.h"
 #include "cppmodelmanagersupportinternal.h"
 #include "cppfollowsymbolundercursor.h"
+#include "cpphoverhandler.h"
+#include "cppoverviewmodel.h"
+#include "cpprefactoringengine.h"
 #include "builtineditordocumentprocessor.h"
 
 #include <app/app_version.h>
@@ -53,7 +56,8 @@ ModelManagerSupport::Ptr ModelManagerSupportProviderInternal::createModelManager
 
 ModelManagerSupportInternal::ModelManagerSupportInternal()
     : m_completionAssistProvider(new InternalCompletionAssistProvider),
-      m_followSymbol(new FollowSymbolUnderCursor)
+      m_followSymbol(new FollowSymbolUnderCursor),
+      m_refactoringEngine(new CppRefactoringEngine)
 {
 }
 
@@ -61,7 +65,7 @@ ModelManagerSupportInternal::~ModelManagerSupportInternal()
 {
 }
 
-BaseEditorDocumentProcessor *ModelManagerSupportInternal::editorDocumentProcessor(
+BaseEditorDocumentProcessor *ModelManagerSupportInternal::createEditorDocumentProcessor(
         TextEditor::TextDocument *baseTextDocument)
 {
     return new BuiltinEditorDocumentProcessor(baseTextDocument);
@@ -72,7 +76,22 @@ CppCompletionAssistProvider *ModelManagerSupportInternal::completionAssistProvid
     return m_completionAssistProvider.data();
 }
 
+TextEditor::BaseHoverHandler *ModelManagerSupportInternal::createHoverHandler()
+{
+    return new CppHoverHandler;
+}
+
 FollowSymbolInterface &ModelManagerSupportInternal::followSymbolInterface()
 {
     return *m_followSymbol;
+}
+
+RefactoringEngineInterface &ModelManagerSupportInternal::refactoringEngineInterface()
+{
+    return *m_refactoringEngine;
+}
+
+std::unique_ptr<AbstractOverviewModel> ModelManagerSupportInternal::createOverviewModel()
+{
+    return std::make_unique<CppTools::OverviewModel>();
 }

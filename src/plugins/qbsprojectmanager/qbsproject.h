@@ -61,8 +61,6 @@ public:
     explicit QbsProject(const Utils::FileName &filename);
     ~QbsProject() override;
 
-    QbsRootProjectNode *rootProjectNode() const override;
-
     QStringList filesGeneratedFrom(const QString &sourceFile) const override;
 
     bool isProjectEditable() const;
@@ -88,7 +86,6 @@ public:
     static ProjectExplorer::FileType fileTypeFor(const QSet<QString> &tags);
 
     QString profileForTarget(const ProjectExplorer::Target *t) const;
-    bool isParsing() const;
     bool hasParseResult() const;
     void parseCurrentBuildConfiguration();
     void scheduleParsing() { m_parsingScheduled = true; }
@@ -104,13 +101,10 @@ public:
     bool needsSpecialDeployment() const override;
     void generateErrors(const qbs::ErrorInfo &e);
 
-    static QString productDisplayName(const qbs::Project &project,
-                                      const qbs::ProductData &product);
     static QString uniqueProductName(const qbs::ProductData &product);
 
     void configureAsExampleProject(const QSet<Core::Id> &platforms) final;
 
-    void invalidate();
     void delayParsing();
 
 private:
@@ -119,7 +113,6 @@ private:
     void rebuildProjectTree();
 
     void changeActiveTarget(ProjectExplorer::Target *t);
-    void buildConfigurationChanged(ProjectExplorer::BuildConfiguration *bc);
     void startParsing();
 
     void parse(const QVariantMap &config, const Utils::Environment &env, const QString &dir,
@@ -136,12 +129,12 @@ private:
     void handleRuleExecutionDone();
     bool checkCancelStatus();
     void updateAfterParse();
+    void delayedUpdateAfterParse();
     void updateProjectNodes();
 
     void projectLoaded() override;
     ProjectExplorer::ProjectImporter *projectImporter() const override;
     bool needsConfiguration() const override { return targets().isEmpty(); }
-    bool requiresTargetPanel() const override { return !targets().isEmpty(); }
 
     static bool ensureWriteableQbsFile(const QString &file);
 
@@ -167,7 +160,6 @@ private:
     CppTools::CppProjectUpdater *m_cppCodeModelUpdater = nullptr;
     CppTools::ProjectInfo m_cppCodeModelProjectInfo;
 
-    QbsBuildConfiguration *m_currentBc;
     mutable ProjectExplorer::ProjectImporter *m_importer = nullptr;
 
     QTimer m_parsingDelay;

@@ -80,12 +80,11 @@ SOURCES += texteditorplugin.cpp \
     codeassist/runner.cpp \
     codeassist/completionassistprovider.cpp \
     codeassist/genericproposalmodel.cpp \
-    codeassist/quickfixassistprovider.cpp \
-    codeassist/quickfixassistprocessor.cpp \
     codeassist/genericproposal.cpp \
     codeassist/genericproposalwidget.cpp \
     codeassist/iassistproposalmodel.cpp \
     codeassist/textdocumentmanipulator.cpp \
+    codeassist/documentcontentcompletion.cpp\
     tabsettingswidget.cpp \
     simplecodestylepreferences.cpp \
     simplecodestylepreferenceswidget.cpp \
@@ -191,13 +190,12 @@ HEADERS += texteditorplugin.h \
     codeassist/assistproposaliteminterface.h \
     codeassist/completionassistprovider.h \
     codeassist/genericproposalmodel.h \
-    codeassist/quickfixassistprovider.h \
-    codeassist/quickfixassistprocessor.h \
     codeassist/genericproposal.h \
     codeassist/genericproposalwidget.h \
     codeassist/iassistproposalmodel.h \
     codeassist/textdocumentmanipulator.h \
     codeassist/textdocumentmanipulatorinterface.h \
+    codeassist/documentcontentcompletion.h \
     tabsettingswidget.h \
     simplecodestylepreferences.h \
     simplecodestylepreferenceswidget.h \

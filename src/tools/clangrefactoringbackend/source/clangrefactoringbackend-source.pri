@@ -11,7 +11,16 @@ HEADERS += \
     $$PWD/symbolstorage.h \
     $$PWD/storagesqlitestatementfactory.h \
     $$PWD/symbolindexing.h \
-    $$PWD/symbolindexinginterface.h
+    $$PWD/symbolindexinginterface.h \
+    $$PWD/collectmacrospreprocessorcallbacks.h \
+    $$PWD/projectpartentry.h \
+    $$PWD/symbolsvisitorbase.h \
+    $$PWD/usedmacro.h \
+    $$PWD/sourcedependency.h \
+    $$PWD/filestatus.h \
+    $$PWD/projectpartartefactexception.h \
+    $$PWD/projectpartartefact.h \
+    $$PWD/filestatuscache.h
 
 !isEmpty(LIBTOOLING_LIBS) {
 SOURCES += \
@@ -57,4 +66,7 @@ HEADERS += \
 SOURCES += \
     $$PWD/sourcerangefilter.cpp \
     $$PWD/symbolindexer.cpp \
-    $$PWD/symbolentry.cpp
+    $$PWD/symbolentry.cpp \
+    $$PWD/symbolstorageinterface.cpp \
+    $$PWD/projectpartartefact.cpp \
+    $$PWD/filestatuscache.cpp

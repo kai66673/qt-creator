@@ -57,10 +57,16 @@ void QmlProfilerClientManager::setFlushInterval(quint32 flushInterval)
     m_flushInterval = flushInterval;
 }
 
+void QmlProfilerClientManager::clearEvents()
+{
+    if (m_clientPlugin)
+        m_clientPlugin->clearEvents();
+}
+
 void QmlProfilerClientManager::clearBufferedData()
 {
     if (m_clientPlugin)
-        m_clientPlugin->clearData();
+        m_clientPlugin->clear();
 }
 
 void QmlProfilerClientManager::stopRecording()
@@ -109,6 +115,10 @@ void QmlProfilerClientManager::createClients()
     QObject::connect(this, &QmlDebug::QmlDebugConnectionManager::connectionOpened,
                      m_clientPlugin.data(), [this]() {
         m_clientPlugin->setRecording(m_profilerState->clientRecording());
+    });
+    QObject::connect(this, &QmlDebug::QmlDebugConnectionManager::connectionClosed,
+                     m_clientPlugin.data(), [this]() {
+        m_profilerState->setServerRecording(false);
     });
 }
 

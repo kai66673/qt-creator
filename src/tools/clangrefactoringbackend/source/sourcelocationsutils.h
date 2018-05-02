@@ -57,9 +57,8 @@ Utils::PathString fromNativePath(const llvm::SmallString<256> &string)
 {
     Utils::PathString path(string.data(), string.size());
 
-#ifdef _WIN32
-    std::replace(path.begin(), path.end(), '\\', '/');
-#endif
+    if (Utils::HostOsInfo::isWindowsHost())
+        std::replace(path.begin(), path.end(), '\\', '/');
 
     return path;
 }
@@ -79,7 +78,7 @@ void appendSourceLocationsToSourceLocationsContainer(
         const auto fileId = decomposedLoction.first;
         const auto offset = decomposedLoction.second;
         const auto fileEntry = sourceManager.getFileEntryForID(fileId);
-        auto filePath = fromNativePath(absolutePath(fileEntry->getName()));
+        auto filePath = FilePath::fromNativeFilePath(absolutePath(fileEntry->getName()));
 
         sourceLocationsContainer.insertSourceLocation(filePathCache.filePathId(filePath),
                                                       fullSourceLocation.getSpellingLineNumber(),

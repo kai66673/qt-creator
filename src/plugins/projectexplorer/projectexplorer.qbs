@@ -15,8 +15,6 @@ Project {
         Depends { name: "TextEditor" }
         Depends { name: "app_version_header" }
 
-        cpp.defines: base.concat("QTC_CPU=X86Architecture")
-
         Group {
             name: "General"
             files: [
@@ -131,7 +129,6 @@ Project {
                 "sessionmodel.cpp", "sessionmodel.h",
                 "sessionview.cpp", "sessionview.h",
                 "sessiondialog.cpp", "sessiondialog.h", "sessiondialog.ui",
-                "settingsaccessor.cpp", "settingsaccessor.h",
                 "showineditortaskhandler.cpp", "showineditortaskhandler.h",
                 "showoutputtaskhandler.cpp", "showoutputtaskhandler.h",
                 "subscription.cpp", "subscription.h",
@@ -147,6 +144,7 @@ Project {
                 "toolchainconfigwidget.cpp", "toolchainconfigwidget.h",
                 "toolchainmanager.cpp", "toolchainmanager.h",
                 "toolchainoptionspage.cpp", "toolchainoptionspage.h",
+                "userfileaccessor.cpp", "userfileaccessor.h",
                 "vcsannotatetaskhandler.cpp", "vcsannotatetaskhandler.h",
                 "waitforstopdialog.cpp", "waitforstopdialog.h",
                 "xcodebuildparser.cpp", "xcodebuildparser.h"

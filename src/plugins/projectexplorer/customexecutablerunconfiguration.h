@@ -65,14 +65,9 @@ public:
 signals:
     void changed();
 
-protected:
-    void initialize();
-    void copyFrom(const CustomExecutableRunConfiguration *source);
-    virtual bool fromMap(const QVariantMap &map) override;
-    QString defaultDisplayName() const;
-
 private:
-    void ctor();
+    bool fromMap(const QVariantMap &map) override;
+    QString defaultDisplayName() const;
 
     void configurationDialogFinished();
     void setExecutable(const QString &executable);
@@ -89,26 +84,12 @@ private:
     CustomExecutableDialog *m_dialog = nullptr;
 };
 
-class CustomExecutableRunConfigurationFactory : public IRunConfigurationFactory
+class CustomExecutableRunConfigurationFactory : public FixedRunConfigurationFactory
 {
     Q_OBJECT
 
 public:
-    explicit CustomExecutableRunConfigurationFactory(QObject *parent = 0);
-
-    QList<Core::Id> availableCreationIds(Target *parent, CreationMode mode) const override;
-    QString displayNameForId(Core::Id id) const override;
-
-    bool canCreate(Target *parent, Core::Id id) const override;
-    bool canRestore(Target *parent, const QVariantMap &map) const override;
-    bool canClone(Target *parent, RunConfiguration *product) const override;
-    RunConfiguration *clone(Target *parent, RunConfiguration *source) override;
-
-private:
-    bool canHandle(Target *parent) const;
-
-    RunConfiguration *doCreate(Target *parent, Core::Id id) override;
-    RunConfiguration *doRestore(Target *parent, const QVariantMap &map) override;
+    explicit CustomExecutableRunConfigurationFactory(QObject *parent = nullptr);
 };
 
 } // namespace ProjectExplorer

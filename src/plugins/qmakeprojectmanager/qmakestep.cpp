@@ -72,31 +72,7 @@ const char QMAKE_QMLDEBUGLIBAUTO_KEY[] = "QtProjectManager.QMakeBuildStep.LinkQm
 const char QMAKE_QMLDEBUGLIB_KEY[] = "QtProjectManager.QMakeBuildStep.LinkQmlDebuggingLibrary";
 }
 
-QMakeStep::QMakeStep(BuildStepList *bsl) :
-    AbstractProcessStep(bsl, Core::Id(QMAKE_BS_ID))
-{
-    ctor();
-}
-
-QMakeStep::QMakeStep(BuildStepList *bsl, Core::Id id) :
-    AbstractProcessStep(bsl, id)
-{
-    ctor();
-}
-
-QMakeStep::QMakeStep(BuildStepList *bsl, QMakeStep *bs) :
-    AbstractProcessStep(bsl, bs),
-    m_userArgs(bs->m_userArgs),
-    m_extraArgs(bs->m_extraArgs),
-    m_forced(bs->m_forced),
-    m_linkQmlDebuggingLibrary(bs->m_linkQmlDebuggingLibrary),
-    m_useQtQuickCompiler(bs->m_useQtQuickCompiler),
-    m_separateDebugInfo(bs->m_separateDebugInfo)
-{
-    ctor();
-}
-
-void QMakeStep::ctor()
+QMakeStep::QMakeStep(BuildStepList *bsl) : AbstractProcessStep(bsl, QMAKE_BS_ID)
 {
     //: QMakeStep default display name
     setDefaultDisplayName(tr("qmake"));
@@ -306,11 +282,6 @@ void QMakeStep::run(QFutureInterface<bool> &fi)
 void QMakeStep::setForced(bool b)
 {
     m_forced = b;
-}
-
-bool QMakeStep::forced()
-{
-    return m_forced;
 }
 
 ProjectExplorer::BuildStepConfigWidget *QMakeStep::createConfigWidget()
@@ -611,15 +582,15 @@ QMakeStepConfigWidget::QMakeStepConfigWidget(QMakeStep *step)
     connect(m_ui->qmlDebuggingLibraryCheckBox, &QCheckBox::toggled,
             this, &QMakeStepConfigWidget::linkQmlDebuggingLibraryChecked);
     connect(m_ui->qmlDebuggingLibraryCheckBox, &QCheckBox::clicked,
-            this, &QMakeStepConfigWidget::askForRebuild);
+            this, [this] { askForRebuild(tr("QML Debugging")); });
     connect(m_ui->qtQuickCompilerCheckBox, &QAbstractButton::toggled,
             this, &QMakeStepConfigWidget::useQtQuickCompilerChecked);
     connect(m_ui->qtQuickCompilerCheckBox, &QCheckBox::clicked,
-            this, &QMakeStepConfigWidget::askForRebuild);
+            this, [this] { askForRebuild(tr("QML Debugging")); });
     connect(m_ui->separateDebugInfoCheckBox, &QAbstractButton::toggled,
             this, &QMakeStepConfigWidget::separateDebugInfoChecked);
     connect(m_ui->separateDebugInfoCheckBox, &QCheckBox::clicked,
-            this, &QMakeStepConfigWidget::askForRebuild);
+            this, [this] { askForRebuild(tr("QMake Configuration")); });
     connect(step, &QMakeStep::userArgumentsChanged,
             this, &QMakeStepConfigWidget::userArgumentsChanged);
     connect(step, &QMakeStep::linkQmlDebuggingLibraryChanged,
@@ -762,10 +733,10 @@ void QMakeStepConfigWidget::linkQmlDebuggingLibraryChecked(bool checked)
     updateQmlDebuggingOption();
 }
 
-void QMakeStepConfigWidget::askForRebuild()
+void QMakeStepConfigWidget::askForRebuild(const QString &title)
 {
     QMessageBox *question = new QMessageBox(Core::ICore::mainWindow());
-    question->setWindowTitle(tr("QML Debugging"));
+    question->setWindowTitle(title);
     question->setText(tr("The option will only take effect if the project is recompiled. Do you want to recompile now?"));
     question->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
     question->setModal(true);
@@ -881,30 +852,13 @@ void QMakeStepConfigWidget::setSummaryText(const QString &text)
 // QMakeStepFactory
 ////
 
-QMakeStepFactory::QMakeStepFactory(QObject *parent) :
-    ProjectExplorer::IBuildStepFactory(parent)
+QMakeStepFactory::QMakeStepFactory()
 {
-}
-
-QList<BuildStepInfo> QMakeStepFactory::availableSteps(BuildStepList *parent) const
-{
-    if (parent->id() != ProjectExplorer::Constants::BUILDSTEPS_BUILD)
-        return {};
-    if (!qobject_cast<QmakeBuildConfiguration *>(parent->parent()))
-        return {};
-
-    return {{QMAKE_BS_ID, tr("qmake"), BuildStepInfo::UniqueStep}};
-}
-
-ProjectExplorer::BuildStep *QMakeStepFactory::create(BuildStepList *parent, Core::Id id)
-{
-    Q_UNUSED(id)
-    return new QMakeStep(parent);
-}
-
-ProjectExplorer::BuildStep *QMakeStepFactory::clone(BuildStepList *parent, ProjectExplorer::BuildStep *source)
-{
-    return new QMakeStep(parent, qobject_cast<QMakeStep *>(source));
+    registerStep<QMakeStep>(QMAKE_BS_ID);
+    setSupportedConfiguration(Constants::QMAKE_BC_ID);
+    setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
+    setDisplayName(tr("qmake"));
+    setFlags(BuildStepInfo::UniqueStep);
 }
 
 QMakeStepConfig::TargetArchConfig QMakeStepConfig::targetArchFor(const Abi &targetAbi, const BaseQtVersion *version)

@@ -27,7 +27,10 @@
 #include "qnxconstants.h"
 
 #include <projectexplorer/runnables.h>
+#include <projectexplorer/target.h>
+
 #include <remotelinux/remotelinuxrunconfigurationwidget.h>
+
 #include <utils/environment.h>
 
 #include <QLabel>
@@ -42,19 +45,8 @@ namespace Internal {
 const char QtLibPathKey[] = "Qt4ProjectManager.QnxRunConfiguration.QtLibPath";
 
 QnxRunConfiguration::QnxRunConfiguration(Target *target)
-    : RemoteLinuxRunConfiguration(target)
+    : RemoteLinuxRunConfiguration(target, Constants::QNX_QNX_RUNCONFIGURATION_PREFIX)
 {}
-
-void QnxRunConfiguration::initialize(Core::Id id, const QString &targetName)
-{
-    RemoteLinuxRunConfiguration::initialize(id, targetName);
-}
-
-void QnxRunConfiguration::copyFrom(const QnxRunConfiguration *source)
-{
-    RemoteLinuxRunConfiguration::copyFrom(source);
-    m_qtLibPath = source->m_qtLibPath;
-}
 
 Runnable QnxRunConfiguration::runnable() const
 {

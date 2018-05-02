@@ -97,27 +97,9 @@ private:
 };
 
 RemoteLinuxCustomRunConfiguration::RemoteLinuxCustomRunConfiguration(Target *target)
-    : RunConfiguration(target)
+    : RunConfiguration(target, runConfigId())
 {
     addExtraAspect(new RemoteLinuxEnvironmentAspect(this));
-}
-
-void RemoteLinuxCustomRunConfiguration::initialize()
-{
-    RunConfiguration::initialize(runConfigId());
-
-    setDefaultDisplayName(runConfigDefaultDisplayName());
-}
-
-void RemoteLinuxCustomRunConfiguration::copyFrom(const RemoteLinuxCustomRunConfiguration *source)
-{
-    RunConfiguration::copyFrom(source);
-
-    m_localExecutable = source->m_localExecutable;
-    m_remoteExecutable = source->m_remoteExecutable;
-    m_arguments = source->m_arguments;
-    m_workingDirectory = source->m_workingDirectory;
-
     setDefaultDisplayName(runConfigDefaultDisplayName());
 }
 
@@ -172,7 +154,7 @@ Core::Id RemoteLinuxCustomRunConfiguration::runConfigId()
 
 QString RemoteLinuxCustomRunConfiguration::runConfigDefaultDisplayName()
 {
-    return tr("Custom Executable (on Remote Generic Linux Host)");
+    return tr("Custom Executable");
 }
 
 static QString localExeKey()

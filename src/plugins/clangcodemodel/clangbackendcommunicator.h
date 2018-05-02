@@ -57,6 +57,7 @@ public:
     using FileContainer = ClangBackEnd::FileContainer;
     using FileContainers = QVector<ClangBackEnd::FileContainer>;
     using ProjectPartContainers = QVector<ClangBackEnd::ProjectPartContainer>;
+    using LocalUseMap = CppTools::SemanticInfo::LocalUseMap;
 
 public:
     BackendCommunicator();
@@ -74,10 +75,15 @@ public:
             const FileContainer &fileContainer,
             quint32 line,
             quint32 column,
-            QTextDocument *textDocument,
-            const CppTools::SemanticInfo::LocalUseMap &localUses);
+            const LocalUseMap &localUses);
+    QFuture<CppTools::CursorInfo> requestLocalReferences(
+            const FileContainer &fileContainer,
+            quint32 line,
+            quint32 column);
+    QFuture<CppTools::ToolTipInfo> requestToolTip(const FileContainer &fileContainer,
+                                                  quint32 line,
+                                                  quint32 column);
     QFuture<CppTools::SymbolInfo> requestFollowSymbol(const FileContainer &curFileContainer,
-                                                      const QVector<Utf8String> &dependentFiles,
                                                       quint32 line,
                                                       quint32 column);
     void completeCode(ClangCompletionAssistProcessor *assistProcessor, const QString &filePath,
@@ -104,13 +110,6 @@ public:
     void updateTranslationUnitVisiblity();
 
     bool isNotWaitingForCompletion() const;
-
-public: // for tests
-    BackendSender *setBackendSender(BackendSender *sender);
-    void killBackendProcess();
-
-signals: // for tests
-    void backendReinitialized();
 
 private:
     void initializeBackend();
@@ -139,7 +138,7 @@ private:
     BackendReceiver m_receiver;
     ClangBackEnd::ClangCodeModelConnectionClient m_connection;
     QTimer m_backendStartTimeOut;
-    QScopedPointer<BackendSender> m_sender;
+    QScopedPointer<ClangBackEnd::ClangCodeModelServerInterface> m_sender;
     int m_connectedCount = 0;
 };
 

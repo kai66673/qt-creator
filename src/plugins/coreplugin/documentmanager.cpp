@@ -27,9 +27,11 @@
 
 #include "icore.h"
 #include "idocument.h"
+#include "idocumentfactory.h"
 #include "coreconstants.h"
 
 #include <coreplugin/diffservice.h>
+#include <coreplugin/dialogs/filepropertiesdialog.h>
 #include <coreplugin/dialogs/readonlyfilesdialog.h>
 #include <coreplugin/dialogs/saveitemsdialog.h>
 #include <coreplugin/editormanager/editormanager.h>
@@ -640,7 +642,7 @@ static bool saveModifiedFilesHelper(const QList<IDocument *> &documents,
                     (*failedToSave) = modifiedDocuments;
                 const QStringList filesToDiff = dia.filesToDiff();
                 if (!filesToDiff.isEmpty()) {
-                    if (auto diffService = ExtensionSystem::PluginManager::getObject<DiffService>())
+                    if (auto diffService = DiffService::instance())
                         diffService->diffModifiedFiles(filesToDiff);
                 }
                 return false;
@@ -710,6 +712,35 @@ bool DocumentManager::saveDocument(IDocument *document, const QString &fileName,
     return ret;
 }
 
+QString DocumentManager::allDocumentFactoryFiltersString(QString *allFilesFilter = 0)
+{
+    QSet<QString> uniqueFilters;
+
+    for (IEditorFactory *factory : IEditorFactory::allEditorFactories()) {
+        for (const QString &mt : factory->mimeTypes()) {
+            const QString filter = mimeTypeForName(mt).filterString();
+            if (!filter.isEmpty())
+                uniqueFilters.insert(filter);
+        }
+    }
+
+    for (IDocumentFactory *factory : IDocumentFactory::allDocumentFactories()) {
+        for (const QString &mt : factory->mimeTypes()) {
+            const QString filter = mimeTypeForName(mt).filterString();
+            if (!filter.isEmpty())
+                uniqueFilters.insert(filter);
+        }
+    }
+
+    QStringList filters = uniqueFilters.toList();
+    filters.sort();
+    const QString allFiles = Utils::allFilesFilterString();
+    if (allFilesFilter)
+        *allFilesFilter = allFiles;
+    filters.prepend(allFiles);
+    return filters.join(QLatin1String(";;"));
+}
+
 QString DocumentManager::getSaveFileName(const QString &title, const QString &pathIn,
                                      const QString &filter, QString *selectedFilter)
 {
@@ -771,7 +802,7 @@ QString DocumentManager::getSaveFileNameWithExtension(const QString &title, cons
 QString DocumentManager::getSaveAsFileName(const IDocument *document)
 {
     QTC_ASSERT(document, return QString());
-    const QString filter = Utils::allFiltersString();
+    const QString filter = allDocumentFactoryFiltersString();
     const QString filePath = document->filePath().toString();
     QString selectedFilter;
     QString fileDialogPath = filePath;
@@ -916,6 +947,12 @@ bool DocumentManager::saveModifiedDocument(IDocument *document, const QString &m
 {
     return saveModifiedDocuments(QList<IDocument *>() << document, message, canceled,
                                  alwaysSaveMessage, alwaysSave, failedToClose);
+}
+
+void DocumentManager::showFilePropertiesDialog(const FileName &filePath)
+{
+    FilePropertiesDialog properties(filePath);
+    properties.exec();
 }
 
 /*!
@@ -1123,7 +1160,7 @@ void DocumentManager::checkForReload()
                 } else {
                     // Ask about content change
                     previousReloadAnswer = reloadPrompt(document->filePath(), document->isModified(),
-                                                        ExtensionSystem::PluginManager::getObject<DiffService>(),
+                                                        DiffService::instance(),
                                                         ICore::dialogParent());
                     switch (previousReloadAnswer) {
                     case ReloadAll:
@@ -1188,7 +1225,7 @@ void DocumentManager::checkForReload()
     }
 
     if (!filesToDiff.isEmpty()) {
-        if (auto diffService = ExtensionSystem::PluginManager::getObject<DiffService>())
+        if (auto diffService = DiffService::instance())
             diffService->diffModifiedFiles(filesToDiff);
     }
 

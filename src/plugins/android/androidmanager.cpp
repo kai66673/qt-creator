@@ -41,8 +41,6 @@
 #include <coreplugin/messagemanager.h>
 #include <coreplugin/icore.h>
 
-#include <extensionsystem/pluginmanager.h>
-
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorer.h>
@@ -92,15 +90,16 @@ static bool openXmlFile(QDomDocument &doc, const Utils::FileName &fileName);
 static bool openManifest(ProjectExplorer::Target *target, QDomDocument &doc);
 static int parseMinSdk(const QDomElement &manifestElem);
 
-bool AndroidManager::supportsAndroid(const ProjectExplorer::Kit *kit)
+static QList<AndroidQtSupport *> g_androidQtSupportProviders;
+
+AndroidQtSupport::AndroidQtSupport()
 {
-    QtSupport::BaseQtVersion *version = QtSupport::QtKitInformation::qtVersion(kit);
-    return version && version->targetDeviceTypes().contains(Constants::ANDROID_DEVICE_TYPE);
+    g_androidQtSupportProviders.append(this);
 }
 
-bool AndroidManager::supportsAndroid(const ProjectExplorer::Target *target)
+AndroidQtSupport::~AndroidQtSupport()
 {
-    return supportsAndroid(target->kit());
+    g_androidQtSupportProviders.removeOne(this);
 }
 
 QString AndroidManager::packageName(ProjectExplorer::Target *target)
@@ -155,8 +154,8 @@ int AndroidManager::minimumSDK(ProjectExplorer::Target *target)
 int AndroidManager::minimumSDK(const ProjectExplorer::Kit *kit)
 {
     int minSDKVersion = -1;
-    if (supportsAndroid(kit)) {
-        QtSupport::BaseQtVersion *version = QtSupport::QtKitInformation::qtVersion(kit);
+    QtSupport::BaseQtVersion *version = QtSupport::QtKitInformation::qtVersion(kit);
+    if (version && version->targetDeviceTypes().contains(Constants::ANDROID_DEVICE_TYPE)) {
         Utils::FileName stockManifestFilePath =
                 Utils::FileName::fromUserInput(version->qmakeProperty("QT_INSTALL_PREFIX") +
                                                QLatin1String("/src/android/templates/AndroidManifest.xml"));
@@ -204,10 +203,11 @@ Utils::FileName AndroidManager::dirPath(ProjectExplorer::Target *target)
 
 Utils::FileName AndroidManager::manifestSourcePath(ProjectExplorer::Target *target)
 {
-    AndroidQtSupport *androidQtSupport = AndroidManager::androidQtSupport(target);
-    Utils::FileName source = androidQtSupport->manifestSourcePath(target);
-    if (!source.isEmpty())
-        return source;
+    if (AndroidQtSupport *androidQtSupport = AndroidManager::androidQtSupport(target)) {
+        Utils::FileName source = androidQtSupport->manifestSourcePath(target);
+        if (!source.isEmpty())
+            return source;
+    }
     return manifestPath(target);
 }
 
@@ -457,8 +457,7 @@ bool AndroidManager::checkForQt51Files(Utils::FileName fileName)
 
 AndroidQtSupport *AndroidManager::androidQtSupport(ProjectExplorer::Target *target)
 {
-    QList<AndroidQtSupport *> providerList = ExtensionSystem::PluginManager::getObjects<AndroidQtSupport>();
-    foreach (AndroidQtSupport *provider, providerList) {
+    for (AndroidQtSupport *provider : g_androidQtSupportProviders) {
         if (provider->canHandle(target))
             return provider;
     }

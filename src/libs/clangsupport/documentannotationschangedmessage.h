@@ -28,7 +28,7 @@
 #include "clangsupport_global.h"
 #include "diagnosticcontainer.h"
 #include "filecontainer.h"
-#include "highlightingmarkcontainer.h"
+#include "tokeninfocontainer.h"
 #include "sourcerangecontainer.h"
 
 #include <QVector>
@@ -39,15 +39,23 @@ class CLANGSUPPORT_EXPORT DocumentAnnotationsChangedMessage
 {
 public:
     DocumentAnnotationsChangedMessage() = default;
+    // For pure token infos update
+    DocumentAnnotationsChangedMessage(const FileContainer &fileContainer,
+                                      const QVector<TokenInfoContainer> &tokenInfos)
+        : m_fileContainer(fileContainer),
+          m_tokenInfos(tokenInfos),
+          m_onlyTokenInfos(true)
+    {
+    }
     DocumentAnnotationsChangedMessage(const FileContainer &fileContainer,
                                       const QVector<DiagnosticContainer> &diagnostics,
                                       const DiagnosticContainer &firstHeaderErrorDiagnostic,
-                                      const QVector<HighlightingMarkContainer> &highlightingMarks,
+                                      const QVector<TokenInfoContainer> &tokenInfos,
                                       const QVector<SourceRangeContainer> &skippedPreprocessorRanges)
         : m_fileContainer(fileContainer),
+          m_tokenInfos(tokenInfos),
           m_diagnostics(diagnostics),
           m_firstHeaderErrorDiagnostic(firstHeaderErrorDiagnostic),
-          m_highlightingMarks(highlightingMarks),
           m_skippedPreprocessorRanges(skippedPreprocessorRanges)
     {
     }
@@ -67,9 +75,14 @@ public:
         return m_firstHeaderErrorDiagnostic;
     }
 
-    const QVector<HighlightingMarkContainer> &highlightingMarks() const
+    const QVector<TokenInfoContainer> &tokenInfos() const
     {
-        return m_highlightingMarks;
+        return m_tokenInfos;
+    }
+
+    bool onlyTokenInfos() const
+    {
+        return m_onlyTokenInfos;
     }
 
     const QVector<SourceRangeContainer> &skippedPreprocessorRanges() const
@@ -79,10 +92,13 @@ public:
 
     friend QDataStream &operator<<(QDataStream &out, const DocumentAnnotationsChangedMessage &message)
     {
+        out << message.m_onlyTokenInfos;
         out << message.m_fileContainer;
+        out << message.m_tokenInfos;
+        if (message.m_onlyTokenInfos)
+            return out;
         out << message.m_diagnostics;
         out << message.m_firstHeaderErrorDiagnostic;
-        out << message.m_highlightingMarks;
         out << message.m_skippedPreprocessorRanges;
 
         return out;
@@ -90,10 +106,13 @@ public:
 
     friend QDataStream &operator>>(QDataStream &in, DocumentAnnotationsChangedMessage &message)
     {
+        in >> message.m_onlyTokenInfos;
         in >> message.m_fileContainer;
+        in >> message.m_tokenInfos;
+        if (message.m_onlyTokenInfos)
+            return in;
         in >> message.m_diagnostics;
         in >> message.m_firstHeaderErrorDiagnostic;
-        in >> message.m_highlightingMarks;
         in >> message.m_skippedPreprocessorRanges;
 
         return in;
@@ -105,20 +124,20 @@ public:
         return first.m_fileContainer == second.m_fileContainer
             && first.m_diagnostics == second.m_diagnostics
             && first.m_firstHeaderErrorDiagnostic == second.m_firstHeaderErrorDiagnostic
-            && first.m_highlightingMarks == second.m_highlightingMarks
+            && first.m_tokenInfos == second.m_tokenInfos
             && first.m_skippedPreprocessorRanges == second.m_skippedPreprocessorRanges;
     }
 
 private:
     FileContainer m_fileContainer;
+    QVector<TokenInfoContainer> m_tokenInfos;
     QVector<DiagnosticContainer> m_diagnostics;
     DiagnosticContainer m_firstHeaderErrorDiagnostic;
-    QVector<HighlightingMarkContainer> m_highlightingMarks;
     QVector<SourceRangeContainer> m_skippedPreprocessorRanges;
+    bool m_onlyTokenInfos = false;
 };
 
 CLANGSUPPORT_EXPORT QDebug operator<<(QDebug debug, const DocumentAnnotationsChangedMessage &message);
-std::ostream &operator<<(std::ostream &os, const DocumentAnnotationsChangedMessage &message);
 
 DECLARE_MESSAGE(DocumentAnnotationsChangedMessage)
 } // namespace ClangBackEnd

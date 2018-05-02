@@ -66,7 +66,12 @@ public:
 using namespace Internal;
 
 RemoteLinuxRunConfiguration::RemoteLinuxRunConfiguration(Target *target)
-    : RunConfiguration(target), d(new RemoteLinuxRunConfigurationPrivate)
+    : RemoteLinuxRunConfiguration(target, IdPrefix)
+{
+}
+
+RemoteLinuxRunConfiguration::RemoteLinuxRunConfiguration(Target *target, Core::Id id)
+    : RunConfiguration(target, id), d(new RemoteLinuxRunConfigurationPrivate)
 {
     addExtraAspect(new RemoteLinuxEnvironmentAspect(this));
 
@@ -79,21 +84,9 @@ RemoteLinuxRunConfiguration::RemoteLinuxRunConfiguration(Target *target)
             this, &RemoteLinuxRunConfiguration::handleBuildSystemDataUpdated);
 }
 
-void RemoteLinuxRunConfiguration::initialize(Core::Id id, const QString &targetName)
+QString RemoteLinuxRunConfiguration::extraId() const
 {
-    RunConfiguration::initialize(id);
-
-    d->targetName = targetName;
-
-    setDefaultDisplayName(defaultDisplayName());
-}
-
-void RemoteLinuxRunConfiguration::copyFrom(const RemoteLinuxRunConfiguration *source)
-{
-    RunConfiguration::copyFrom(source);
-    *d = *source->d;
-
-    setDefaultDisplayName(defaultDisplayName());
+    return d->targetName;
 }
 
 RemoteLinuxRunConfiguration::~RemoteLinuxRunConfiguration()
@@ -123,7 +116,7 @@ Runnable RemoteLinuxRunConfiguration::runnable() const
 
 QVariantMap RemoteLinuxRunConfiguration::toMap() const
 {
-    QVariantMap map(RunConfiguration::toMap());
+    QVariantMap map = RunConfiguration::toMap();
     map.insert(QLatin1String(ArgumentsKey), d->arguments);
     map.insert(QLatin1String(TargetNameKey), d->targetName);
     map.insert(QLatin1String(UseAlternateExeKey), d->useAlternateRemoteExecutable);
@@ -152,18 +145,19 @@ bool RemoteLinuxRunConfiguration::fromMap(const QVariantMap &map)
     d->alternateRemoteExecutable = map.value(QLatin1String(AlternateExeKey)).toString();
     d->workingDirectory = map.value(QLatin1String(WorkingDirectoryKey)).toString();
 
-    setDefaultDisplayName(defaultDisplayName());
+    // Hack for old-style mangled ids. FIXME: Remove.
+    if (d->targetName.isEmpty()) {
+        QString extra = ProjectExplorer::idFromMap(map).suffixAfter(id());
+        d->targetName = extra;
+    }
 
+    setDefaultDisplayName(defaultDisplayName());
     return true;
 }
 
-QString RemoteLinuxRunConfiguration::defaultDisplayName()
+QString RemoteLinuxRunConfiguration::defaultDisplayName() const
 {
-    if (!d->targetName.isEmpty())
-        //: %1 is the name of a project which is being run on remote Linux
-        return tr("%1 (on Remote Device)").arg(d->targetName);
-    //: Remote Linux run configuration default display name
-    return tr("Run on Remote Device");
+    return IRunConfigurationFactory::decoratedTargetName(d->targetName, target());
 }
 
 QString RemoteLinuxRunConfiguration::arguments() const

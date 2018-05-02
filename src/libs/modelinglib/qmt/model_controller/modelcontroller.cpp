@@ -604,16 +604,24 @@ void ModelController::setUndoController(UndoController *undoController)
     m_undoController = undoController;
 }
 
+Uid ModelController::ownerKey(const Uid &key) const
+{
+    MElement *element = findElement(key);
+    if (!element)
+        return Uid::invalidUid();
+    return ownerKey(element);
+}
+
 Uid ModelController::ownerKey(const MElement *element) const
 {
     QMT_ASSERT(element, return Uid());
     MObject *owner = element->owner();
     if (!owner)
-        return Uid();
+        return Uid::invalidUid();
     return owner->uid();
 }
 
-MElement *ModelController::findElement(const Uid &key)
+MElement *ModelController::findElement(const Uid &key) const
 {
     if (MObject *object = findObject(key))
         return object;
@@ -915,17 +923,20 @@ MContainer ModelController::copyElements(const MSelection &modelSelection)
     return copiedElements;
 }
 
-void ModelController::pasteElements(MObject *owner, const MContainer &modelContainer)
+void ModelController::pasteElements(MObject *owner, const MReferences &modelContainer, PasteOption option)
 {
     // clone all elements and renew their keys
     QHash<Uid, Uid> renewedKeys;
     QList<MElement *> clonedElements;
     foreach (MElement *element, modelContainer.elements()) {
-        MCloneDeepVisitor visitor;
-        element->accept(&visitor);
-        MElement *clonedElement = visitor.cloned();
-        renewElementKey(clonedElement, &renewedKeys);
-        clonedElements.append(clonedElement);
+        if (option == PasteAlwaysWithNewKeys || option == PasteAlwaysAndKeepKeys || !findElement(element->uid())) {
+            MCloneDeepVisitor visitor;
+            element->accept(&visitor);
+            MElement *clonedElement = visitor.cloned();
+            if (option == PasteAlwaysWithNewKeys || (option == PasteAlwaysAndKeepKeys && findElement(element->uid())))
+                renewElementKey(clonedElement, &renewedKeys);
+            clonedElements.append(clonedElement);
+        }
     }
     // fix all keys referencing between pasting elements
     foreach (MElement *clonedElement, clonedElements)
@@ -1049,9 +1060,9 @@ void ModelController::renewElementKey(MElement *element, QHash<Uid, Uid> *renewe
         }
         auto object = dynamic_cast<MObject *>(element);
         if (object) {
-            foreach (const Handle<MObject> &child, object->children())
+            for (const Handle<MObject> &child : object->children())
                 renewElementKey(child.target(), renewedKeys);
-            foreach (const Handle<MRelation> &relation, object->relations())
+            for (const Handle<MRelation> &relation : object->relations())
                 renewElementKey(relation.target(), renewedKeys);
         }
     }
@@ -1060,9 +1071,9 @@ void ModelController::renewElementKey(MElement *element, QHash<Uid, Uid> *renewe
 void ModelController::updateRelationKeys(MElement *element, const QHash<Uid, Uid> &renewedKeys)
 {
     if (auto object = dynamic_cast<MObject *>(element)) {
-        foreach (const Handle<MRelation> &handle, object->relations())
+        for (const Handle<MRelation> &handle : object->relations())
             updateRelationEndKeys(handle.target(), renewedKeys);
-        foreach (const Handle<MObject> &child, object->children())
+        for (const Handle<MObject> &child : object->children())
             updateRelationKeys(child.target(), renewedKeys);
     } else if (auto relation = dynamic_cast<MRelation *>(element)) {
         updateRelationEndKeys(relation, renewedKeys);
@@ -1086,9 +1097,9 @@ void ModelController::mapObject(MObject *object)
     if (object) {
         QMT_CHECK(!m_objectsMap.contains(object->uid()));
         m_objectsMap.insert(object->uid(), object);
-        foreach (const Handle<MObject> &child, object->children())
+        for (const Handle<MObject> &child : object->children())
             mapObject(child.target());
-        foreach (const Handle<MRelation> &relation, object->relations())
+        for (const Handle<MRelation> &relation : object->relations())
             mapRelation(relation.target());
     }
 }
@@ -1097,9 +1108,9 @@ void ModelController::unmapObject(MObject *object)
 {
     if (object) {
         QMT_CHECK(m_objectsMap.contains(object->uid()));
-        foreach (const Handle<MRelation> &relation, object->relations())
+        for (const Handle<MRelation> &relation : object->relations())
             unmapRelation(relation.target());
-        foreach (const Handle<MObject> &child, object->children())
+        for (const Handle<MObject> &child : object->children())
             unmapObject(child.target());
         m_objectsMap.remove(object->uid());
     }
@@ -1198,7 +1209,7 @@ void ModelController::verifyModelIntegrity(const MObject *object, QHash<Uid, con
     QMT_ASSERT(object, return);
     QMT_ASSERT(!objectsMap->contains(object->uid()), return);
     objectsMap->insert(object->uid(), object);
-    foreach (const Handle<MRelation> &handle, object->relations()) {
+    for (const Handle<MRelation> &handle : object->relations()) {
         MRelation *relation = handle.target();
         if (relation) {
             QMT_ASSERT(!relationsMap->contains(relation->uid()), return);
@@ -1211,7 +1222,7 @@ void ModelController::verifyModelIntegrity(const MObject *object, QHash<Uid, con
             objectRelationsMap->insert(relation->endBUid(), relation);
         }
     }
-    foreach (const Handle<MObject> &handle, object->children()) {
+    for (const Handle<MObject> &handle : object->children()) {
         MObject *childObject = handle.target();
         if (childObject)
             verifyModelIntegrity(childObject, objectsMap, relationsMap, objectRelationsMap);

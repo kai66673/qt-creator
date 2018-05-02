@@ -87,10 +87,18 @@ const Icon NEWFILE({
         {QLatin1String(":/utils/images/filenew.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon OPENFILE({
         {QLatin1String(":/utils/images/fileopen.png"), Theme::PanelTextColorMid}}, Icon::Tint);
+const Icon OPENFILE_TOOLBAR({
+        {QLatin1String(":/utils/images/fileopen.png"), Theme::IconsBaseColor}});
 const Icon SAVEFILE({
         {QLatin1String(":/utils/images/filesave.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon SAVEFILE_TOOLBAR({
         {QLatin1String(":/utils/images/filesave.png"), Theme::IconsBaseColor}});
+
+const Icon EXPORTFILE_TOOLBAR({
+        {QLatin1String(":/utils/images/fileexport.png"), Theme::IconsBaseColor}});
+const Icon MULTIEXPORTFILE_TOOLBAR({
+        {QLatin1String(":/utils/images/filemultiexport.png"), Theme::IconsBaseColor}});
+
 const Icon UNDO({
         {QLatin1String(":/utils/images/undo.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon UNDO_TOOLBAR({
@@ -111,8 +119,6 @@ const Icon CUT({
         {QLatin1String(":/utils/images/editcut.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon CUT_TOOLBAR({
         {QLatin1String(":/utils/images/editcut.png"), Theme::IconsBaseColor}});
-const Icon DIR(
-        QLatin1String(":/utils/images/dir.png"));
 const Icon RESET({
         {QLatin1String(":/utils/images/reset.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon RESET_TOOLBAR({
@@ -232,6 +238,15 @@ const Icon OVERLAY_WARNING({
 const Icon OVERLAY_ERROR({
         {":/utils/images/iconoverlay_error_background.png", Theme::BackgroundColorNormal},
         {":/utils/images/iconoverlay_error.png", Theme::IconsErrorColor}}, Icon::Tint);
+
+const Icon CODEMODEL_ERROR({
+        {":/utils/images/codemodelerror.png", Theme::IconsErrorColor}}, Icon::Tint);
+const Icon CODEMODEL_WARNING({
+        {":/utils/images/codemodelwarning.png", Theme::IconsWarningColor}}, Icon::Tint);
+const Icon CODEMODEL_DISABLED_ERROR({
+        {":/utils/images/codemodelerror.png", Theme::IconsDisabledColor}}, Icon::Tint);
+const Icon CODEMODEL_DISABLED_WARNING({
+        {":/utils/images/codemodelwarning.png", Theme::IconsDisabledColor}}, Icon::Tint);
 
 } // namespace Icons
 } // namespace Utils

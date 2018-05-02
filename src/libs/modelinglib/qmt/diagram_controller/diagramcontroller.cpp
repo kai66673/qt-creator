@@ -487,7 +487,7 @@ DContainer DiagramController::copyElements(const DSelection &diagramSelection, c
     return copiedElements;
 }
 
-void DiagramController::pasteElements(const DContainer &diagramContainer, MDiagram *diagram)
+void DiagramController::pasteElements(const DReferences &diagramContainer, MDiagram *diagram)
 {
     QMT_ASSERT(diagram, return);
 
@@ -764,13 +764,13 @@ void DiagramController::removeObjects(MObject *modelObject)
         DElement *diagramElement = findDelegate(modelObject, diagram);
         if (diagramElement)
             removeElement(diagramElement, diagram);
-        foreach (const Handle<MRelation> &relation, modelObject->relations()) {
+        for (const Handle<MRelation> &relation : modelObject->relations()) {
             DElement *diagramElement = findDelegate(relation.target(), diagram);
             if (diagramElement)
                 removeElement(diagramElement, diagram);
         }
     }
-    foreach (const Handle<MObject> &object, modelObject->children()) {
+    for (const Handle<MObject> &object : modelObject->children()) {
         if (object.hasTarget())
             removeObjects(object.target());
     }

@@ -31,10 +31,14 @@
 #include <QIcon>
 #include <QWidget>
 
-namespace Core { class IEditor; }
+namespace Core {
+class IContext;
+class IEditor;
+}
 
 namespace Utils {
 class NavigationTreeView;
+class FileCrumbLabel;
 }
 
 QT_BEGIN_NAMESPACE
@@ -46,6 +50,8 @@ QT_END_NAMESPACE
 
 namespace ProjectExplorer {
 namespace Internal {
+
+class DelayedFileCrumbLabel;
 
 class FolderNavigationWidgetFactory : public Core::INavigationWidgetFactory
 {
@@ -76,6 +82,8 @@ signals:
 private:
     static int rootIndex(const QString &id);
     void updateProjectsDirectoryRoot();
+    void registerActions();
+
     static QVector<RootDirectory> m_rootDirectories;
 };
 
@@ -85,6 +93,7 @@ class FolderNavigationWidget : public QWidget
     Q_PROPERTY(bool autoSynchronization READ autoSynchronization WRITE setAutoSynchronization)
 public:
     explicit FolderNavigationWidget(QWidget *parent = nullptr);
+    ~FolderNavigationWidget();
 
     static QStringList projectFilesInDirectory(const QString &path);
 
@@ -97,25 +106,33 @@ public:
     void insertRootDirectory(const FolderNavigationWidgetFactory::RootDirectory &directory);
     void removeRootDirectory(const QString &id);
 
+    void addNewItem();
+    void editCurrentItem();
+    void removeCurrentItem();
+
 protected:
     void contextMenuEvent(QContextMenuEvent *ev) override;
 
 private:
     void setHiddenFilesFilter(bool filter);
     void setCurrentEditor(Core::IEditor *editor);
+    void selectBestRootForFile(const Utils::FileName &filePath);
     void selectFile(const Utils::FileName &filePath);
     void setRootDirectory(const Utils::FileName &directory);
     int bestRootForFile(const Utils::FileName &filePath);
     void openItem(const QModelIndex &index);
     QStringList projectsInDirectory(const QModelIndex &index) const;
     void openProjectsInDirectory(const QModelIndex &index);
+    void setCrumblePath(const QModelIndex &index, const QModelIndex &);
 
+    Core::IContext *m_context = nullptr;
     Utils::NavigationTreeView *m_listView = nullptr;
     QFileSystemModel *m_fileSystemModel = nullptr;
     QAction *m_filterHiddenFilesAction = nullptr;
     bool m_autoSync = false;
     QToolButton *m_toggleSync = nullptr;
     QComboBox *m_rootSelector = nullptr;
+    DelayedFileCrumbLabel *m_crumbLabel = nullptr;
 
     // FolderNavigationWidgetFactory needs private members to build a menu
     friend class FolderNavigationWidgetFactory;

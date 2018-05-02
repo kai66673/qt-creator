@@ -480,19 +480,26 @@ struct DumperOptions
     QString options;
 };
 
+struct Watcher : DumperOptions
+{
+    Watcher(const QString &iname, const QString &exp)
+        : DumperOptions(QString("\"watchers\":[{\"exp\":\"%2\",\"iname\":\"%1\"}]").arg(iname, toHex(exp)))
+    {}
+};
+
 struct Check
 {
     Check() {}
 
-    Check(const QString &iname, const Value &value, const Type &type)
-        : iname(iname), expectedName(nameFromIName(iname)),
-          expectedValue(value), expectedType(type)
+    Check(const QString &iname, const Name &name, const Value &value, const Type &type)
+        : iname(iname.startsWith("watch") ? iname : "local." + iname),
+          expectedName(name),
+          expectedValue(value),
+          expectedType(type)
     {}
 
-    Check(const QString &iname, const Name &name,
-         const Value &value, const Type &type)
-        : iname(iname), expectedName(name),
-          expectedValue(value), expectedType(type)
+    Check(const QString &iname, const Value &value, const Type &type)
+        : Check(iname, nameFromIName(iname), value, type)
     {}
 
     bool matches(DebuggerEngine engine, int debuggerVersion, const Context &context) const
@@ -959,9 +966,10 @@ public:
 
 struct TempStuff
 {
-    TempStuff(const char *tag) : buildTemp(QString("qt_tst_dumpers_") + tag + '_')
+    TempStuff(const char *tag)
+        : buildTemp(QDir::currentPath() + "/qt_tst_dumpers_" + tag + "_XXXXXX")
     {
-        buildPath = QDir::currentPath() + '/' + buildTemp.path();
+        buildPath = buildTemp.path();
         buildTemp.setAutoRemove(false);
         QVERIFY(!buildPath.isEmpty());
     }
@@ -1454,7 +1462,7 @@ void tst_Dumpers::dumper()
             parent = parentIName(parent);
             if (parent.isEmpty())
                 break;
-            expandedINames.insert("local." + parent);
+            expandedINames.insert(parent);
         }
     }
 
@@ -1516,7 +1524,8 @@ void tst_Dumpers::dumper()
              << "-c"
              << "bm doit!qtcDebugBreakFunction;g"
              << "debug\\doit.exe";
-        cmds += "!qtcreatorcdbext.script sys.path.insert(1, '" + dumperDir + "')\n"
+        cmds += ".symopt+0x8000\n"
+                "!qtcreatorcdbext.script sys.path.insert(1, '" + dumperDir + "')\n"
                 "!qtcreatorcdbext.script from cdbbridge import *\n"
                 "!qtcreatorcdbext.script theDumper = Dumper()\n"
                 "!qtcreatorcdbext.script theDumper.setupDumpers()\n"
@@ -1668,7 +1677,7 @@ void tst_Dumpers::dumper()
 
     for (int i = data.checks.size(); --i >= 0; ) {
         Check check = data.checks.at(i);
-        QString iname = "local." + check.iname;
+        const QString iname = check.iname;
         WatchItem *item = static_cast<WatchItem *>(local.findAnyChild([iname](Utils::TreeItem *item) {
             return static_cast<WatchItem *>(item)->internalName() == iname;
         }));
@@ -4173,6 +4182,17 @@ void tst_Dumpers::dumper_data()
                + Check("a", "0 + 0i", "_Complex double") % LldbEngine
                + Check("b", "0 + 0i", "_Complex double") % LldbEngine;
 
+    QTest::newRow("StdFunction")
+            << Data("#include <functional>\n"
+                    "void bar(int) {}",
+
+                    "std::function<void(int)> x;\n"
+                    "std::function<void(int)> y = bar;\n"
+                    "std::function<void(int)> z = [](int) {};\n")
+            + GdbEngine
+            + Check("x", "(null)", "std::function<void(int)>")
+            + Check("y", ValuePattern(".* <bar(int)>"), "std::function<void(int)>");
+
 
     QTest::newRow("StdDeque")
             << Data("#include <deque>\n",
@@ -5335,6 +5355,22 @@ void tst_Dumpers::dumper_data()
                + Check("fbad", "(unknown:24) (24)", "Flags");
 
 
+    QTest::newRow("EnumInClass")
+            << Data("struct E {\n"
+                    "    enum Enum1 { a1, b1, c1 };\n"
+                    "    typedef enum Enum2 { a2, b2, c2 } Enum2;\n"
+                    "    typedef enum { a3, b3, c3 } Enum3;\n"
+                    "    Enum1 e1 = Enum1(c1 | b1);\n"
+                    "    Enum2 e2 = Enum2(c2 | b2);\n"
+                    "    Enum3 e3 = Enum3(c3 | b3);\n"
+                    "};\n",
+                    "E e;\n")
+                + GdbEngine
+                + Check("e.e1", "E::b1 | E::c1 (0x0003)", "E::Enum1")
+                + Check("e.e2", "E::b2 | E::c2 (0x0003)", "E::Enum2")
+                + Check("e.e3", "E::b3 | E::c3 (0x0003)", "E::Enum3");
+
+
     QTest::newRow("Array")
             << Data("",
                     "double a1[3][3];\n"
@@ -5440,7 +5476,7 @@ void tst_Dumpers::dumper_data()
                + Check("s.x", "2", "unsigned int : 3") % NoCdbEngine
                + Check("s.y", "3", "unsigned int : 4") % NoCdbEngine
                + Check("s.z", "39", "unsigned int : 18") % NoCdbEngine
-               + Check("s.e", "V2 (1)", "E : 3") % NoCdbEngine
+               + Check("s.e", "V2 (1)", "E : 3") % GdbEngine
                + Check("s.x", "2", "unsigned int") % CdbEngine
                + Check("s.y", "3", "unsigned int") % CdbEngine
                + Check("s.z", "39", "unsigned int") % CdbEngine
@@ -6921,11 +6957,11 @@ void tst_Dumpers::dumper_data()
 
     QTest::newRow("StringDisplay")
             << Data("#include <string.h>\n"
-                    "struct QtcDumperTest_String"
+                    "struct QtcDumperTest_String\n"
                     "{\n"
                     "   char *first;\n"
                     "   const char *second = \"second\";\n"
-                    "   const char third[6] = \"third\";\n"
+                    "   const char third[6] = {'t','h','i','r','d','\\0'};\n"
                     "   QtcDumperTest_String()\n"
                     "   {\n"
                     "      first = new char[6];\n"
@@ -6955,6 +6991,14 @@ void tst_Dumpers::dumper_data()
             + Check("b", FloatValue("-2"), TypeDef("double", "long double"))
             + Check("c", FloatValue("0"), TypeDef("double", "long double"))
             + Check("d", FloatValue("0.5"), TypeDef("double", "long double"));
+
+    QTest::newRow("WatchList")
+            << Data("", "")
+            + Watcher("watch.1", "42;43")
+            + Check("watch.1", "42;43", "<2 items>", "")
+            + Check("watch.1.0", "42", "42", "int")
+            + Check("watch.1.1", "43", "43", "int");
+
 
 #ifdef Q_OS_LINUX
     QTest::newRow("StaticMembersInLib")

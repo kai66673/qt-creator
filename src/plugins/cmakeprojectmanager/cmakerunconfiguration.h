@@ -35,7 +35,6 @@ class CMakeRunConfiguration : public ProjectExplorer::RunConfiguration
 {
     Q_OBJECT
     friend class CMakeRunConfigurationWidget;
-    friend class ProjectExplorer::IRunConfigurationFactory;
 
 public:
     explicit CMakeRunConfiguration(ProjectExplorer::Target *target);
@@ -45,7 +44,6 @@ public:
 
     void setExecutable(const QString &executable);
     void setBaseWorkingDirectory(const Utils::FileName &workingDirectory);
-
     QString title() const;
 
     QVariantMap toMap() const override;
@@ -54,15 +52,14 @@ public:
 
     QString buildSystemTarget() const final { return m_buildSystemTarget; }
 
-private:
-    void initialize(Core::Id id, const QString &target,
-               const Utils::FileName &workingDirectory, const QString &title);
-    void copyFrom(const CMakeRunConfiguration *source);
+    Utils::OutputFormatter *createOutputFormatter() const final;
 
+private:
     bool fromMap(const QVariantMap &map) override;
     QString defaultDisplayName() const;
 
     void updateEnabledState() final;
+    QString extraId() const final;
 
     QString baseWorkingDirectory() const;
 
@@ -86,24 +83,9 @@ class CMakeRunConfigurationFactory : public ProjectExplorer::IRunConfigurationFa
 public:
     explicit CMakeRunConfigurationFactory(QObject *parent = 0);
 
-    bool canCreate(ProjectExplorer::Target *parent, Core::Id id) const override;
-    bool canRestore(ProjectExplorer::Target *parent, const QVariantMap &map) const override;
-    bool canClone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *product) const override;
-    ProjectExplorer::RunConfiguration *clone(ProjectExplorer::Target *parent,
-                                             ProjectExplorer::RunConfiguration *product) override;
-
-    QList<Core::Id> availableCreationIds(ProjectExplorer::Target *parent, CreationMode mode) const override;
-    QString displayNameForId(Core::Id id) const override;
-
-    static Core::Id idFromBuildTarget(const QString &target);
-    static QString buildTargetFromId(Core::Id id);
-
-private:
-    bool canHandle(ProjectExplorer::Target *parent) const;
-
-    ProjectExplorer::RunConfiguration *doCreate(ProjectExplorer::Target *parent, Core::Id id) override;
-    ProjectExplorer::RunConfiguration *doRestore(ProjectExplorer::Target *parent,
-                                                 const QVariantMap &map) override;
+    QList<ProjectExplorer::RunConfigurationCreationInfo>
+    availableCreators(ProjectExplorer::Target *parent) const override;
+    bool canCreateHelper(ProjectExplorer::Target *parent, const QString &suffix) const override;
 };
 
 } // namespace Internal

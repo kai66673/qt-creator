@@ -50,12 +50,13 @@ class Abi;
 class Project;
 }
 
-namespace Utils { class Environment; }
-
 namespace Android {
 
-class AndroidPlugin;
-namespace Internal { class AndroidSdkManager; }
+
+namespace Internal {
+class AndroidSdkManager;
+class AndroidPluginPrivate;
+}
 
 class AndroidDeviceInfo
 {
@@ -123,6 +124,9 @@ public:
     bool automaticKitCreation() const;
     void setAutomaticKitCreation(bool b);
 
+    QString deviceQmlsceneCommand() const;
+    void setDeviceQmlsceneCommand(const QString &qmlsceneCommand);
+
     Utils::FileName adbToolPath() const;
     Utils::FileName androidToolPath() const;
     Utils::FileName emulatorToolPath() const;
@@ -133,6 +137,7 @@ public:
                             const QString &ndkToolChainVersion) const;
 
     Utils::FileName gdbPath(const ProjectExplorer::Abi &abi, const QString &ndkToolChainVersion) const;
+    Utils::FileName makePath() const;
 
     Utils::FileName keytoolPath() const;
 
@@ -176,6 +181,7 @@ private:
     QStringList m_makeExtraSearchDirectories;
     unsigned m_partitionSize = 1024;
     bool m_automaticKitCreation = true;
+    QString m_deviceQmlsceneCommand;
 
     //caches
     mutable bool m_NdkInformationUpToDate = false;
@@ -187,7 +193,6 @@ private:
 
 class ANDROID_EXPORT AndroidConfigurations : public QObject
 {
-    friend class Android::AndroidPlugin;
     Q_OBJECT
 
 public:
@@ -196,7 +201,6 @@ public:
     static void setConfig(const AndroidConfig &config);
     static AndroidConfigurations *instance();
 
-    static void updateAndroidDevice();
     static AndroidDeviceInfo showDeviceDialog(ProjectExplorer::Project *project, int apiLevel, const QString &abi);
     static void setDefaultDevice(ProjectExplorer::Project *project, const QString &abi, const QString &serialNumber); // serial number or avd name
     static QString defaultDevice(ProjectExplorer::Project *project, const QString &abi); // serial number or avd name
@@ -211,11 +215,13 @@ signals:
     void updated();
 
 private:
-    AndroidConfigurations(QObject *parent);
+    friend class Android::Internal::AndroidPluginPrivate;
+    AndroidConfigurations();
     ~AndroidConfigurations();
     void load();
     void save();
 
+    static void updateAndroidDevice();
     static AndroidConfigurations *m_instance;
     AndroidConfig m_config;
     std::unique_ptr<Internal::AndroidSdkManager> m_sdkManager;

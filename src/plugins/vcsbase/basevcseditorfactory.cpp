@@ -52,7 +52,8 @@ namespace VcsBase {
 VcsEditorFactory::VcsEditorFactory(const VcsBaseEditorParameters *parameters,
                                    // Force copy, see QTCREATORBUG-13218
                                    const EditorWidgetCreator editorWidgetCreator,
-                                   std::function<void(const QString &, const QString &)> describeFunc)
+                                   std::function<void(const QString &, const QString &)> describeFunc, QObject *parent)
+    : TextEditorFactory(parent)
 {
     setProperty("VcsEditorFactoryName", QByteArray(parameters->id));
     setId(parameters->id);
@@ -83,10 +84,13 @@ VcsEditorFactory::VcsEditorFactory(const VcsBaseEditorParameters *parameters,
 
 VcsBaseEditor *VcsEditorFactory::createEditorById(const char *id)
 {
-    auto factory =  ExtensionSystem::PluginManager::getObject<VcsEditorFactory>(
-        [id](QObject *ob) { return ob->property("VcsEditorFactoryName").toByteArray() == id; });
-    QTC_ASSERT(factory, return 0);
-    return qobject_cast<VcsBaseEditor *>(factory->createEditor());
+    for (IEditorFactory *factory : allEditorFactories()) {
+        if (auto vcsFactory = qobject_cast<VcsEditorFactory *>(factory)) {
+            if (vcsFactory->property("VcsEditorFactoryName").toByteArray() == id)
+                return qobject_cast<VcsBaseEditor *>(factory->createEditor());
+        }
+    }
+    return nullptr;
 }
 
 } // namespace VcsBase

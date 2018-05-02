@@ -27,8 +27,9 @@
 
 #include "symbolqueryinterface.h"
 
+#include "sourcelocations.h"
+
 #include <filepathid.h>
-#include <sourcelocations.h>
 
 #include <cpptools/usages.h>
 
@@ -46,28 +47,45 @@ public:
         : m_statementFactory(statementFactory)
     {}
 
-    SourceLocations locationsAt(ClangBackEnd::FilePathId filePathId, int line, int utf8Column) override
+    SourceLocations locationsAt(ClangBackEnd::FilePathId filePathId,
+                                int line,
+                                int utf8Column) const override
     {
         ReadStatement &locationsStatement = m_statementFactory.selectLocationsForSymbolLocation;
 
         const std::size_t reserveSize = 128;
 
         return locationsStatement.template values<SourceLocation, 4>(reserveSize,
-                                                                     filePathId.fileNameId,
+                                                                     filePathId.filePathId,
                                                                      line,
                                                                      utf8Column);
     }
 
-    CppTools::Usages sourceUsagesAt(ClangBackEnd::FilePathId filePathId, int line, int utf8Column)
+    CppTools::Usages sourceUsagesAt(ClangBackEnd::FilePathId filePathId,
+                                    int line,
+                                    int utf8Column) const override
     {
         ReadStatement &locationsStatement = m_statementFactory.selectSourceUsagesForSymbolLocation;
 
         const std::size_t reserveSize = 128;
 
         return locationsStatement.template values<CppTools::Usage, 3>(reserveSize,
-                                                                      filePathId.fileNameId,
+                                                                      filePathId.filePathId,
                                                                       line,
                                                                       utf8Column);
+    }
+
+    Symbols symbolsContaining(SymbolType /*symbolType*/,
+                              Utils::SmallStringView/*regularExpression*/) const override
+    {
+        // TODO: implement
+        return Classes();
+    }
+
+    Functions functionsContaining(Utils::SmallStringView/*regularExpression*/) const override
+    {
+        // TODO: implement
+        return Functions();
     }
 
 private:

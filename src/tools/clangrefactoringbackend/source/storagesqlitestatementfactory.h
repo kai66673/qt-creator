@@ -41,8 +41,10 @@ public:
     using WriteStatementType = WriteStatement;
 
     StorageSqliteStatementFactory(Database &database)
-        : database(database)
+        : transaction(database),
+          database(database)
     {
+        transaction.commit();
     }
 
     Sqlite::Table createNewSymbolsTable() const
@@ -57,9 +59,7 @@ public:
         table.addIndex({usrColumn, symbolNameColumn});
         table.addIndex({symbolIdColumn});
 
-        Sqlite::ImmediateTransaction<DatabaseType> transaction(database);
         table.initialize(database);
-        transaction.commit();
 
         return table;
     }
@@ -76,17 +76,46 @@ public:
         const Sqlite::Column &sourceIdColumn = table.addColumn("sourceId", Sqlite::ColumnType::Integer);
         table.addIndex({sourceIdColumn});
 
-        Sqlite::ImmediateTransaction<DatabaseType> transaction(database);
         table.initialize(database);
-        transaction.commit();
+
+        return table;
+    }
+
+    Sqlite::Table createNewUsedMacrosTable() const
+    {
+        Sqlite::Table table;
+        table.setName("newUsedMacros");
+        table.setUseTemporaryTable(true);
+        const Sqlite::Column &sourceIdColumn = table.addColumn("sourceId", Sqlite::ColumnType::Integer);
+        const Sqlite::Column &macroNameColumn = table.addColumn("macroName", Sqlite::ColumnType::Text);
+        table.addIndex({sourceIdColumn, macroNameColumn});
+
+        table.initialize(database);
+
+        return table;
+    }
+
+    Sqlite::Table createNewSourceDependenciesTable() const
+    {
+        Sqlite::Table table;
+        table.setName("newSourceDependencies");
+        table.setUseTemporaryTable(true);
+        const Sqlite::Column &sourceIdColumn = table.addColumn("sourceId", Sqlite::ColumnType::Integer);
+        const Sqlite::Column &dependencySourceIdColumn = table.addColumn("dependencySourceId", Sqlite::ColumnType::Text);
+        table.addIndex({sourceIdColumn, dependencySourceIdColumn});
+
+        table.initialize(database);
 
         return table;
     }
 
 public:
+    Sqlite::ImmediateNonThrowingDestructorTransaction transaction;
     Database &database;
     Sqlite::Table newSymbolsTablet{createNewSymbolsTable()};
     Sqlite::Table newLocationsTable{createNewLocationsTable()};
+    Sqlite::Table newUsedMacroTable{createNewUsedMacrosTable()};
+    Sqlite::Table newNewSourceDependenciesTable{createNewSourceDependenciesTable()};
     WriteStatement insertSymbolsToNewSymbolsStatement{
         "INSERT INTO newSymbols(temporarySymbolId, usr, symbolName) VALUES(?,?,?)",
         database};
@@ -128,6 +157,77 @@ public:
         "DELETE FROM newLocations",
         database
     };
+    WriteStatement insertProjectPartStatement{
+        "INSERT OR IGNORE INTO projectParts(projectPartName, compilerArguments, compilerMacros, includeSearchPaths) VALUES (?,?,?,?)",
+        database
+    };
+    WriteStatement updateProjectPartStatement{
+        "UPDATE projectParts SET compilerArguments = ?, compilerMacros = ?, includeSearchPaths = ? WHERE projectPartName = ?",
+        database
+    };
+    ReadStatement getProjectPartIdStatement{
+        "SELECT projectPartId FROM projectParts WHERE projectPartName = ?",
+        database
+    };
+    WriteStatement deleteAllProjectPartsSourcesWithProjectPartIdStatement{
+        "DELETE FROM projectPartsSources WHERE projectPartId = ?",
+        database
+    };
+    WriteStatement insertProjectPartSourcesStatement{
+        "INSERT INTO projectPartsSources(projectPartId, sourceId) VALUES (?,?)",
+        database
+    };
+   ReadStatement getCompileArgumentsForFileIdStatement{
+        "SELECT compilerArguments FROM projectParts WHERE projectPartId = (SELECT projectPartId FROM projectPartsSources WHERE sourceId = ?)",
+        database
+    };
+   WriteStatement insertIntoNewUsedMacrosStatement{
+       "INSERT INTO newUsedMacros(sourceId, macroName) VALUES (?,?)",
+       database
+   };
+   WriteStatement syncNewUsedMacrosStatement{
+        "INSERT INTO usedMacros(sourceId, macroName) SELECT sourceId, macroName FROM newUsedMacros WHERE NOT EXISTS (SELECT sourceId FROM usedMacros WHERE usedMacros.sourceId == newUsedMacros.sourceId AND usedMacros.macroName == newUsedMacros.macroName)",
+        database
+    };
+   WriteStatement deleteOutdatedUsedMacrosStatement{
+        "DELETE FROM usedMacros WHERE sourceId IN (SELECT sourceId FROM newUsedMacros) AND NOT EXISTS (SELECT sourceId FROM newUsedMacros WHERE newUsedMacros.sourceId == usedMacros.sourceId AND newUsedMacros.macroName == usedMacros.macroName)",
+        database
+    };
+   WriteStatement deleteNewUsedMacrosTableStatement{
+        "DELETE FROM newUsedMacros",
+        database
+    };
+   WriteStatement insertFileStatuses{
+        "INSERT OR REPLACE INTO fileStatuses(sourceId, size, lastModified, isInPrecompiledHeader) VALUES (?,?,?,?)",
+        database
+    };
+   WriteStatement insertIntoNewSourceDependenciesStatement{
+       "INSERT INTO newSourceDependencies(sourceId, dependencySourceId) VALUES (?,?)",
+       database
+   };
+   WriteStatement syncNewSourceDependenciesStatement{
+        "INSERT INTO sourceDependencies(sourceId, dependencySourceId) SELECT sourceId, dependencySourceId FROM newSourceDependencies WHERE NOT EXISTS (SELECT sourceId FROM sourceDependencies WHERE sourceDependencies.sourceId == newSourceDependencies.sourceId AND sourceDependencies.dependencySourceId == newSourceDependencies.dependencySourceId)",
+        database
+    };
+   WriteStatement deleteOutdatedSourceDependenciesStatement{
+       "DELETE FROM sourceDependencies WHERE sourceId IN (SELECT sourceId FROM newSourceDependencies) AND NOT EXISTS (SELECT sourceId FROM newSourceDependencies WHERE newSourceDependencies.sourceId == sourceDependencies.sourceId AND newSourceDependencies.dependencySourceId == sourceDependencies.dependencySourceId)",
+       database
+   };
+   WriteStatement deleteNewSourceDependenciesStatement{
+       "DELETE FROM newSourceDependencies",
+       database
+   };
+   ReadStatement getProjectPartArtefactsBySourceId{
+       "SELECT compilerArguments, compilerMacros, includeSearchPaths, projectPartId FROM projectParts WHERE projectPartId = (SELECT projectPartId FROM projectPartsSources WHERE sourceId = ?)",
+       database
+   };
+   ReadStatement getProjectPartArtefactsByProjectPartName{
+       "SELECT compilerArguments, compilerMacros, includeSearchPaths, projectPartId FROM projectParts WHERE projectPartName = ?",
+       database
+   };
+   ReadStatement getLowestLastModifiedTimeOfDependencies{
+       "WITH RECURSIVE sourceIds(sourceId) AS (VALUES(?) UNION SELECT dependencySourceId FROM sourceDependencies, sourceIds WHERE sourceDependencies.sourceId = sourceIds.sourceId) SELECT min(lastModified) FROM fileStatuses, sourceIds WHERE fileStatuses.sourceId = sourceIds.sourceId",
+       database
+   };
 };
-
 } // namespace ClangBackEnd

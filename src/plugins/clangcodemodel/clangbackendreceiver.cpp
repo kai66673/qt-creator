@@ -39,7 +39,7 @@
 
 #include <utils/qtcassert.h>
 
-static Q_LOGGING_CATEGORY(log, "qtc.clangcodemodel.ipc")
+#define qCDebugIpc() qCDebug(ipcLog) << "<===="
 
 using namespace ClangBackEnd;
 
@@ -50,8 +50,8 @@ static bool printAliveMessageHelper()
 {
     const bool print = qEnvironmentVariableIntValue("QTC_CLANG_FORCE_VERBOSE_ALIVE");
     if (!print) {
-        qCDebug(log) << "Hint: AliveMessage will not be printed. "
-                        "Force it by setting QTC_CLANG_FORCE_VERBOSE_ALIVE=1.";
+        qCDebug(ipcLog) << "Hint: AliveMessage will not be printed. "
+                           "Force it by setting QTC_CLANG_FORCE_VERBOSE_ALIVE=1.";
     }
 
     return print;
@@ -59,7 +59,7 @@ static bool printAliveMessageHelper()
 
 static bool printAliveMessage()
 {
-    static bool print = log().isDebugEnabled() ? printAliveMessageHelper() : false;
+    static bool print = ipcLog().isDebugEnabled() ? printAliveMessageHelper() : false;
     return print;
 }
 
@@ -101,16 +101,14 @@ void BackendReceiver::deleteProcessorsOfEditorWidget(TextEditor::TextEditorWidge
 
 QFuture<CppTools::CursorInfo> BackendReceiver::addExpectedReferencesMessage(
         quint64 ticket,
-        QTextDocument *textDocument,
         const CppTools::SemanticInfo::LocalUseMap &localUses)
 {
-    QTC_CHECK(textDocument);
     QTC_CHECK(!m_referencesTable.contains(ticket));
 
     QFutureInterface<CppTools::CursorInfo> futureInterface;
     futureInterface.reportStarted();
 
-    const ReferencesEntry entry{futureInterface, textDocument, localUses};
+    const ReferencesEntry entry{futureInterface, localUses};
     m_referencesTable.insert(ticket, entry);
 
     return futureInterface.future();
@@ -128,6 +126,18 @@ QFuture<CppTools::SymbolInfo> BackendReceiver::addExpectedRequestFollowSymbolMes
     return futureInterface.future();
 }
 
+QFuture<CppTools::ToolTipInfo> BackendReceiver::addExpectedToolTipMessage(quint64 ticket)
+{
+    QTC_CHECK(!m_toolTipsTable.contains(ticket));
+
+    QFutureInterface<CppTools::ToolTipInfo> futureInterface;
+    futureInterface.reportStarted();
+
+    m_toolTipsTable.insert(ticket, futureInterface);
+
+    return futureInterface.future();
+}
+
 bool BackendReceiver::isExpectingCodeCompletedMessage() const
 {
     return !m_assistProcessorsTable.isEmpty();
@@ -139,31 +149,41 @@ void BackendReceiver::reset()
     qDeleteAll(m_assistProcessorsTable.begin(), m_assistProcessorsTable.end());
     m_assistProcessorsTable.clear();
 
-    // Clean up futures for references
-    for (ReferencesEntry &entry : m_referencesTable)
+    // Clean up futures for references; TODO: Remove duplication
+    for (ReferencesEntry &entry : m_referencesTable) {
         entry.futureInterface.cancel();
+        entry.futureInterface.reportFinished();
+    }
     m_referencesTable.clear();
-    for (QFutureInterface<CppTools::SymbolInfo> &futureInterface : m_followTable)
+    for (QFutureInterface<CppTools::SymbolInfo> &futureInterface : m_followTable) {
         futureInterface.cancel();
+        futureInterface.reportFinished();
+    }
     m_followTable.clear();
+    for (QFutureInterface<CppTools::ToolTipInfo> &futureInterface : m_toolTipsTable) {
+        futureInterface.cancel();
+        futureInterface.reportFinished();
+    }
+    m_toolTipsTable.clear();
 }
 
 void BackendReceiver::alive()
 {
     if (printAliveMessage())
-        qCDebug(log) << "<<< AliveMessage";
+        qCDebugIpc() << "AliveMessage";
     QTC_ASSERT(m_aliveHandler, return);
     m_aliveHandler();
 }
 
 void BackendReceiver::echo(const EchoMessage &message)
 {
-    qCDebug(log) << "<<<" << message;
+    qCDebugIpc() << message;
 }
 
 void BackendReceiver::codeCompleted(const CodeCompletedMessage &message)
 {
-    qCDebug(log) << "<<< CodeCompletedMessage with" << message.codeCompletions().size() << "items";
+    qCDebugIpc() << "CodeCompletedMessage with" << message.codeCompletions().size()
+                 << "items";
 
     const quint64 ticket = message.ticketNumber();
     QScopedPointer<ClangCompletionAssistProcessor> processor(m_assistProcessorsTable.take(ticket));
@@ -175,48 +195,47 @@ void BackendReceiver::codeCompleted(const CodeCompletedMessage &message)
 
 void BackendReceiver::documentAnnotationsChanged(const DocumentAnnotationsChangedMessage &message)
 {
-    qCDebug(log) << "<<< DocumentAnnotationsChangedMessage with"
+    qCDebugIpc() << "DocumentAnnotationsChangedMessage with"
                  << message.diagnostics().size() << "diagnostics"
-                 << message.highlightingMarks().size() << "highlighting marks"
+                 << message.tokenInfos().size() << "highlighting marks"
                  << message.skippedPreprocessorRanges().size() << "skipped preprocessor ranges";
 
     auto processor = ClangEditorDocumentProcessor::get(message.fileContainer().filePath());
 
-    if (processor) {
-        const QString projectPartId = message.fileContainer().projectPartId();
-        const QString filePath = message.fileContainer().filePath();
-        const QString documentProjectPartId = CppTools::CppToolsBridge::projectPartIdForFile(filePath);
-        if (projectPartId == documentProjectPartId) {
-            const quint32 documentRevision = message.fileContainer().documentRevision();
-            processor->updateCodeWarnings(message.diagnostics(),
-                                          message.firstHeaderErrorDiagnostic(),
-                                          documentRevision);
-            processor->updateHighlighting(message.highlightingMarks(),
-                                          message.skippedPreprocessorRanges(),
-                                          documentRevision);
-        }
+    if (!processor)
+        return;
+
+    const QString projectPartId = message.fileContainer().projectPartId();
+    const QString filePath = message.fileContainer().filePath();
+    const QString documentProjectPartId = CppTools::CppToolsBridge::projectPartIdForFile(filePath);
+    if (projectPartId != documentProjectPartId)
+        return;
+
+    const quint32 documentRevision = message.fileContainer().documentRevision();
+    if (message.onlyTokenInfos()) {
+        processor->updateTokenInfos(message.tokenInfos(), documentRevision);
+        return;
     }
+    processor->updateCodeWarnings(message.diagnostics(),
+                                  message.firstHeaderErrorDiagnostic(),
+                                  documentRevision);
+    processor->updateHighlighting(message.tokenInfos(),
+                                  message.skippedPreprocessorRanges(),
+                                  documentRevision);
 }
 
 static
-CppTools::CursorInfo::Range toCursorInfoRange(const QTextDocument &textDocument,
-                                              const SourceRangeContainer &sourceRange)
+CppTools::CursorInfo::Range toCursorInfoRange(const SourceRangeContainer &sourceRange)
 {
     const SourceLocationContainer start = sourceRange.start();
     const SourceLocationContainer end = sourceRange.end();
     const unsigned length = end.column() - start.column();
 
-    const QTextBlock block = textDocument.findBlockByNumber(static_cast<int>(start.line()) - 1);
-    const int shift = ClangCodeModel::Utils::extraUtf8CharsShift(block.text(),
-                                                                 static_cast<int>(start.column()));
-    const uint column = start.column() - static_cast<uint>(shift);
-
-    return CppTools::CursorInfo::Range(start.line(), column, length);
+    return CppTools::CursorInfo::Range(start.line(), start.column(), length);
 }
 
 static
-CppTools::CursorInfo toCursorInfo(const QTextDocument &textDocument,
-                                  const CppTools::SemanticInfo::LocalUseMap &localUses,
+CppTools::CursorInfo toCursorInfo(const CppTools::SemanticInfo::LocalUseMap &localUses,
                                   const ReferencesMessage &message)
 {
     CppTools::CursorInfo result;
@@ -224,7 +243,7 @@ CppTools::CursorInfo toCursorInfo(const QTextDocument &textDocument,
 
     result.areUseRangesForLocalVariable = message.isLocalVariable();
     for (const SourceRangeContainer &reference : references)
-        result.useRanges.append(toCursorInfoRange(textDocument, reference));
+        result.useRanges.append(toCursorInfoRange(reference));
 
     result.useRanges.reserve(references.size());
     result.localUses = localUses;
@@ -251,7 +270,7 @@ CppTools::SymbolInfo toSymbolInfo(const FollowSymbolMessage &message)
 
 void BackendReceiver::references(const ReferencesMessage &message)
 {
-    qCDebug(log) << "<<< ReferencesMessage with"
+    qCDebugIpc() << "ReferencesMessage with"
                  << message.references().size() << "references";
 
     const quint64 ticket = message.ticketNumber();
@@ -262,14 +281,79 @@ void BackendReceiver::references(const ReferencesMessage &message)
     if (futureInterface.isCanceled())
         return; // Editor document closed or a new request was issued making this result outdated.
 
-    QTC_ASSERT(entry.textDocument, return);
-    futureInterface.reportResult(toCursorInfo(*entry.textDocument, entry.localUses, message));
+    futureInterface.reportResult(toCursorInfo(entry.localUses, message));
+    futureInterface.reportFinished();
+}
+
+static TextEditor::HelpItem::Category toHelpItemCategory(ToolTipInfo::QdocCategory category)
+{
+    switch (category) {
+    case ToolTipInfo::Unknown:
+        return TextEditor::HelpItem::Unknown;
+    case ToolTipInfo::ClassOrNamespace:
+        return TextEditor::HelpItem::ClassOrNamespace;
+    case ToolTipInfo::Enum:
+        return TextEditor::HelpItem::Enum;
+    case ToolTipInfo::Typedef:
+        return TextEditor::HelpItem::Typedef;
+    case ToolTipInfo::Macro:
+        return TextEditor::HelpItem::Macro;
+    case ToolTipInfo::Brief:
+        return TextEditor::HelpItem::Brief;
+    case ToolTipInfo::Function:
+        return TextEditor::HelpItem::Function;
+    }
+
+    return TextEditor::HelpItem::Unknown;
+}
+
+static QStringList toStringList(const Utf8StringVector &utf8StringVector)
+{
+    QStringList list;
+    list.reserve(utf8StringVector.size());
+
+    for (const Utf8String &utf8String : utf8StringVector)
+        list << utf8String.toString();
+
+    return list;
+}
+
+static CppTools::ToolTipInfo toToolTipInfo(const ToolTipMessage &message)
+{
+    CppTools::ToolTipInfo info;
+
+    const ToolTipInfo backendInfo = message.toolTipInfo();
+
+    info.text = backendInfo.text();
+    info.briefComment = backendInfo.briefComment();
+
+    info.qDocIdCandidates = toStringList(backendInfo.qdocIdCandidates());
+    info.qDocMark = backendInfo.qdocMark();
+    info.qDocCategory = toHelpItemCategory(backendInfo.qdocCategory());
+
+    info.sizeInBytes = backendInfo.sizeInBytes();
+
+    return info;
+}
+
+void BackendReceiver::tooltip(const ToolTipMessage &message)
+{
+    qCDebugIpc() << "ToolTipMessage" << message.toolTipInfo().text();
+
+    const quint64 ticket = message.ticketNumber();
+    QFutureInterface<CppTools::ToolTipInfo> futureInterface = m_toolTipsTable.take(ticket);
+    QTC_CHECK(futureInterface != QFutureInterface<CppTools::ToolTipInfo>());
+
+    if (futureInterface.isCanceled())
+        return; // A new request was issued making this one outdated.
+
+    futureInterface.reportResult(toToolTipInfo(message));
     futureInterface.reportFinished();
 }
 
 void BackendReceiver::followSymbol(const ClangBackEnd::FollowSymbolMessage &message)
 {
-    qCDebug(log) << "<<< FollowSymbolMessage with"
+    qCDebugIpc() << "FollowSymbolMessage with"
                  << message.sourceRange() << "range";
 
     const quint64 ticket = message.ticketNumber();

@@ -299,12 +299,11 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     auto vc = initializeVcs<GitVersionControl>(context, m_gitClient);
 
     // Create the settings Page
-    auto settingsPage = new SettingsPage(vc);
-    addAutoReleasedObject(settingsPage);
+    auto settingsPage = new SettingsPage(vc, this);
     connect(settingsPage, &SettingsPage::settingsChanged,
             this, &GitPlugin::updateRepositoryBrowserAction);
 
-    addAutoReleasedObject(new GitGrep);
+    new GitGrep(this);
 
     const auto describeFunc = [this](const QString &source, const QString &id) {
         m_gitClient->show(source, id);
@@ -312,14 +311,13 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     const int editorCount = sizeof(editorParameters) / sizeof(editorParameters[0]);
     const auto widgetCreator = []() { return new GitEditorWidget; };
     for (int i = 0; i < editorCount; i++)
-        addAutoReleasedObject(new VcsEditorFactory(editorParameters + i, widgetCreator, describeFunc));
+        new VcsEditorFactory(editorParameters + i, widgetCreator, describeFunc, this);
 
-    addAutoReleasedObject(new VcsSubmitEditorFactory(&submitParameters,
-        []() { return new GitSubmitEditor(&submitParameters); }));
+    new VcsSubmitEditorFactory(&submitParameters,
+        []() { return new GitSubmitEditor(&submitParameters); }, this);
 
     const QString prefix = "git";
-    m_commandLocator = new CommandLocator("Git", prefix, prefix);
-    addAutoReleasedObject(m_commandLocator);
+    m_commandLocator = new CommandLocator("Git", prefix, prefix, this);
 
     //register actions
     ActionContainer *toolsContainer = ActionManager::actionContainer(Core::Constants::M_TOOLS);
@@ -337,21 +335,21 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     createFileAction(currentFileMenu, tr("Diff Current File"), tr("Diff of \"%1\""),
                      "Git.Diff", context, true, std::bind(&GitPlugin::diffCurrentFile, this),
-                      QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+D") : tr("Alt+G,Alt+D")));
+                      QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+D") : tr("Alt+G,Alt+D")));
 
     createFileAction(currentFileMenu, tr("Log Current File"), tr("Log of \"%1\""),
                      "Git.Log", context, true, std::bind(&GitPlugin::logFile, this),
-                     QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+L") : tr("Alt+G,Alt+L")));
+                     QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+L") : tr("Alt+G,Alt+L")));
 
     createFileAction(currentFileMenu, tr("Blame Current File"), tr("Blame for \"%1\""),
                      "Git.Blame", context, true, std::bind(&GitPlugin::blameFile, this),
-                     QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+B") : tr("Alt+G,Alt+B")));
+                     QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+B") : tr("Alt+G,Alt+B")));
 
     currentFileMenu->addSeparator(context);
 
     createFileAction(currentFileMenu, tr("Stage File for Commit"), tr("Stage \"%1\" for Commit"),
                      "Git.Stage", context, true, std::bind(&GitPlugin::stageFile, this),
-                     QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+A") : tr("Alt+G,Alt+A")));
+                     QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+A") : tr("Alt+G,Alt+A")));
 
     createFileAction(currentFileMenu, tr("Unstage File from Commit"), tr("Unstage \"%1\" from Commit"),
                      "Git.Unstage", context, true, std::bind(&GitPlugin::unstageFile, this));
@@ -363,7 +361,7 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     createFileAction(currentFileMenu, tr("Undo Uncommitted Changes"), tr("Undo Uncommitted Changes for \"%1\""),
                      "Git.Undo", context,
                      true, std::bind(&GitPlugin::undoFileChanges, this, true),
-                     QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+U") : tr("Alt+G,Alt+U")));
+                     QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+U") : tr("Alt+G,Alt+U")));
 
 
     /*  "Current Project" menu */
@@ -373,11 +371,11 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     createProjectAction(currentProjectMenu, tr("Diff Current Project"), tr("Diff Project \"%1\""),
                         "Git.DiffProject", context, true, &GitPlugin::diffCurrentProject,
-                        QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+Shift+D") : tr("Alt+G,Alt+Shift+D")));
+                        QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+Shift+D") : tr("Alt+G,Alt+Shift+D")));
 
     createProjectAction(currentProjectMenu, tr("Log Project"), tr("Log Project \"%1\""),
                         "Git.LogProject", context, true, &GitPlugin::logProject,
-                        QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+K") : tr("Alt+G,Alt+K")));
+                        QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+K") : tr("Alt+G,Alt+K")));
 
     createProjectAction(currentProjectMenu, tr("Clean Project..."), tr("Clean Project \"%1\"..."),
                         "Git.CleanProject", context, true, &GitPlugin::cleanProject);
@@ -408,7 +406,7 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     createRepositoryAction(localRepositoryMenu, tr("Commit..."), "Git.Commit",
                            context, true, std::bind(&GitPlugin::startCommit, this, SimpleCommit),
-                           QKeySequence(UseMacShortcuts ? tr("Meta+G,Meta+C") : tr("Alt+G,Alt+C")));
+                           QKeySequence(useMacShortcuts ? tr("Meta+G,Meta+C") : tr("Alt+G,Alt+C")));
 
     createRepositoryAction(localRepositoryMenu, tr("Amend Last Commit..."), "Git.AmendCommit",
                            context, true, std::bind(&GitPlugin::startCommit, this, AmendCommit));
@@ -423,6 +421,9 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     createRepositoryAction(localRepositoryMenu, tr("Reset..."), "Git.Reset",
                            context, true, std::bind(&GitPlugin::resetRepository, this));
+
+    createRepositoryAction(localRepositoryMenu, tr("Recover Deleted Files"), "Git.RecoverDeleted",
+                           context, true, std::bind(&GitPlugin::recoverDeletedFiles, this));
 
     m_interactiveRebaseAction
             = createRepositoryAction(localRepositoryMenu,
@@ -805,6 +806,15 @@ void GitPlugin::resetRepository()
     dialog.setWindowTitle(tr("Undo Changes to %1").arg(QDir::toNativeSeparators(topLevel)));
     if (dialog.runDialog(topLevel, QString(), LogChangeWidget::IncludeRemotes))
         m_gitClient->reset(topLevel, dialog.resetFlag(), dialog.commit());
+}
+
+void GitPlugin::recoverDeletedFiles()
+{
+    if (!DocumentManager::saveAllModifiedDocuments())
+        return;
+    const VcsBasePluginState state = currentState();
+    QTC_ASSERT(state.hasTopLevel(), return);
+    m_gitClient->recoverDeletedFiles(state.topLevel());
 }
 
 void GitPlugin::startRebase()

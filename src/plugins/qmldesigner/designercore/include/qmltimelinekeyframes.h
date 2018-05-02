@@ -54,6 +54,8 @@ public:
     void setValue(const QVariant &value, qreal frame);
     QVariant value(qreal frame) const;
 
+    TypeName valueType() const;
+
     qreal currentFrame() const;
 
     bool hasKeyframe(qreal frame);
@@ -64,7 +66,15 @@ public:
     const QList<ModelNode> keyframePositions() const;
 
     static bool isValidKeyframe(const ModelNode &node);
+    static bool checkKeyframesType(const ModelNode &node);
     static QmlTimelineFrames keyframesForKeyframe(const ModelNode &node);
+
+    void moveAllFrames(qreal offset);
+    void scaleAllFrames(qreal factor);
+    int getSupposedTargetIndex(qreal newFrame) const;
+
+    int indexOfFrame(const ModelNode &frame) const;
+    void slideFrame(int sourceIndex, int targetIndex);
 };
 
 } //QmlDesigner

@@ -37,7 +37,7 @@ class Documents;
 class JobQueue
 {
 public:
-    JobQueue(Documents &documents, ProjectParts &projects);
+    JobQueue(Documents &documents, ProjectParts &projects, const Utf8String &logTag = Utf8String());
 
     bool add(const JobRequest &job);
 
@@ -56,20 +56,24 @@ public:
 
 public: // for tests
     JobRequests &queue();
+    const JobRequests &queue() const;
     int size() const;
     void prioritizeRequests();
 
 private:
+    bool areRunConditionsMet(const JobRequest &request, const Document &document) const;
     void cancelJobRequest(const JobRequest &jobRequest);
     bool isJobRunningForTranslationUnit(const Utf8String &translationUnitId);
     bool isJobRunningForJobRequest(const JobRequest &jobRequest);
     JobRequests takeJobRequestsToRunNow();
     void removeExpiredRequests();
-    bool isJobRequestExpired(const JobRequest &jobRequest);
+    bool isJobRequestAddable(const JobRequest &jobRequest, QString &notAddableReason);
+    bool isJobRequestExpired(const JobRequest &jobRequest, QString &expirationReason);
 
 private:
     Documents &m_documents;
     ProjectParts &m_projectParts;
+    Utf8String m_logTag;
 
     IsJobRunningForTranslationUnitHandler m_isJobRunningForTranslationUnitHandler;
     IsJobRunningForJobRequestHandler m_isJobRunningForJobRequestHandler;

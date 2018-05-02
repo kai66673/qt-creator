@@ -26,9 +26,10 @@
 #include "clangeditordocumentprocessor.h"
 #include "clangfollowsymbol.h"
 
+#include <cpptools/cppmodelmanager.h>
 #include <texteditor/texteditor.h>
 
-#include <clangsupport/highlightingmarkcontainer.h>
+#include <clangsupport/tokeninfocontainer.h>
 
 #include <utils/textutils.h>
 #include <utils/algorithm.h>
@@ -37,18 +38,18 @@ namespace ClangCodeModel {
 namespace Internal {
 
 // Returns invalid Mark if it is not found at (line, column)
-static bool findMark(const QVector<ClangBackEnd::HighlightingMarkContainer> &marks,
+static bool findMark(const QVector<ClangBackEnd::TokenInfoContainer> &marks,
                      uint line,
                      uint column,
-                     ClangBackEnd::HighlightingMarkContainer &mark)
+                     ClangBackEnd::TokenInfoContainer &mark)
 {
     mark = Utils::findOrDefault(marks,
-        [line, column](const ClangBackEnd::HighlightingMarkContainer &curMark) {
+        [line, column](const ClangBackEnd::TokenInfoContainer &curMark) {
             if (curMark.line() != line)
                 return false;
             if (curMark.column() == column)
                 return true;
-            if (curMark.column() < column && curMark.column() + curMark.length() >= column)
+            if (curMark.column() < column && curMark.column() + curMark.length() > column)
                 return true;
             return false;
         });
@@ -57,7 +58,7 @@ static bool findMark(const QVector<ClangBackEnd::HighlightingMarkContainer> &mar
     return true;
 }
 
-static int getMarkPos(QTextCursor cursor, const ClangBackEnd::HighlightingMarkContainer &mark)
+static int getMarkPos(QTextCursor cursor, const ClangBackEnd::TokenInfoContainer &mark)
 {
     cursor.setPosition(0);
     cursor.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, mark.line() - 1);
@@ -65,17 +66,14 @@ static int getMarkPos(QTextCursor cursor, const ClangBackEnd::HighlightingMarkCo
     return cursor.position();
 }
 
-static TextEditor::TextEditorWidget::Link linkAtCursor(QTextCursor cursor,
-                                                       const QString &filePath,
-                                                       uint line,
-                                                       uint column,
-                                                       ClangEditorDocumentProcessor *processor)
+static Utils::Link linkAtCursor(QTextCursor cursor, const QString &filePath, uint line, uint column,
+                                ClangEditorDocumentProcessor *processor)
 {
-    using Link = TextEditor::TextEditorWidget::Link;
+    using Link = Utils::Link;
 
-    const QVector<ClangBackEnd::HighlightingMarkContainer> &marks
-            = processor->highlightingMarks();
-    ClangBackEnd::HighlightingMarkContainer mark;
+    const QVector<ClangBackEnd::TokenInfoContainer> &marks
+            = processor->tokenInfos();
+    ClangBackEnd::TokenInfoContainer mark;
     if (!findMark(marks, line, column, mark))
         return Link();
 
@@ -85,23 +83,22 @@ static TextEditor::TextEditorWidget::Link linkAtCursor(QTextCursor cursor,
     Link token(filePath, mark.line(), mark.column());
     token.linkTextStart = getMarkPos(cursor, mark);
     token.linkTextEnd = token.linkTextStart + mark.length();
-    if (mark.isIncludeDirectivePath()) {
+    if (mark.extraInfo().includeDirectivePath) {
         if (tokenStr != "include" && tokenStr != "#" && tokenStr != "<")
             return token;
         return Link();
     }
-    if (mark.isIdentifier() || tokenStr == "operator")
+    if (mark.extraInfo().identifier || tokenStr == "operator")
         return token;
     return Link();
 }
 
-TextEditor::TextEditorWidget::Link ClangFollowSymbol::findLink(
-        const CppTools::CursorInEditor &data,
-        bool resolveTarget,
-        const CPlusPlus::Snapshot &,
-        const CPlusPlus::Document::Ptr &,
-        CppTools::SymbolFinder *,
-        bool)
+Utils::Link ClangFollowSymbol::findLink(const CppTools::CursorInEditor &data,
+                                        bool resolveTarget,
+                                        const CPlusPlus::Snapshot &snapshot,
+                                        const CPlusPlus::Document::Ptr &documentFromSemanticInfo,
+                                        CppTools::SymbolFinder *symbolFinder,
+                                        bool inNextSplit)
 {
     int lineNumber = 0, positionInBlock = 0;
     QTextCursor cursor = Utils::Text::wordStartCursor(data.cursor());
@@ -134,8 +131,12 @@ TextEditor::TextEditorWidget::Link ClangFollowSymbol::findLink(
     CppTools::SymbolInfo result = info.result();
 
     // We did not fail but the result is empty
-    if (result.fileName.isEmpty())
-        return Link();
+    if (result.fileName.isEmpty()) {
+        const CppTools::RefactoringEngineInterface &refactoringEngine
+                = *CppTools::CppModelManager::instance();
+        return refactoringEngine.globalFollowSymbol(data, snapshot, documentFromSemanticInfo,
+                                                    symbolFinder, inNextSplit);
+    }
 
     return Link(result.fileName, result.startLine, result.startColumn - 1);
 }

@@ -36,12 +36,15 @@
 #include "texteditorconstants.h"
 #include "typingsettings.h"
 #include <texteditor/generichighlighter/highlighter.h>
+#include <coreplugin/diffservice.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/editormanager/documentmodel.h>
+#include <extensionsystem/pluginmanager.h>
 #include <utils/textutils.h>
 #include <utils/guard.h>
 #include <utils/mimetypes/mimedatabase.h>
 
+#include <QAction>
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -74,18 +77,14 @@ namespace TextEditor {
 class TextDocumentPrivate
 {
 public:
-    TextDocumentPrivate() :
-        m_fontSettingsNeedsApply(false),
-        m_highlighter(0),
-        m_completionAssistProvider(0),
-        m_indenter(new Indenter),
-        m_fileIsReadOnly(false),
-        m_autoSaveRevision(-1)
+    TextDocumentPrivate()
+        : m_indenter(new Indenter)
     {
     }
 
     QTextCursor indentOrUnindent(const QTextCursor &textCursor, bool doIndent,
-                                 bool blockSelection = false, int column = 0, int *offset = 0);
+                                 bool blockSelection = false, int column = 0,
+                                 int *offset = nullptr);
     void resetRevisions();
     void updateRevisions();
 
@@ -97,14 +96,14 @@ public:
     TabSettings m_tabSettings;
     ExtraEncodingSettings m_extraEncodingSettings;
     FontSettings m_fontSettings;
-    bool m_fontSettingsNeedsApply; // for applying font settings delayed till an editor becomes visible
+    bool m_fontSettingsNeedsApply = false; // for applying font settings delayed till an editor becomes visible
     QTextDocument m_document;
-    SyntaxHighlighter *m_highlighter;
-    CompletionAssistProvider *m_completionAssistProvider;
+    SyntaxHighlighter *m_highlighter = nullptr;
+    CompletionAssistProvider *m_completionAssistProvider = nullptr;
     QScopedPointer<Indenter> m_indenter;
 
-    bool m_fileIsReadOnly;
-    int m_autoSaveRevision;
+    bool m_fileIsReadOnly = false;
+    int m_autoSaveRevision = -1;
 
     TextMarks m_marksCache; // Marks not owned
     Utils::Guard m_modificationChangedGuard;
@@ -128,7 +127,7 @@ QTextCursor TextDocumentPrivate::indentOrUnindent(const QTextCursor &textCursor,
     bool modified = true;
 
     QTextBlock startBlock = m_document.findBlock(start);
-    QTextBlock endBlock = m_document.findBlock(blockSelection ? end : end - 1).next();
+    QTextBlock endBlock = m_document.findBlock(blockSelection ? end : qMax(end - 1, 0)).next();
     const bool cursorAtBlockStart = (textCursor.position() == startBlock.position());
     const bool anchorAtBlockStart = (textCursor.anchor() == startBlock.position());
     const bool oneLinePartial = (startBlock.next() == endBlock)
@@ -178,7 +177,7 @@ QTextCursor TextDocumentPrivate::indentOrUnindent(const QTextCursor &textCursor,
                 text = block.text();
             }
 
-            int indentPosition = ts.positionAtColumn(text, column, 0, true);
+            int indentPosition = ts.positionAtColumn(text, column, nullptr, true);
             int spaces = ts.spacesLeftFromPosition(text, indentPosition);
             int startColumn = ts.columnAt(text, indentPosition - spaces);
             int targetColumn = ts.indentedColumn(ts.columnAt(text, indentPosition), doIndent);
@@ -357,6 +356,22 @@ void TextDocument::setFontSettings(const FontSettings &fontSettings)
     emit fontSettingsChanged();
 }
 
+QAction *TextDocument::createDiffAgainstCurrentFileAction(
+    QObject *parent, const std::function<Utils::FileName()> &filePath)
+{
+    const auto diffAgainstCurrentFile = [filePath]() {
+        auto diffService = DiffService::instance();
+        auto textDocument = TextEditor::TextDocument::currentTextDocument();
+        const QString leftFilePath = textDocument ? textDocument->filePath().toString() : QString();
+        const QString rightFilePath = filePath().toString();
+        if (diffService && !leftFilePath.isEmpty() && !rightFilePath.isEmpty())
+            diffService->diffFiles(leftFilePath, rightFilePath);
+    };
+    auto diffAction = new QAction(tr("Diff Against Current File"), parent);
+    QObject::connect(diffAction, &QAction::triggered, parent, diffAgainstCurrentFile);
+    return diffAction;
+}
+
 void TextDocument::triggerPendingUpdates()
 {
     if (d->m_fontSettingsNeedsApply)
@@ -373,9 +388,9 @@ CompletionAssistProvider *TextDocument::completionAssistProvider() const
     return d->m_completionAssistProvider;
 }
 
-QuickFixAssistProvider *TextDocument::quickFixAssistProvider() const
+IAssistProvider *TextDocument::quickFixAssistProvider() const
 {
-    return 0;
+    return nullptr;
 }
 
 void TextDocument::applyFontSettings()
@@ -430,7 +445,7 @@ void TextDocument::setIndenter(Indenter *indenter)
     for (QTextBlock it = document()->begin(); it.isValid(); it = it.next()) {
         TextBlockUserData *userData = TextDocumentLayout::testUserData(it);
         if (userData)
-            userData->setCodeFormatterData(0);
+            userData->setCodeFormatterData(nullptr);
     }
     d->m_indenter.reset(indenter);
 }
@@ -487,7 +502,7 @@ bool TextDocument::save(QString *errorString, const QString &saveFileName, bool 
     QTextCursor cursor(&d->m_document);
 
     // When autosaving, we don't want to modify the document/location under the user's fingers.
-    TextEditorWidget *editorWidget = 0;
+    TextEditorWidget *editorWidget = nullptr;
     int savedPosition = 0;
     int savedAnchor = 0;
     int savedVScrollBarValue = 0;
@@ -960,7 +975,7 @@ void TextDocument::removeMark(TextMark *mark)
 
     removeMarkFromMarksCache(mark);
     emit markRemoved(mark);
-    mark->setBaseTextDocument(0);
+    mark->setBaseTextDocument(nullptr);
     updateLayout();
 }
 
@@ -984,7 +999,7 @@ void TextDocument::moveMark(TextMark *mark, int previousLine)
             qDebug() << "Could not find mark" << mark << "on line" << previousLine;
     }
     removeMarkFromMarksCache(mark);
-    mark->setBaseTextDocument(0);
+    mark->setBaseTextDocument(nullptr);
     addMark(mark);
 }
 

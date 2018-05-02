@@ -28,6 +28,7 @@
 #include "sqlitedatabasebackend.h"
 #include "sqliteglobal.h"
 #include "sqlitetable.h"
+#include "sqlitetransaction.h"
 
 #include <utils/smallstring.h>
 
@@ -36,10 +37,9 @@
 
 namespace Sqlite {
 
-class SQLITE_EXPORT Database
+class SQLITE_EXPORT Database final : public TransactionInterface
 {
     template <typename Database>
-    friend class AbstractTransaction;
     friend class Statement;
     friend class Backend;
 
@@ -82,6 +82,11 @@ public:
         return m_databaseBackend.lastInsertedRowId();
     }
 
+    void setLastInsertedRowId(int64_t rowId)
+    {
+        m_databaseBackend.setLastInsertedRowId(rowId);
+    }
+
     int changesCount()
     {
         return m_databaseBackend.changesCount();
@@ -90,6 +95,36 @@ public:
     int totalChangesCount()
     {
         return m_databaseBackend.totalChangesCount();
+    }
+
+    void deferredBegin()
+    {
+        m_databaseMutex.lock();
+        execute("BEGIN");
+    }
+
+    void immediateBegin()
+    {
+        m_databaseMutex.lock();
+        execute("BEGIN IMMEDIATE");
+    }
+
+    void exclusiveBegin()
+    {
+        m_databaseMutex.lock();
+        execute("BEGIN EXCLUSIVE");
+    }
+
+    void commit()
+    {
+        execute("COMMIT");
+        m_databaseMutex.unlock();
+    }
+
+    void rollback()
+    {
+        execute("ROLLBACK");
+        m_databaseMutex.unlock();
     }
 
 private:

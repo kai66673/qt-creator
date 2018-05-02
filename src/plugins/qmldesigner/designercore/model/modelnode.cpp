@@ -310,7 +310,7 @@ QString ModelNode::simplifiedTypeName() const
         throw InvalidModelNodeException(__LINE__, __FUNCTION__, __FILE__);
     }
 
-    return QString::fromUtf8(type().split('.').last());
+    return QString::fromUtf8(type().split('.').constLast());
 }
 
 QString ModelNode::displayName() const
@@ -1118,14 +1118,15 @@ bool ModelNode::isComponent() const
 
     if (metaInfo().isView() && hasNodeProperty("delegate")) {
         const ModelNode delegateNode = nodeProperty("delegate").modelNode();
-        if (delegateNode.hasMetaInfo()) {
-            const NodeMetaInfo delegateMetaInfo = delegateNode.metaInfo();
-            if (delegateMetaInfo.isValid() && delegateMetaInfo.isFileComponent())
+        if (delegateNode.isValid()) {
+            if (delegateNode.hasMetaInfo()) {
+                const NodeMetaInfo delegateMetaInfo = delegateNode.metaInfo();
+                if (delegateMetaInfo.isValid() && delegateMetaInfo.isFileComponent())
+                    return true;
+            }
+            if (delegateNode.nodeSourceType() == ModelNode::NodeWithComponentSource)
                 return true;
         }
-
-        if (delegateNode.nodeSourceType() == ModelNode::NodeWithComponentSource)
-            return true;
     }
 
     if (metaInfo().isSubclassOf("QtQuick.Loader")) {
@@ -1137,7 +1138,7 @@ bool ModelNode::isComponent() const
          * the default property is always implcitly a NodeListProperty. This is something that has to be fixed.
          */
 
-            ModelNode componentNode = nodeListProperty("component").toModelNodeList().first();
+            ModelNode componentNode = nodeListProperty("component").toModelNodeList().constFirst();
             if (componentNode.nodeSourceType() == ModelNode::NodeWithComponentSource)
                 return true;
             if (componentNode.metaInfo().isFileComponent())
@@ -1174,7 +1175,7 @@ QIcon ModelNode::typeIcon() const
         QList <ItemLibraryEntry> itemLibraryEntryList = libraryInfo->entriesForType(
                     type(), majorVersion(), minorVersion());
         if (!itemLibraryEntryList.isEmpty())
-            return itemLibraryEntryList.first().typeIcon();
+            return itemLibraryEntryList.constFirst().typeIcon();
         else if (metaInfo().isValid())
             return QIcon(QStringLiteral(":/ItemLibrary/images/item-default-icon.png"));
     }

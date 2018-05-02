@@ -45,10 +45,13 @@ TestOutputReader *QtTestConfiguration::outputReader(const QFutureInterface<TestR
     if (qtSettings.isNull())
         return nullptr;
 
-    if (qtSettings->useXMLOutput)
-        return new QtTestOutputReader(fi, app, buildDirectory(), projectFile(), QtTestOutputReader::XML);
-    else
-        return new QtTestOutputReader(fi, app, buildDirectory(), projectFile(), QtTestOutputReader::PlainText);
+    if (qtSettings->useXMLOutput) {
+        return new QtTestOutputReader(fi, app, buildDirectory(), projectFile(),
+                                      QtTestOutputReader::XML, TestType::QtTest);
+    } else {
+        return new QtTestOutputReader(fi, app, buildDirectory(), projectFile(),
+                                      QtTestOutputReader::PlainText, TestType::QtTest);
+    }
 }
 
 QStringList QtTestConfiguration::argumentsForTestRunner(QStringList *omitted) const
@@ -57,7 +60,7 @@ QStringList QtTestConfiguration::argumentsForTestRunner(QStringList *omitted) co
             = Core::Id(Constants::FRAMEWORK_PREFIX).withSuffix(QtTest::Constants::FRAMEWORK_NAME);
 
     QStringList arguments;
-    if (AutotestPlugin::instance()->settings()->processArgs) {
+    if (AutotestPlugin::settings()->processArgs) {
         arguments.append(QTestUtils::filterInterfering(
                              runnable().commandLineArguments.split(' ', QString::SkipEmptyParts),
                              omitted, false));

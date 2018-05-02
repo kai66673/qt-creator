@@ -27,14 +27,19 @@
 
 #include <coreplugin/icore.h>
 
+#include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorerconstants.h>
 
+#include <utils/fileutils.h>
+#include <utils/qtcassert.h>
 #include <utils/qtcfallthrough.h>
 
 #include <QDir>
 #include <QRegularExpression>
 
 namespace CppTools {
+
+static constexpr char SYSTEM_INCLUDE_PREFIX[] = "-isystem";
 
 CompilerOptionsBuilder::CompilerOptionsBuilder(const ProjectPart &projectPart,
                                                const QString &clangVersion,
@@ -51,6 +56,7 @@ QStringList CompilerOptionsBuilder::build(CppTools::ProjectFile::Kind fileKind, 
 
     addWordWidth();
     addTargetTriple();
+    addExtraCodeModelFlags();
     addLanguageOption(fileKind);
     addOptionsForLanguage(/*checkForBorlandExtensions*/ true);
     enableExceptions();
@@ -58,6 +64,7 @@ QStringList CompilerOptionsBuilder::build(CppTools::ProjectFile::Kind fileKind, 
     addToolchainAndProjectMacros();
     undefineClangVersionMacrosForMsvc();
     undefineCppLanguageFeatureMacrosForMsvc2015();
+    addDefineFunctionMacrosMsvc();
 
     addPredefinedHeaderPathsOptions();
     addPrecompiledHeaderOptions(pchUsage);
@@ -102,16 +109,37 @@ void CompilerOptionsBuilder::addTargetTriple()
     }
 }
 
+void CompilerOptionsBuilder::addExtraCodeModelFlags()
+{
+    // extraCodeModelFlags keep build architecture for cross-compilation.
+    // In case of iOS build target triple has aarch64 archtecture set which makes
+    // code model fail with CXError_Failure. To fix that we explicitly provide architecture.
+    m_options.append(m_projectPart.extraCodeModelFlags);
+}
+
 void CompilerOptionsBuilder::enableExceptions()
 {
     add(QLatin1String("-fcxx-exceptions"));
     add(QLatin1String("-fexceptions"));
 }
 
+static Utils::FileName absoluteDirectory(const QString &filePath)
+{
+    return Utils::FileName::fromString(QFileInfo(filePath + '/').absolutePath());
+}
+
+static Utils::FileName projectTopLevelDirectory(const ProjectPart &projectPart)
+{
+    if (!projectPart.project)
+        return Utils::FileName();
+    return projectPart.project->projectDirectory();
+}
+
 void CompilerOptionsBuilder::addHeaderPathOptions()
 {
     typedef ProjectPartHeaderPath HeaderPath;
     const QString defaultPrefix = includeDirOption();
+    const Utils::FileName projectDirectory = projectTopLevelDirectory(m_projectPart);
 
     QStringList result;
 
@@ -123,6 +151,7 @@ void CompilerOptionsBuilder::addHeaderPathOptions()
             continue;
 
         QString prefix;
+        Utils::FileName path;
         switch (headerPath.type) {
         case HeaderPath::FrameworkPath:
             prefix = QLatin1String("-F");
@@ -130,11 +159,16 @@ void CompilerOptionsBuilder::addHeaderPathOptions()
         default: // This shouldn't happen, but let's be nice..:
             // intentional fall-through:
         case HeaderPath::IncludePath:
-            prefix = defaultPrefix;
+            path = absoluteDirectory(headerPath.path);
+            if (path == projectDirectory || path.isChildOf(projectDirectory))
+                prefix = defaultPrefix;
+            else
+                prefix = SYSTEM_INCLUDE_PREFIX;
             break;
         }
 
-        result.append(prefix + QDir::toNativeSeparators(headerPath.path));
+        result.append(prefix);
+        result.append(QDir::toNativeSeparators(headerPath.path));
     }
 
     m_options.append(result);
@@ -389,6 +423,12 @@ void CompilerOptionsBuilder::undefineCppLanguageFeatureMacrosForMsvc2015()
     }
 }
 
+void CompilerOptionsBuilder::addDefineFunctionMacrosMsvc()
+{
+    if (m_projectPart.toolchainType == ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID)
+        addMacros({{"__FUNCSIG__", "\"\""}, {"__FUNCTION__", "\"\""}, {"__FUNCDNAME__", "\"\""}});
+}
+
 QString CompilerOptionsBuilder::includeDirOption() const
 {
     return QLatin1String("-I");
@@ -430,12 +470,6 @@ QString CompilerOptionsBuilder::includeOption() const
     return QLatin1String("-include");
 }
 
-static bool isGccOrMinGwToolchain(const Core::Id &toolchainType)
-{
-    return toolchainType == ProjectExplorer::Constants::GCC_TOOLCHAIN_TYPEID
-        || toolchainType == ProjectExplorer::Constants::MINGW_TOOLCHAIN_TYPEID;
-}
-
 bool CompilerOptionsBuilder::excludeDefineDirective(const ProjectExplorer::Macro &macro) const
 {
     // This is a quick fix for QTCREATORBUG-11501.
@@ -443,16 +477,10 @@ bool CompilerOptionsBuilder::excludeDefineDirective(const ProjectExplorer::Macro
     if (macro.key == "__cplusplus")
         return true;
 
-    // gcc 4.9 has:
-    //    #define __has_include(STR) __has_include__(STR)
-    //    #define __has_include_next(STR) __has_include_next__(STR)
-    // The right-hand sides are gcc built-ins that clang does not understand, and they'd
-    // override clang's own (non-macro, it seems) definitions of the symbols on the left-hand
-    // side.
-    if (isGccOrMinGwToolchain(m_projectPart.toolchainType)
-            && macro.key.contains("has_include")) {
+    // Ignore for all compiler toolchains since LLVM has it's own implementation for
+    // __has_include(STR) and __has_include_next(STR)
+    if (macro.key.startsWith("__has_include"))
         return true;
-    }
 
     // If _FORTIFY_SOURCE is defined (typically in release mode), it will
     // enable the inclusion of extra headers to help catching buffer overflows
@@ -476,30 +504,32 @@ bool CompilerOptionsBuilder::excludeDefineDirective(const ProjectExplorer::Macro
 
 bool CompilerOptionsBuilder::excludeHeaderPath(const QString &headerPath) const
 {
-    // A clang tool chain might have another version and passing in the
-    // intrinsics path from that version will lead to errors (unknown
-    // intrinsics, unfavorable order with regard to include_next).
-    if (m_projectPart.toolchainType == ProjectExplorer::Constants::CLANG_TOOLCHAIN_TYPEID) {
-        if (headerPath.contains("lib/gcc/i686-apple-darwin"))
-            return true;
-        static QRegularExpression clangIncludeDir(
-                    QLatin1String("\\A.*/lib/clang/\\d+\\.\\d+(\\.\\d+)?/include\\z"));
-        return clangIncludeDir.match(headerPath).hasMatch();
-    }
-
-    return false;
+    // Always exclude clang system includes (including intrinsics) which do not come with libclang
+    // that Qt Creator uses for code model.
+    // For example GCC on macOS uses system clang include path which makes clang code model
+    // include incorrect system headers.
+    static QRegularExpression clangIncludeDir(
+                QLatin1String("\\A.*/lib/clang/\\d+\\.\\d+(\\.\\d+)?/include\\z"));
+    return clangIncludeDir.match(headerPath).hasMatch();
 }
 
 void CompilerOptionsBuilder::addPredefinedHeaderPathsOptions()
 {
-    add("-undef");
     add("-nostdinc");
     add("-nostdlibinc");
 
-    if (!m_clangVersion.isEmpty()
-            && m_projectPart.toolchainType != ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID) {
-        add(includeDirOption() + clangIncludeDirectory());
-    }
+    // In case of MSVC we need builtin clang defines to correctly handle clang includes
+    if (m_projectPart.toolchainType != ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID)
+        add("-undef");
+
+    addClangIncludeFolder();
+}
+
+void CompilerOptionsBuilder::addClangIncludeFolder()
+{
+    QTC_CHECK(!m_clangVersion.isEmpty());
+    add(SYSTEM_INCLUDE_PREFIX);
+    add(clangIncludeDirectory());
 }
 
 void CompilerOptionsBuilder::addProjectConfigFileInclude()
@@ -521,7 +551,7 @@ static QString creatorLibexecPath()
 
 QString CompilerOptionsBuilder::clangIncludeDirectory() const
 {
-    QDir dir(creatorLibexecPath() + "/clang/lib/clang/" + m_clangVersion + "/include");
+    QDir dir(creatorLibexecPath() + "/clang" + clangIncludePath(m_clangVersion));
     if (!dir.exists() || !QFileInfo(dir, "stdint.h").exists())
         dir = QDir(m_clangResourceDirectory);
     return QDir::toNativeSeparators(dir.canonicalPath());

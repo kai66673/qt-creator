@@ -29,6 +29,8 @@
 #include "cdboptionspage.h"
 #include "cdbparsehelpers.h"
 
+#include <app/app_version.h>
+
 #include <debugger/breakhandler.h>
 #include <debugger/debuggeractions.h>
 #include <debugger/debuggercore.h>
@@ -152,7 +154,7 @@ static const char localsPrefixC[] = "local.";
 
 struct MemoryViewCookie
 {
-    explicit MemoryViewCookie(MemoryAgent *a = 0, quint64 addr = 0, quint64 l = 0)
+    explicit MemoryViewCookie(MemoryAgent *a = nullptr, quint64 addr = 0, quint64 l = 0)
         : agent(a), address(addr), length(l)
     {}
 
@@ -272,13 +274,20 @@ void CdbEngine::init()
 
     // Create local list of mappings in native separators
     m_sourcePathMappings.clear();
+    const QString &packageSources = runParameters().qtPackageSourceLocation;
+    if (!packageSources.isEmpty()) {
+        for (const QString &buildPath : qtBuildPaths()) {
+            m_sourcePathMappings.push_back({QDir::toNativeSeparators(buildPath),
+                                            QDir::toNativeSeparators(packageSources)});
+        }
+    }
+
     const QSharedPointer<GlobalDebuggerOptions> globalOptions = Internal::globalDebuggerOptions();
     SourcePathMap sourcePathMap = globalOptions->sourcePathMap;
     if (!sourcePathMap.isEmpty()) {
-        m_sourcePathMappings.reserve(sourcePathMap.size());
         for (auto it = sourcePathMap.constBegin(), cend = sourcePathMap.constEnd(); it != cend; ++it) {
-            m_sourcePathMappings.push_back(SourcePathMapping(QDir::toNativeSeparators(it.key()),
-                                                             QDir::toNativeSeparators(it.value())));
+            m_sourcePathMappings.push_back({QDir::toNativeSeparators(it.key()),
+                                            QDir::toNativeSeparators(it.value())});
         }
     }
     // update source path maps from debugger start params
@@ -424,15 +433,16 @@ void CdbEngine::setupEngine()
     const QFileInfo extensionFi(CdbEngine::extensionLibraryName(cdbIs64Bit));
     if (!extensionFi.isFile()) {
         handleSetupFailure(tr("Internal error: The extension %1 cannot be found.\n"
-                           "If you have updated Qt Creator via Maintenance Tool, you may "
+                           "If you have updated %2 via Maintenance Tool, you may "
                            "need to rerun the Tool and select \"Add or remove components\" "
-                           "and then select the\n"
-                           "Qt > Tools > Qt Creator > Qt Creator CDB Debugger Support component.\n"
-                           "If you build Qt Creator from sources and want to use a CDB executable "
-                           "with another bitness than your Qt Creator build,\n"
+                           "and then select the "
+                           "Qt > Tools > Qt Creator CDB Debugger Support component.\n"
+                           "If you build %2 from sources and want to use a CDB executable "
+                           "with another bitness than your %2 build, "
                            "you will need to build a separate CDB extension with the "
                            "same bitness as the CDB you want to use.").
-                arg(QDir::toNativeSeparators(extensionFi.absoluteFilePath())));
+                arg(QDir::toNativeSeparators(extensionFi.absoluteFilePath()),
+                    Core::Constants::IDE_DISPLAY_NAME));
         return;
     }
     const QString extensionFileName = extensionFi.fileName();
@@ -541,17 +551,17 @@ void CdbEngine::setupEngine()
     showMessage(QString("%1 running as %2").
                 arg(QDir::toNativeSeparators(executable)).arg(pid), LogMisc);
     m_hasDebuggee = true;
+    m_initialSessionIdleHandled = false;
     if (isRemote) { // We do not get an 'idle' in a remote session, but are accessible
         m_accessible = true;
         runCommand({".load " + extensionFileName, NoFlags});
-        notifyEngineSetupOk();
+        handleInitialSessionIdle();
     }
 }
 
-void CdbEngine::setupInferior()
+void CdbEngine::handleInitialSessionIdle()
 {
-    if (debug)
-        qDebug("setupInferior");
+    m_initialSessionIdleHandled = true;
     const DebuggerRunParameters &rp = runParameters();
     if (!rp.commandsAfterConnect.isEmpty())
         runCommand({rp.commandsAfterConnect, NoFlags});
@@ -566,6 +576,7 @@ void CdbEngine::setupInferior()
                     [this, id](const DebuggerResponse &r) { handleBreakInsert(r, id); }});
     }
 
+    runCommand({".symopt+0x8000"}); // disable searching public symbol table - improving the symbol lookup speed
     runCommand({"sxn 0x4000001f", NoFlags}); // Do not break on WowX86 exceptions.
     runCommand({"sxn ibp", NoFlags}); // Do not break on initial breakpoints.
     runCommand({".asm source_line", NoFlags}); // Source line in assembly
@@ -582,13 +593,13 @@ void CdbEngine::setupInferior()
         if (response.resultClass == ResultDone)
             notifyInferiorPid(response.data.toProcessHandle());
         if (response.resultClass == ResultDone || runParameters().startMode == AttachCore) {
-            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorSetupOk")
-                    notifyInferiorSetupOk();
+            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyEngineSetupOk")
+                    notifyEngineSetupOk();
         }  else {
             showMessage(QString("Failed to determine inferior pid: %1").
                         arg(response.data["msg"].data()), LogError);
-            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorSetupFailed")
-                    notifyInferiorSetupFailed();
+            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyEngineSetupFailed")
+                        notifyEngineSetupFailed();
         }
     }});
 }
@@ -638,12 +649,17 @@ void CdbEngine::runEngine()
     // else the debugger will slow down considerably.
     const auto cb = [this](const DebuggerResponse &r) { handleBreakInsert(r, BreakpointModelId()); };
     if (boolSetting(CdbBreakOnCrtDbgReport)) {
-        const QString module = msvcRunTime(runParameters().toolChainAbi.osFlavor());
-        const QString debugModule = module + 'D';
-        const QString wideFunc = QString::fromLatin1(CdbOptionsPage::crtDbgReport).append('W');
-        runCommand({breakAtFunctionCommand(QLatin1String(CdbOptionsPage::crtDbgReport), module), BuiltinCommand, cb});
-        runCommand({breakAtFunctionCommand(wideFunc, module), BuiltinCommand, cb});
-        runCommand({breakAtFunctionCommand(QLatin1String(CdbOptionsPage::crtDbgReport), debugModule), BuiltinCommand, cb});
+        Abi::OSFlavor flavor = runParameters().toolChainAbi.osFlavor();
+        // CrtDebugReport can not be safely resolved for vc 19
+        if ((flavor > Abi::WindowsMsvc2005Flavor && flavor <= Abi::WindowsMsvc2013Flavor) ||
+                flavor > Abi::WindowsMSysFlavor || flavor <= Abi::WindowsCEFlavor) {
+            const QString module = msvcRunTime(flavor);
+            const QString debugModule = module + 'D';
+            const QString wideFunc = QString::fromLatin1(CdbOptionsPage::crtDbgReport).append('W');
+            runCommand({breakAtFunctionCommand(QLatin1String(CdbOptionsPage::crtDbgReport), module), BuiltinCommand, cb});
+            runCommand({breakAtFunctionCommand(wideFunc, module), BuiltinCommand, cb});
+            runCommand({breakAtFunctionCommand(QLatin1String(CdbOptionsPage::crtDbgReport), debugModule), BuiltinCommand, cb});
+        }
     }
 //    if (boolSetting(BreakOnWarning)) {
 //        runCommand({"bm /( QtCored4!qWarning", BuiltinCommand}); // 'bm': All overloads.
@@ -675,33 +691,27 @@ void CdbEngine::shutdownInferior()
 
     if (!isCdbProcessRunning()) { // Direct launch: Terminated with process.
         if (debug)
-            qDebug("notifyInferiorShutdownOk");
-        STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownOk")
-        notifyInferiorShutdownOk();
-        return;
-    }
-
-    if (m_accessible) { // except console.
+            qDebug("notifyInferiorShutdownFinished");
+        STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownFinished")
+    } else if (m_accessible) { // except console.
         if (runParameters().startMode == AttachExternal || runParameters().startMode == AttachCrashedExternal)
             detachDebugger();
-        STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownOk")
-        notifyInferiorShutdownOk();
+        STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownFinished")
     } else {
         // A command got stuck.
         if (commandsPending()) {
             showMessage("Cannot shut down inferior due to pending commands.", LogWarning);
-            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownFailed")
-            notifyInferiorShutdownFailed();
-            return;
-        }
-        if (!canInterruptInferior()) {
+            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownFinished")
+        } else if (!canInterruptInferior()) {
             showMessage("Cannot interrupt the inferior.", LogWarning);
-            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownFailed")
-            notifyInferiorShutdownFailed();
+            STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorShutdownFinished")
+        } else {
+            interruptInferior(); // Calls us again
             return;
         }
-        interruptInferior(); // Calls us again
     }
+
+    notifyInferiorShutdownFinished();
 }
 
 /* shutdownEngine/processFinished:
@@ -722,7 +732,7 @@ void CdbEngine::shutdownEngine()
 
     if (!isCdbProcessRunning()) { // Direct launch: Terminated with process.
         STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyEngineShutdownOk")
-        notifyEngineShutdownOk();
+        notifyEngineShutdownFinished();
         return;
     }
 
@@ -881,7 +891,10 @@ void CdbEngine::doInterruptInferior(SpecialStopMode sm)
 
     QTC_ASSERT(!m_signalOperation, notifyInferiorStopFailed();  return;);
     if (DebuggerRunTool *rt = runTool()) {
-        if (IDevice::ConstPtr device = rt->device())
+        IDevice::ConstPtr device = rt->device();
+        if (!device)
+            device = runParameters().inferior.device;
+        if (device)
             m_signalOperation = device->signalOperation();
     }
     m_specialStopMode = sm;
@@ -2133,9 +2146,8 @@ void CdbEngine::handleSessionIdle(const QString &message)
         break;
     }
 
-    if (state() == EngineSetupRequested) { // Temporary stop at beginning
-        STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyEngineSetupOk")
-                notifyEngineSetupOk();
+    if (!m_initialSessionIdleHandled) { // Temporary stop at beginning
+        handleInitialSessionIdle();
         // Store stop reason to be handled in runEngine().
         if (runParameters().startMode == AttachCore) {
             m_coreStopReason.reset(new GdbMi);
@@ -2723,7 +2735,7 @@ CdbEngine::NormalizedSourceFileName CdbEngine::sourceMapNormalizeFileNameFromDeb
 
 // Parse frame from GDBMI. Duplicate of the gdb code, but that
 // has more processing.
-static StackFrames parseFrames(const GdbMi &gdbmi, bool *incomplete = 0)
+static StackFrames parseFrames(const GdbMi &gdbmi, bool *incomplete = nullptr)
 {
     if (incomplete)
         *incomplete = false;

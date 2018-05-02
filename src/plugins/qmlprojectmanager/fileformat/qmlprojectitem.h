@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <utils/environment.h>
+
 #include <QObject>
 #include <QSet>
 #include <QStringList>
@@ -46,6 +48,8 @@ class QmlProjectItem : public QObject
 public:
     QString sourceDirectory() const { return m_sourceDirectory; }
     void setSourceDirectory(const QString &directoryPath);
+    QString targetDirectory() const { return m_targetDirectory; }
+    void setTargetDirectory(const QString &directoryPath);
 
     QStringList importPaths() const { return m_absoluteImportPaths; }
     void setImportPaths(const QStringList &paths);
@@ -58,14 +62,19 @@ public:
 
     void appendContent(QmlProjectContentItem *item) { m_content.append(item); }
 
+    QList<Utils::EnvironmentItem> environment() const;
+    void addToEnviroment(const QString &key, const QString &value);
+
 signals:
     void qmlFilesChanged(const QSet<QString> &, const QSet<QString> &);
 
 protected:
     QString m_sourceDirectory;
+    QString m_targetDirectory;
     QStringList m_importPaths;
     QStringList m_absoluteImportPaths;
     QString m_mainFile;
+    QList<Utils::EnvironmentItem> m_environment;
     QList<QmlProjectContentItem *> m_content; // content property
 };
 

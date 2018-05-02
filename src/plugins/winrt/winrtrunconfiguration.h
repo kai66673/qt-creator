@@ -48,16 +48,19 @@ public:
 
     QString buildSystemTarget() const final;
 
+    ProjectExplorer::Runnable runnable() const override;
+
 signals:
     void argumentsChanged(QString);
     void uninstallAfterStopChanged(bool);
 
 private:
-    friend class ProjectExplorer::IRunConfigurationFactory;
-    void initialize(Core::Id id);
+    QString extraId() const final;
 
     QString m_proFilePath;
     bool m_uninstallAfterStop = false;
+
+    QString executable() const;
 };
 
 } // namespace Internal

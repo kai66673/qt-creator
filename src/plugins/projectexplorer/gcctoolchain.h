@@ -104,6 +104,12 @@ public:
         return checkImpl(compilerArguments);
     }
 
+    void invalidate()
+    {
+        QMutexLocker locker(&m_mutex);
+        m_cache.clear();
+    }
+
 private:
     Utils::optional<T> checkImpl(const QStringList &compilerArguments)
     {
@@ -159,6 +165,7 @@ public:
     void resetToolChain(const Utils::FileName &);
     Utils::FileName compilerCommand() const override;
     void setPlatformCodeGenFlags(const QStringList &);
+    QStringList extraCodeModelFlags() const override;
     QStringList platformCodeGenFlags() const;
     void setPlatformLinkerFlags(const QStringList &);
     QStringList platformLinkerFlags() const;
@@ -202,6 +209,10 @@ protected:
     // that passes the initial options directly down to the gcc compiler
     using OptionsReinterpreter = std::function<QStringList(const QStringList &options)>;
     void setOptionsReinterpreter(const OptionsReinterpreter &optionsReinterpreter);
+
+    using ExtraHeaderPathsFunction = std::function<void(QList<HeaderPath> &)>;
+    void initExtraHeaderPathsFunction(ExtraHeaderPathsFunction &&extraHeaderPathsFunction) const;
+
     static QList<HeaderPath> gccHeaderPaths(const Utils::FileName &gcc, const QStringList &args, const QStringList &env);
 
     class WarningFlagAdder
@@ -217,11 +228,17 @@ protected:
         bool m_doesEnable = false;
         bool m_triggered = false;
     };
+    void toolChainUpdated() override;
 
 private:
     explicit GccToolChain(Detection d);
 
     void updateSupportedAbis() const;
+    static QStringList gccPrepareArguments(const QStringList &flags,
+                                           const QString &sysRoot,
+                                           const QStringList &platformCodeGenFlags,
+                                           Core::Id languageId,
+                                           OptionsReinterpreter reinterpretOptions);
 
     Utils::FileName m_compilerCommand;
     QStringList m_platformCodeGenFlags;
@@ -235,8 +252,9 @@ private:
     mutable QList<HeaderPath> m_headerPaths;
     mutable QString m_version;
 
-    mutable std::shared_ptr<Cache<QVector<Macro>>> m_predefinedMacrosCache;
+    mutable std::shared_ptr<Cache<QVector<Macro>, 64>> m_predefinedMacrosCache;
     mutable std::shared_ptr<Cache<QList<HeaderPath>>> m_headerPathsCache;
+    mutable ExtraHeaderPathsFunction m_extraHeaderPathsFunction = [](QList<HeaderPath> &) {};
 
     friend class Internal::GccToolChainConfigWidget;
     friend class Internal::GccToolChainFactory;

@@ -755,14 +755,14 @@ void TreeModel::createChildren(const MObject *parentObject, ModelItem *parentIte
     m_objectToItemMap.insert(parentObject, parentItem);
     QMT_CHECK(!m_itemToObjectMap.contains(parentItem));
     m_itemToObjectMap.insert(parentItem, parentObject);
-    foreach (const Handle<MObject> &object, parentObject->children()) {
+    for (const Handle<MObject> &object : parentObject->children()) {
         if (object.hasTarget()) {
             ModelItem *item = createItem(object.target());
             parentItem->appendRow(item);
             createChildren(object.target(), item);
         }
     }
-    foreach (const Handle<MRelation> &handle, parentObject->relations()) {
+    for (const Handle<MRelation> &handle : parentObject->relations()) {
         if (handle.hasTarget()) {
             MRelation *relation = handle.target();
             ModelItem *item = createItem(relation);
@@ -780,10 +780,16 @@ void TreeModel::removeObjectFromItemMap(const MObject *object)
     QMT_CHECK(m_itemToObjectMap.contains(item));
     m_itemToObjectMap.remove(item);
     m_objectToItemMap.remove(object);
-    foreach (const Handle<MObject> &child, object->children()) {
+    for (const Handle<MObject> &child : object->children()) {
         if (child.hasTarget())
             removeObjectFromItemMap(child.target());
     }
+}
+
+QString TreeModel::filterLabel(const QString &label) const
+{
+    QString s = label;
+    return s.replace("\n"," ");
 }
 
 QString TreeModel::createObjectLabel(const MObject *object)
@@ -793,16 +799,16 @@ QString TreeModel::createObjectLabel(const MObject *object)
     if (object->name().isEmpty()) {
         if (auto item = dynamic_cast<const MItem *>(object)) {
             if (!item->variety().isEmpty())
-                return QString("[%1]").arg(item->variety());
+                return filterLabel(QString("[%1]").arg(item->variety()));
         }
         return tr("[unnamed]");
     }
 
     if (auto klass = dynamic_cast<const MClass *>(object)) {
         if (!klass->umlNamespace().isEmpty())
-            return QString("%1 [%2]").arg(klass->name()).arg(klass->umlNamespace());
+            return filterLabel(QString("%1 [%2]").arg(klass->name()).arg(klass->umlNamespace()));
     }
-    return object->name();
+    return filterLabel(object->name());
 }
 
 QString TreeModel::createRelationLabel(const MRelation *relation)
@@ -817,7 +823,7 @@ QString TreeModel::createRelationLabel(const MRelation *relation)
     name += " - ";
     if (MObject *endB = m_modelController->findObject(relation->endBUid()))
         name += createObjectLabel(endB);
-    return name;
+    return filterLabel(name);
 }
 
 QIcon TreeModel::createIcon(StereotypeIcon::Element stereotypeIconElement, StyleEngine::ElementType styleElementType,
@@ -825,7 +831,7 @@ QIcon TreeModel::createIcon(StereotypeIcon::Element stereotypeIconElement, Style
 {
     const Style *style = m_styleController->adaptStyle(styleElementType);
     return m_stereotypeController->createIcon(stereotypeIconElement, stereotypes, defaultIconPath, style,
-                                              QSize(48, 48), QMarginsF(3.0, 2.0, 3.0, 4.0));
+                                              QSize(48, 48), QMarginsF(3.0, 2.0, 3.0, 4.0), 3.0);
 }
 
 } // namespace qmt

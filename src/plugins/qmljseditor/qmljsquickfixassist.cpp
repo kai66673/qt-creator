@@ -30,7 +30,10 @@
 //temp
 #include "qmljsquickfix.h"
 
-#include <extensionsystem/pluginmanager.h>
+#include <texteditor/codeassist/genericproposal.h>
+#include <texteditor/codeassist/iassistprocessor.h>
+
+#include <utils/algorithm.h>
 
 using namespace QmlJSTools;
 using namespace TextEditor;
@@ -40,7 +43,7 @@ namespace QmlJSEditor {
 using namespace Internal;
 
 // -----------------------
-// QuickFixAssistInterface
+// QmlJSQuickFixAssistInterface
 // -----------------------
 QmlJSQuickFixAssistInterface::QmlJSQuickFixAssistInterface(QmlJSEditorWidget *editor,
                                                            AssistReason reason)
@@ -64,14 +67,19 @@ QmlJSRefactoringFilePtr QmlJSQuickFixAssistInterface::currentFile() const
 }
 
 // ---------------------------
+// QmlJSQuickFixAssistProcessor
+// ---------------------------
+class QmlJSQuickFixAssistProcessor : public IAssistProcessor
+{
+    IAssistProposal *perform(const AssistInterface *interface) override
+    {
+        return GenericProposal::createProposal(interface, findQmlJSQuickFixes(interface));
+    }
+};
+
+// ---------------------------
 // QmlJSQuickFixAssistProvider
 // ---------------------------
-QmlJSQuickFixAssistProvider::QmlJSQuickFixAssistProvider(QObject *parent)
-    : TextEditor::QuickFixAssistProvider(parent)
-{}
-
-QmlJSQuickFixAssistProvider::~QmlJSQuickFixAssistProvider()
-{}
 
 IAssistProvider::RunType QmlJSQuickFixAssistProvider::runType() const
 {
@@ -80,15 +88,7 @@ IAssistProvider::RunType QmlJSQuickFixAssistProvider::runType() const
 
 IAssistProcessor *QmlJSQuickFixAssistProvider::createProcessor() const
 {
-    return new QuickFixAssistProcessor(this);
-}
-
-QList<QuickFixFactory *> QmlJSQuickFixAssistProvider::quickFixFactories() const
-{
-    QList<QuickFixFactory *> results;
-    foreach (QmlJSQuickFixFactory *f, ExtensionSystem::PluginManager::getObjects<QmlJSQuickFixFactory>())
-        results.append(f);
-    return results;
+    return new QmlJSQuickFixAssistProcessor;
 }
 
 } // namespace QmlJSEditor

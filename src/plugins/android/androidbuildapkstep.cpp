@@ -44,6 +44,7 @@
 
 #include <qtsupport/qtkitinformation.h>
 
+#include <utils/algorithm.h>
 #include <utils/synchronousprocess.h>
 #include <utils/utilsicons.h>
 
@@ -94,25 +95,13 @@ private:
                                                        this);
 };
 
-AndroidBuildApkStep::AndroidBuildApkStep(ProjectExplorer::BuildStepList *parent, const Core::Id id)
+AndroidBuildApkStep::AndroidBuildApkStep(ProjectExplorer::BuildStepList *parent, Core::Id id)
     : ProjectExplorer::AbstractProcessStep(parent, id),
       m_buildTargetSdk(AndroidConfig::apiLevelNameFor(AndroidConfigurations::
                                          sdkManager()->latestAndroidSdkPlatform()))
 {
     //: AndroidBuildApkStep default display name
     setDefaultDisplayName(tr("Build Android APK"));
-}
-
-AndroidBuildApkStep::AndroidBuildApkStep(ProjectExplorer::BuildStepList *parent,
-    AndroidBuildApkStep *other)
-    : ProjectExplorer::AbstractProcessStep(parent, other),
-      m_signPackage(other->signPackage()),
-      m_verbose(other->m_verbose),
-      m_useMinistro(other->useMinistro()),
-      m_openPackageLocation(other->m_openPackageLocation),
-      // leave m_openPackageLocationForRun at false
-      m_buildTargetSdk(other->m_buildTargetSdk)
-{
 }
 
 bool AndroidBuildApkStep::init(QList<const BuildStep *> &earlierSteps)
@@ -143,7 +132,7 @@ bool AndroidBuildApkStep::init(QList<const BuildStep *> &earlierSteps)
             return false;
         }
     } else if (version->qtVersion() < QtSupport::QtVersionNumber(5, 4, 0)) {
-        emit addOutput(tr("The minimum Qt version required for Gradle build to work is %2. "
+        emit addOutput(tr("The minimum Qt version required for Gradle build to work is %1. "
                           "It is recommended to install the latest Qt version.")
                        .arg("5.4.0"), OutputFormat::Stderr);
         return false;
@@ -157,7 +146,8 @@ bool AndroidBuildApkStep::init(QList<const BuildStep *> &earlierSteps)
     }
 
     JavaParser *parser = new JavaParser;
-    parser->setProjectFileList(target()->project()->files(ProjectExplorer::Project::AllFiles));
+    parser->setProjectFileList(Utils::transform(target()->project()->files(ProjectExplorer::Project::AllFiles),
+                                                &Utils::FileName::toString));
     parser->setSourceDirectory(androidPackageSourceDir());
     parser->setBuildDirectory(Utils::FileName::fromString(bc->buildDirectory().appendPath(Constants::ANDROID_BUILDDIRECTORY).toString()));
     setOutputParser(parser);
@@ -174,7 +164,7 @@ bool AndroidBuildApkStep::init(QList<const BuildStep *> &earlierSteps)
 
 void AndroidBuildApkStep::showInGraphicalShell()
 {
-    Core::FileUtils::showInGraphicalShell(Core::ICore::instance()->mainWindow(), m_apkPath);
+    Core::FileUtils::showInGraphicalShell(Core::ICore::mainWindow(), m_apkPath);
 }
 
 ProjectExplorer::BuildStepConfigWidget *AndroidBuildApkStep::createConfigWidget()

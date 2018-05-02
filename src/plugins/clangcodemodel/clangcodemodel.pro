@@ -3,6 +3,8 @@ include(../../shared/clang/clang_installation.pri)
 
 include(../../shared/clang/clang_defines.pri)
 
+requires(!isEmpty(LLVM_VERSION))
+
 SOURCES += \
     clangactivationsequencecontextprocessor.cpp \
     clangactivationsequenceprocessor.cpp \
@@ -19,6 +21,7 @@ SOURCES += \
     clangcompletionassistprovider.cpp \
     clangcompletionchunkstotextconverter.cpp \
     clangcompletioncontextanalyzer.cpp \
+    clangcurrentdocumentfilter.cpp \
     clangdiagnosticfilter.cpp \
     clangdiagnosticmanager.cpp \
     clangdiagnostictooltipwidget.cpp \
@@ -28,14 +31,17 @@ SOURCES += \
     clangfixitoperationsextractor.cpp \
     clangfollowsymbol.cpp \
     clangfunctionhintmodel.cpp \
-    clanghighlightingmarksreporter.cpp \
+    clanghighlightingresultreporter.cpp \
+    clanghoverhandler.cpp \
     clangmodelmanagersupport.cpp \
     clangpreprocessorassistproposalitem.cpp \
     clangprojectsettings.cpp \
     clangprojectsettingswidget.cpp \
+    clangrefactoringengine.cpp \
     clangtextmark.cpp \
     clanguiheaderondiskmanager.cpp \
-    clangutils.cpp
+    clangutils.cpp \
+    clangoverviewmodel.cpp
 
 HEADERS += \
     clangactivationsequencecontextprocessor.h \
@@ -54,6 +60,7 @@ HEADERS += \
     clangcompletionchunkstotextconverter.h \
     clangcompletioncontextanalyzer.h \
     clangconstants.h \
+    clangcurrentdocumentfilter.h \
     clangdiagnosticfilter.h \
     clangdiagnosticmanager.h \
     clangdiagnostictooltipwidget.h \
@@ -63,20 +70,20 @@ HEADERS += \
     clangfixitoperationsextractor.h \
     clangfollowsymbol.h \
     clangfunctionhintmodel.h \
-    clanghighlightingmarksreporter.h \
+    clanghighlightingresultreporter.h \
+    clanghoverhandler.h \
     clangisdiagnosticrelatedtolocation.h \
     clangmodelmanagersupport.h \
     clangpreprocessorassistproposalitem.h \
     clangprojectsettings.h \
     clangprojectsettingswidget.h \
+    clangrefactoringengine.h \
     clangtextmark.h \
     clanguiheaderondiskmanager.h \
-    clangutils.h
+    clangutils.h \
+    clangoverviewmodel.h
 
 FORMS += clangprojectsettingswidget.ui
-
-RESOURCES += \
-    clangcodemodel.qrc
 
 DISTFILES += \
     README \

@@ -24,33 +24,33 @@
 ****************************************************************************/
 
 #include "projecttree.h"
+
+#include "project.h"
+#include "projectexplorerconstants.h"
+#include "projectnodes.h"
 #include "projecttreewidget.h"
 #include "session.h"
-#include "project.h"
-#include "projectnodes.h"
-#include "projectexplorerconstants.h"
 
-#include <utils/algorithm.h>
-#include <utils/qtcassert.h>
-#include <coreplugin/icore.h>
-#include <coreplugin/editormanager/ieditor.h>
-#include <coreplugin/editormanager/editormanager.h>
-#include <coreplugin/idocument.h>
-#include <coreplugin/infobar.h>
-#include <coreplugin/vcsmanager.h>
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
 #include <coreplugin/documentmanager.h>
-#include <coreplugin/navigationwidget.h>
+#include <coreplugin/editormanager/editormanager.h>
+#include <coreplugin/editormanager/ieditor.h>
+#include <coreplugin/icore.h>
+#include <coreplugin/idocument.h>
+#include <coreplugin/infobar.h>
 #include <coreplugin/modemanager.h>
+#include <coreplugin/navigationwidget.h>
+#include <coreplugin/vcsmanager.h>
+
+#include <utils/algorithm.h>
+#include <utils/qtcassert.h>
 
 #include <QApplication>
 #include <QMenu>
 #include <QTimer>
 
-namespace {
-const char EXTERNAL_FILE_WARNING[] = "ExternalFile";
-}
+namespace { const char EXTERNAL_FILE_WARNING[] = "ExternalFile"; }
 
 using namespace Utils;
 
@@ -110,6 +110,12 @@ Node *ProjectTree::findCurrentNode()
     return s_instance->m_currentNode;
 }
 
+FileName ProjectTree::currentFilePath()
+{
+    Node *currentNode = findCurrentNode();
+    return currentNode ? currentNode->filePath() : FileName();
+}
+
 void ProjectTree::registerWidget(ProjectTreeWidget *widget)
 {
     s_instance->m_projectTreeWidgets.append(widget);
@@ -150,7 +156,7 @@ void ProjectTree::update()
 void ProjectTree::updateFromProjectTreeWidget(ProjectTreeWidget *widget)
 {
     Node *currentNode = widget->currentNode();
-    Project *project = SessionManager::projectForNode(currentNode);
+    Project *project = projectForNode(currentNode);
 
     setCurrent(currentNode, project);
 }
@@ -169,7 +175,7 @@ void ProjectTree::updateFromNode(Node *node)
 {
     Project *project;
     if (node)
-        project = SessionManager::projectForNode(node);
+        project = projectForNode(node);
     else
         project = SessionManager::startupProject();
 
@@ -183,8 +189,6 @@ void ProjectTree::setCurrent(Node *node, Project *project)
     const bool changedProject = project != m_currentProject;
     if (changedProject) {
         if (m_currentProject) {
-            disconnect(m_currentProject, &Project::projectContextUpdated,
-                       this, &ProjectTree::updateContext);
             disconnect(m_currentProject, &Project::projectLanguagesUpdated,
                        this, &ProjectTree::updateContext);
         }
@@ -192,8 +196,6 @@ void ProjectTree::setCurrent(Node *node, Project *project)
         m_currentProject = project;
 
         if (m_currentProject) {
-            connect(m_currentProject, &Project::projectContextUpdated,
-                    this, &ProjectTree::updateContext);
             connect(m_currentProject, &Project::projectLanguagesUpdated,
                     this, &ProjectTree::updateContext);
         }
@@ -315,7 +317,7 @@ bool ProjectTree::hasFocus(ProjectTreeWidget *widget)
 void ProjectTree::showContextMenu(ProjectTreeWidget *focus, const QPoint &globalPos, Node *node)
 {
     QMenu *contextMenu = nullptr;
-    Project *project = SessionManager::projectForNode(node);
+    Project *project = projectForNode(node);
     emit s_instance->aboutToShowContextMenu(project, node);
 
     if (!node) {
@@ -384,6 +386,51 @@ bool ProjectTree::hasNode(const Node *node)
                     p->containerNode() == node
                     || p->rootProjectNode()->findNode([node](const Node *n) { return n == node; }));
     });
+}
+
+void ProjectTree::forEachNode(const std::function<void(Node *)> &task)
+{
+    const QList<Project *> projects = SessionManager::projects();
+    for (Project *project : projects) {
+        if (ProjectNode *projectNode = project->rootProjectNode()) {
+            task(projectNode);
+            projectNode->forEachGenericNode(task);
+        }
+    }
+}
+
+Project *ProjectTree::projectForNode(Node *node)
+{
+    if (!node)
+        return nullptr;
+
+    FolderNode *folder = node->asFolderNode();
+    if (!folder)
+        folder = node->parentFolderNode();
+
+    while (folder && folder->parentFolderNode())
+        folder = folder->parentFolderNode();
+
+    return Utils::findOrDefault(SessionManager::projects(), [folder](const Project *pro) {
+        return pro->containerNode() == folder;
+    });
+}
+
+Node *ProjectTree::nodeForFile(const FileName &fileName)
+{
+    Node *node = nullptr;
+    for (const Project *project : SessionManager::projects()) {
+        if (ProjectNode *projectNode = project->rootProjectNode()) {
+            projectNode->forEachGenericNode([&](Node *n) {
+                if (n->filePath() == fileName) {
+                    // prefer file nodes
+                    if (!node || (node->nodeType() != NodeType::File && n->nodeType() == NodeType::File))
+                        node = n;
+                }
+            });
+        }
+    }
+    return node;
 }
 
 void ProjectTree::hideContextMenu()

@@ -94,9 +94,9 @@ void TextEditorWidget::setTextEditor(TextEditor::BaseTextEditor *textEditor)
         oldEditor->deleteLater();
 }
 
-QString TextEditorWidget::contextHelpId() const
+void TextEditorWidget::contextHelpId(const Core::IContext::HelpIdCallback &callback) const
 {
-    return m_textEditorView->contextHelpId();
+    m_textEditorView->contextHelpId(callback);
 }
 
 void TextEditorWidget::updateSelectionByCursorPosition()
@@ -126,7 +126,7 @@ void TextEditorWidget::jumpTextCursorToSelectedModelNode()
         return;
 
     if (!m_textEditorView->selectedModelNodes().isEmpty())
-        selectedNode = m_textEditorView->selectedModelNodes().first();
+        selectedNode = m_textEditorView->selectedModelNodes().constFirst();
 
     if (selectedNode.isValid()) {
         RewriterView *rewriterView = m_textEditorView->model()->rewriterView();
@@ -193,7 +193,12 @@ bool TextEditorWidget::eventFilter( QObject *, QEvent *event)
             return true;
         }
 
-        QKeySequence keySqeuence(keyEvent->key() | keyEvent->modifiers());
+        static const Qt::KeyboardModifiers relevantModifiers = Qt::ShiftModifier
+                | Qt::ControlModifier
+                | Qt::AltModifier
+                | Qt::MetaModifier;
+
+        QKeySequence keySqeuence(keyEvent->key() | (keyEvent->modifiers() & relevantModifiers));
         for (QKeySequence overrideSequence : overrideSequences)
             if (keySqeuence.matches(overrideSequence)) {
                 keyEvent->accept();

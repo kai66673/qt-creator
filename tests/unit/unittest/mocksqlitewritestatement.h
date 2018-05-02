@@ -52,11 +52,44 @@ public:
     MOCK_METHOD4(write,
                  void (uint, uint, uint, uint));
 
+    MOCK_METHOD4(write,
+                 void (long long, int, int, int));
+
     MOCK_METHOD2(write,
                  void (uint, Utils::SmallStringView));
 
+    MOCK_METHOD2(write,
+                 void (Utils::SmallStringView, Utils::SmallStringView));
+
+    MOCK_METHOD3(write,
+                 void (Utils::SmallStringView, Utils::SmallStringView, Utils::SmallStringView));
+
+    MOCK_METHOD4(write,
+                 void (Utils::SmallStringView,
+                       Utils::SmallStringView,
+                       Utils::SmallStringView,
+                       Utils::SmallStringView));
+
     MOCK_METHOD1(write,
                  void (Utils::SmallStringView));
+
+    MOCK_METHOD1(write,
+                 void (long long));
+
+    MOCK_METHOD1(write,
+                 void (int));
+
+    MOCK_METHOD2(write,
+                 void (int, int));
+
+    MOCK_METHOD3(write,
+                 void (uint, uint, uint));
+
+    MOCK_METHOD4(write,
+                 void (int, off_t, time_t, bool));
+
+    MOCK_METHOD2(write,
+                 void (uint, uint));
 
     Utils::SmallString sqlStatement;
 };

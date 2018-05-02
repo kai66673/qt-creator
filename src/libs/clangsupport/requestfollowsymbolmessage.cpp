@@ -27,8 +27,6 @@
 
 #include <QDebug>
 
-#include <ostream>
-
 namespace ClangBackEnd {
 
 quint64 RequestFollowSymbolMessage::ticketCounter = 0;
@@ -38,7 +36,6 @@ QDebug operator<<(QDebug debug, const RequestFollowSymbolMessage &message)
     debug.nospace() << "RequestFollowSymbolMessage(";
 
     debug.nospace() << message.m_fileContainer << ", ";
-    debug.nospace() << message.m_dependentFiles << ", ";
     debug.nospace() << message.m_ticketNumber << ", ";
     debug.nospace() << message.m_line << ", ";
     debug.nospace() << message.m_column << ", ";
@@ -46,19 +43,6 @@ QDebug operator<<(QDebug debug, const RequestFollowSymbolMessage &message)
     debug.nospace() << ")";
 
     return debug;
-}
-
-std::ostream &operator<<(std::ostream &os, const RequestFollowSymbolMessage &message)
-{
-    os << "("
-       << message.m_fileContainer << ", "
-       << message.m_dependentFiles << ", "
-       << message.m_ticketNumber << ", "
-       << message.m_line << ", "
-       << message.m_column << ", "
-       << ")";
-
-     return os;
 }
 
 } // namespace ClangBackEnd

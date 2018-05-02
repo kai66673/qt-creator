@@ -72,8 +72,6 @@ private:
     void executeNextI() override;
 
     void setupEngine() override;
-    void startLldbStage2();
-    void setupInferior() override;
     void runEngine() override;
     void shutdownInferior() override;
     void shutdownEngine() override;
@@ -138,6 +136,7 @@ private:
 
     void runCommand(const DebuggerCommand &cmd) override;
     void debugLastCommand() override;
+    void handleAttachedToCore();
 
 private:
     DebuggerCommand m_lastDebuggableCommand;

@@ -51,7 +51,11 @@ class BaseTreeViewPrivate : public QObject
 public:
     explicit BaseTreeViewPrivate(BaseTreeView *parent)
         : q(parent), m_settings(0), m_expectUserChanges(false), m_progressIndicator(0)
-    {}
+    {
+        m_settingsTimer.setSingleShot(true);
+        connect(&m_settingsTimer, &QTimer::timeout,
+                this, &BaseTreeViewPrivate::doSaveState);
+    }
 
     bool eventFilter(QObject *, QEvent *event)
     {
@@ -102,6 +106,12 @@ public:
 
     void saveState()
     {
+        m_settingsTimer.start(2000); // Once per 2 secs should be enough.
+    }
+
+    void doSaveState()
+    {
+        m_settingsTimer.stop();
         if (m_settings && !m_settingsKey.isEmpty()) {
             m_settings->beginGroup(m_settingsKey);
             QVariantList l;
@@ -210,6 +220,7 @@ public:
     BaseTreeView *q;
     QMap<int, int> m_userHandled; // column -> width, "not present" means "automatic"
     QSettings *m_settings;
+    QTimer m_settingsTimer;
     QString m_settingsKey;
     bool m_expectUserChanges;
     ProgressIndicator *m_progressIndicator;
@@ -272,14 +283,18 @@ BaseTreeView::~BaseTreeView()
 
 void BaseTreeView::setModel(QAbstractItemModel *m)
 {
-    if (BaseTreeModel *oldModel = qobject_cast<BaseTreeModel *>(model()))
+    if (BaseTreeModel *oldModel = qobject_cast<BaseTreeModel *>(model())) {
         disconnect(oldModel, &BaseTreeModel::requestExpansion, this, &BaseTreeView::expand);
+        disconnect(oldModel, &BaseTreeModel::requestCollapse, this, &BaseTreeView::collapse);
+    }
 
     TreeView::setModel(m);
 
     if (m) {
-        if (BaseTreeModel *newModel = qobject_cast<BaseTreeModel *>(m))
+        if (BaseTreeModel *newModel = qobject_cast<BaseTreeModel *>(m)) {
             connect(newModel, &BaseTreeModel::requestExpansion, this, &BaseTreeView::expand);
+            connect(newModel, &BaseTreeModel::requestCollapse, this, &BaseTreeView::collapse);
+        }
         d->restoreState();
 
         QVariant delegateBlob = m->data(QModelIndex(), ItemDelegateRole);
@@ -293,10 +308,21 @@ void BaseTreeView::setModel(QAbstractItemModel *m)
 
 void BaseTreeView::mousePressEvent(QMouseEvent *ev)
 {
-    TreeView::mousePressEvent(ev);
-    const QModelIndex mi = indexAt(ev->pos());
-    if (!mi.isValid())
-        d->toggleColumnWidth(columnAt(ev->x()));
+    ItemViewEvent ive(ev, this);
+    if (!model()->setData(ive.index(), QVariant::fromValue(ive), ItemViewEventRole))
+        TreeView::mousePressEvent(ev);
+// Resizing columns by clicking on the empty space seems to be controversial.
+// Let's try without for a while.
+//    const QModelIndex mi = indexAt(ev->pos());
+//    if (!mi.isValid())
+//        d->toggleColumnWidth(columnAt(ev->x()));
+}
+
+void BaseTreeView::mouseReleaseEvent(QMouseEvent *ev)
+{
+    ItemViewEvent ive(ev, this);
+    if (!model()->setData(ive.index(), QVariant::fromValue(ive), ItemViewEventRole))
+        TreeView::mouseReleaseEvent(ev);
 }
 
 void BaseTreeView::contextMenuEvent(QContextMenuEvent *ev)

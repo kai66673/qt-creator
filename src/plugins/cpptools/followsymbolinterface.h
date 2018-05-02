@@ -39,7 +39,7 @@ class SymbolFinder;
 class CPPTOOLS_EXPORT FollowSymbolInterface
 {
 public:
-    using Link = TextEditor::TextEditorWidget::Link;
+    using Link = Utils::Link;
 
     virtual ~FollowSymbolInterface() {}
     virtual Link findLink(const CursorInEditor &data,

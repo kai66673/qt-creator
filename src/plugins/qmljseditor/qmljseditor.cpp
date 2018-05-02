@@ -35,10 +35,10 @@
 #include "qmljshoverhandler.h"
 #include "qmljsquickfixassist.h"
 #include "qmloutlinemodel.h"
+#include "quicktoolbar.h"
 
 #include <qmljs/qmljsbind.h>
 #include <qmljs/qmljsevaluate.h>
-#include <qmljs/qmljsicontextpane.h>
 #include <qmljs/qmljsmodelmanagerinterface.h>
 #include <qmljs/qmljsutils.h>
 
@@ -68,6 +68,7 @@
 #include <texteditor/codeassist/genericproposal.h>
 #include <texteditor/codeassist/genericproposalmodel.h>
 #include <texteditor/texteditoractionhandler.h>
+#include <texteditor/textmark.h>
 
 #include <utils/annotateditemdelegate.h>
 #include <utils/changeset.h>
@@ -128,7 +129,7 @@ void QmlJSEditorWidget::finalizeInitialization()
     textDocument()->setCodec(QTextCodec::codecForName("UTF-8")); // qml files are defined to be utf-8
 
     m_modelManager = ModelManagerInterface::instance();
-    m_contextPane = ExtensionSystem::PluginManager::getObject<IContextPane>();
+    m_contextPane = QmlJSEditorPlugin::quickToolBar();
 
     m_modelManager->activateScan();
 
@@ -654,8 +655,16 @@ static QString inspectCppComponent(const CppComponentValue *cppValue)
     const int enumeratorCount = cppValue->metaObject()->enumeratorCount();
     for (int index = cppValue->metaObject()->enumeratorOffset(); index < enumeratorCount; ++index) {
         LanguageUtils::FakeMetaEnum enumerator = cppValue->metaObject()->enumerator(index);
-        bufWriter << "    // Enum " << enumerator.name() << " { " <<
-                     enumerator.keys().join(QLatin1Char(',')) << " }" << endl;
+        bufWriter << "    enum " << enumerator.name() << " {" << endl;
+        const QStringList keys = enumerator.keys();
+        const int keysCount = keys.size();
+        for (int i = 0; i < keysCount; ++i) {
+            bufWriter << "        " << keys.at(i);
+            if (i != keysCount - 1)
+                bufWriter << ',';
+            bufWriter << endl;
+        }
+        bufWriter << "    }" << endl;
     }
 
     bufWriter << "}" << endl;
@@ -703,36 +712,36 @@ void QmlJSEditorWidget::inspectElementUnderCursor() const
     widget->textDocument()->setPlainText(buf);
 }
 
-TextEditorWidget::Link QmlJSEditorWidget::findLinkAt(const QTextCursor &cursor,
-                                                             bool /*resolveTarget*/,
-                                                             bool /*inNextSplit*/)
+Utils::Link QmlJSEditorWidget::findLinkAt(const QTextCursor &cursor,
+                                          bool /*resolveTarget*/,
+                                          bool /*inNextSplit*/)
 {
     const SemanticInfo semanticInfo = m_qmlJsEditorDocument->semanticInfo();
     if (! semanticInfo.isValid())
-        return Link();
+        return Utils::Link();
 
     const unsigned cursorPosition = cursor.position();
 
     AST::Node *node = semanticInfo.astNodeAt(cursorPosition);
-    QTC_ASSERT(node, return Link());
+    QTC_ASSERT(node, return Utils::Link());
 
     if (AST::UiImport *importAst = cast<AST::UiImport *>(node)) {
         // if it's a file import, link to the file
         foreach (const ImportInfo &import, semanticInfo.document->bind()->imports()) {
             if (import.ast() == importAst && import.type() == ImportType::File) {
-                TextEditorWidget::Link link(import.path());
+                Utils::Link link(import.path());
                 link.linkTextStart = importAst->firstSourceLocation().begin();
                 link.linkTextEnd = importAst->lastSourceLocation().end();
                 return link;
             }
         }
-        return Link();
+        return Utils::Link();
     }
 
     // string literals that could refer to a file link to them
     if (StringLiteral *literal = cast<StringLiteral *>(node)) {
         const QString &text = literal->value.toString();
-        TextEditorWidget::Link link;
+        Utils::Link link;
         link.linkTextStart = literal->literalToken.begin();
         link.linkTextEnd = literal->literalToken.end();
         if (semanticInfo.snapshot.document(text)) {
@@ -756,9 +765,9 @@ TextEditorWidget::Link QmlJSEditorWidget::findLinkAt(const QTextCursor &cursor,
     int line = 0, column = 0;
 
     if (! (value && value->getSourceLocation(&fileName, &line, &column)))
-        return Link();
+        return Utils::Link();
 
-    TextEditorWidget::Link link;
+    Utils::Link link;
     link.targetFileName = fileName;
     link.targetLine = line;
     link.targetColumn = column - 1; // adjust the column
@@ -783,7 +792,7 @@ TextEditorWidget::Link QmlJSEditorWidget::findLinkAt(const QTextCursor &cursor,
         return link;
     }
 
-    return Link();
+    return Utils::Link();
 }
 
 void QmlJSEditorWidget::findUsages()
@@ -820,7 +829,7 @@ void QmlJSEditorWidget::contextMenuEvent(QContextMenuEvent *e)
         AssistInterface *interface = createAssistInterface(QuickFix, ExplicitlyInvoked);
         if (interface) {
             QScopedPointer<IAssistProcessor> processor(
-                        QmlJSEditorPlugin::instance()->quickFixAssistProvider()->createProcessor());
+                        QmlJSEditorPlugin::quickFixAssistProvider()->createProcessor());
             QScopedPointer<IAssistProposal> proposal(processor->perform(interface));
             if (!proposal.isNull()) {
                 GenericProposalModel *model = static_cast<GenericProposalModel *>(proposal->model());

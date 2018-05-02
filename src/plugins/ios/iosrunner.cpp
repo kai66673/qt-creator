@@ -26,7 +26,6 @@
 #include "iosbuildstep.h"
 #include "iosconfigurations.h"
 #include "iosdevice.h"
-#include "iosmanager.h"
 #include "iosrunconfiguration.h"
 #include "iosrunner.h"
 #include "iossimulator.h"
@@ -48,6 +47,7 @@
 
 #include <utils/fileutils.h>
 #include <utils/qtcprocess.h>
+#include <utils/url.h>
 #include <utils/utilsicons.h>
 
 #include <QDateTime>
@@ -270,7 +270,7 @@ void IosRunner::handleGotInferiorPid(IosToolHandler *handler, const QString &bun
     if (prerequisiteOk)
         reportStarted();
     else
-        reportFailure(tr("Could not get necessary ports the debugger connection."));
+        reportFailure(tr("Could not get necessary ports for the debugger connection."));
 }
 
 void IosRunner::handleAppOutput(IosToolHandler *handler, const QString &output)
@@ -406,6 +406,7 @@ void IosQmlProfilerSupport::start()
     QTcpServer server;
     QTC_ASSERT(server.listen(QHostAddress::LocalHost)
                || server.listen(QHostAddress::LocalHostIPv6), return);
+    serverUrl.setScheme(Utils::urlTcpScheme());
     serverUrl.setHost(server.serverAddress().toString());
 
     Port qmlPort = m_runner->qmlServerPort();

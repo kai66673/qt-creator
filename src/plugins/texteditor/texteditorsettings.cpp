@@ -81,8 +81,7 @@ public:
 static TextEditorSettingsPrivate *d = 0;
 static TextEditorSettings *m_instance = 0;
 
-TextEditorSettings::TextEditorSettings(QObject *parent)
-    : QObject(parent)
+TextEditorSettings::TextEditorSettings()
 {
     QTC_ASSERT(!m_instance, return);
     m_instance = this;
@@ -288,6 +287,8 @@ TextEditorSettings::TextEditorSettings(QObject *parent)
                              tr("Applied to lines describing changes in VCS log."),
                              Format(QColor(192, 0, 0), QColor()));
 
+
+    // Mixin categories
     formatDescr.emplace_back(C_ERROR,
                              tr("Error"),
                              tr("Underline color of error diagnostics."),
@@ -312,14 +313,18 @@ TextEditorSettings::TextEditorSettings(QObject *parent)
                              QColor(255, 190, 0),
                              QTextCharFormat::DotLine,
                              FormatDescription::ShowUnderlineControl);
-    Format declarationFormat;
+    Format declarationFormat = Format::createMixinFormat();
     declarationFormat.setBold(true);
     formatDescr.emplace_back(C_DECLARATION,
                              tr("Function Declaration"),
-                             tr("Style adjustments to function declarations."),
+                             tr("Style adjustments to (function) declarations."),
                              declarationFormat,
                              FormatDescription::ShowFontUnderlineAndRelativeControls);
-    Format outputArgumentFormat;
+    formatDescr.emplace_back(C_FUNCTION_DEFINITION,
+                             tr("Function Definition"),
+                             tr("Name of function at its definition."),
+                             Format::createMixinFormat());
+    Format outputArgumentFormat = Format::createMixinFormat();
     outputArgumentFormat.setItalic(true);
     formatDescr.emplace_back(C_OUTPUT_ARGUMENT,
                              tr("Output Argument"),

@@ -65,6 +65,7 @@
 #include <diffeditor/diffeditorconstants.h>
 #include <diffeditor/diffeditorcontroller.h>
 #include <diffeditor/diffutils.h>
+#include <utils/utilsicons.h>
 
 #include <QAction>
 #include <QCoreApplication>
@@ -372,6 +373,8 @@ public:
         mapSetting(addToggleButton("-w", tr("Ignore Whitespace"),
                                    tr("Ignore whitespace only changes.")),
                    settings.boolPointer(GitSettings::ignoreSpaceChangesInBlameKey));
+
+        addButton(tr("Reload"), Utils::Icons::RELOAD.icon());
     }
 };
 
@@ -402,6 +405,8 @@ public:
         QAction *graphButton = addToggleButton(graphArguments, tr("Graph"),
                                                tr("Show textual graph log."));
         mapSetting(graphButton, settings.boolPointer(GitSettings::graphLogKey));
+
+        addButton(tr("Reload"), Utils::Icons::RELOAD.icon());
     }
 };
 
@@ -612,7 +617,8 @@ void GitClient::slotStageChunk()
     if (m_contextController.isNull())
         return;
 
-    const QString patch = m_contextController->makePatch(false, true);
+    DiffEditorController::PatchOptions options = DiffEditorController::AddPrefix;
+    const QString patch = m_contextController->makePatch(options);
     if (patch.isEmpty())
         return;
 
@@ -624,7 +630,9 @@ void GitClient::slotUnstageChunk()
     if (m_contextController.isNull())
         return;
 
-    const QString patch = m_contextController->makePatch(true, true);
+    DiffEditorController::PatchOptions options = DiffEditorController::AddPrefix;
+    options |= DiffEditorController::Revert;
+    const QString patch = m_contextController->makePatch(options);
     if (patch.isEmpty())
         return;
 
@@ -652,11 +660,11 @@ void GitClient::stage(const QString &patch, bool revert)
                               &errorMessage, args)) {
         if (errorMessage.isEmpty()) {
             if (revert)
-                VcsOutputWindow::append(tr("Chunk successfully unstaged"));
+                VcsOutputWindow::appendSilently(tr("Chunk successfully unstaged"));
             else
-                VcsOutputWindow::append(tr("Chunk successfully staged"));
+                VcsOutputWindow::appendSilently(tr("Chunk successfully staged"));
         } else {
-            VcsOutputWindow::append(errorMessage);
+            VcsOutputWindow::appendError(errorMessage);
         }
         m_contextController->requestReload();
     } else {
@@ -991,6 +999,23 @@ void GitClient::reset(const QString &workingDirectory, const QString &argument, 
         flags |= VcsCommand::ExpectRepoChanges;
     }
     vcsExec(workingDirectory, arguments, nullptr, true, flags);
+}
+
+void GitClient::recoverDeletedFiles(const QString &workingDirectory)
+{
+    const SynchronousProcessResponse response =
+            vcsFullySynchronousExec(workingDirectory, {"ls-files", "--deleted"},
+                                    VcsCommand::SuppressCommandLogging);
+    if (response.result == SynchronousProcessResponse::Finished) {
+        const QString stdOut = response.stdOut().trimmed();
+        if (stdOut.isEmpty()) {
+            VcsOutputWindow::appendError(tr("Nothing to recover"));
+            return;
+        }
+        const QStringList files = stdOut.split('\n');
+        synchronousCheckoutFiles(workingDirectory, files, QString(), nullptr, false);
+        VcsOutputWindow::append(tr("Files recovered"), VcsOutputWindow::Message);
+    }
 }
 
 void GitClient::addFile(const QString &workingDirectory, const QString &fileName)
@@ -2834,7 +2859,8 @@ void GitClient::subversionLog(const QString &workingDirectory)
 
 void GitClient::push(const QString &workingDirectory, const QStringList &pushArgs)
 {
-    vcsExec(workingDirectory, QStringList({"push"}) + pushArgs, nullptr, true);
+    vcsExec(workingDirectory, QStringList({"push"}) + pushArgs, nullptr, true,
+            VcsCommand::ShowSuccessMessage);
 }
 
 bool GitClient::synchronousMerge(const QString &workingDirectory, const QString &branch,

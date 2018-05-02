@@ -175,10 +175,38 @@ Warning: this is an experimental feature and might lead to failing to execute th
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_7">
           <item>
-           <widget class="QListWidget" name="frameworkListWidget">
+           <widget class="QTreeWidget" name="frameworkTreeWidget">
             <property name="toolTip">
              <string>Selects the test frameworks to be handled by the AutoTest plugin.</string>
             </property>
+            <property name="rootIsDecorated">
+             <bool>false</bool>
+            </property>
+            <property name="headerHidden">
+             <bool>false</bool>
+            </property>
+            <property name="columnCount">
+             <number>2</number>
+            </property>
+            <attribute name="headerDefaultSectionSize">
+             <number>150</number>
+            </attribute>
+            <column>
+             <property name="text">
+              <string>Framework</string>
+             </property>
+             <property name="toolTip">
+              <string>Selects the test frameworks to be handled by the AutoTest plugin.</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Group</string>
+             </property>
+             <property name="toolTip">
+              <string>Enables grouping of test cases.</string>
+             </property>
+            </column>
            </widget>
           </item>
           <item>

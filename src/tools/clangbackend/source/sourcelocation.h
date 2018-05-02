@@ -40,6 +40,7 @@ class SourceLocation
     friend class SourceRange;
     friend class TranslationUnit;
     friend class Cursor;
+    friend class FullTokenInfo;
     friend bool operator==(const SourceLocation &first, const SourceLocation &second);
 
 public:
@@ -57,12 +58,14 @@ public:
     SourceLocationContainer toSourceLocationContainer() const;
 
 private:
-    SourceLocation(CXSourceLocation cxSourceLocation);
+    SourceLocation(CXTranslationUnit cxTranslationUnit,
+                   CXSourceLocation cxSourceLocation);
 
     operator CXSourceLocation() const;
 
 private:
    CXSourceLocation cxSourceLocation;
+   CXTranslationUnit cxTranslationUnit;
    mutable Utf8String filePath_;
    uint line_ = 0;
    uint column_ = 0;

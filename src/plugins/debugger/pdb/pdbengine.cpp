@@ -102,7 +102,7 @@ void PdbEngine::runCommand(const DebuggerCommand &cmd)
 void PdbEngine::shutdownInferior()
 {
     QTC_ASSERT(state() == InferiorShutdownRequested, qDebug() << state());
-    notifyInferiorShutdownOk();
+    notifyInferiorShutdownFinished();
 }
 
 void PdbEngine::shutdownEngine()
@@ -151,13 +151,6 @@ void PdbEngine::setupEngine()
         return;
     }
     notifyEngineSetupOk();
-}
-
-void PdbEngine::setupInferior()
-{
-    QTC_ASSERT(state() == InferiorSetupRequested, qDebug() << state());
-
-    notifyInferiorSetupOk();
 }
 
 void PdbEngine::runEngine()

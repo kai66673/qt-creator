@@ -72,7 +72,10 @@ MATCHER_P3(IsLocation, filePathId, line, column,
 class SymbolIndexing : public testing::Test
 {
 protected:
-    FilePathId filePathId(Utils::SmallString filePath);
+    FilePathId filePathId(Utils::SmallStringView filePath)
+    {
+        return filePathCache.filePathId(ClangBackEnd::FilePathView{filePath});
+    }
 
 protected:
     Sqlite::Database database{":memory:", Sqlite::JournalMode::Memory};
@@ -84,8 +87,10 @@ protected:
     PathString main1Path = TESTDATA_DIR "/symbolindexing_main1.cpp";
     ProjectPartContainer projectPart1{"project1",
                                       {"cc", "-I", TESTDATA_DIR, "-std=c++1z"},
+                                      {{"DEFINE", "1"}},
+                                      {"/includes"},
                                       {},
-                                      {main1Path.clone()}};
+                                      {filePathId(main1Path)}};
 };
 
 TEST_F(SymbolIndexing, Locations)
@@ -110,8 +115,6 @@ TEST_F(SymbolIndexing, DISABLED_TemplateFunction)
                     IsLocation(filePathId(TESTDATA_DIR "/symbolindexing_main1.cpp"), 6, 5)));
 }
 
-ClangBackEnd::FilePathId SymbolIndexing::filePathId(Utils::SmallString filePath)
-{
-    return filePathCache.filePathId(filePath);
-}
+
+
 }

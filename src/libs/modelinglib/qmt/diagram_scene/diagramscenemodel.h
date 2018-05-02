@@ -31,6 +31,7 @@
 #include <QList>
 #include <QHash>
 #include <QSet>
+#include <QRectF>
 
 QT_BEGIN_NAMESPACE
 class QGraphicsItem;
@@ -63,6 +64,7 @@ class QMT_EXPORT DiagramSceneModel : public QObject
     class CreationVisitor;
     class UpdateVisitor;
     class OriginItem;
+    class SelectionStatus;
 
     friend class UpdateVisitor;
     friend class DiagramGraphicsScene;
@@ -94,6 +96,7 @@ public:
     MDiagram *diagram() const { return m_diagram; }
     void setDiagram(MDiagram *diagram);
     QGraphicsScene *graphicsScene() const;
+    QRectF sceneRect() const;
 
     bool hasSelection() const;
     bool hasMultiObjectsSelection() const;
@@ -110,14 +113,15 @@ public:
     QSet<QGraphicsItem *> selectedItems() const { return m_selectedItems; }
     DElement *element(QGraphicsItem *item) const;
     bool isElementEditable(const DElement *element) const;
+    bool isInFrontOf(const QGraphicsItem *frontItem, const QGraphicsItem *backItem);
 
     void selectAllElements();
     void selectElement(DElement *element);
     void editElement(DElement *element);
     void copyToClipboard();
-    bool exportImage(const QString &fileName);
-    bool exportPdf(const QString &fileName);
-    bool exportSvg(const QString &fileName);
+    bool exportImage(const QString &fileName, bool selectedElements);
+    bool exportPdf(const QString &fileName, bool selectedElements);
+    bool exportSvg(const QString &fileName, bool selectedElements);
 
     void selectItem(QGraphicsItem *item, bool multiSelect);
     void moveSelectedItems(QGraphicsItem *grabbedItem, const QPointF &delta);
@@ -153,13 +157,14 @@ private:
     void clearGraphicsScene();
     void removeExtraSceneItems();
     void addExtraSceneItems();
+    void saveSelectionStatusBeforeExport(bool exportSelectedElements, SelectionStatus *status);
+    void restoreSelectedStatusAfterExport(const SelectionStatus &status);
     void recalcSceneRectSize();
     QGraphicsItem *createGraphicsItem(DElement *element);
     void updateGraphicsItem(QGraphicsItem *item, DElement *element);
     void deleteGraphicsItem(QGraphicsItem *item, DElement *element);
     void updateFocusItem(const QSet<QGraphicsItem *> &selectedItems);
     void unsetFocusItem();
-    bool isInFrontOf(const QGraphicsItem *frontItem, const QGraphicsItem *backItem);
 
     enum Busy {
         NotBusy,
@@ -184,6 +189,7 @@ private:
     Busy m_busyState = NotBusy;
     OriginItem *m_originItem = nullptr;
     QGraphicsItem *m_focusItem = nullptr;
+    QRectF m_sceneRect;
 };
 
 } // namespace qmt

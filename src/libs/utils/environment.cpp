@@ -332,6 +332,13 @@ void Environment::prependOrSetLibrarySearchPath(const QString &value)
     }
 }
 
+void Environment::prependOrSetLibrarySearchPaths(const QStringList &values)
+{
+    Utils::reverseForeach(values, [this](const QString &value) {
+        prependOrSetLibrarySearchPath(value);
+    });
+}
+
 Environment Environment::systemEnvironment()
 {
     return *staticSystemEnvironment();
@@ -493,7 +500,7 @@ Environment::const_iterator Environment::constEnd() const
 
 Environment::const_iterator Environment::constFind(const QString &name) const
 {
-    return m_values.constFind(name);
+    return findKey(m_values, m_osType, name);
 }
 
 int Environment::size() const
@@ -558,6 +565,11 @@ QList<EnvironmentItem> Environment::diff(const Environment &other, bool checkApp
 bool Environment::hasKey(const QString &key) const
 {
     return m_values.contains(key);
+}
+
+OsType Environment::osType() const
+{
+    return m_osType;
 }
 
 QString Environment::userName() const

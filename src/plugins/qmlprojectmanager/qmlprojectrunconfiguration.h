@@ -29,10 +29,6 @@
 
 #include <projectexplorer/runnables.h>
 
-#include <QPointer>
-
-QT_FORWARD_DECLARE_CLASS(QStringListModel)
-
 namespace Core { class IEditor; }
 
 namespace QtSupport { class BaseQtVersion; }
@@ -54,8 +50,6 @@ public:
 
     ProjectExplorer::Runnable runnable() const override;
 
-    QtSupport::BaseQtVersion *qtVersion() const;
-
     enum MainScriptSource {
         FileInEditor,
         FileInProjectFile,
@@ -73,23 +67,18 @@ public:
     QVariantMap toMap() const override;
 
     ProjectExplorer::Abi abi() const override;
+
 signals:
     void scriptSourceChanged();
 
 private:
-    void initialize(Core::Id id);
-    void copyFrom(const QmlProjectRunConfiguration *source);
-    virtual bool fromMap(const QVariantMap &map) override;
+    bool fromMap(const QVariantMap &map) override;
 
     void changeCurrentFile(Core::IEditor* = 0);
     void updateEnabledState() final;
 
     QString executable() const;
     QString commandLineArguments() const;
-
-    static bool isValidVersion(QtSupport::BaseQtVersion *version);
-
-    static QString canonicalCapsPath(const QString &filePath);
 
     // absolute path to current file (if being used)
     QString m_currentFileFilename;

@@ -28,23 +28,35 @@
 namespace ClangBackEnd {
 
 SymbolsCollector::SymbolsCollector(FilePathCachingInterface &filePathCache)
-    : m_collectSymbolsAction(filePathCache)
+    : m_collectSymbolsAction(m_symbolEntries, m_sourceLocationEntries, filePathCache),
+      m_collectMacrosSourceFileCallbacks(m_symbolEntries, m_sourceLocationEntries, filePathCache),
+      m_filePathCache(filePathCache)
 {
 }
 
-void SymbolsCollector::addFiles(const Utils::PathStringVector &filePaths, const Utils::SmallStringVector &arguments)
+void SymbolsCollector::addFiles(const FilePathIds &filePathIds,
+                                const Utils::SmallStringVector &arguments)
 {
-    ClangTool::addFiles(filePaths, arguments);
+    m_clangTool.addFiles(m_filePathCache.filePaths(filePathIds), arguments);
+    m_collectMacrosSourceFileCallbacks.addSourceFiles(filePathIds);
 }
 
 void SymbolsCollector::addUnsavedFiles(const V2::FileContainers &unsavedFiles)
 {
-    ClangTool::addUnsavedFiles(unsavedFiles);
+    m_clangTool.addUnsavedFiles(unsavedFiles);
+}
+
+void SymbolsCollector::clear()
+{
+    m_collectMacrosSourceFileCallbacks.clear();
+    m_symbolEntries.clear();
+    m_sourceLocationEntries.clear();
+    m_clangTool = ClangTool();
 }
 
 void SymbolsCollector::collectSymbols()
 {
-    auto tool = createTool();
+    auto tool = m_clangTool.createTool();
 
     tool.run(clang::tooling::newFrontendActionFactory(&m_collectSymbolsAction,
                                                       &m_collectMacrosSourceFileCallbacks).get());
@@ -58,6 +70,26 @@ const SymbolEntries &SymbolsCollector::symbols() const
 const SourceLocationEntries &SymbolsCollector::sourceLocations() const
 {
     return m_collectSymbolsAction.sourceLocations();
+}
+
+const FilePathIds &SymbolsCollector::sourceFiles() const
+{
+    return m_collectMacrosSourceFileCallbacks.sourceFiles();
+}
+
+const UsedMacros &SymbolsCollector::usedMacros() const
+{
+    return m_collectMacrosSourceFileCallbacks.usedMacros();
+}
+
+const FileStatuses &SymbolsCollector::fileStatuses() const
+{
+    return m_collectMacrosSourceFileCallbacks.fileStatuses();
+}
+
+const SourceDependencies &SymbolsCollector::sourceDependencies() const
+{
+    return m_collectMacrosSourceFileCallbacks.sourceDependencies();
 }
 
 } // namespace ClangBackEnd

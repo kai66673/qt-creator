@@ -27,6 +27,8 @@
 
 #include <filepathid.h>
 
+#include <utils/linecolumn.h>
+
 #include <limits>
 #include <vector>
 
@@ -37,19 +39,10 @@ namespace ClangBackEnd {
 enum class SymbolType
 {
     Declaration,
-    DeclarationReference
-};
-
-class LineColumn
-{
-public:
-    LineColumn(uint line, uint column)
-        : line(line),
-          column(column)
-    {}
-
-    uint line =  0;
-    uint column = 0;
+    DeclarationReference,
+    MacroDefinition,
+    MacroUsage,
+    MacroUndefinition
 };
 
 using SymbolIndex = long long;
@@ -59,27 +52,24 @@ class SourceLocationEntry
 public:
     SourceLocationEntry(SymbolIndex symbolId,
                         FilePathId filePathId,
-                        LineColumn lineColumn,
+                        Utils::LineColumn lineColumn,
                         SymbolType symbolType)
         : symbolId(symbolId),
           filePathId(filePathId),
-          line(lineColumn.line),
-          column(lineColumn.column),
+          lineColumn(lineColumn),
           symbolType(symbolType)
     {}
 
     SymbolIndex symbolId = 0;
     FilePathId filePathId;
-    uint line =  0;
-    uint column = 0;
+    Utils::LineColumn lineColumn;
     SymbolType symbolType;
 
     friend bool operator==(const SourceLocationEntry &first, const SourceLocationEntry &second)
     {
         return first.symbolId == second.symbolId
             && first.filePathId == second.filePathId
-            && first.line == second.line
-            && first.column == second.column
+            && first.lineColumn == second.lineColumn
             && first.symbolType == second.symbolType;
     }
 };

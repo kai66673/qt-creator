@@ -64,6 +64,7 @@ public:
     void updateAll();
     void updateColumn(int column);
     void expand();
+    void collapse();
     TreeItem *firstChild() const;
     TreeItem *lastChild() const;
     int level() const;
@@ -82,7 +83,8 @@ public:
     void forSelectedChildren(const std::function<bool(TreeItem *)> &pred) const;
     void forAllChildren(const std::function<void(TreeItem *)> &pred) const;
     TreeItem *findAnyChild(const std::function<bool(TreeItem *)> &pred) const;
-    // like findAnyChild() but processes children from bottom to top
+    // like findAnyChild() but processes children in exact reverse order
+    // (bottom to top, most inner children first)
     TreeItem *reverseFindAnyChild(const std::function<bool(TreeItem *)> &pred) const;
 
     // Levels are 1-based: Child at Level 1 is an immediate child.
@@ -191,7 +193,6 @@ protected:
     QModelIndex sibling(int row, int column, const QModelIndex &idx) const override;
     Qt::ItemFlags flags(const QModelIndex &idx) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-    bool hasChildren(const QModelIndex &idx) const override;
 
     bool canFetchMore(const QModelIndex &idx) const override;
     void fetchMore(const QModelIndex &idx) override;
@@ -201,6 +202,7 @@ protected:
 
 signals:
     void requestExpansion(QModelIndex);
+    void requestCollapse(QModelIndex);
 
 protected:
     friend class TreeItem;

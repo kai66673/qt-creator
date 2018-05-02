@@ -26,7 +26,7 @@
 #include "clangdocuments.h"
 
 #include <diagnosticset.h>
-#include <highlightingmarks.h>
+#include <tokenprocessor.h>
 #include <clangexceptions.h>
 #include <projects.h>
 #include <skippedsourceranges.h>
@@ -188,14 +188,14 @@ void Documents::updateDocumentsWithChangedDependencies(const QVector<FileContain
 
 std::vector<Document> Documents::setDocumentsDirtyIfProjectPartChanged()
 {
-    std::vector<Document> notDirtyBefore;
+    std::vector<Document> affectedDocuments;
 
     for (auto &document : documents_) {
-        if (!document.isDirty() && document.setDirtyIfProjectPartIsOutdated())
-            notDirtyBefore.push_back(document);
+        if (document.setDirtyIfProjectPartIsOutdated())
+            affectedDocuments.push_back(document);
     }
 
-    return notDirtyBefore;
+    return affectedDocuments;
 }
 
 QVector<FileContainer> Documents::newerFileContainers(const QVector<FileContainer> &fileContainers) const

@@ -94,12 +94,13 @@ public:
     FileName &appendString(const QString &str);
     FileName &appendString(QChar str);
 
-    using QString::size;
+    using QString::chop;
+    using QString::clear;
     using QString::count;
-    using QString::length;
     using QString::isEmpty;
     using QString::isNull;
-    using QString::clear;
+    using QString::length;
+    using QString::size;
 private:
     FileName(const QString &string);
 };
@@ -132,7 +133,7 @@ public:
 #ifdef Q_OS_WIN
 
 template <typename T>
-static T withNTFSPermissions(const std::function<T()> &task)
+T withNTFSPermissions(const std::function<T()> &task)
 {
     qt_ntfs_permission_lookup++;
     T result = task();
@@ -140,10 +141,13 @@ static T withNTFSPermissions(const std::function<T()> &task)
     return result;
 }
 
+template <>
+QTCREATOR_UTILS_EXPORT void withNTFSPermissions(const std::function<void()> &task);
+
 #else // Q_OS_WIN
 
 template <typename T>
-static T withNTFSPermissions(const std::function<T()> &task)
+T withNTFSPermissions(const std::function<T()> &task)
 {
     return task();
 }

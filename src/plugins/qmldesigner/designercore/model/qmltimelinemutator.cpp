@@ -130,6 +130,11 @@ qreal QmlTimelineMutator::duration() const
     return endFrame() - startFrame();
 }
 
+bool QmlTimelineMutator::isEnabled() const
+{
+    return QmlObjectNode(modelNode()).modelValue("enabled").toBool();
+}
+
 qreal QmlTimelineMutator::minActualFrame(const ModelNode &target) const
 {
     qreal min = std::numeric_limits<double>::max();
@@ -154,6 +159,19 @@ qreal QmlTimelineMutator::maxActualFrame(const ModelNode &target) const
     }
 
     return max;
+}
+
+void QmlTimelineMutator::moveAllFrames(const ModelNode &target, qreal offset)
+{
+    for (QmlTimelineFrames &frames : framesForTarget(target))
+        frames.moveAllFrames(offset);
+
+}
+
+void QmlTimelineMutator::scaleAllFrames(const ModelNode &target, qreal factor)
+{
+    for (QmlTimelineFrames &frames : framesForTarget(target))
+        frames.scaleAllFrames(factor);
 }
 
 QList<ModelNode> QmlTimelineMutator::allTargets() const
@@ -184,6 +202,29 @@ QList<QmlTimelineFrames> QmlTimelineMutator::framesForTarget(const ModelNode &ta
          }
      }
      return result;
+}
+
+void QmlTimelineMutator::destroyFramesForTarget(const ModelNode &target)
+{
+    for (QmlTimelineFrames frames : framesForTarget(target))
+        frames.destroy();
+}
+
+bool QmlTimelineMutator::hasActiveTimeline(AbstractView *view)
+{
+    if (view && view->isAttached()) {
+        if (!view->model()->hasImport(Import::createLibraryImport("QtQuick.Timeline", "1.0"), true, true))
+            return false;
+
+        const ModelNode root = view->rootModelNode();
+        if (root.isValid())
+            for (const ModelNode &child : root.directSubModelNodes()) {
+                if (QmlTimelineMutator::isValidQmlTimelineMutator(child))
+                    return QmlTimelineMutator(child).isEnabled();
+            }
+    }
+
+    return false;
 }
 
 void QmlTimelineMutator::addFramesIfNotExists(const ModelNode &node, const PropertyName &propertyName)

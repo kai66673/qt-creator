@@ -117,17 +117,6 @@ BareMetalCustomRunConfiguration::BareMetalCustomRunConfiguration(ProjectExplorer
 {
 }
 
-void BareMetalCustomRunConfiguration::initialize()
-{
-    BareMetalRunConfiguration::initialize(runConfigId(), QString());
-}
-
-void BareMetalCustomRunConfiguration::copyFrom(const BareMetalCustomRunConfiguration *source)
-{
-    BareMetalRunConfiguration::copyFrom(source);
-    m_localExecutable = source->m_localExecutable;
-}
-
 bool BareMetalCustomRunConfiguration::isConfigured() const
 {
     return !m_localExecutable.isEmpty();
@@ -154,16 +143,6 @@ QWidget *BareMetalCustomRunConfiguration::createConfigurationWidget()
 Utils::OutputFormatter *BareMetalCustomRunConfiguration::createOutputFormatter() const
 {
     return new QtSupport::QtOutputFormatter(target()->project());
-}
-
-Core::Id BareMetalCustomRunConfiguration::runConfigId()
-{
-    return "BareMetal.CustomRunConfig";
-}
-
-QString BareMetalCustomRunConfiguration::runConfigDefaultDisplayName()
-{
-    return tr("Custom Executable (on GDB server or hardware debugger)");
 }
 
 static QString exeKey()

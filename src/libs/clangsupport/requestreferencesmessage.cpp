@@ -27,8 +27,6 @@
 
 #include <QDebug>
 
-#include <ostream>
-
 namespace ClangBackEnd {
 
 quint64 RequestReferencesMessage::ticketCounter = 0;
@@ -41,22 +39,11 @@ QDebug operator<<(QDebug debug, const RequestReferencesMessage &message)
     debug.nospace() << message.m_ticketNumber << ", ";
     debug.nospace() << message.m_line << ", ";
     debug.nospace() << message.m_column << ", ";
+    debug.nospace() << message.m_local << ", ";
 
     debug.nospace() << ")";
 
     return debug;
-}
-
-std::ostream &operator<<(std::ostream &os, const RequestReferencesMessage &message)
-{
-    os << "("
-       << message.m_fileContainer << ", "
-       << message.m_ticketNumber << ", "
-       << message.m_line << ", "
-       << message.m_column << ", "
-       << ")";
-
-     return os;
 }
 
 } // namespace ClangBackEnd

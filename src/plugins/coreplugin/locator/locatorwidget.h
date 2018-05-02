@@ -29,10 +29,12 @@
 
 #include <utils/optional.h>
 
+#include <QFutureWatcher>
 #include <QPointer>
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
+class QAbstractItemModel;
 class QAction;
 class QMenu;
 QT_END_NAMESPACE
@@ -86,19 +88,19 @@ private:
     QList<ILocatorFilter*> filtersFor(const QString &text, QString &searchText);
     void setProgressIndicatorVisible(bool visible);
 
-    LocatorModel *m_locatorModel;
+    LocatorModel *m_locatorModel = nullptr;
 
-    QMenu *m_filterMenu;
-    QAction *m_refreshAction;
-    QAction *m_configureAction;
-    Utils::FancyLineEdit *m_fileLineEdit;
+    QMenu *m_filterMenu = nullptr;
+    QAction *m_refreshAction = nullptr;
+    QAction *m_configureAction = nullptr;
+    Utils::FancyLineEdit *m_fileLineEdit = nullptr;
     QTimer m_showPopupTimer;
-    QFutureWatcher<LocatorFilterEntry> *m_entriesWatcher;
+    QFutureWatcher<LocatorFilterEntry> *m_entriesWatcher = nullptr;
     QString m_requestedCompletionText;
     bool m_needsClearResult = true;
     bool m_updateRequested = false;
     bool m_possibleToolTipRequest = false;
-    QWidget *m_progressIndicator;
+    QWidget *m_progressIndicator = nullptr;
     QTimer m_showProgressTimer;
     Utils::optional<int> m_rowRequestedForAccept;
 };
@@ -106,7 +108,7 @@ private:
 class LocatorPopup : public QWidget
 {
 public:
-    LocatorPopup(LocatorWidget *locatorWidget, QWidget *parent = 0);
+    LocatorPopup(LocatorWidget *locatorWidget, QWidget *parent = nullptr);
 
     CompletionList *completionList() const;
     LocatorWidget *inputWidget() const;
@@ -121,12 +123,12 @@ protected:
     virtual void inputLostFocus();
 
     QPointer<QWidget> m_window;
-    CompletionList *m_tree;
+    CompletionList *m_tree = nullptr;
 
 private:
     void updateWindow();
 
-    LocatorWidget *m_inputWidget;
+    LocatorWidget *m_inputWidget = nullptr;
 };
 
 LocatorWidget *createStaticLocatorWidget(Locator *locator);

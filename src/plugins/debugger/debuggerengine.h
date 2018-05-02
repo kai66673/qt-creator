@@ -73,7 +73,6 @@ class Breakpoint;
 class QmlCppEngine;
 class DebuggerToolTipContext;
 class MemoryViewSetupData;
-class Terminal;
 class TerminalRunner;
 class ThreadId;
 
@@ -139,6 +138,7 @@ public:
     QString startMessage; // First status message shown.
     QString debugInfoLocation; // Gdb "set-debug-file-directory".
     QStringList debugSourceLocation; // Gdb "directory"
+    QString qtPackageSourceLocation;
     bool isSnapshot = false; // Set if created internally.
     ProjectExplorer::Abi toolChainAbi;
 
@@ -157,7 +157,7 @@ public:
     bool isNativeMixedDebugging() const;
     void validateExecutable();
 
-    Utils::MacroExpander *macroExpander = 0;
+    Utils::MacroExpander *macroExpander = nullptr;
 
     // For Debugger testing.
     int testCase = 0;
@@ -313,6 +313,7 @@ public:
     virtual void insertBreakpoint(Breakpoint bp);  // FIXME: make pure
     virtual void removeBreakpoint(Breakpoint bp);  // FIXME: make pure
     virtual void changeBreakpoint(Breakpoint bp);  // FIXME: make pure
+    virtual void enableSubBreakpoint(const QString &locid, bool on);
 
     virtual bool acceptsDebuggerCommands() const { return true; }
     virtual void executeDebuggerCommand(const QString &command, DebuggerLanguages languages);
@@ -364,7 +365,7 @@ public:
     void updateViews();
     bool isSlaveEngine() const;
     bool isMasterEngine() const;
-    DebuggerEngine *masterEngine() const;
+    DebuggerEngine *masterEngine();
     virtual DebuggerEngine *activeEngine() { return this; }
     virtual DebuggerEngine *cppEngine() { return 0; }
 
@@ -386,9 +387,6 @@ protected:
     void notifyEngineSetupOk();
     void notifyEngineSetupFailed();
     void notifyEngineRunFailed();
-
-    void notifyInferiorSetupOk();
-    void notifyInferiorSetupFailed();
 
     void notifyEngineRunAndInferiorRunOk();
     void notifyEngineRunAndInferiorStopOk();
@@ -414,17 +412,14 @@ protected:
 
     virtual void setState(DebuggerState state, bool forced = false);
 
-    void notifyInferiorShutdownOk();
-    void notifyInferiorShutdownFailed();
+    void notifyInferiorShutdownFinished();
 
     void notifyEngineSpontaneousShutdown();
-    void notifyEngineShutdownOk();
-    void notifyEngineShutdownFailed();
+    void notifyEngineShutdownFinished();
 
     void notifyEngineIll();
 
     virtual void setupEngine() = 0;
-    virtual void setupInferior() = 0;
     virtual void runEngine() = 0;
     virtual void shutdownInferior() = 0;
     virtual void shutdownEngine() = 0;

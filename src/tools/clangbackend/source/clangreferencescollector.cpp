@@ -121,7 +121,7 @@ public:
     ReferencesCollector(CXTranslationUnit cxTranslationUnit);
     ~ReferencesCollector();
 
-    ReferencesResult collect(uint line, uint column) const;
+    ReferencesResult collect(uint line, uint column, bool localReferences = false) const;
 
 private:
     bool isWithinTokenRange(CXToken token, uint line, uint column) const;
@@ -155,7 +155,7 @@ ReferencesCollector::~ReferencesCollector()
 
 bool ReferencesCollector::isWithinTokenRange(CXToken token, uint line, uint column) const
 {
-    const SourceRange range = clang_getTokenExtent(m_cxTranslationUnit, token);
+    const SourceRange range {m_cxTranslationUnit, clang_getTokenExtent(m_cxTranslationUnit, token)};
     return range.contains(line, column);
 }
 
@@ -207,7 +207,7 @@ bool ReferencesCollector::checkToken(unsigned index, const Utf8String &identifie
     return candidate.usr() == usr;
 }
 
-ReferencesResult ReferencesCollector::collect(uint line, uint column) const
+ReferencesResult ReferencesCollector::collect(uint line, uint column, bool localReferences) const
 {
     ReferencesResult result;
 
@@ -216,16 +216,21 @@ ReferencesResult ReferencesCollector::collect(uint line, uint column) const
         return result;
 
     const Cursor cursorFromUser = m_cxCursors[static_cast<int>(index)];
+
     const ReferencedCursor refCursor = ReferencedCursor::find(cursorFromUser);
     const Utf8String usr = refCursor.usr();
     if (usr.isEmpty())
+        return result;
+
+    if (localReferences && !refCursor.isLocalVariable())
         return result;
 
     const CXToken token = m_cxTokens[index];
     const Utf8String identifier = ClangString(clang_getTokenSpelling(m_cxTranslationUnit, token));
     for (uint i = 0; i < m_cxTokenCount; ++i) {
         if (checkToken(i, identifier, usr)) {
-            const SourceRange range = clang_getTokenExtent(m_cxTranslationUnit, m_cxTokens[i]);
+            const SourceRange range {m_cxTranslationUnit,
+                                     clang_getTokenExtent(m_cxTranslationUnit, m_cxTokens[i])};
             result.references.append(range);
         }
     }
@@ -239,10 +244,11 @@ ReferencesResult ReferencesCollector::collect(uint line, uint column) const
 
 ReferencesResult collectReferences(CXTranslationUnit cxTranslationUnit,
                                    uint line,
-                                   uint column)
+                                   uint column,
+                                   bool localReferences)
 {
     ReferencesCollector collector(cxTranslationUnit);
-    return collector.collect(line, column);
+    return collector.collect(line, column, localReferences);
 }
 
 } // namespace ClangBackEnd

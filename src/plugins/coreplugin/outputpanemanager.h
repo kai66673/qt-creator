@@ -55,7 +55,6 @@ class OutputPaneManager : public QWidget
 public:
     void init();
     static OutputPaneManager *instance();
-    QWidget *buttonsWidget();
     void updateStatusButtons(bool visible);
     static void updateMaximizeButton(bool maximized);
 
@@ -113,7 +112,6 @@ private:
     QToolButton *m_nextToolButton;
     QWidget *m_toolBar;
 
-    QList<IOutputPane *> m_panes;
     QVector<OutputPaneToggleButton *> m_buttons;
     QVector<QAction *> m_actions;
     QVector<Id> m_ids;

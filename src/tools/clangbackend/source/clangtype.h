@@ -53,18 +53,23 @@ public:
     bool isReferencingConstant() const;
     bool isOutputArgument() const;
     bool isBuiltinType() const;
+    bool isUnsigned() const;
 
     Utf8String utf8Spelling() const;
     ClangString spelling() const;
+    Utf8String builtinTypeToString() const;
     int argumentCount() const;
 
     Type alias() const;
     Type canonical() const;
     Type classType() const;
     Type pointeeType() const;
+    Type resultType() const;
     Type argument(int index) const;
 
     Cursor declaration() const;
+
+    long long sizeOf(bool *isValid) const;
 
     CXTypeKind kind() const;
 

@@ -35,41 +35,25 @@
 
 namespace ClangBackEnd {
 
-JobQueue::JobQueue(Documents &documents, ProjectParts &projectParts)
+JobQueue::JobQueue(Documents &documents, ProjectParts &projectParts, const Utf8String &logTag)
     : m_documents(documents)
     , m_projectParts(projectParts)
+    , m_logTag(logTag)
 {
 }
 
 bool JobQueue::add(const JobRequest &job)
 {
-    if (m_queue.contains(job)) {
-        qCDebug(jobsLog) << "Not adding duplicate request" << job;
-        return false;
-    }
-
-    if (isJobRunningForJobRequest(job)) {
-        qCDebug(jobsLog) << "Not adding duplicate request for already running job" << job;
-        return false;
-    }
-
-    if (!m_documents.hasDocument(job.filePath, job.projectPartId)) {
-        qCDebug(jobsLog) << "Not adding / cancelling due to already closed document:" << job;
+    QString notAddableReason;
+    if (isJobRequestAddable(job, notAddableReason)) {
+        qCDebugJobs() << "Adding" << job;
+        m_queue.append(job);
+        return true;
+    } else {
+        qCDebugJobs() << "Not adding" << job << notAddableReason;
         cancelJobRequest(job);
         return false;
     }
-
-    const Document document = m_documents.document(job.filePath, job.projectPartId);
-    if (!document.isIntact()) {
-        qCDebug(jobsLog) << "Not adding / cancelling due not intact document:" << job;
-        cancelJobRequest(job);
-        return false;
-    }
-
-    qCDebug(jobsLog) << "Adding" << job;
-    m_queue.append(job);
-
-    return true;
 }
 
 int JobQueue::size() const
@@ -92,8 +76,13 @@ void JobQueue::removeExpiredRequests()
 
     foreach (const JobRequest &jobRequest, m_queue) {
         try {
-            if (!isJobRequestExpired(jobRequest))
+            QString expirationReason;
+            if (isJobRequestExpired(jobRequest, expirationReason)) {
+                qCDebugJobs() << "Expired:" << jobRequest << expirationReason;
+                cancelJobRequest(jobRequest);
+            } else {
                 cleanedRequests.append(jobRequest);
+            }
         } catch (const std::exception &exception) {
             qWarning() << "Error in Jobs::removeOutDatedRequests for"
                        << jobRequest << ":" << exception.what();
@@ -103,7 +92,33 @@ void JobQueue::removeExpiredRequests()
     m_queue = cleanedRequests;
 }
 
-bool JobQueue::isJobRequestExpired(const JobRequest &jobRequest)
+bool JobQueue::isJobRequestAddable(const JobRequest &jobRequest, QString &notAddableReason)
+{
+    if (m_queue.contains(jobRequest)) {
+        notAddableReason = "duplicate request in queue";
+        return false;
+    }
+
+    if (isJobRunningForJobRequest(jobRequest)) {
+        notAddableReason = "duplicate request for already running job";
+        return false;
+    }
+
+    if (!m_documents.hasDocument(jobRequest.filePath, jobRequest.projectPartId)) {
+        notAddableReason = "document already closed";
+        return false;
+    }
+
+    const Document document = m_documents.document(jobRequest.filePath, jobRequest.projectPartId);
+    if (!document.isIntact()) {
+        notAddableReason = "document not intact";
+        return false;
+    }
+
+    return true;
+}
+
+bool JobQueue::isJobRequestExpired(const JobRequest &jobRequest, QString &expirationReason)
 {
     const JobRequest::ExpirationConditions conditions = jobRequest.expirationConditions;
     const UnsavedFiles unsavedFiles = m_documents.unsavedFiles();
@@ -111,7 +126,7 @@ bool JobQueue::isJobRequestExpired(const JobRequest &jobRequest)
 
     if (conditions.testFlag(Condition::UnsavedFilesChanged)) {
         if (jobRequest.unsavedFilesChangeTimePoint != unsavedFiles.lastChangeTimePoint()) {
-            qCDebug(jobsLog) << "Removing due to outdated unsaved files:" << jobRequest;
+            expirationReason = "outdated unsaved files";
             return true;
         }
     }
@@ -120,12 +135,12 @@ bool JobQueue::isJobRequestExpired(const JobRequest &jobRequest)
 
     if (conditions.testFlag(Condition::DocumentClosed)) {
         if (!m_documents.hasDocument(jobRequest.filePath, jobRequest.projectPartId)) {
-            qCDebug(jobsLog) << "Removing due to already closed document:" << jobRequest;
+            expirationReason = "document already closed";
             return true;
         }
 
         if (!m_projectParts.hasProjectPart(jobRequest.projectPartId)) {
-            qCDebug(jobsLog) << "Removing due to already closed project:" << jobRequest;
+            expirationReason = "project already closed";
             return true;
         }
         projectCheckedAndItExists = true;
@@ -133,14 +148,13 @@ bool JobQueue::isJobRequestExpired(const JobRequest &jobRequest)
         const Document document
                 = m_documents.document(jobRequest.filePath, jobRequest.projectPartId);
         if (!document.isIntact()) {
-            qCDebug(jobsLog) << "Removing/Cancelling due to not intact document:" << jobRequest;
-            cancelJobRequest(jobRequest);
+            expirationReason = "document not intact";
             return true;
         }
 
         if (conditions.testFlag(Condition::DocumentRevisionChanged)) {
             if (document.documentRevision() > jobRequest.documentRevision) {
-                qCDebug(jobsLog) << "Removing due to changed document revision:" << jobRequest;
+                expirationReason = "changed document revision";
                 return true;
             }
         }
@@ -148,13 +162,13 @@ bool JobQueue::isJobRequestExpired(const JobRequest &jobRequest)
 
     if (conditions.testFlag(Condition::ProjectChanged)) {
         if (!projectCheckedAndItExists && !m_projectParts.hasProjectPart(jobRequest.projectPartId)) {
-            qCDebug(jobsLog) << "Removing due to already closed project:" << jobRequest;
+            expirationReason = "project already closed";
             return true;
         }
 
         const ProjectPart &project = m_projectParts.project(jobRequest.projectPartId);
         if (project.lastChangeTimePoint() != jobRequest.projectChangeTimePoint) {
-            qCDebug(jobsLog) << "Removing due to outdated project:" << jobRequest;
+            expirationReason = "outdated project";
             return true;
         }
     }
@@ -194,28 +208,28 @@ void JobQueue::cancelJobRequest(const JobRequest &jobRequest)
         m_cancelJobRequest(jobRequest);
 }
 
-static bool areRunConditionsMet(const JobRequest &request, const Document &document)
+bool JobQueue::areRunConditionsMet(const JobRequest &request, const Document &document) const
 {
     using Condition = JobRequest::RunCondition;
     const JobRequest::RunConditions conditions = request.runConditions;
 
     if (conditions.testFlag(Condition::DocumentSuspended) && !document.isSuspended()) {
-        qCDebug(jobsLog) << "Not choosing due to unsuspended document:" << request;
+        qCDebugJobs() << "Not choosing due to unsuspended document:" << request;
         return false;
     }
 
     if (conditions.testFlag(Condition::DocumentUnsuspended) && document.isSuspended()) {
-        qCDebug(jobsLog) << "Not choosing due to suspended document:" << request;
+        qCDebugJobs() << "Not choosing due to suspended document:" << request;
         return false;
     }
 
     if (conditions.testFlag(Condition::DocumentVisible) && !document.isVisibleInEditor()) {
-        qCDebug(jobsLog) << "Not choosing due to invisble document:" << request;
+        qCDebugJobs() << "Not choosing due to invisible document:" << request;
         return false;
     }
 
     if (conditions.testFlag(Condition::DocumentNotVisible) && document.isVisibleInEditor()) {
-        qCDebug(jobsLog) << "Not choosing due to visble document:" << request;
+        qCDebugJobs() << "Not choosing due to visible document:" << request;
         return false;
     }
 
@@ -223,14 +237,20 @@ static bool areRunConditionsMet(const JobRequest &request, const Document &docum
         if (document.isDirty()) {
             // TODO: If the document is dirty due to a project update,
             // references are processes later than ideal.
-            qCDebug(jobsLog) << "Not choosing due to dirty document:" << request;
+            qCDebugJobs() << "Not choosing due to dirty document:" << request;
             return false;
         }
 
         if (request.documentRevision != document.documentRevision()) {
-            qCDebug(jobsLog) << "Not choosing due to revision mismatch:" << request;
+            qCDebugJobs() << "Not choosing due to revision mismatch:" << request;
             return false;
         }
+    }
+
+    if (conditions.testFlag(Condition::DocumentParsed)
+            && !document.translationUnits().hasParsedTranslationUnit()) {
+        qCDebugJobs() << "Not choosing due to not yet parsed translation unit:" << request;
+        return false;
     }
 
     return true;
@@ -306,6 +326,11 @@ void JobQueue::setCancelJobRequest(const JobQueue::CancelJobRequest &cancelJobRe
 }
 
 JobRequests &JobQueue::queue()
+{
+    return m_queue;
+}
+
+const JobRequests &JobQueue::queue() const
 {
     return m_queue;
 }

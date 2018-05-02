@@ -25,6 +25,9 @@
 
 #pragma once
 
+#include "fulltokeninfo.h"
+#include "tokenprocessor.h"
+
 #include <clangsupport/codecompletion.h>
 
 #include <clang-c/Index.h>
@@ -34,13 +37,12 @@ namespace ClangBackEnd {
 class Cursor;
 class DiagnosticContainer;
 class DiagnosticSet;
-class HighlightingMarkContainer;
-class HighlightingMarks;
 class ReferencesResult;
 class SkippedSourceRanges;
 class SourceLocation;
 class SourceRange;
 class SourceRangeContainer;
+class ToolTipInfo;
 class TranslationUnitUpdateInput;
 class TranslationUnitUpdateResult;
 class UnsavedFiles;
@@ -81,11 +83,14 @@ public:
                             QVector<DiagnosticContainer> &mainFileDiagnostics) const;
     void extractDocumentAnnotations(DiagnosticContainer &firstHeaderErrorDiagnostic,
                                     QVector<DiagnosticContainer> &mainFileDiagnostics,
-                                    QVector<HighlightingMarkContainer> &highlightingMarks,
+                                    QVector<TokenInfoContainer> &tokenInfos,
                                     QVector<SourceRangeContainer> &skippedSourceRanges) const;
 
-
-    ReferencesResult references(uint line, uint column) const;
+    ReferencesResult references(uint line, uint column, bool localReferences = false) const;
+    ToolTipInfo tooltip(UnsavedFiles &unsavedFiles,
+                        const Utf8String &textCodecName,
+                        uint line,
+                        uint column) const;
     DiagnosticSet diagnostics() const;
 
     SourceLocation sourceLocationAt(uint line, uint column) const;
@@ -96,14 +101,14 @@ public:
     Cursor cursorAt(const Utf8String &filePath, uint line, uint column) const;
     Cursor cursor() const;
 
-    HighlightingMarks highlightingMarks() const;
-    HighlightingMarks highlightingMarksInRange(const SourceRange &range) const;
+    TokenProcessor<TokenInfo> tokenInfos() const;
+    TokenProcessor<TokenInfo> tokenInfosInRange(const SourceRange &range) const;
+
+    TokenProcessor<FullTokenInfo> fullTokenInfos() const;
+    TokenProcessor<FullTokenInfo> fullTokenInfosInRange(const SourceRange &range) const;
 
     SkippedSourceRanges skippedSourceRanges() const;
-    SourceRangeContainer followSymbol(uint line,
-                                      uint column,
-                                      const QVector<Utf8String> &dependentFiles,
-                                      const CommandLineArguments &currentArgs) const;
+    SourceRangeContainer followSymbol(uint line, uint column) const;
 
 private:
     const Utf8String m_id;

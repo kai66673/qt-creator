@@ -31,7 +31,6 @@
 #include <QCoreApplication>
 #include <QDebug>
 
-
 namespace ClangBackEnd {
 
 void EchoClangCodeModelServer::dispatch(const MessageEnvelop &message)
@@ -41,7 +40,6 @@ void EchoClangCodeModelServer::dispatch(const MessageEnvelop &message)
 
 void EchoClangCodeModelServer::end()
 {
-    ConnectionServer<EchoClangCodeModelServer, ClangCodeModelClientProxy>::removeServer();
     QCoreApplication::quit();
 }
 
@@ -96,6 +94,11 @@ void EchoClangCodeModelServer::requestReferences(const RequestReferencesMessage 
 }
 
 void EchoClangCodeModelServer::requestFollowSymbol(const RequestFollowSymbolMessage &message)
+{
+    echoMessage(message);
+}
+
+void EchoClangCodeModelServer::requestToolTip(const RequestToolTipMessage &message)
 {
     echoMessage(message);
 }

@@ -54,10 +54,8 @@ namespace Beautifier {
 namespace Internal {
 namespace ArtisticStyle {
 
-ArtisticStyle::ArtisticStyle(BeautifierPlugin *parent) :
-    BeautifierAbstractTool(parent),
-    m_beautifierPlugin(parent),
-    m_settings(new ArtisticStyleSettings)
+ArtisticStyle::ArtisticStyle()
+    : m_settings(new ArtisticStyleSettings)
 {
 }
 
@@ -81,6 +79,8 @@ bool ArtisticStyle::initialize()
     connect(m_settings, &ArtisticStyleSettings::supportedMimeTypesChanged,
             [this] { updateActions(Core::EditorManager::currentEditor()); });
 
+    new ArtisticStyleOptionsPage(m_settings, this);
+
     return true;
 }
 
@@ -94,11 +94,6 @@ void ArtisticStyle::updateActions(Core::IEditor *editor)
     m_formatFile->setEnabled(editor && m_settings->isApplicable(editor->document()));
 }
 
-QList<QObject *> ArtisticStyle::autoReleaseObjects()
-{
-    return {new ArtisticStyleOptionsPage(m_settings, this)};
-}
-
 void ArtisticStyle::formatFile()
 {
     const QString cfgFileName = configurationFile();
@@ -106,7 +101,7 @@ void ArtisticStyle::formatFile()
         BeautifierPlugin::showError(BeautifierPlugin::msgCannotGetConfigurationFile(
                                         tr(Constants::ArtisticStyle::DISPLAY_NAME)));
     } else {
-        m_beautifierPlugin->formatCurrentFile(command(cfgFileName));
+        BeautifierPlugin::formatCurrentFile(command(cfgFileName));
     }
 }
 
@@ -118,13 +113,13 @@ QString ArtisticStyle::configurationFile() const
     if (m_settings->useOtherFiles()) {
         if (const ProjectExplorer::Project *project
                 = ProjectExplorer::ProjectTree::currentProject()) {
-            const QStringList files = project->files(ProjectExplorer::Project::AllFiles);
-            for (const QString &file : files) {
+            const Utils::FileNameList files = project->files(ProjectExplorer::Project::AllFiles);
+            for (const Utils::FileName &file : files) {
                 if (!file.endsWith(".astylerc"))
                     continue;
-                const QFileInfo fi(file);
+                const QFileInfo fi = file.toFileInfo();
                 if (fi.isReadable())
-                    return file;
+                    return file.toString();
             }
         }
     }

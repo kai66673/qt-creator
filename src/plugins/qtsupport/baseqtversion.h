@@ -133,7 +133,10 @@ public:
     virtual void addToEnvironment(const ProjectExplorer::Kit *k, Utils::Environment &env) const;
     virtual Utils::Environment qmakeRunEnvironment() const;
 
+    // source path defined by qmake property QT_INSTALL_PREFIX/src or by qmake.stash QT_SOURCE_TREE
     virtual Utils::FileName sourcePath() const;
+    // returns source path for installed qt packages and empty string for self build qt
+    Utils::FileName qtPackageSourcePath() const;
     bool isInSourceDirectory(const Utils::FileName &filePath);
     bool isSubProject(const Utils::FileName &filePath) const;
 
@@ -141,8 +144,6 @@ public:
     virtual QString uicCommand() const;
     virtual QString designerCommand() const;
     virtual QString linguistCommand() const;
-    QString qmlsceneCommand() const;
-    QString qmlviewerCommand() const;
     QString qscxmlcCommand() const;
 
     QString qtVersionString() const;
@@ -188,10 +189,10 @@ public:
     ///         warnings and finally info items.
     QList<ProjectExplorer::Task> reportIssues(const QString &proFile, const QString &buildDir) const;
 
-    static bool isQmlDebuggingSupported(ProjectExplorer::Kit *k, QString *reason = 0);
-    bool isQmlDebuggingSupported(QString *reason = 0) const;
-    static bool isQtQuickCompilerSupported(ProjectExplorer::Kit *k, QString *reason = 0);
-    bool isQtQuickCompilerSupported(QString *reason = 0) const;
+    static bool isQmlDebuggingSupported(ProjectExplorer::Kit *k, QString *reason = nullptr);
+    bool isQmlDebuggingSupported(QString *reason = nullptr) const;
+    static bool isQtQuickCompilerSupported(ProjectExplorer::Kit *k, QString *reason = nullptr);
+    bool isQtQuickCompilerSupported(QString *reason = nullptr) const;
 
     virtual QString qmlDumpTool(bool debugVersion) const;
 
@@ -204,7 +205,6 @@ public:
     static QString defaultUnexpandedDisplayName(const Utils::FileName &qmakePath,
                                       bool fromPath = false);
 
-    virtual QSet<Core::Id> availableFeatures() const;
     virtual QSet<Core::Id> targetDeviceTypes() const = 0;
 
     virtual QList<ProjectExplorer::Task> validateKit(const ProjectExplorer::Kit *k);
@@ -216,6 +216,8 @@ public:
     Utils::FileName qmlPath() const;
     Utils::FileName binPath() const;
     Utils::FileName mkspecsPath() const;
+    Utils::FileName qmlBinPath() const;
+    Utils::FileName librarySearchPath() const;
 
     Utils::FileNameList directoriesToIgnoreInProjectTree() const;
 
@@ -234,7 +236,9 @@ public:
     static void populateQmlFileFinder(Utils::FileInProjectFinder *finder,
                                       const ProjectExplorer::Target *target);
 
+    QSet<Core::Id> features() const;
 protected:
+    virtual QSet<Core::Id> availableFeatures() const;
     BaseQtVersion();
     BaseQtVersion(const Utils::FileName &path, bool isAutodetected = false, const QString &autodetectionSource = QString());
     BaseQtVersion(const BaseQtVersion &other);
@@ -255,8 +259,8 @@ private:
     void setupExpander();
     void updateSourcePath() const;
     void updateVersionInfo() const;
-    enum Binaries { QmlViewer, QmlScene, Designer, Linguist, Uic, QScxmlc };
-    QString findQtBinary(Binaries binary) const;
+    enum HostBinaries { Designer, Linguist, Uic, QScxmlc };
+    QString findHostBinary(HostBinaries binary) const;
     void updateMkspec() const;
     QHash<ProKey, ProString> versionInfo() const;
     static bool queryQMakeVariables(const Utils::FileName &binary, const Utils::Environment &env,
@@ -291,7 +295,9 @@ private:
 
     QString m_unexpandedDisplayName;
     QString m_autodetectionSource;
+    QSet<Core::Id> m_overrideFeatures;
     mutable Utils::FileName m_sourcePath;
+    mutable Utils::FileName m_qtSources;
 
     mutable Utils::FileName m_mkspec;
     mutable Utils::FileName m_mkspecFullPath;
@@ -305,8 +311,6 @@ private:
     mutable QString m_uicCommand;
     mutable QString m_designerCommand;
     mutable QString m_linguistCommand;
-    mutable QString m_qmlsceneCommand;
-    mutable QString m_qmlviewerCommand;
     mutable QString m_qscxmlcCommand;
 
     mutable QList<ProjectExplorer::Abi> m_qtAbis;

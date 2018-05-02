@@ -28,6 +28,7 @@
 #include "projectconfiguration.h"
 #include "projectexplorerconstants.h"
 #include "applicationlauncher.h"
+#include "buildtargetinfo.h"
 #include "devicesupport/idevice.h"
 
 #include <utils/port.h>
@@ -47,6 +48,7 @@ namespace ProjectExplorer {
 class Abi;
 class BuildConfiguration;
 class IRunConfigurationAspect;
+class IRunConfigurationFactory;
 class RunConfiguration;
 class RunConfigWidget;
 class RunControl;
@@ -102,20 +104,20 @@ public:
     explicit IRunConfigurationAspect(RunConfiguration *runConfig);
     ~IRunConfigurationAspect() override;
 
-    virtual IRunConfigurationAspect *create(RunConfiguration *runConfig) const = 0;
-    virtual IRunConfigurationAspect *clone(RunConfiguration *runConfig) const;
-
     using RunConfigWidgetCreator = std::function<RunConfigWidget *()>;
     void setRunConfigWidgetCreator(const RunConfigWidgetCreator &runConfigWidgetCreator);
     RunConfigWidget *createConfigurationWidget() const;
+    void copyFrom(IRunConfigurationAspect *other);
 
     void setId(Core::Id id) { m_id = id; }
     void setDisplayName(const QString &displayName) { m_displayName = displayName; }
+    void setSettingsKey(const QString &settingsKey) { m_settingsKey = settingsKey; }
     void setProjectSettings(ISettingsAspect *settings);
     void setGlobalSettings(ISettingsAspect *settings);
 
-    QString displayName() const { return m_displayName; }
     Core::Id id() const { return m_id; }
+    QString displayName() const { return m_displayName; }
+    QString settingsKey() const { return  m_settingsKey; }
     bool isUsingGlobalSettings() const { return m_useGlobalSettings; }
     void setUsingGlobalSettings(bool value);
     void resetProjectToGlobalSettings();
@@ -133,6 +135,7 @@ protected:
 private:
     Core::Id m_id;
     QString m_displayName;
+    QString m_settingsKey; // Name of data in settings.
     bool m_useGlobalSettings = false;
     RunConfiguration *m_runConfiguration = nullptr;
     ISettingsAspect *m_projectSettings = nullptr; // Owned if present.
@@ -259,11 +262,7 @@ signals:
     void configurationFinished();
 
 protected:
-    friend class IRunConfigurationFactory;
-
-    RunConfiguration(Target *target);
-    void initialize(Core::Id id);
-    void copyFrom(const RunConfiguration *source);
+    RunConfiguration(Target *target, Core::Id id);
 
     /// convenience function to get current build configuration.
     BuildConfiguration *activeBuildConfiguration() const;
@@ -273,7 +272,30 @@ protected:
 private:
     static void addAspectFactory(const AspectFactory &aspectFactory);
 
+    friend class IRunConfigurationFactory;
+
     QList<IRunConfigurationAspect *> m_aspects;
+};
+
+class RunConfigurationCreationInfo
+{
+public:
+    enum CreationMode {AlwaysCreate, ManualCreationOnly};
+    RunConfigurationCreationInfo(const IRunConfigurationFactory *factory,
+                                 Core::Id id,
+                                 QString extra, QString displayName,
+                                 CreationMode creationMode = AlwaysCreate)
+        : factory(factory), id(id),
+          extra(extra),
+          displayName(displayName),
+          creationMode(creationMode)
+    {}
+
+    const IRunConfigurationFactory *factory = nullptr;
+    Core::Id id;
+    QString extra;
+    QString displayName;
+    CreationMode creationMode = AlwaysCreate;
 };
 
 class PROJECTEXPLORER_EXPORT IRunConfigurationFactory : public QObject
@@ -282,42 +304,68 @@ class PROJECTEXPLORER_EXPORT IRunConfigurationFactory : public QObject
 
 public:
     explicit IRunConfigurationFactory(QObject *parent = nullptr);
+    ~IRunConfigurationFactory();
 
-    enum CreationMode {UserCreate, AutoCreate};
-    virtual QList<Core::Id> availableCreationIds(Target *parent, CreationMode mode = UserCreate) const = 0;
-    virtual QString displayNameForId(Core::Id id) const = 0;
+    static const QList<IRunConfigurationFactory *> allRunConfigurationFactories();
 
-    virtual bool canCreate(Target *parent, Core::Id id) const = 0;
-    RunConfiguration *create(Target *parent, Core::Id id);
-    virtual bool canRestore(Target *parent, const QVariantMap &map) const = 0;
-    RunConfiguration *restore(Target *parent, const QVariantMap &map);
-    virtual bool canClone(Target *parent, RunConfiguration *product) const = 0;
-    virtual RunConfiguration *clone(Target *parent, RunConfiguration *product) = 0;
+    virtual QList<RunConfigurationCreationInfo> availableCreators(Target *parent) const;
+
+    virtual bool canHandle(Target *target) const;
+
+    RunConfiguration *create(Target *parent, Core::Id id, const QString &extra) const;
+    bool canRestore(Target *parent, const QVariantMap &map) const;
+    RunConfiguration *restore(Target *parent, const QVariantMap &map) const;
+    bool canClone(Target *parent, RunConfiguration *product) const;
+    RunConfiguration *clone(Target *parent, RunConfiguration *product) const;
 
     static IRunConfigurationFactory *find(Target *parent, const QVariantMap &map);
     static IRunConfigurationFactory *find(Target *parent, RunConfiguration *rc);
     static QList<IRunConfigurationFactory *> find(Target *parent);
 
-    template <class RunConfig, typename ...Args>
-    static RunConfig *createHelper(Target *target, Args ...args) {
-        auto runConfig = new RunConfig(target);
-        runConfig->initialize(args...);
-        return runConfig;
-    }
+    Core::Id runConfigurationBaseId() const { return m_runConfigBaseId; }
+
+    static QString decoratedTargetName(const QString targetName, Target *kit);
+
+protected:
+    virtual bool canCreateHelper(Target *parent, const QString &buildTarget) const;
+
+    using RunConfigurationCreator = std::function<RunConfiguration *(Target *)>;
 
     template <class RunConfig>
-    static RunConfig *cloneHelper(Target *target, const RunConfiguration *source) {
-        auto runConfig = new RunConfig(target);
-        runConfig->copyFrom(static_cast<const RunConfig *>(source));
-        return runConfig;
+    void registerRunConfiguration(Core::Id runConfigBaseId)
+    {
+        m_creator = [](Target *t) -> RunConfiguration * { return new RunConfig(t); };
+        m_runConfigBaseId = runConfigBaseId;
     }
 
-signals:
-    void availableCreationIdsChanged();
+    void addSupportedProjectType(Core::Id id);
+    void setSupportedTargetDeviceTypes(const QList<Core::Id> &ids);
+    void setDisplayNamePattern(const QString &pattern);
+
+    RunConfigurationCreationInfo convert(const BuildTargetInfo &ti) const;
+    RunConfigurationCreationInfo convert(const QString &displayName, const QString &targetName = QString()) const;
 
 private:
-    virtual RunConfiguration *doCreate(Target *parent, Core::Id id) = 0;
-    virtual RunConfiguration *doRestore(Target *parent, const QVariantMap &map) = 0;
+    RunConfigurationCreator m_creator;
+    Core::Id m_runConfigBaseId;
+    QList<Core::Id> m_supportedProjectTypes;
+    QList<Core::Id> m_supportedTargetDeviceTypes;
+};
+
+class PROJECTEXPLORER_EXPORT FixedRunConfigurationFactory : public IRunConfigurationFactory
+{
+    Q_OBJECT
+
+public:
+    explicit FixedRunConfigurationFactory(const QString &displayName,
+                                          bool addDeviceName = false,
+                                          QObject *parent = nullptr);
+
+    QList<RunConfigurationCreationInfo> availableCreators(Target *parent) const override;
+
+private:
+    const QString m_fixedBuildTarget;
+    const bool m_decorateTargetName;
 };
 
 class PROJECTEXPLORER_EXPORT RunConfigWidget : public QWidget
@@ -354,7 +402,7 @@ public:
     QVariant recordedData(const QString &channel) const;
 
     // Part of read-only interface of RunControl for convenience.
-    void appendMessage(const QString &msg, Utils::OutputFormat format);
+    void appendMessage(const QString &msg, Utils::OutputFormat format, bool appendNewLine = true);
     IDevice::ConstPtr device() const;
     const Runnable &runnable() const;
     Core::Id runMode() const;

@@ -27,8 +27,9 @@
 
 #include <projectexplorer/runnables.h>
 
-#include <QStringList>
+#include <QCheckBox>
 #include <QLabel>
+#include <QStringList>
 #include <QWidget>
 
 namespace qbs { class InstallOptions; }
@@ -63,29 +64,30 @@ public:
     QString buildSystemTarget() const final;
     QString uniqueProductName() const;
     bool isConsoleApplication() const;
+    bool usingLibraryPaths() const { return m_usingLibraryPaths; }
+    void setUsingLibraryPaths(bool useLibPaths);
 
 signals:
     void targetInformationChanged();
     void usingDyldImageSuffixChanged(bool);
 
-
 private:
-    void initialize(Core::Id id);
-    void copyFrom(const QbsRunConfiguration *source);
+    QVariantMap toMap() const final;
+    bool fromMap(const QVariantMap &map) final;
+    QString extraId() const final;
 
     void installStepChanged();
     void installStepToBeRemoved(int pos);
     QString baseWorkingDirectory() const;
     QString defaultDisplayName();
 
-    void ctor();
-
     void updateTarget();
-
-    QString m_uniqueProductName;
 
     QbsInstallStep *m_currentInstallStep = nullptr; // We do not take ownership!
     ProjectExplorer::BuildStepList *m_currentBuildStepList = nullptr; // We do not take ownership!
+    QString m_uniqueProductName;
+    QString m_productDisplayName;
+    bool m_usingLibraryPaths = true;
 };
 
 class QbsRunConfigurationWidget : public QWidget
@@ -102,6 +104,7 @@ private:
 
     QbsRunConfiguration *m_rc;
     QLabel *m_executableLineLabel;
+    QCheckBox *m_usingLibPathsCheckBox;
     bool m_ignoreChange = false;
     bool m_isShown = false;
 };
@@ -113,20 +116,10 @@ class QbsRunConfigurationFactory : public ProjectExplorer::IRunConfigurationFact
 public:
     explicit QbsRunConfigurationFactory(QObject *parent = 0);
 
-    bool canCreate(ProjectExplorer::Target *parent, Core::Id id) const override;
-    bool canRestore(ProjectExplorer::Target *parent, const QVariantMap &map) const override;
-    bool canClone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *source) const override;
-    ProjectExplorer::RunConfiguration *clone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *source) override;
+    bool canCreateHelper(ProjectExplorer::Target *parent, const QString &suffix) const override;
 
-    QList<Core::Id> availableCreationIds(ProjectExplorer::Target *parent, CreationMode mode) const override;
-    QString displayNameForId(Core::Id id) const override;
-
-private:
-    bool canHandle(ProjectExplorer::Target *t) const;
-
-    ProjectExplorer::RunConfiguration *doCreate(ProjectExplorer::Target *parent, Core::Id id) override;
-    ProjectExplorer::RunConfiguration *doRestore(ProjectExplorer::Target *parent,
-                                                 const QVariantMap &map) override;
+    QList<ProjectExplorer::RunConfigurationCreationInfo>
+    availableCreators(ProjectExplorer::Target *parent) const override;
 };
 
 } // namespace Internal

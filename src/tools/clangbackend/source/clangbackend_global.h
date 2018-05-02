@@ -36,4 +36,14 @@ enum class PreferredTranslationUnit
     LastUninitialized,
 };
 
+// CLANG-UPGRADE-CHECK: Remove IS_PRETTY_DECL_SUPPORTED once we require clang >= 7.0
+#if defined(CINDEX_VERSION_HAS_PRETTYDECL_BACKPORTED) || CINDEX_VERSION_MINOR >= 47
+#  define IS_PRETTY_DECL_SUPPORTED
+#endif
+
+// CLANG-UPGRADE-CHECK: Remove IS_INVALIDDECL_SUPPORTED once we require clang >= 7.0
+#if defined(CINDEX_VERSION_HAS_ISINVALIDECL_BACKPORTED) || CINDEX_VERSION_MINOR >= 46
+#  define IS_INVALIDDECL_SUPPORTED
+#endif
+
 } // namespace ClangBackEnd

@@ -50,6 +50,7 @@ public:
         Invalid,
 
         UpdateDocumentAnnotations,
+        UpdateExtraDocumentAnnotations,
         CreateInitialDocumentPreamble,
 
         ParseSupportiveTranslationUnit,
@@ -59,6 +60,7 @@ public:
         RequestDocumentAnnotations,
         RequestReferences,
         FollowSymbol,
+        RequestToolTip,
 
         SuspendDocument,
         ResumeDocument,
@@ -70,7 +72,8 @@ public:
         DocumentNotVisible      = 1 << 2,
         DocumentSuspended       = 1 << 3,
         DocumentUnsuspended     = 1 << 4,
-        CurrentDocumentRevision = 1 << 5,
+        DocumentParsed          = 1 << 5,
+        CurrentDocumentRevision = 1 << 6,
     };
     Q_DECLARE_FLAGS(RunConditions, RunCondition)
 
@@ -94,6 +97,7 @@ public:
 
     IAsyncJob *createJob() const;
     void cancelJob(ClangCodeModelClientInterface &client) const;
+    bool isTakeOverable() const;
 
     bool operator==(const JobRequest &other) const;
 
@@ -117,7 +121,8 @@ public:
     qint32 funcNameStartLine = -1;
     qint32 funcNameStartColumn = -1;
     quint64 ticketNumber = 0;
-    Utf8StringVector dependentFiles;
+    Utf8String textCodecName;
+    bool localReferences = false;
 };
 
 using JobRequests = QVector<JobRequest>;
