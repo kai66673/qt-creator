@@ -155,7 +155,7 @@ void FileScope::fillMethods(QList<TextEditor::AssistProposalItemInterface *> &co
     }
 }
 
-void FileScope::fillLink(TextEditor::TextEditorWidget::Link &link, unsigned tokenIndex)
+void FileScope::fillLink(Utils::Link &link, unsigned tokenIndex)
 {
     const Token &tk = m_source->translationUnit()->tokenAt(tokenIndex);
     link.targetFileName = m_source->fileName();

@@ -37,33 +37,15 @@ using namespace ProjectExplorer;
 
 namespace GoLang {
 
-GoCompilerCleanStepFactory::GoCompilerCleanStepFactory(QObject *parent)
-    : IBuildStepFactory(parent)
-{ }
-
-QList<BuildStepInfo> GoCompilerCleanStepFactory::availableSteps(BuildStepList *parent) const
+GoCompilerCleanStepFactory::GoCompilerCleanStepFactory()
+    : BuildStepFactory()
 {
-    if (parent->id() != ProjectExplorer::Constants::BUILDSTEPS_CLEAN)
-        return {};
-
-    auto bc = qobject_cast<GoBuildConfiguration *>(parent->parent());
-    if (!bc || bc->hasGoCompilerCleanStep())
-        return {};
-
-    return {{ Constants::C_GOCOMPILERCLEANSTEP_ID, tr("Go Compiler Clean Step") }};
-}
-
-BuildStep *GoCompilerCleanStepFactory::create(BuildStepList *parent, Core::Id)
-{
-    return new GoCompilerBuildStep(parent, GoCompilerBuildStep::Clean);
-}
-
-BuildStep *GoCompilerCleanStepFactory::clone(BuildStepList *parent, BuildStep *buildStep)
-{
-    QTC_ASSERT(parent, return nullptr);
-    QTC_ASSERT(buildStep, return nullptr);
-    std::unique_ptr<GoCompilerBuildStep> result(new GoCompilerBuildStep(parent, GoCompilerBuildStep::Clean));
-    return result->fromMap(buildStep->toMap()) ? result.release() : nullptr;
+    registerStep<GoCompilerCleanStep>(Constants::C_GOCOMPILERCLEANSTEP_ID);
+    setDisplayName(tr("Go Compiler Clean Step"));
+    setFlags(BuildStepInfo::Unclonable);
+    setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_CLEAN);
+    setSupportedConfiguration(Constants::C_GOBUILDCONFIGURATION_ID);
+    setRepeatable(false);
 }
 
 }   // namespace GoLang

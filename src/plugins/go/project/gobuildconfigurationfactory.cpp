@@ -45,9 +45,13 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoBuildConfigurationFactory::GoBuildConfigurationFactory(QObject *parent)
-    : IBuildConfigurationFactory(parent)
-{ }
+GoBuildConfigurationFactory::GoBuildConfigurationFactory()
+    : IBuildConfigurationFactory()
+{
+    registerBuildConfiguration<GoBuildConfiguration>(Constants::C_GOBUILDCONFIGURATION_ID);
+    setSupportedProjectType(Constants::C_GOPROJECT_ID);
+    setSupportedProjectMimeTypeName(Constants::C_GO_PROJECT_MIMETYPE);
+}
 
 QList<BuildInfo *> GoBuildConfigurationFactory::availableBuilds(const Target *parent) const
 {
@@ -55,16 +59,21 @@ QList<BuildInfo *> GoBuildConfigurationFactory::availableBuilds(const Target *pa
     GoProject *project = qobject_cast<GoProject *>(parent->project());
     QTC_ASSERT(project, return {});
 
-    QFileInfo projFileInfo(project->projectFilePath().toFileInfo());
-    ProjectExplorer::BuildInfo *goBuild = new ProjectExplorer::BuildInfo(this);
-    goBuild->displayName = tr("Default");
-    goBuild->buildDirectory = Utils::FileName::fromString(projFileInfo.absolutePath());
-    goBuild->kitId = parent->kit()->id();
-    goBuild->typeName = QStringLiteral("Default");
-    return { goBuild };
+    // Create the build info
+    BuildInfo *info = createBuildInfo(parent->kit(), project->projectFilePath().toString());
+
+    info->displayName.clear(); // ask for a name
+    info->buildDirectory.clear(); // This depends on the displayName
+
+    return {info};
 }
 
 QList<BuildInfo *> GoBuildConfigurationFactory::availableSetups(const Kit *k, const QString &projectPath) const
+{
+    return { createBuildInfo(k, projectPath) };
+}
+
+BuildInfo *GoBuildConfigurationFactory::createBuildInfo(const Kit *k, const QString &projectPath) const
 {
     QFileInfo projFileInfo(projectPath);
     ProjectExplorer::BuildInfo *goBuild = new ProjectExplorer::BuildInfo(this);
@@ -73,86 +82,6 @@ QList<BuildInfo *> GoBuildConfigurationFactory::availableSetups(const Kit *k, co
     goBuild->kitId = k->id();
     goBuild->typeName = QStringLiteral("Default");
     return { goBuild };
-}
-
-BuildConfiguration *GoBuildConfigurationFactory::create(Target *parent, const BuildInfo *info) const
-{
-    GoProject *project = qobject_cast<GoProject *>(parent->project());
-    QTC_ASSERT(project, return nullptr);
-
-    // Create the build configuration and initialize it from build info
-    GoBuildConfiguration *result = new GoBuildConfiguration(parent);
-    result->setDisplayName(info->displayName);
-    result->setDefaultDisplayName(info->displayName);
-    result->setBuildDirectory(info->buildDirectory);
-
-    // Add Go compiler build step
-    BuildStepList *buildSteps = result->stepList(Core::Id(ProjectExplorer::Constants::BUILDSTEPS_BUILD));
-    buildSteps->appendStep(new GoCompilerBuildStep(buildSteps, GoCompilerBuildStep::Get));
-    buildSteps->appendStep(new GoCompilerBuildStep(buildSteps, GoCompilerBuildStep::Build));
-
-
-    // Add clean step
-    BuildStepList *cleanSteps = result->stepList(Core::Id(ProjectExplorer::Constants::BUILDSTEPS_CLEAN));
-    cleanSteps->appendStep(new GoCompilerBuildStep(cleanSteps, GoCompilerBuildStep::Clean));
-
-    return result;
-}
-
-bool GoBuildConfigurationFactory::canRestore(const Target *parent, const QVariantMap &map) const
-{
-    Q_UNUSED(parent);
-    return GoBuildConfiguration::canRestore(map);
-}
-
-BuildConfiguration *GoBuildConfigurationFactory::restore(Target *parent, const QVariantMap &map)
-{
-    QTC_ASSERT(canRestore(parent, map), return nullptr);
-
-    // Create the build configuration
-    auto result = new GoBuildConfiguration(parent);
-
-    // Restore from map
-    bool status = result->fromMap(map);
-    QTC_ASSERT(status, return nullptr);
-
-    return result;
-}
-
-bool GoBuildConfigurationFactory::canClone(const Target *parent, BuildConfiguration *product) const
-{
-    QTC_ASSERT(parent, return false);
-    QTC_ASSERT(product, return false);
-    return product->id() == Constants::C_GOBUILDCONFIGURATION_ID;
-}
-
-BuildConfiguration *GoBuildConfigurationFactory::clone(Target *parent, BuildConfiguration *product)
-{
-    QTC_ASSERT(parent, return nullptr);
-    QTC_ASSERT(product, return nullptr);
-    auto buildConfiguration = qobject_cast<GoBuildConfiguration *>(product);
-    QTC_ASSERT(buildConfiguration, return nullptr);
-    std::unique_ptr<GoBuildConfiguration> result(new GoBuildConfiguration(parent));
-    return result->fromMap(buildConfiguration->toMap()) ? result.release() : nullptr;
-}
-
-int GoBuildConfigurationFactory::priority(const Kit *k, const QString &projectPath) const
-{
-    if (k && Utils::mimeTypeForFile(projectPath).matchesName(QLatin1String(Constants::C_GO_PROJECT_MIMETYPE)))
-        return 0;
-    return -1;
-}
-
-int GoBuildConfigurationFactory::priority(const Target *parent) const
-{
-    return canHandle(parent) ? 0 : -1;
-}
-
-bool GoBuildConfigurationFactory::canHandle(const Target *t) const
-{
-    if (!t->project()->supportsKit(t->kit()))
-        return false;
-    return qobject_cast<GoProject *>(t->project());
 }
 
 }   // namespace GoLang

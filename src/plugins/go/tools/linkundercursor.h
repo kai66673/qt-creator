@@ -34,7 +34,7 @@ class LinkUnderCursor: public SymbolUnderCursor
 public:
     LinkUnderCursor(GoSource::Ptr doc);
 
-    TextEditor::TextEditorWidget::Link link(unsigned pos);
+    Utils::Link link(unsigned pos);
 
 private:
     void defineLinkUnderCursor();

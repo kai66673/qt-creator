@@ -53,7 +53,7 @@ public:
 
     void editorDocumentTimerRestarted();
 
-    TextEditor::TextEditorWidget::Link findLinkAt(const QTextCursor &tc);
+    Utils::Link findLinkAt(const QTextCursor &tc);
     QString evaluateIdentifierTypeDescription(int pos);
     void findUsages(int pos);
     void renameSymbolUnderCursor(int pos);

@@ -37,33 +37,14 @@ using namespace ProjectExplorer;
 
 namespace GoLang {
 
-GoCompilerBuildStepFactory::GoCompilerBuildStepFactory(QObject *parent)
-    : IBuildStepFactory(parent)
-{ }
-
-QList<BuildStepInfo> GoCompilerBuildStepFactory::availableSteps(BuildStepList *parent) const
+GoCompilerBuildStepFactory::GoCompilerBuildStepFactory()
+    : BuildStepFactory()
 {
-    if (parent->id() != ProjectExplorer::Constants::BUILDSTEPS_BUILD)
-        return {};
-
-    auto bc = qobject_cast<GoBuildConfiguration *>(parent->parent());
-    if (!bc || bc->hasGoCompilerBuildStep())
-        return {};
-
-    return {{ Constants::C_GOCOMPILERBUILDSTEP_ID, tr("Go Compiler Build Step") }};
-}
-
-BuildStep *GoCompilerBuildStepFactory::create(BuildStepList *parent, Core::Id)
-{
-    return new GoCompilerBuildStep(parent, GoCompilerBuildStep::Build);
-}
-
-BuildStep *GoCompilerBuildStepFactory::clone(BuildStepList *parent, BuildStep *buildStep)
-{
-    QTC_ASSERT(parent, return nullptr);
-    QTC_ASSERT(buildStep, return nullptr);
-    std::unique_ptr<GoCompilerBuildStep> result(new GoCompilerBuildStep(parent, GoCompilerBuildStep::Build));
-    return result->fromMap(buildStep->toMap()) ? result.release() : nullptr;
+    registerStep<GoCompilerBuildStep>(Constants::C_GOCOMPILERBUILDSTEP_ID);
+    setDisplayName(tr("Go Compiler Build Step"));
+    setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
+    setSupportedConfiguration(Constants::C_GOBUILDCONFIGURATION_ID);
+    setRepeatable(false);
 }
 
 }   // namespace GoLang

@@ -32,7 +32,7 @@
 
 namespace GoLang {
 
-class GoCompilerBuildStep : public ProjectExplorer::AbstractProcessStep
+class BaseGoCompilerStep : public ProjectExplorer::AbstractProcessStep
 {
     Q_OBJECT
 
@@ -43,7 +43,7 @@ public:
         Clean
     };
 
-    GoCompilerBuildStep(ProjectExplorer::BuildStepList *parentList, GoOption option);
+    BaseGoCompilerStep(ProjectExplorer::BuildStepList *parentList, GoOption option);
 
     ProjectExplorer::BuildStepConfigWidget *createConfigWidget() override;
     bool init(QList<const BuildStep *> &earlierSteps) override;
@@ -77,6 +77,30 @@ private:
     GoOption m_goOption;
 
     Utils::FileName m_outFilePath;
+};
+
+class GoCompilerGetStep: public BaseGoCompilerStep
+{
+    Q_OBJECT
+
+public:
+    GoCompilerGetStep(ProjectExplorer::BuildStepList *parentList);
+};
+
+class GoCompilerBuildStep: public BaseGoCompilerStep
+{
+    Q_OBJECT
+
+public:
+    GoCompilerBuildStep(ProjectExplorer::BuildStepList *parentList);
+};
+
+class GoCompilerCleanStep: public BaseGoCompilerStep
+{
+    Q_OBJECT
+
+public:
+    GoCompilerCleanStep(ProjectExplorer::BuildStepList *parentList);
 };
 
 }   // namespace GoLang

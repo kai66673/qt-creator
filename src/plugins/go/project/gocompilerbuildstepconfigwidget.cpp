@@ -39,7 +39,7 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoCompilerBuildStepConfigWidget::GoCompilerBuildStepConfigWidget(GoCompilerBuildStep *buildStep)
+GoCompilerBuildStepConfigWidget::GoCompilerBuildStepConfigWidget(BaseGoCompilerStep *buildStep)
     : BuildStepConfigWidget()
     , m_buildStep(buildStep)
     , m_ui(new Ui::GoCompilerBuildStepConfigWidget())
@@ -70,13 +70,13 @@ QString GoCompilerBuildStepConfigWidget::summaryText() const
     QString result;
 
     switch (m_buildStep->goOption()) {
-        case GoCompilerBuildStep::Get:
+        case BaseGoCompilerStep::Get:
             result = Constants::C_GOCOMPILERGETSTEPWIDGET_SUMMARY;
             break;
-        case GoCompilerBuildStep::Build:
+        case BaseGoCompilerStep::Build:
             result = Constants::C_GOCOMPILERBUILDSTEPWIDGET_SUMMARY;
             break;
-        case GoCompilerBuildStep::Clean:
+        case BaseGoCompilerStep::Clean:
             result = Constants::C_GOCOMPILERCLEANSTEPWIDGET_SUMMARY;
             break;
     }
@@ -89,13 +89,13 @@ QString GoCompilerBuildStepConfigWidget::displayName() const
     QString result;
 
     switch (m_buildStep->goOption()) {
-        case GoCompilerBuildStep::Get:
+        case BaseGoCompilerStep::Get:
             result = Constants::C_GOCOMPILERGETSTEPWIDGET_DISPLAY;
             break;
-        case GoCompilerBuildStep::Build:
+        case BaseGoCompilerStep::Build:
             result = Constants::C_GOCOMPILERBUILDSTEPWIDGET_DISPLAY;
             break;
-        case GoCompilerBuildStep::Clean:
+        case BaseGoCompilerStep::Clean:
             result = Constants::C_GOCOMPILERCLEANSTEPWIDGET_DISPLAY;
             break;
     }

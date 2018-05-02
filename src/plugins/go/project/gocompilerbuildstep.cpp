@@ -44,7 +44,7 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoCompilerBuildStep::GoCompilerBuildStep(ProjectExplorer::BuildStepList *parentList, GoOption option)
+BaseGoCompilerStep::BaseGoCompilerStep(ProjectExplorer::BuildStepList *parentList, GoOption option)
     : AbstractProcessStep(parentList,
                           option == Clean ? Constants::C_GOCOMPILERCLEANSTEP_ID
                                           : (option == Build ? Constants::C_GOCOMPILERBUILDSTEP_ID : Constants::C_GOCOMPILERGETSTEP_ID))
@@ -67,21 +67,21 @@ GoCompilerBuildStep::GoCompilerBuildStep(ProjectExplorer::BuildStepList *parentL
 
     GoBuildConfiguration *bc = qobject_cast<GoBuildConfiguration *>(buildConfiguration());
     connect(bc, &GoBuildConfiguration::buildDirectoryChanged,
-            this, &GoCompilerBuildStep::updateProcessParameters);
+            this, &BaseGoCompilerStep::updateProcessParameters);
     connect(bc, &BuildConfiguration::environmentChanged,
-            this, &GoCompilerBuildStep::updateEnvironment);
+            this, &BaseGoCompilerStep::updateEnvironment);
     if (m_goOption == Build)
-        connect(this, &GoCompilerBuildStep::outFilePathChanged,
+        connect(this, &BaseGoCompilerStep::outFilePathChanged,
                 bc, &GoBuildConfiguration::outFilePathChanged);
     updateProcessParameters();
 }
 
-ProjectExplorer::BuildStepConfigWidget *GoCompilerBuildStep::createConfigWidget()
+ProjectExplorer::BuildStepConfigWidget *BaseGoCompilerStep::createConfigWidget()
 {
     return new GoCompilerBuildStepConfigWidget(this);
 }
 
-bool GoCompilerBuildStep::init(QList<const BuildStep *> &earlierSteps)
+bool BaseGoCompilerStep::init(QList<const BuildStep *> &earlierSteps)
 {
     setOutputParser(new GoOutputParser());
     if (IOutputParser *parser = target()->kit()->createOutputParser())
@@ -90,7 +90,7 @@ bool GoCompilerBuildStep::init(QList<const BuildStep *> &earlierSteps)
     return AbstractProcessStep::init(earlierSteps);
 }
 
-void GoCompilerBuildStep::run(QFutureInterface<bool> &fi)
+void BaseGoCompilerStep::run(QFutureInterface<bool> &fi)
 {
     ProcessParameters *parameters = processParameters();
     Environment env = parameters->environment();
@@ -105,7 +105,7 @@ void GoCompilerBuildStep::run(QFutureInterface<bool> &fi)
     AbstractProcessStep::run(fi);
 }
 
-bool GoCompilerBuildStep::fromMap(const QVariantMap &map)
+bool BaseGoCompilerStep::fromMap(const QVariantMap &map)
 {
     AbstractProcessStep::fromMap(map);
     switch (m_goOption) {
@@ -124,7 +124,7 @@ bool GoCompilerBuildStep::fromMap(const QVariantMap &map)
     return true;
 }
 
-QVariantMap GoCompilerBuildStep::toMap() const
+QVariantMap BaseGoCompilerStep::toMap() const
 {
     QVariantMap result = AbstractProcessStep::toMap();
 
@@ -143,19 +143,19 @@ QVariantMap GoCompilerBuildStep::toMap() const
     return result;
 }
 
-QStringList GoCompilerBuildStep::userCompilerOptions() const
+QStringList BaseGoCompilerStep::userCompilerOptions() const
 {
     return m_userCompilerOptions;
 }
 
-void GoCompilerBuildStep::setUserCompilerOptions(const QStringList &options)
+void BaseGoCompilerStep::setUserCompilerOptions(const QStringList &options)
 {
     m_userCompilerOptions = options;
     emit userCompilerOptionsChanged(options);
     updateProcessParameters();
 }
 
-void GoCompilerBuildStep::updateProcessParameters()
+void BaseGoCompilerStep::updateProcessParameters()
 {
     updateOutFilePath();
     updateCommand();
@@ -165,19 +165,19 @@ void GoCompilerBuildStep::updateProcessParameters()
     emit processParametersChanged();
 }
 
-void GoCompilerBuildStep::updateCommand()
+void BaseGoCompilerStep::updateCommand()
 {
     processParameters()->setCommand(QStringLiteral("go"));
 }
 
-void GoCompilerBuildStep::updateWorkingDirectory()
+void BaseGoCompilerStep::updateWorkingDirectory()
 {
     auto bc = qobject_cast<GoBuildConfiguration *>(buildConfiguration());
     QTC_ASSERT(bc, return);
     processParameters()->setWorkingDirectory(bc->buildDirectory().toString());
 }
 
-void GoCompilerBuildStep::updateArguments()
+void BaseGoCompilerStep::updateArguments()
 {
     auto bc = qobject_cast<GoBuildConfiguration *>(buildConfiguration());
     QTC_ASSERT(bc, return);
@@ -206,19 +206,19 @@ void GoCompilerBuildStep::updateArguments()
     processParameters()->setArguments(arguments.join(QChar::Space));
 }
 
-void GoCompilerBuildStep::updateEnvironment()
+void BaseGoCompilerStep::updateEnvironment()
 {
     auto bc = qobject_cast<GoBuildConfiguration *>(buildConfiguration());
     QTC_ASSERT(bc, return);
     processParameters()->setEnvironment(bc->environment());
 }
 
-Utils::FileName GoCompilerBuildStep::outFilePath() const
+Utils::FileName BaseGoCompilerStep::outFilePath() const
 {
     return m_outFilePath;
 }
 
-void GoCompilerBuildStep::setOutFilePath(const Utils::FileName &outFilePath)
+void BaseGoCompilerStep::setOutFilePath(const Utils::FileName &outFilePath)
 {
     if (outFilePath == m_outFilePath)
         return;
@@ -226,10 +226,10 @@ void GoCompilerBuildStep::setOutFilePath(const Utils::FileName &outFilePath)
     emit outFilePathChanged(outFilePath);
 }
 
-GoCompilerBuildStep::GoOption GoCompilerBuildStep::goOption() const
+BaseGoCompilerStep::GoOption BaseGoCompilerStep::goOption() const
 { return m_goOption; }
 
-void GoCompilerBuildStep::updateOutFilePath()
+void BaseGoCompilerStep::updateOutFilePath()
 {
     if (m_goOption == Build) {
         GoBuildConfiguration *bc = qobject_cast<GoBuildConfiguration *>(buildConfiguration());
@@ -239,5 +239,17 @@ void GoCompilerBuildStep::updateOutFilePath()
         setOutFilePath(FileName::fromString(targetName));
     }
 }
+
+GoCompilerGetStep::GoCompilerGetStep(BuildStepList *parentList)
+    : BaseGoCompilerStep(parentList, BaseGoCompilerStep::Get)
+{ }
+
+GoCompilerBuildStep::GoCompilerBuildStep(BuildStepList *parentList)
+    : BaseGoCompilerStep(parentList, BaseGoCompilerStep::Build)
+{ }
+
+GoCompilerCleanStep::GoCompilerCleanStep(BuildStepList *parentList)
+    : BaseGoCompilerStep(parentList, BaseGoCompilerStep::Clean)
+{ }
 
 }   // namespace GoLang

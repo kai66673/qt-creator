@@ -188,7 +188,7 @@ void GoEditorWidget::findUsages()
 void GoEditorWidget::renameSymbolUnderCursor()
 { d->m_goDocument->renameSymbolUnderCursor(textCursor().position()); }
 
-TextEditorWidget::Link GoEditorWidget::findLinkAt(const QTextCursor &tc, bool /*resolveTarget*/, bool /*inNextSplit*/)
+Utils::Link GoEditorWidget::findLinkAt(const QTextCursor &tc, bool /*resolveTarget*/, bool /*inNextSplit*/)
 { return d->m_goDocument->findLinkAt(tc); }
 
 void GoEditorWidget::finalizeInitialization()

@@ -31,20 +31,20 @@ LinkUnderCursor::LinkUnderCursor(GoSource::Ptr doc)
     : SymbolUnderCursor(doc)
 { }
 
-TextEditor::TextEditorWidget::Link LinkUnderCursor::link(unsigned pos)
+Utils::Link LinkUnderCursor::link(unsigned pos)
 {
     m_pos = pos;
     defineLinkUnderCursor();
 
     if (m_symbol && m_token && m_symbol->owner()) {
-        TextEditor::TextEditorWidget::Link link;
+        Utils::Link link;
         link.linkTextStart = m_token->begin();
         link.linkTextEnd = m_token->end();
         m_symbol->fileScope()->fillLink(link, m_symbol->sourceLocation());
         return link;
     }
 
-    return TextEditor::TextEditorWidget::Link();
+    return Utils::Link();
 }
 
 void LinkUnderCursor::defineLinkUnderCursor()

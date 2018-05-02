@@ -38,7 +38,7 @@ GoHoverHandler::GoHoverHandler() :
     TextEditor::BaseHoverHandler()
 { }
 
-void GoHoverHandler::identifyMatch(TextEditor::TextEditorWidget *editorWidget, int pos)
+void GoHoverHandler::identifyMatch(TextEditor::TextEditorWidget *editorWidget, int pos, ReportPriority)
 {
     const QString extraSelectionTooltip = editorWidget->extraSelectionTooltip(pos);
     if (!extraSelectionTooltip.isEmpty()) {

@@ -169,7 +169,7 @@ bool GoDocument::save(QString *errorString, const QString &fileName, bool autoSa
     return true;
 }
 
-TextEditorWidget::Link GoDocument::findLinkAt(const QTextCursor &tc)
+Utils::Link GoDocument::findLinkAt(const QTextCursor &tc)
 { return processor()->findLinkAt(tc); }
 
 QString GoDocument::evaluateIdentifierTypeDescription(int pos)

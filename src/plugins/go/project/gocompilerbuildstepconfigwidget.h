@@ -31,7 +31,7 @@
 
 namespace GoLang {
 
-class GoCompilerBuildStep;
+class BaseGoCompilerStep;
 
 namespace Ui { class GoCompilerBuildStepConfigWidget; }
 
@@ -40,7 +40,7 @@ class GoCompilerBuildStepConfigWidget : public ProjectExplorer::BuildStepConfigW
     Q_OBJECT
 
 public:
-    GoCompilerBuildStepConfigWidget(GoCompilerBuildStep *buildStep);
+    GoCompilerBuildStepConfigWidget(BaseGoCompilerStep *buildStep);
     ~GoCompilerBuildStepConfigWidget();
 
     QString summaryText() const override;
@@ -53,7 +53,7 @@ private:
 
     void onAdditionalArgumentsTextEdited(const QString &text);
 
-    GoCompilerBuildStep *m_buildStep;
+    BaseGoCompilerStep *m_buildStep;
     QScopedPointer<Ui::GoCompilerBuildStepConfigWidget> m_ui;
 };
 

@@ -129,7 +129,7 @@ public:
 
     virtual FileScope *asFileScope() override { return this; }
 
-    void fillLink(TextEditor::TextEditorWidget::Link &link, unsigned tokenIndex);
+    void fillLink(Utils::Link &link, unsigned tokenIndex);
 
     GoSource *source() const;
 

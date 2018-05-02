@@ -35,68 +35,10 @@
 namespace GoLang {
 
 GoRunConfigurationFactory::GoRunConfigurationFactory()
-{ }
-
-QList<Core::Id> GoRunConfigurationFactory::availableCreationIds(ProjectExplorer::Target *parent,
-                                                                ProjectExplorer::IRunConfigurationFactory::CreationMode mode) const
+    : FixedRunConfigurationFactory("-TempRunConf")
 {
-    Q_UNUSED(mode);
-
-    if (!canHandle(parent))
-        return {};
-
-    return { Constants::C_GORUNCONFIGURATION_ID };
-}
-
-QString GoRunConfigurationFactory::displayNameForId(Core::Id id) const
-{
-    return id.toString();
-}
-
-bool GoRunConfigurationFactory::canCreate(ProjectExplorer::Target *parent, Core::Id id) const
-{
-    Q_UNUSED(id);
-    return canHandle(parent);
-}
-
-bool GoRunConfigurationFactory::canRestore(ProjectExplorer::Target *parent, const QVariantMap &map) const
-{
-    Q_UNUSED(map);
-    return canHandle(parent);
-}
-
-bool GoRunConfigurationFactory::canClone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *product) const
-{
-    QTC_ASSERT(parent, return false);
-    QTC_ASSERT(product, return false);
-    return canHandle(parent);
-}
-
-ProjectExplorer::RunConfiguration *GoRunConfigurationFactory::clone(ProjectExplorer::Target *parent, ProjectExplorer::RunConfiguration *product)
-{
-    QTC_ASSERT(parent, return nullptr);
-    QTC_ASSERT(product, return nullptr);
-    std::unique_ptr<GoRunConfiguration> result(createHelper<GoRunConfiguration>(parent, Constants::C_GORUNCONFIGURATION_ID));
-    return result->fromMap(product->toMap()) ? result.release() : nullptr;
-}
-
-bool GoRunConfigurationFactory::canHandle(ProjectExplorer::Target *parent) const
-{
-    if (!parent->project()->supportsKit(parent->kit()))
-        return false;
-    return qobject_cast<GoProject *>(parent->project());
-}
-
-ProjectExplorer::RunConfiguration *GoRunConfigurationFactory::doCreate(ProjectExplorer::Target *parent, Core::Id id)
-{
-    return createHelper<GoRunConfiguration>(parent, id);
-}
-
-ProjectExplorer::RunConfiguration *GoRunConfigurationFactory::doRestore(ProjectExplorer::Target *parent, const QVariantMap &map)
-{
-    auto result = createHelper<GoRunConfiguration>(parent, ProjectExplorer::idFromMap(map));
-    result->fromMap(map);
-    return result;
+    registerRunConfiguration<GoRunConfiguration>(Constants::C_GORUNCONFIGURATION_ID);
+    addSupportedProjectType(Constants::C_GOPROJECT_ID);
 }
 
 }   // namespace GoLang

@@ -29,17 +29,12 @@
 
 namespace GoLang {
 
-class GoCompilerCleanStepFactory : public ProjectExplorer::IBuildStepFactory
+class GoCompilerCleanStepFactory : public ProjectExplorer::BuildStepFactory
 {
     Q_OBJECT
 
 public:
-    GoCompilerCleanStepFactory(QObject *parent = nullptr);
-
-    QList<ProjectExplorer::BuildStepInfo> availableSteps(ProjectExplorer::BuildStepList *parent) const override;
-
-    ProjectExplorer::BuildStep *create(ProjectExplorer::BuildStepList *parent, Core::Id) override;
-    ProjectExplorer::BuildStep *clone(ProjectExplorer::BuildStepList *parent, ProjectExplorer::BuildStep *buildStep) override;
+    GoCompilerCleanStepFactory();
 };
 
 }   // namespace GoLang

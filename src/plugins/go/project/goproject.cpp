@@ -69,7 +69,7 @@ bool GoProject::needsConfiguration() const
     return targets().empty();
 }
 
-bool GoProject::supportsKit(ProjectExplorer::Kit *k, QString *errorMessage) const
+bool GoProject::supportsKit(const ProjectExplorer::Kit *k, QString *errorMessage) const
 {
     auto tc = dynamic_cast<GoToolChain*>(ProjectExplorer::ToolChainKitInformation::toolChain(k, Constants::C_GOLANGUAGE_ID));
     if (!tc) {
@@ -87,10 +87,9 @@ bool GoProject::supportsKit(ProjectExplorer::Kit *k, QString *errorMessage) cons
 
 Utils::FileNameList GoProject::goFiles() const
 {
-    const QStringList nim = files(AllFiles, [](const ProjectExplorer::Node *fn) {
-        return fn->filePath().endsWith(".go");
+    return files([](const ProjectExplorer::Node *fn) {
+        return AllFiles(fn) && fn->filePath().endsWith(".go");
     });
-    return Utils::transform(nim, [](const QString &fp) { return Utils::FileName::fromString(fp); });
 }
 
 QList<QString> GoProject::packagesForSuffix(const QString &suffix)
