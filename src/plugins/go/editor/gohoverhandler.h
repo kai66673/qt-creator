@@ -38,7 +38,7 @@ public:
     explicit GoHoverHandler();
 
 private:
-    void identifyMatch(TextEditor::TextEditorWidget *editorWidget, int pos, ReportPriority) override;
+    void identifyMatch(TextEditor::TextEditorWidget *editorWidget, int pos, ReportPriority report) override;
     void decorateToolTip() override;
 };
 

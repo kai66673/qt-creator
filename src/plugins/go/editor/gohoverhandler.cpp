@@ -26,6 +26,7 @@ THE SOFTWARE.
 #include "goeditor.h"
 
 #include <texteditor/textdocument.h>
+#include <utils/executeondestruction.h>
 #include <utils/fileutils.h>
 
 #include <QDir>
@@ -38,16 +39,21 @@ GoHoverHandler::GoHoverHandler() :
     TextEditor::BaseHoverHandler()
 { }
 
-void GoHoverHandler::identifyMatch(TextEditor::TextEditorWidget *editorWidget, int pos, ReportPriority)
+void GoHoverHandler::identifyMatch(TextEditor::TextEditorWidget *editorWidget, int pos, ReportPriority report)
 {
+    Utils::ExecuteOnDestruction reportPriority([this, report](){ report(priority()); });
+
     const QString extraSelectionTooltip = editorWidget->extraSelectionTooltip(pos);
     if (!extraSelectionTooltip.isEmpty()) {
         setToolTip(extraSelectionTooltip);
+        setPriority(Priority_Tooltip);
     } else {
         if (GoEditorWidget *goEditorWidget = qobject_cast<GoEditorWidget *>(editorWidget)) {
             const QString typeToolTip = goEditorWidget->evaluateIdentifierTypeDescription(pos);
-            if (!typeToolTip.isEmpty())
+            if (!typeToolTip.isEmpty()) {
                 setToolTip(typeToolTip);
+                setPriority(Priority_Tooltip);
+            }
         }
     }
 }
