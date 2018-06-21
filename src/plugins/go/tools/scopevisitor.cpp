@@ -142,8 +142,11 @@ bool ScopePositionVisitor::visit(FuncDeclAST *ast)
                 switchScope(ast->scope);
                 accept(ast->body);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }
@@ -158,6 +161,8 @@ bool ScopePositionVisitor::visit(BlockStmtAST *ast)
         switch (it->value->positionRelation(m_pos, _tokens)) {
             case Contain:
                 accept(it->value);
+                _traverseFinished = true;
+                return false;
             case Before:
                 _traverseFinished = true;
                 return false;
@@ -180,8 +185,11 @@ bool ScopePositionVisitor::visit(IfStmtAST *ast)
                 accept(ast->body);
                 accept(ast->elseStmt);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }
@@ -200,8 +208,11 @@ bool ScopePositionVisitor::visit(RangeStmtAST *ast)
                 switchScope(ast->scope);
                 accept(ast->body);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }
@@ -220,8 +231,11 @@ bool ScopePositionVisitor::visit(ForStmtAST *ast)
                 accept(ast->post);
                 accept(ast->body);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }
@@ -239,8 +253,11 @@ bool ScopePositionVisitor::visit(TypeSwitchStmtAST *ast)
                 accept(ast->assign);
                 accept(ast->body);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }
@@ -258,8 +275,11 @@ bool ScopePositionVisitor::visit(SwitchStmtAST *ast)
                 switchScope(ast->scope);
                 accept(ast->body);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }
@@ -276,8 +296,11 @@ bool ScopePositionVisitor::visit(CaseClauseAST *ast)
                 switchScope(ast->scope);
                 accept(ast->body);
             }
+            _traverseFinished = true;
+            break;
         case Before:
             _traverseFinished = true;
+            break;
         case After:
             break;
     }

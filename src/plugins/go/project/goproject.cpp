@@ -31,6 +31,7 @@
 #include "gopackage.h"
 
 #include <coreplugin/progressmanager/progressmanager.h>
+#include <coreplugin/vcsmanager.h>
 #include <projectexplorer/kit.h>
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/kitinformation.h>
@@ -67,22 +68,6 @@ GoProject::GoProject(const Utils::FileName &fileName)
 bool GoProject::needsConfiguration() const
 {
     return targets().empty();
-}
-
-bool GoProject::supportsKit(const ProjectExplorer::Kit *k, QString *errorMessage) const
-{
-    auto tc = dynamic_cast<GoToolChain*>(ProjectExplorer::ToolChainKitInformation::toolChain(k, Constants::C_GOLANGUAGE_ID));
-    if (!tc) {
-        if (errorMessage)
-            *errorMessage = tr("No Go compiler set.");
-        return false;
-    }
-    if (!tc->compilerCommand().exists()) {
-        if (errorMessage)
-            *errorMessage = tr("Go compiler doesn't exist");
-        return false;
-    }
-    return true;
 }
 
 Utils::FileNameList GoProject::goFiles() const
@@ -152,11 +137,13 @@ void GoProject::collectProjectFiles()
     m_lastProjectScan.start();
     QTC_ASSERT(!m_futureWatcher.future().isRunning(), return);
     Utils::FileName prjDir = projectDirectory();
-    QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir] {
-        return ProjectExplorer::FileNode::scanForFiles(prjDir, [](const Utils::FileName &fn) {
+    const QList<Core::IVersionControl *> versionControls = Core::VcsManager::versionControls();
+    QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir, versionControls] {
+        return ProjectExplorer::FileNode::scanForFilesWithVersionControls(prjDir, [](const Utils::FileName &fn) {
             return new ProjectExplorer::FileNode(fn, ProjectExplorer::FileType::Source, false);
-        });
+        }, versionControls);
     });
+
     m_futureWatcher.setFuture(future);
     Core::ProgressManager::addTask(future, tr("Scanning for Go files"), "Go.Project.Scan");
 }
@@ -164,23 +151,24 @@ void GoProject::collectProjectFiles()
 void GoProject::updateProject()
 {
     emitParsingStarted();
-
     const QStringList oldFiles = m_files;
     m_files.clear();
 
-    QList<ProjectExplorer::FileNode *> fileNodes = Utils::filtered(m_futureWatcher.future().result(),
-                                                                   [&](const ProjectExplorer::FileNode *fn) {
+    std::vector<std::unique_ptr<ProjectExplorer::FileNode>> fileNodes
+            = Utils::transform<std::vector>(m_futureWatcher.future().result(),
+                                            [](ProjectExplorer::FileNode *fn) {
+            return std::unique_ptr<ProjectExplorer::FileNode>(fn);
+    });
+    std::remove_if(std::begin(fileNodes), std::end(fileNodes),
+                   [this](const std::unique_ptr<ProjectExplorer::FileNode> &fn) {
         const Utils::FileName path = fn->filePath();
         const QString fileName = path.fileName();
-        const bool keep = !m_excludedFiles.contains(path.toString())
-                && !fileName.endsWith(".goproject", Utils::HostOsInfo::fileNameCaseSensitivity())
-                && !fileName.contains(".goproject.user", Utils::HostOsInfo::fileNameCaseSensitivity());
-        if (!keep)
-            delete fn;
-        return keep;
+        return m_excludedFiles.contains(path.toString())
+                || fileName.endsWith(".goproject", Utils::HostOsInfo::fileNameCaseSensitivity())
+                || fileName.contains(".goproject.user", Utils::HostOsInfo::fileNameCaseSensitivity());
     });
 
-    m_files = Utils::transform(fileNodes, [](const ProjectExplorer::FileNode *fn) {
+    m_files = Utils::transform<QList>(fileNodes, [](const std::unique_ptr<ProjectExplorer::FileNode> &fn) {
         return fn->filePath().toString();
     });
     Utils::sort(m_files, [](const QString &a, const QString &b) { return a < b; });
@@ -188,10 +176,10 @@ void GoProject::updateProject()
     if (oldFiles == m_files)
         return;
 
-    auto newRoot = new GoProjectNode(*this, projectDirectory());
+    auto newRoot = std::make_unique<GoProjectNode>(*this, projectDirectory());
     newRoot->setDisplayName(displayName());
-    newRoot->addNestedNodes(fileNodes);
-    setRootProjectNode(newRoot);
+    newRoot->addNestedNodes(std::move(fileNodes));
+    setRootProjectNode(std::move(newRoot));
 
     emitParsingFinished(true);
 

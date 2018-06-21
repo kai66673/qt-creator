@@ -54,6 +54,7 @@
 #include <coreplugin/iwizardfactory.h>
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/projectmanager.h>
+#include <projectexplorer/runconfiguration.h>
 #include <projectexplorer/toolchainmanager.h>
 #include <texteditor/texteditorconstants.h>
 #include <texteditor/snippets/snippetprovider.h>
@@ -66,12 +67,15 @@ namespace GoLang {
 class GoLangPluginFeatureProvider : public Core::IFeatureProvider
 {
 public:
-    virtual QSet<Core::Id> availableFeatures(Core::Id /*id*/) const override {
-        return QSet<Core::Id>() << Core::Id(GoLang::Constants::GO_SUPPORT_FEATURE);
-    }
+    virtual QSet<Core::Id> availableFeatures(Core::Id /*id*/) const override;
     virtual QSet<Core::Id> availablePlatforms() const override { return QSet<Core::Id>(); }
     virtual QString displayNameForPlatform(Core::Id /*id*/) const override { return QString(); }
 };
+
+QSet<Core::Id> GoLangPluginFeatureProvider::availableFeatures(Core::Id) const
+{
+    return QSet<Core::Id>() << Core::Id(GoLang::Constants::GO_SUPPORT_FEATURE);
+}
 
 }   // namespace GoLang
 
@@ -83,19 +87,30 @@ using namespace GoEditor::Internal;
 class GoPluginPrivate
 {
 public:
-    GoPluginPrivate() : iconProvider(0) { }
+    GoPluginPrivate() : iconProvider(nullptr) { }
 
     GoIconProvider *iconProvider;
     GoLang::GoSettings *settings;
 
     QAction *m_findUsagesAction;
     QAction *m_renameSymbolUnderCursorAction;
+
+    GoEditorFactory editorFactory;
+    GoOutlineWidgetFactory outlineWidgetFactory;
+    GoLang::GoToolChainFactory toolChainFactory;
+    GoLang::GoBuildConfigurationFactory buildConfigurationFactory;
+    GoLang::GoRunConfigurationFactory runConfigurationFactory;
+    GoLang::GoCompilerGetStepFactory compilerGetStepFactory;
+    GoLang::GoCompilerBuildStepFactory compilerBuildStepFactory;
+    GoLang::GoCompilerCleanStepFactory compilerCleanStepFactory;
+    GoLang::GoGeneralSettingsPage generalSettingsPage;
+    GoLang::GoToolsSettingsPage toolsSettingsPage;
 };
 
 GoPlugin *GoPlugin::m_instance(nullptr);
 
 GoPlugin::GoPlugin()
-    : d(new GoPluginPrivate)
+    : d(nullptr)
 {
     m_instance = this;
 }
@@ -113,6 +128,8 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     Q_UNUSED(arguments)
     Q_UNUSED(errorMessage)
 
+    d = new GoPluginPrivate;
+
     GoLang::GoConfigurations::initialize();
 
     qRegisterMetaType<GoTools::GoSource::Ptr>("GoTools::GoSource::Ptr");
@@ -120,27 +137,18 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     ProjectExplorer::ToolChainManager::registerLanguage(GoLang::Constants::C_GOLANGUAGE_ID,
                                                         GoLang::Constants::C_GOLANGUAGE_NAME);
 
-    ProjectExplorer::RunControl::registerWorker<GoLang::GoRunConfiguration, ProjectExplorer::SimpleTargetRunner>
-            (ProjectExplorer::Constants::NORMAL_RUN_MODE);
+    auto constraint = [](ProjectExplorer::RunConfiguration *runConfig) {
+        return qobject_cast<GoLang::GoRunConfiguration *>(runConfig) != nullptr;
+    };
+
+    ProjectExplorer::RunControl::registerWorker<ProjectExplorer::SimpleTargetRunner>
+            (ProjectExplorer::Constants::NORMAL_RUN_MODE, constraint);
 
     TextEditor::SnippetProvider::registerGroup(Go::Constants::GO_SNIPPETS_GROUP_ID,
                                                tr("Go", "GoEditor::GoSnippetProvider"),
                                                &::GoEditor::Internal::GoEditor::decorateEditor);
 
     d->iconProvider = new GoIconProvider;
-
-    addAutoReleasedObject(new GoEditorFactory);
-    addAutoReleasedObject(new GoOutlineWidgetFactory);
-
-    addAutoReleasedObject(new GoLang::GoToolChainFactory);
-    addAutoReleasedObject(new GoLang::GoBuildConfigurationFactory);
-    addAutoReleasedObject(new GoLang::GoRunConfigurationFactory);
-    addAutoReleasedObject(new GoLang::GoCompilerGetStepFactory);
-    addAutoReleasedObject(new GoLang::GoCompilerBuildStepFactory);
-    addAutoReleasedObject(new GoLang::GoCompilerCleanStepFactory);
-    addAutoReleasedObject(new GoLang::GoGeneralSettingsPage);
-
-    addAutoReleasedObject(new GoLang::GoToolsSettingsPage);
 
     ProjectExplorer::ProjectManager::registerProjectType<GoLang::GoProject>(GoLang::Constants::C_GO_PROJECT_MIMETYPE);
 

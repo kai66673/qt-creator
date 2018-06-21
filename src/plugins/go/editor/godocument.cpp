@@ -169,8 +169,8 @@ bool GoDocument::save(QString *errorString, const QString &fileName, bool autoSa
     return true;
 }
 
-Utils::Link GoDocument::findLinkAt(const QTextCursor &tc)
-{ return processor()->findLinkAt(tc); }
+void GoDocument::findLinkAt(const QTextCursor &tc, Utils::ProcessLinkCallback &&processLinkCallback)
+{ return processor()->findLinkAt(tc, std::move(processLinkCallback)); }
 
 QString GoDocument::evaluateIdentifierTypeDescription(int pos)
 { return processor()->evaluateIdentifierTypeDescription(pos); }

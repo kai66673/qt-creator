@@ -50,7 +50,6 @@ public:
     GoProject(const Utils::FileName &fileName);
 
     bool needsConfiguration() const override;
-    bool supportsKit(const ProjectExplorer::Kit *k, QString *errorMessage) const override;
     Utils::FileNameList goFiles() const;
 
     QList<QString> packagesForSuffix(const QString &suffix);

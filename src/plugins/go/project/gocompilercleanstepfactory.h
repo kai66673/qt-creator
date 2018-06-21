@@ -31,8 +31,6 @@ namespace GoLang {
 
 class GoCompilerCleanStepFactory : public ProjectExplorer::BuildStepFactory
 {
-    Q_OBJECT
-
 public:
     GoCompilerCleanStepFactory();
 };

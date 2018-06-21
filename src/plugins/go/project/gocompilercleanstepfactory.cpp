@@ -41,7 +41,7 @@ GoCompilerCleanStepFactory::GoCompilerCleanStepFactory()
     : BuildStepFactory()
 {
     registerStep<GoCompilerCleanStep>(Constants::C_GOCOMPILERCLEANSTEP_ID);
-    setDisplayName(tr("Go Compiler Clean Step"));
+    setDisplayName(GoCompilerCleanStep::tr("Go Compiler Clean Step"));
     setFlags(BuildStepInfo::Unclonable);
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_CLEAN);
     setSupportedConfiguration(Constants::C_GOBUILDCONFIGURATION_ID);

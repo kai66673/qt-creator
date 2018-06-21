@@ -38,7 +38,7 @@ class GoBuildConfiguration : public ProjectExplorer::BuildConfiguration
     Q_OBJECT
 
 public:
-    GoBuildConfiguration(ProjectExplorer::Target *target);
+    GoBuildConfiguration(ProjectExplorer::Target *target, Core::Id id);
 
     ProjectExplorer::NamedWidget *createConfigWidget() override;
 

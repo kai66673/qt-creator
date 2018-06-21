@@ -31,8 +31,6 @@ namespace GoLang {
 
 class GoCompilerGetStepFactory : public ProjectExplorer::BuildStepFactory
 {
-    Q_OBJECT
-
 public:
     GoCompilerGetStepFactory();
 };

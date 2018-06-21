@@ -28,7 +28,6 @@
 #include "golangconstants.h"
 #include "gorunconfigurationwidget.h"
 
-#include <projectexplorer/runnables.h>
 #include <projectexplorer/localenvironmentaspect.h>
 #include <projectexplorer/runconfigurationaspects.h>
 #include <utils/environment.h>
@@ -41,19 +40,15 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent)
-    : RunConfiguration(parent, Constants::C_GORUNCONFIGURATION_ID)
+GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent, Core::Id id)
+    : RunConfiguration(parent, id)
     , m_buildConfiguration(nullptr)
-    , m_workingDirectoryAspect(new WorkingDirectoryAspect(this, Constants::C_GORUNCONFIGURATION_WORKINGDIRECTORYASPECT_ID))
-    , m_argumentAspect(new ArgumentsAspect(this, Constants::C_GORUNCONFIGURATION_ARGUMENTASPECT_ID))
-    , m_terminalAspect(new TerminalAspect(this, Constants::C_GORUNCONFIGURATION_TERMINALASPECT_ID))
-    , m_localEnvironmentAspect(new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier()))
 {
-    m_terminalAspect->setRunMode(ApplicationLauncher::Gui);
-
-    addExtraAspect(m_argumentAspect);
-    addExtraAspect(m_terminalAspect);
-    addExtraAspect(m_localEnvironmentAspect);
+    addExtraAspect(new ExecutableAspect(this));
+    addExtraAspect(new ArgumentsAspect(this, Constants::C_GORUNCONFIGURATION_ARGUMENTASPECT_ID));
+    addExtraAspect(new WorkingDirectoryAspect(this, Constants::C_GORUNCONFIGURATION_WORKINGDIRECTORYASPECT_ID));
+    addExtraAspect(new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier()));
+    addExtraAspect(new TerminalAspect(this, Constants::C_GORUNCONFIGURATION_TERMINALASPECT_ID));
 
     // Connect target signals
     connect(this->target(), &Target::activeBuildConfigurationChanged,
@@ -65,17 +60,6 @@ GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent)
 QWidget *GoRunConfiguration::createConfigurationWidget()
 {
     return new GoRunConfigurationWidget(this);
-}
-
-Runnable GoRunConfiguration::runnable() const
-{
-    StandardRunnable result;
-    result.runMode = m_terminalAspect->runMode();
-    result.executable = m_executable;
-    result.commandLineArguments = m_argumentAspect->arguments();
-    result.workingDirectory = m_workingDirectoryAspect->workingDirectory().toString();
-    result.environment = m_localEnvironmentAspect->environment();
-    return result;
 }
 
 QVariantMap GoRunConfiguration::toMap() const
@@ -94,27 +78,15 @@ bool GoRunConfiguration::fromMap(const QVariantMap &map)
     return true;
 }
 
-void GoRunConfiguration::setExecutable(const QString &path)
-{
-    if (m_executable == path)
-        return;
-    m_executable = path;
-    emit executableChanged(path);
-}
-
-void GoRunConfiguration::setWorkingDirectory(const QString &path)
-{
-    m_workingDirectoryAspect->setDefaultWorkingDirectory(FileName::fromString(path));
-}
-
 void GoRunConfiguration::updateConfiguration()
 {
     GoBuildConfiguration *buildConfiguration = qobject_cast<GoBuildConfiguration *>(activeBuildConfiguration());
     QTC_ASSERT(buildConfiguration, return);
     setActiveBuildConfiguration(buildConfiguration);
     const QFileInfo outFileInfo = buildConfiguration->outFilePath().toFileInfo();
-    setExecutable(outFileInfo.absoluteFilePath());
-    setWorkingDirectory(outFileInfo.absoluteDir().absolutePath());
+    extraAspect<ExecutableAspect>()->setExecutable(FileName::fromString(outFileInfo.absoluteFilePath()));
+    const QString workingDirectory = outFileInfo.absoluteDir().absolutePath();
+    extraAspect<WorkingDirectoryAspect>()->setDefaultWorkingDirectory(FileName::fromString(workingDirectory));
 
     setDisplayName(outFileInfo.absoluteFilePath());
     setDefaultDisplayName(outFileInfo.absoluteFilePath());

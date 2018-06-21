@@ -36,7 +36,7 @@ namespace GoLang {
 GoPackageProcessor::GoPackageProcessor(GoProject *project)
     : QObject(project)
     , m_project(project)
-    , m_toolChain(0)
+    , m_toolChain(nullptr)
 { }
 
 QList<QString> GoPackageProcessor::packagesForSuffix(const QString &suffix)
@@ -67,7 +67,7 @@ QList<QString> GoPackageProcessor::packages()
 void GoPackageProcessor::checkToolChain()
 {
     bool needUpdatePackages = false;
-    GoToolChain *toolChain = 0;
+    GoToolChain *toolChain = nullptr;
     if (ProjectExplorer::Target *activeTarget = m_project->activeTarget())
         if (ProjectExplorer::Kit *kit = activeTarget->kit())
             toolChain = static_cast<GoToolChain *>(ProjectExplorer::ToolChainKitInformation::toolChain(kit, Constants::C_GOLANGUAGE_ID));
@@ -113,6 +113,8 @@ void GoPackageProcessor::updatePackages()
             packagesPath.append(QStringLiteral("windows_"));
             break;
         case ProjectExplorer::Abi::VxWorks:
+        case ProjectExplorer::Abi::QnxOS:
+        case ProjectExplorer::Abi::BareMetalOS:
         case ProjectExplorer::Abi::UnknownOS:
             cleanPackages();
             return;

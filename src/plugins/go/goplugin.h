@@ -39,7 +39,7 @@ class GoPlugin: public ExtensionSystem::IPlugin
 
 public:
     GoPlugin();
-    ~GoPlugin();
+    ~GoPlugin() override;
 
     bool initialize(const QStringList &arguments, QString *errorMessage) override;
     void extensionsInitialized() override;

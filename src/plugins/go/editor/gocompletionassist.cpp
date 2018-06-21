@@ -224,7 +224,7 @@ TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEdit
             QStringList functionArgs = functionHint.functionArguments(m_interface->position() - 1);
             if (functionArgs.isEmpty())
                 return 0;
-            TextEditor::IFunctionHintProposalModel *model = new GoFunctionHintModel(functionArgs);
+            TextEditor::FunctionHintProposalModelPtr model(new GoFunctionHintModel(functionArgs));
             TextEditor::IAssistProposal *proposal = new TextEditor::FunctionHintProposal(functionHint.lparenPosition() + 1, model);
             return proposal;
         }
@@ -291,7 +291,7 @@ TextEditor::IAssistProposal *GoCompletionAssistProcessor::perform(const TextEdit
 
         }
         if (!m_completions.isEmpty()) {
-            GoAssistProposalModel *model = new GoAssistProposalModel(m_completions);
+            TextEditor::GenericProposalModelPtr model(new GoAssistProposalModel(m_completions));
             TextEditor::IAssistProposal *proposal = new TextEditor::GenericProposal(startOfName, model);
             return proposal;
         }

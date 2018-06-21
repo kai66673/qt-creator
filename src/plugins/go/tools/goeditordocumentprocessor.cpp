@@ -90,14 +90,14 @@ void GoEditorDocumentProcessor::semanticRehighlight()
 void GoEditorDocumentProcessor::editorDocumentTimerRestarted()
 { }
 
-Utils::Link GoEditorDocumentProcessor::findLinkAt(const QTextCursor &tc)
+void GoEditorDocumentProcessor::findLinkAt(const QTextCursor &tc, Utils::ProcessLinkCallback &&processLinkCallback)
 {
     if (isSourceReady()) {
         LinkUnderCursor linkFinder(m_source);
-        return linkFinder.link(tc.position());
+        return processLinkCallback(linkFinder.link(tc.position()));
     }
 
-    return Utils::Link();
+    return processLinkCallback(Utils::Link());
 }
 
 QString GoEditorDocumentProcessor::evaluateIdentifierTypeDescription(int pos)

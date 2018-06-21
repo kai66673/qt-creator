@@ -41,7 +41,7 @@ GoCompilerBuildStepFactory::GoCompilerBuildStepFactory()
     : BuildStepFactory()
 {
     registerStep<GoCompilerBuildStep>(Constants::C_GOCOMPILERBUILDSTEP_ID);
-    setDisplayName(tr("Go Compiler Build Step"));
+    setDisplayName(GoCompilerBuildStep::tr("Go Compiler Build Step"));
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
     setSupportedConfiguration(Constants::C_GOBUILDCONFIGURATION_ID);
     setRepeatable(false);

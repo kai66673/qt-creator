@@ -58,6 +58,8 @@ public:
             switch (it->value->positionRelation(m_pos, _tokens)) {
                 case Contain:
                     accept(it->value);
+                    _traverseFinished = true;
+                    return;
                 case Before:
                     _traverseFinished = true;
                     return;

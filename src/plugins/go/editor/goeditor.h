@@ -71,8 +71,8 @@ public:
     void renameSymbolUnderCursor();
 
 protected:
-    virtual Utils::Link findLinkAt(const QTextCursor &tc, bool resolveTarget = true,
-                                   bool inNextSplit = false) override;
+    void findLinkAt(const QTextCursor &tc, Utils::ProcessLinkCallback &&processLinkCallback,
+                    bool resolveTarget = true, bool inNextSplit = false) override;
 
 private:
     void finalizeInitialization() override;

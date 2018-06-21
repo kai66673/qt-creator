@@ -166,7 +166,7 @@ static QList<Abi> guessGoAbi (const QString &goRoot)
             } */ else if (p == QLatin1String("linux")) {
                 os = Abi::LinuxOS;
                 if (flavor == Abi::UnknownFlavor)
-                    flavor = Abi::GenericLinuxFlavor;
+                    flavor = Abi::GenericFlavor;
                 format = Abi::ElfFormat;
             } else if (p.startsWith(QLatin1String("freebsd"))) {
                 os = Abi::BsdOS;
@@ -393,11 +393,11 @@ bool GoToolChain::fromMap(const QVariantMap &data)
 
     m_compilerCommand = FileName::fromString(data.value(QLatin1String(compilerCommandKeyC)).toString());
     m_goRoot = FileName::fromString(data.value(QLatin1String(goRootKeyC)).toString());
-    m_targetAbi = Abi(data.value(QLatin1String(targetAbiKeyC)).toString());
+    m_targetAbi = Abi::fromString(data.value(QLatin1String(targetAbiKeyC)).toString());
     QStringList abiList = data.value(QLatin1String(supportedAbisKeyC)).toStringList();
     m_supportedAbis.clear();
     foreach (const QString &a, abiList) {
-        Abi abi(a);
+        Abi abi = Abi::fromString(a);
         if (!abi.isValid())
             continue;
         m_supportedAbis.append(abi);

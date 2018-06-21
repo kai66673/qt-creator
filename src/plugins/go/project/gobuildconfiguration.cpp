@@ -37,8 +37,8 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoBuildConfiguration::GoBuildConfiguration(ProjectExplorer::Target *target)
-    : BuildConfiguration(target, Constants::C_GOBUILDCONFIGURATION_ID)
+GoBuildConfiguration::GoBuildConfiguration(ProjectExplorer::Target *target, Core::Id id)
+    : BuildConfiguration(target, id)
 { }
 
 NamedWidget *GoBuildConfiguration::createConfigWidget()

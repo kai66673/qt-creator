@@ -43,10 +43,9 @@ class GoRunConfiguration : public ProjectExplorer::RunConfiguration
     Q_OBJECT
 
 public:
-    GoRunConfiguration(ProjectExplorer::Target *parent);
+    GoRunConfiguration(ProjectExplorer::Target *parent, Core::Id id);
 
     QWidget *createConfigurationWidget() override;
-    ProjectExplorer::Runnable runnable() const override;
     QVariantMap toMap() const override;
     bool fromMap(const QVariantMap &map) override;
 
@@ -54,17 +53,11 @@ signals:
     void executableChanged(const QString &args);
 
 private:
-    void setExecutable(const QString &path);
-    void setWorkingDirectory(const QString &path);
     void updateConfiguration();
     void setActiveBuildConfiguration(GoBuildConfiguration *activeBuildConfiguration);
 
     QString m_executable;
     GoBuildConfiguration *m_buildConfiguration;
-    ProjectExplorer::WorkingDirectoryAspect* m_workingDirectoryAspect;
-    ProjectExplorer::ArgumentsAspect* m_argumentAspect;
-    ProjectExplorer::TerminalAspect* m_terminalAspect;
-    ProjectExplorer::LocalEnvironmentAspect* m_localEnvironmentAspect;
 };
 
 }   // namespace GoLang
