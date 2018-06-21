@@ -65,6 +65,7 @@ public:
     ResolvedType &call(ResolveContext *resolver, int refLvl = 0);
     ResolvedType &rangeValue(ResolveContext *resolver, int refLvl = 0);
     ResolvedType &rangeKey(ResolveContext *resolver, int refLvl = 0);
+    ResolvedType &rangeKeyOrChanType(ResolveContext *resolver, int refLvl = 0);
     ResolvedType &chanValue(ResolveContext *resolver, int refLvl = 0);
     ResolvedType &unstar();
     ResolvedType &deref();

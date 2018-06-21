@@ -2631,7 +2631,7 @@ ResolvedType RangeExpAST::rangeValueType(ResolveContext *resolver) const
 { return x ? x->resolve(resolver).rangeValue(resolver) : ResolvedType(); }
 
 ResolvedType RangeExpAST::rangeKeyType(ResolveContext *resolver) const
-{ return x ? x->resolve(resolver).rangeKey(resolver) : ResolvedType(); }
+{ return x ? x->resolve(resolver).rangeKeyOrChanType(resolver) : ResolvedType(); }
 
 ResolvedType RangeExpAST::resolve(ResolveContext *) const
 {

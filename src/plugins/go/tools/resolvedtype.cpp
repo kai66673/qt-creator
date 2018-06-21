@@ -150,6 +150,14 @@ ResolvedType &ResolvedType::rangeValue(ResolveContext *resolver, int refLvl)
 ResolvedType &ResolvedType::rangeKey(ResolveContext *resolver, int refLvl)
 { return switchTo(m_type->indexType(resolver, refLvl + m_referenceLevel)); }
 
+ResolvedType &ResolvedType::rangeKeyOrChanType(ResolveContext *resolver, int refLvl)
+{
+    auto chanType = m_type->chanValueType(resolver, refLvl + m_referenceLevel);
+    if (chanType.m_type != Control::unresolvedType())
+        return switchTo(chanType);
+    return switchTo(m_type->indexType(resolver, refLvl + m_referenceLevel));
+}
+
 ResolvedType &ResolvedType::chanValue(ResolveContext *resolver, int refLvl)
 { return switchTo(m_type->chanValueType(resolver, refLvl + m_referenceLevel)); }
 
