@@ -36,7 +36,6 @@
 #include "toolchainmanager.h"
 
 #include <utils/algorithm.h>
-#include <utils/asconst.h>
 #include <utils/detailswidget.h>
 #include <utils/environment.h>
 #include <utils/pathchooser.h>
@@ -337,7 +336,7 @@ bool CustomToolChain::fromMap(const QVariantMap &data)
 
     m_compilerCommand = FileName::fromString(data.value(QLatin1String(compilerCommandKeyC)).toString());
     m_makeCommand = FileName::fromString(data.value(QLatin1String(makeCommandKeyC)).toString());
-    m_targetAbi = Abi(data.value(QLatin1String(targetAbiKeyC)).toString());
+    m_targetAbi = Abi::fromString(data.value(QLatin1String(targetAbiKeyC)).toString());
     const QStringList macros = data.value(QLatin1String(predefinedMacrosKeyC)).toStringList();
     m_predefinedMacros = Macro::toMacros(macros.join('\n').toUtf8());
     setHeaderPaths(data.value(QLatin1String(headerPathsKeyC)).toStringList());
@@ -380,43 +379,8 @@ Core::Id CustomToolChain::outputParserId() const
     return m_outputParserId;
 }
 
-static Core::Id convertLegacySettings(Core::Id parserId)
-{
-    enum OutputParser
-    {
-        Gcc = 0,
-        Clang = 1,
-        LinuxIcc = 2,
-        Msvc = 3,
-        Custom = 4,
-        OutputParserCount
-    };
-
-    bool ok;
-    const OutputParser index = static_cast<OutputParser>(parserId.toString().toInt(&ok));
-    if (!ok)
-        return parserId;
-
-    switch (index) {
-    case Gcc:
-        return GccParser::id();
-    case Clang:
-        return ClangParser::id();
-    case LinuxIcc:
-        return LinuxIccParser::id();
-    case Msvc:
-        return HostOsInfo::isWindowsHost() ? MsvcParser::id() : CustomParser::id();
-    case Custom:
-        return CustomParser::id();
-    default:
-        return parserId;
-    }
-}
-
 void CustomToolChain::setOutputParserId(Core::Id parserId)
 {
-    parserId = convertLegacySettings(parserId);
-
     if (m_outputParserId == parserId)
         return;
     m_outputParserId = parserId;

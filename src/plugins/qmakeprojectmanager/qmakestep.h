@@ -44,7 +44,6 @@ namespace QtSupport { class BaseQtVersion; }
 
 namespace QmakeProjectManager {
 class QmakeBuildConfiguration;
-class QmakeProject;
 
 namespace Internal {
 
@@ -52,8 +51,6 @@ namespace Ui { class QMakeStep; }
 
 class QMakeStepFactory : public ProjectExplorer::BuildStepFactory
 {
-    Q_OBJECT
-
 public:
     QMakeStepFactory();
 };
@@ -120,8 +117,15 @@ public:
     bool immutable() const override;
     void setForced(bool b);
 
+    enum class ArgumentFlag {
+        OmitProjectPath = 0x01,
+        Expand = 0x02
+    };
+    Q_DECLARE_FLAGS(ArgumentFlags, ArgumentFlag);
+
     // the complete argument line
-    QString allArguments(const QtSupport::BaseQtVersion *v, bool shorted = false) const;
+    QString allArguments(const QtSupport::BaseQtVersion *v,
+                         ArgumentFlags flags = ArgumentFlags()) const;
     QMakeStepConfig deducedArguments() const;
     // arguments passed to the pro file parser
     QStringList parserArguments();
@@ -193,10 +197,10 @@ class QMakeStepConfigWidget : public ProjectExplorer::BuildStepConfigWidget
     Q_OBJECT
 public:
     QMakeStepConfigWidget(QMakeStep *step);
-    ~QMakeStepConfigWidget();
-    QString summaryText() const;
-    QString additionalSummaryText() const;
-    QString displayName() const;
+    ~QMakeStepConfigWidget() override;
+    QString summaryText() const override;
+    QString additionalSummaryText() const override;
+    QString displayName() const override;
 private:
     // slots for handling buildconfiguration/step signals
     void qtVersionChanged();
@@ -231,3 +235,5 @@ private:
 };
 
 } // namespace QmakeProjectManager
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(QmakeProjectManager::QMakeStep::ArgumentFlags);

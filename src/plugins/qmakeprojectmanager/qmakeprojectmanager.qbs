@@ -30,7 +30,6 @@ Project {
                 "externaleditors.cpp", "externaleditors.h",
                 "librarydetailscontroller.cpp", "librarydetailscontroller.h",
                 "librarydetailswidget.ui",
-                "makestep.cpp", "makestep.h", "makestep.ui",
                 "makefileparse.cpp", "makefileparse.h",
                 "profilecompletionassist.cpp", "profilecompletionassist.h",
                 "profileeditor.cpp", "profileeditor.h",
@@ -39,10 +38,10 @@ Project {
                 "qmakebuildinfo.h",
                 "qmakekitconfigwidget.cpp", "qmakekitconfigwidget.h",
                 "qmakekitinformation.cpp", "qmakekitinformation.h",
+                "qmakemakestep.cpp", "qmakemakestep.h",
                 "qmakeparser.cpp", "qmakeparser.h",
                 "qmakeparsernodes.cpp", "qmakeparsernodes.h",
                 "qmakeprojectimporter.cpp", "qmakeprojectimporter.h",
-                "qmakerunconfigurationfactory.cpp", "qmakerunconfigurationfactory.h",
                 "qmakestep.cpp", "qmakestep.h", "qmakestep.ui",
                 "qmakebuildconfiguration.cpp", "qmakebuildconfiguration.h",
                 "qmakenodes.cpp", "qmakenodes.h",
@@ -90,10 +89,6 @@ Project {
                 "subdirsprojectwizard.cpp", "subdirsprojectwizard.h",
                 "subdirsprojectwizarddialog.cpp", "subdirsprojectwizarddialog.h",
                 "simpleprojectwizard.cpp", "simpleprojectwizard.h",
-                "testwizard.cpp", "testwizard.h",
-                "testwizarddialog.cpp", "testwizarddialog.h",
-                "testwizardpage.cpp", "testwizardpage.h",
-                "testwizardpage.ui",
                 "wizards.qrc"
             ]
         }

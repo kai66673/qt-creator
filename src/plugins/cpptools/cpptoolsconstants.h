@@ -66,9 +66,9 @@ const char CPP_FILE_SETTINGS_ID[] = "B.Cpp.File Naming";
 const char CPP_FILE_SETTINGS_NAME[] = QT_TRANSLATE_NOOP("CppTools", "File Naming");
 const char CPP_CODE_MODEL_SETTINGS_ID[] = "C.Cpp.Code Model";
 const char CPP_CODE_MODEL_SETTINGS_NAME[] = QT_TRANSLATE_NOOP("CppTools", "Code Model");
+const char CPP_DIAGNOSTIC_CONFIG_SETTINGS_ID[] = "C.Cpp.Diagnostic Config";
+const char CPP_DIAGNOSTIC_CONFIG_SETTINGS_NAME[] = QT_TRANSLATE_NOOP("CppTools", "Diagnostic Configurations");
 const char CPP_SETTINGS_CATEGORY[] = "I.C++";
-const char CPP_SETTINGS_TR_CATEGORY[] = QT_TRANSLATE_NOOP("CppTools", "C++");
-const char SETTINGS_CATEGORY_CPP_ICON[] = ":/cpptools/images/category_cpp.png";
 
 const char CPP_CLANG_FIXIT_AVAILABLE_MARKER_ID[] = "ClangFixItAvailableMarker";
 
@@ -93,6 +93,13 @@ const char LOCATOR_FILTER_DISPLAY_NAME[] = QT_TRANSLATE_NOOP("CppTools", "C++ Cl
 const char SYMBOLS_FIND_FILTER_ID[] = "Symbols";
 const char SYMBOLS_FIND_FILTER_DISPLAY_NAME[] = QT_TRANSLATE_NOOP("CppTools", "C++ Symbols");
 
+// CLANG-UPGRADE-CHECK: Checks/update URLs.
+//
+// Upgrade the version in the URL. Note that we cannot use the macro
+// CLANG_VERSION here because it might denote a version that was not yet
+// released (e.g. 6.0.1, but only 6.0.0 was released).
+constexpr const char TIDY_DOCUMENTATION_URL_TEMPLATE[]
+    = "https://releases.llvm.org/6.0.0/tools/clang/tools/extra/docs/clang-tidy/checks/%1.html";
 
 } // namespace Constants
 } // namespace CppTools

@@ -29,12 +29,11 @@
 #include "qmakeprojectmanager.h"
 #include "qmakenodes.h"
 #include "qmakestep.h"
-#include "makestep.h"
+#include "qmakemakestep.h"
 #include "qmakebuildconfiguration.h"
 #include "desktopqmakerunconfiguration.h"
 #include "wizards/guiappwizard.h"
 #include "wizards/librarywizard.h"
-#include "wizards/testwizard.h"
 #include "wizards/simpleprojectwizard.h"
 #include "wizards/subdirsprojectwizard.h"
 #include "customwidgetwizard/customwidgetwizard.h"
@@ -96,7 +95,7 @@ public:
         qmakeProjectWizard{"qmakeproject", IWizardFactory::ProjectWizard};
 
     QMakeStepFactory qmakeStepFactory;
-    MakeStepFactory makeStepFactory;
+    QmakeMakeStepFactory makeStepFactory;
 
     QmakeBuildConfigurationFactory buildConfigFactory;
     DesktopQmakeRunConfigurationFactory runConfigFactory;
@@ -148,7 +147,6 @@ bool QmakeProjectManagerPlugin::initialize(const QStringList &arguments, QString
             new SubdirsProjectWizard,
             new GuiAppWizard,
             new LibraryWizard,
-            new TestWizard,
             new CustomWidgetWizard,
             new SimpleProjectWizard
         };

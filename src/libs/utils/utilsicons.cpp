@@ -82,6 +82,9 @@ const Icon BOOKMARK_TEXTEDITOR({
         {QLatin1String(":/utils/images/bookmark.png"), Theme::Bookmarks_TextMarkColor}}, Icon::Tint);
 const Icon SNAPSHOT_TOOLBAR({
         {QLatin1String(":/utils/images/snapshot.png"), Theme::IconsBaseColor}});
+const Icon NEWSEARCH_TOOLBAR({
+        {QLatin1String(":/utils/images/zoom.png"), Theme::IconsBaseColor},
+        {QLatin1String(":/utils/images/iconoverlay_add_small.png"), Theme::IconsRunColor}});
 
 const Icon NEWFILE({
         {QLatin1String(":/utils/images/filenew.png"), Theme::PanelTextColorMid}}, Icon::Tint);
@@ -123,8 +126,6 @@ const Icon RESET({
         {QLatin1String(":/utils/images/reset.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon RESET_TOOLBAR({
         {QLatin1String(":/utils/images/reset.png"), Theme::IconsBaseColor}});
-const Icon DARK_CLOSE(
-        QLatin1String(":/utils/images/darkclose.png"));
 
 const Icon ARROW_UP({
         {QLatin1String(":/utils/images/arrowup.png"), Theme::IconsBaseColor}});
@@ -177,6 +178,8 @@ const Icon CLOSE_SPLIT_RIGHT({
 const Icon FILTER({
         {QLatin1String(":/utils/images/filtericon.png"), Theme::IconsBaseColor}});
 const Icon LINK({
+        {QLatin1String(":/utils/images/linkicon.png"), Theme::PanelTextColorMid}}, Icon::Tint);
+const Icon LINK_TOOLBAR({
         {QLatin1String(":/utils/images/linkicon.png"), Theme::IconsBaseColor}});
 const Icon WARNING({
         {QLatin1String(":/utils/images/warningfill.png"), Theme::BackgroundColorNormal},
@@ -247,6 +250,9 @@ const Icon CODEMODEL_DISABLED_ERROR({
         {":/utils/images/codemodelerror.png", Theme::IconsDisabledColor}}, Icon::Tint);
 const Icon CODEMODEL_DISABLED_WARNING({
         {":/utils/images/codemodelwarning.png", Theme::IconsDisabledColor}}, Icon::Tint);
+const Icon CODEMODEL_FIXIT({
+        {":/utils/images/lightbulbcap.png", Theme::PanelTextColorMid},
+        {":/utils/images/lightbulb.png", Theme::IconsWarningColor}}, Icon::Tint);
 
 } // namespace Icons
 } // namespace Utils

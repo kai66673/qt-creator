@@ -67,7 +67,6 @@ enum TestCases
 // Some convenience.
 void updateState(DebuggerRunTool *runTool);
 void updateLocalsWindow(bool showReturn);
-const CPlusPlus::Snapshot &cppCodeModelSnapshot();
 bool hasSnapshots();
 void openTextEditor(const QString &titlePattern, const QString &contents);
 
@@ -77,7 +76,7 @@ void showMessage(const QString &msg, int channel, int timeout = -1);
 bool isReverseDebugging();
 void runControlStarted(DebuggerRunTool *runTool);
 void runControlFinished(DebuggerRunTool *runTool);
-void displayDebugger(DebuggerRunTool *runTool, bool updateEngine);
+void displayDebugger(DebuggerRunTool *runTool);
 void synchronizeBreakpoints();
 
 void saveModeToRestore();
@@ -123,6 +122,8 @@ QAction *addCheckableAction(QMenu *menu, const QString &display, bool on, bool c
 
 // Qt's various build paths for unpatched versions
 QStringList qtBuildPaths();
+
+void addDebugInfoTask(unsigned id, const QString &cmd);
 
 } // namespace Internal
 } // namespace Debugger

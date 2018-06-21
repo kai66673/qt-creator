@@ -122,6 +122,7 @@ public:
     const QString applicationDisplayName;
 
     void setBaseFilePath(const Utils::FileName &baseFilePath) { m_baseFilePath = baseFilePath; }
+    void setReadOnly() { m_readOnly = true; }
     Utils::FileName baseFilePath() const { return m_baseFilePath; }
 
     virtual RestoreData readData(const Utils::FileName &path, QWidget *parent) const;
@@ -129,6 +130,7 @@ public:
 
 protected:
     // Report errors:
+    QVariantMap restoreSettings(const Utils::FileName &settingsPath, QWidget *parent) const;
     ProceedInfo reportIssues(const Issue &issue, const FileName &path, QWidget *parent) const;
 
     virtual QVariantMap preprocessReadSettings(const QVariantMap &data) const;
@@ -140,6 +142,7 @@ protected:
 private:
     Utils::FileName m_baseFilePath;
     mutable std::unique_ptr<PersistentSettingsWriter> m_writer;
+    bool m_readOnly = false;
 };
 
 // --------------------------------------------------------------------
@@ -169,9 +172,9 @@ public:
     BackingUpSettingsAccessor(std::unique_ptr<BackUpStrategy> &&strategy, const QString &docType,
                               const QString &displayName, const QString &applicationDisplayName);
 
-    RestoreData readData(const Utils::FileName &path, QWidget *parent) const;
+    RestoreData readData(const Utils::FileName &path, QWidget *parent) const override;
     Utils::optional<Issue> writeData(const Utils::FileName &path, const QVariantMap &data,
-                                     QWidget *parent) const;
+                                     QWidget *parent) const override;
 
     BackUpStrategy *strategy() const { return m_strategy.get(); }
 
@@ -234,7 +237,8 @@ class MergingSettingsAccessor;
 class QTCREATOR_UTILS_EXPORT UpgradingSettingsAccessor : public BackingUpSettingsAccessor
 {
 public:
-    UpgradingSettingsAccessor(const QString &displayName, const QString &applicationDisplayName);
+    UpgradingSettingsAccessor(const QString &docType,
+                              const QString &displayName, const QString &applicationDisplayName);
     UpgradingSettingsAccessor(std::unique_ptr<BackUpStrategy> &&strategy, const QString &docType,
                               const QString &displayName, const QString &appDisplayName);
 

@@ -91,7 +91,7 @@ public:
 
 public:
     CppModelManager();
-    ~CppModelManager();
+    ~CppModelManager() override;
 
     static CppModelManager *instance();
     static void createCppModelManager(Internal::CppToolsPlugin *parent);
@@ -117,9 +117,6 @@ public:
     QFuture<void> updateProjectInfo(QFutureInterface<void> &futureInterface,
                                     const ProjectInfo &newProjectInfo);
 
-    ProjectInfo updateCompilerCallDataForProject(ProjectExplorer::Project *project,
-                                                 ProjectInfo::CompilerCallData &compilerCallData);
-
     /// \return The project part with the given project file
     ProjectPart::Ptr projectPartForId(const QString &projectPartId) const;
     /// \return All project parts that mention the given file name as one of the sources/headers.
@@ -133,7 +130,7 @@ public:
     ///         all loaded projects.
     ProjectPart::Ptr fallbackProjectPart();
 
-    CPlusPlus::Snapshot snapshot() const;
+    CPlusPlus::Snapshot snapshot() const override;
     Document::Ptr document(const QString &fileName) const;
     bool replaceDocument(Document::Ptr newDoc);
 
@@ -163,7 +160,8 @@ public:
                       const QString &replacement) final;
     void findUsages(const CppTools::CursorInEditor &data,
                     UsagesCallback &&showUsagesCallback) const final;
-    Link globalFollowSymbol(const CursorInEditor &data,
+    void globalFollowSymbol(const CursorInEditor &data,
+                            Utils::ProcessLinkCallback &&processLinkCallback,
                             const CPlusPlus::Snapshot &snapshot,
                             const CPlusPlus::Document::Ptr &documentFromSemanticInfo,
                             SymbolFinder *symbolFinder,
@@ -214,12 +212,12 @@ public:
                                      RefactoringEngineInterface *refactoringEngine);
     static void removeRefactoringEngine(RefactoringEngineType type);
 
-    void setLocatorFilter(std::unique_ptr<Core::ILocatorFilter> &&filter = nullptr);
-    void setClassesFilter(std::unique_ptr<Core::ILocatorFilter> &&filter = nullptr);
-    void setIncludesFilter(std::unique_ptr<Core::ILocatorFilter> &&filter = nullptr);
-    void setFunctionsFilter(std::unique_ptr<Core::ILocatorFilter> &&filter = nullptr);
-    void setSymbolsFindFilter(std::unique_ptr<Core::IFindFilter> &&filter = nullptr);
-    void setCurrentDocumentFilter(std::unique_ptr<Core::ILocatorFilter> &&filter = nullptr);
+    void setLocatorFilter(std::unique_ptr<Core::ILocatorFilter> &&filter);
+    void setClassesFilter(std::unique_ptr<Core::ILocatorFilter> &&filter);
+    void setIncludesFilter(std::unique_ptr<Core::ILocatorFilter> &&filter);
+    void setFunctionsFilter(std::unique_ptr<Core::ILocatorFilter> &&filter);
+    void setSymbolsFindFilter(std::unique_ptr<Core::IFindFilter> &&filter);
+    void setCurrentDocumentFilter(std::unique_ptr<Core::ILocatorFilter> &&filter);
 
     void renameIncludes(const QString &oldFileName, const QString &newFileName);
 
@@ -274,7 +272,6 @@ private:
 
     void dumpModelManagerConfiguration(const QString &logFileId);
     void initCppTools();
-    void resetFilters();
 
 private:
     Internal::CppModelManagerPrivate *d;

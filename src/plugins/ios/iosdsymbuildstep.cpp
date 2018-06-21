@@ -64,8 +64,6 @@ IosDsymBuildStep::IosDsymBuildStep(BuildStepList *parent) :
 bool IosDsymBuildStep::init(QList<const BuildStep *> &earlierSteps)
 {
     BuildConfiguration *bc = buildConfiguration();
-    if (!bc)
-        bc = target()->activeBuildConfiguration();
 
     ProcessParameters *pp = processParameters();
     pp->setMacroExpander(bc->macroExpander());
@@ -277,8 +275,6 @@ QString IosDsymBuildStepConfigWidget::displayName() const
 void IosDsymBuildStepConfigWidget::updateDetails()
 {
     BuildConfiguration *bc = m_buildStep->buildConfiguration();
-    if (!bc)
-        bc = m_buildStep->target()->activeBuildConfiguration();
 
     ProcessParameters param;
     param.setMacroExpander(bc->macroExpander());
@@ -328,9 +324,6 @@ void IosDsymBuildStepConfigWidget::resetDefaults()
 IosDsymBuildStepFactory::IosDsymBuildStepFactory()
 {
     registerStep<IosDsymBuildStep>(Constants::IOS_DSYM_BUILD_STEP_ID);
-    setSupportedStepLists({ProjectExplorer::Constants::BUILDSTEPS_CLEAN,
-                           ProjectExplorer::Constants::BUILDSTEPS_BUILD,
-                           ProjectExplorer::Constants::BUILDSTEPS_DEPLOY});
     setSupportedDeviceTypes({Constants::IOS_DEVICE_TYPE,
                              Constants::IOS_SIMULATOR_TYPE});
     setDisplayName("dsymutil");

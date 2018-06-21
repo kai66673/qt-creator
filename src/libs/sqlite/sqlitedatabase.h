@@ -32,10 +32,16 @@
 
 #include <utils/smallstring.h>
 
+#include <chrono>
 #include <mutex>
 #include <vector>
 
 namespace Sqlite {
+
+using namespace std::chrono_literals;
+
+class ReadStatement;
+class WriteStatement;
 
 class SQLITE_EXPORT Database final : public TransactionInterface
 {
@@ -45,15 +51,19 @@ class SQLITE_EXPORT Database final : public TransactionInterface
 
 public:
     using MutexType = std::mutex;
+    using ReadStatement = Sqlite::ReadStatement;
+    using WriteStatement = Sqlite::WriteStatement;
 
     Database();
-    Database(Utils::PathString &&databaseFilePath, JournalMode journalMode=JournalMode::Wal);
+    Database(Utils::PathString &&databaseFilePath,
+             JournalMode journalMode=JournalMode::Wal);
+    Database(Utils::PathString &&databaseFilePath,
+             std::chrono::milliseconds busyTimeout = 1000ms,
+             JournalMode journalMode=JournalMode::Wal);
+    ~Database();
 
     Database(const Database &) = delete;
-    bool operator=(const Database &) = delete;
-
-    Database(Database &&) = delete;
-    bool operator=(Database &&) = delete;
+    Database &operator=(const Database &) = delete;
 
     void open();
     void open(Utils::PathString &&databaseFilePath);
@@ -97,45 +107,29 @@ public:
         return m_databaseBackend.totalChangesCount();
     }
 
-    void deferredBegin()
-    {
-        m_databaseMutex.lock();
-        execute("BEGIN");
-    }
-
-    void immediateBegin()
-    {
-        m_databaseMutex.lock();
-        execute("BEGIN IMMEDIATE");
-    }
-
-    void exclusiveBegin()
-    {
-        m_databaseMutex.lock();
-        execute("BEGIN EXCLUSIVE");
-    }
-
-    void commit()
-    {
-        execute("COMMIT");
-        m_databaseMutex.unlock();
-    }
-
-    void rollback()
-    {
-        execute("ROLLBACK");
-        m_databaseMutex.unlock();
-    }
-
 private:
+    void deferredBegin();
+    void immediateBegin();
+    void exclusiveBegin();
+    void commit();
+    void rollback();
+    void lock();
+    void unlock();
+
     void initializeTables();
+    void registerTransactionStatements();
+    void deleteTransactionStatements();
     std::mutex &databaseMutex() { return m_databaseMutex; }
+
+    class Statements;
 
 private:
     Utils::PathString m_databaseFilePath;
     DatabaseBackend m_databaseBackend;
     std::vector<Table> m_sqliteTables;
     std::mutex m_databaseMutex;
+    std::unique_ptr<Statements> m_statements;
+    std::chrono::milliseconds m_busyTimeout;
     JournalMode m_journalMode = JournalMode::Wal;
     OpenMode m_openMode = OpenMode::ReadWrite;
     bool m_isOpen = false;

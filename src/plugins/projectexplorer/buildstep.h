@@ -118,13 +118,11 @@ public:
     BuildStepCreator creator;
 };
 
-class PROJECTEXPLORER_EXPORT BuildStepFactory : public QObject
+class PROJECTEXPLORER_EXPORT BuildStepFactory
 {
-    Q_OBJECT
-
 public:
     BuildStepFactory();
-    ~BuildStepFactory();
+    virtual ~BuildStepFactory();
 
     static const QList<BuildStepFactory *> allBuildStepFactories();
 
@@ -132,11 +130,13 @@ public:
     Core::Id stepId() const;
     BuildStep *create(BuildStepList *parent, Core::Id id);
     BuildStep *restore(BuildStepList *parent, const QVariantMap &map);
-    BuildStep *clone(BuildStepList *parent, BuildStep *product);
 
-    virtual bool canHandle(BuildStepList *bsl) const;
+    bool canHandle(BuildStepList *bsl) const;
 
 protected:
+    BuildStepFactory(const BuildStepFactory &) = delete;
+    BuildStepFactory &operator=(const BuildStepFactory &) = delete;
+
     using BuildStepCreator = std::function<BuildStep *(BuildStepList *)>;
 
     template <class BuildStepType>
@@ -191,9 +191,9 @@ public:
                 this, &BuildStepConfigWidget::updateSummary);
     }
 
-    QString summaryText() const { return QLatin1String("<b>") + displayName() + QLatin1String("</b>"); }
-    QString displayName() const { return m_step->displayName(); }
-    bool showWidget() const { return false; }
+    QString summaryText() const override { return QLatin1String("<b>") + displayName() + QLatin1String("</b>"); }
+    QString displayName() const override { return m_step->displayName(); }
+    bool showWidget() const override { return false; }
     BuildStep *step() const { return m_step; }
 
 private:

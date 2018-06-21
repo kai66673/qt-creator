@@ -152,7 +152,8 @@ static void readNumericVector(std::vector<double> *v, const QByteArray &rawData,
                 case 8:
                     readNumericVectorHelper<qint64>(v, rawData);
                     return;
-                }
+            }
+            break;
         case DebuggerEncoding::HexEncodedUnsignedInteger:
             switch (encoding.size) {
                 case 1:
@@ -168,6 +169,7 @@ static void readNumericVector(std::vector<double> *v, const QByteArray &rawData,
                     readNumericVectorHelper<quint64>(v, rawData);
                     return;
             }
+            break;
         case DebuggerEncoding::HexEncodedFloat:
             switch (encoding.size) {
                 case 4:
@@ -414,9 +416,9 @@ public:
     QString removeNamespaces(QString str) const;
 
     bool contextMenuEvent(const ItemViewEvent &ev);
-    QMenu *createFormatMenu(WatchItem *item);
-    QMenu *createMemoryMenu(WatchItem *item);
-    QMenu *createBreakpointMenu(WatchItem *item);
+    QMenu *createFormatMenu(WatchItem *item, QWidget *parent);
+    QMenu *createMemoryMenu(WatchItem *item, QWidget *parent);
+    QMenu *createBreakpointMenu(WatchItem *item, QWidget *parent);
 
     void addStackLayoutMemoryView(bool separateView, const QPoint &p);
 
@@ -649,7 +651,7 @@ static QString quoteUnprintable(const QString &str)
 
     QString encoded;
     if (theUnprintableBase == -1) {
-        foreach (const QChar c, str) {
+        for (const QChar c : str) {
             int u = c.unicode();
             if (c.isPrint())
                 encoded += c;
@@ -665,7 +667,7 @@ static QString quoteUnprintable(const QString &str)
         return encoded;
     }
 
-    foreach (const QChar c, str) {
+    for (const QChar c : str) {
         if (c.isPrint())
             encoded += c;
         else if (theUnprintableBase == 8)
@@ -829,7 +831,7 @@ static QString displayName(const WatchItem *item)
 {
     QString result;
 
-    const WatchItem *p = item->parentItem();
+    const WatchItem *p = item->parent();
     if (!p)
         return result;
     if (item->arrayIndex >= 0) {
@@ -996,6 +998,7 @@ QVariant WatchModel::data(const QModelIndex &idx, int role) const
                 case 2:
                     return item->type;
             }
+            break;
         }
 
         case Qt::DisplayRole: {
@@ -1007,6 +1010,7 @@ QVariant WatchModel::data(const QModelIndex &idx, int role) const
                 case 2:
                     return displayType(item);
             }
+            break;
         }
 
         case Qt::ToolTipRole:
@@ -1063,8 +1067,8 @@ bool WatchModel::setData(const QModelIndex &idx, const QVariant &value, int role
         if (auto dev = ev.as<QDropEvent>()) {
             if (dev->mimeData()->hasText()) {
                 QString exp;
-                QString data = dev->mimeData()->text();
-                foreach (const QChar c, data)
+                const QString data = dev->mimeData()->text();
+                for (const QChar c : data)
                     exp.append(c.isPrint() ? c : QChar(' '));
                 m_handler->watchVariable(exp);
                 //ev->acceptProposedAction();
@@ -1653,9 +1657,9 @@ bool WatchModel::contextMenuEvent(const ItemViewEvent &ev)
               [this] { grabWidget(); });
 
     menu->addSeparator();
-    menu->addMenu(createFormatMenu(item));
-    menu->addMenu(createMemoryMenu(item));
-    menu->addMenu(createBreakpointMenu(item));
+    menu->addMenu(createFormatMenu(item, menu));
+    menu->addMenu(createMemoryMenu(item, menu));
+    menu->addMenu(createBreakpointMenu(item, menu));
     menu->addSeparator();
 
     addAction(menu, tr("Expand All Children"),
@@ -1708,13 +1712,14 @@ bool WatchModel::contextMenuEvent(const ItemViewEvent &ev)
 
     menu->addSeparator();
     menu->addAction(action(SettingsDialog));
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
     menu->popup(ev.globalPos());
     return true;
 }
 
-QMenu *WatchModel::createBreakpointMenu(WatchItem *item)
+QMenu *WatchModel::createBreakpointMenu(WatchItem *item, QWidget *parent)
 {
-    auto menu = new QMenu(tr("Add Data Breakpoint"));
+    auto menu = new QMenu(tr("Add Data Breakpoint"), parent);
     if (!item) {
         menu->setEnabled(false);
         return menu;
@@ -1756,9 +1761,9 @@ QMenu *WatchModel::createBreakpointMenu(WatchItem *item)
     return menu;
 }
 
-QMenu *WatchModel::createMemoryMenu(WatchItem *item)
+QMenu *WatchModel::createMemoryMenu(WatchItem *item, QWidget *parent)
 {
-    auto menu = new QMenu(tr("Open Memory Editor"));
+    auto menu = new QMenu(tr("Open Memory Editor"), parent);
     if (!item || !m_engine->hasCapability(ShowMemoryCapability)) {
         menu->setEnabled(false);
         return menu;
@@ -1809,9 +1814,9 @@ QMenu *WatchModel::createMemoryMenu(WatchItem *item)
     return menu;
 }
 
-QMenu *WatchModel::createFormatMenu(WatchItem *item)
+QMenu *WatchModel::createFormatMenu(WatchItem *item, QWidget *parent)
 {
-    auto menu = new QMenu(tr("Change Value Display Format"));
+    auto menu = new QMenu(tr("Change Value Display Format"), parent);
     if (!item) {
         menu->setEnabled(false);
         return menu;
@@ -1848,7 +1853,7 @@ QMenu *WatchModel::createFormatMenu(WatchItem *item)
                        [this, iname] {
                                 // FIXME: Extend to multi-selection.
                                 //const QModelIndexList active = activeRows();
-                                //foreach (const QModelIndex &idx, active)
+                                //for (const QModelIndex &idx : active)
                                 //    setModelData(LocalsIndividualFormatRole, AutomaticFormat, idx);
                                 setIndividualFormat(iname, AutomaticFormat);
                                 m_engine->updateLocals();
@@ -1868,7 +1873,7 @@ QMenu *WatchModel::createFormatMenu(WatchItem *item)
     addCheckableAction(menu, spacer + tr("Automatic"), true, typeFormat == AutomaticFormat,
                        [this, item] {
                             //const QModelIndexList active = activeRows();
-                           //foreach (const QModelIndex &idx, active)
+                           //for (const QModelIndex &idx : active)
                            //    setModelData(LocalsTypeFormatRole, AutomaticFormat, idx);
                            setTypeFormat(item->type, AutomaticFormat);
                            m_engine->updateLocals();
@@ -1977,7 +1982,7 @@ void WatchHandler::insertItems(const GdbMi &data)
     QSet<WatchItem *> itemsToSort;
 
     const bool sortStructMembers = boolSetting(SortStructMembers);
-    foreach (const GdbMi &child, data.children()) {
+    for (const GdbMi &child : data.children()) {
         auto item = new WatchItem;
         item->parse(child, sortStructMembers);
         const TypeInfo ti = m_model->m_reportedTypeInfo.value(item->type);
@@ -2569,7 +2574,7 @@ void WatchHandler::appendWatchersAndTooltipRequests(DebuggerCommand *cmd)
 
 void WatchHandler::addDumpers(const GdbMi &dumpers)
 {
-    foreach (const GdbMi &dumper, dumpers.children()) {
+    for (const GdbMi &dumper : dumpers.children()) {
         DisplayFormats formats;
         formats.append(RawFormat);
         QString reportedFormats = dumper["formats"].data();
@@ -2636,7 +2641,7 @@ QSet<QString> WatchHandler::expandedINames() const
 void WatchHandler::recordTypeInfo(const GdbMi &typeInfo)
 {
     if (typeInfo.type() == GdbMi::List) {
-        foreach (const GdbMi &s, typeInfo.children()) {
+        for (const GdbMi &s : typeInfo.children()) {
             QString typeName = fromHex(s["name"].data());
             TypeInfo ti(s["size"].data().toUInt());
             m_model->m_reportedTypeInfo.insert(typeName, ti);

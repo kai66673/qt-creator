@@ -44,7 +44,7 @@
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/projectexplorericons.h>
-#include <projectexplorer/runnables.h>
+#include <projectexplorer/runconfigurationaspects.h>
 #include <projectexplorer/session.h>
 #include <projectexplorer/target.h>
 #include <projectexplorer/taskhub.h>
@@ -92,7 +92,7 @@ class LocalProcessRunner : public RunWorker
     Q_DECLARE_TR_FUNCTIONS(Debugger::Internal::LocalProcessRunner)
 
 public:
-    LocalProcessRunner(RunControl *runControl, const StandardRunnable &runnable)
+    LocalProcessRunner(RunControl *runControl, const Runnable &runnable)
         : RunWorker(runControl), m_runnable(runnable)
     {
         connect(&m_proc, &QProcess::errorOccurred,
@@ -176,7 +176,7 @@ public:
         Core::AsynchronousMessageBox::critical(tr("Error"), msg);
     }
 
-    StandardRunnable m_runnable;
+    Runnable m_runnable;
     Utils::QtcProcess m_proc;
 };
 
@@ -277,7 +277,7 @@ void DebuggerRunTool::setStartMode(DebuggerStartMode startMode)
             projects.insert(0, startupProject);
         }
         foreach (Project *project, projects)
-            m_runParameters.projectSourceFiles.append(transform(project->files(Project::SourceFiles), &FileName::toString));
+            m_runParameters.projectSourceFiles.append(project->files(Project::SourceFiles));
         if (!projects.isEmpty())
             m_runParameters.projectSourceDirectory = projects.first()->projectDirectory().toString();
 
@@ -394,7 +394,7 @@ void DebuggerRunTool::setServerStartScript(const QString &serverStartScript)
 {
     if (!serverStartScript.isEmpty()) {
         // Provide script information about the environment
-        StandardRunnable serverStarter;
+        Runnable serverStarter;
         serverStarter.executable = serverStartScript;
         QtcProcess::addArg(&serverStarter.commandLineArguments, m_runParameters.inferior.executable);
         QtcProcess::addArg(&serverStarter.commandLineArguments, m_runParameters.remoteChannel);
@@ -434,9 +434,7 @@ void DebuggerRunTool::setOverrideStartScript(const QString &script)
 
 void DebuggerRunTool::setInferior(const Runnable &runnable)
 {
-    QTC_ASSERT(runnable.is<StandardRunnable>(), reportFailure(); return);
-    m_runParameters.inferior = runnable.as<StandardRunnable>();
-    setUseTerminal(m_runParameters.inferior.runMode == ApplicationLauncher::Console);
+    m_runParameters.inferior = runnable;
 }
 
 void DebuggerRunTool::setInferiorExecutable(const QString &executable)
@@ -477,16 +475,16 @@ void DebuggerRunTool::setCoreFileName(const QString &coreFile, bool isSnapshot)
 
 void DebuggerRunTool::appendInferiorCommandLineArgument(const QString &arg)
 {
-    if (!m_runParameters.inferior.commandLineArguments.isEmpty())
-        m_runParameters.inferior.commandLineArguments.append(' ');
-    m_runParameters.inferior.commandLineArguments.append(arg);
+    QtcProcess::addArg(&m_runParameters.inferior.commandLineArguments, arg,
+                       device() ? device()->osType() : HostOsInfo::hostOs());
 }
 
 void DebuggerRunTool::prependInferiorCommandLineArgument(const QString &arg)
 {
     if (!m_runParameters.inferior.commandLineArguments.isEmpty())
         m_runParameters.inferior.commandLineArguments.prepend(' ');
-    m_runParameters.inferior.commandLineArguments.prepend(arg);
+    m_runParameters.inferior.commandLineArguments.prepend(
+                QtcProcess::quoteArg(arg, device() ? device()->osType() : HostOsInfo::hostOs()));
 }
 
 void DebuggerRunTool::addQmlServerInferiorCommandLineArgumentIfNeeded()
@@ -610,7 +608,7 @@ void DebuggerRunTool::start()
 
     if (m_runParameters.startMode == StartInternal) {
         QStringList unhandledIds;
-        foreach (Breakpoint bp, breakHandler()->allBreakpoints()) {
+        for (const Breakpoint &bp : breakHandler()->allBreakpoints()) {
             if (bp.isEnabled() && !m_engine->acceptsBreakpoint(bp))
                 unhandledIds.append(bp.id().toString());
         }
@@ -702,7 +700,18 @@ void DebuggerRunTool::quitDebugger()
 
 void DebuggerRunTool::abortDebugger()
 {
-    m_engine->abortDebugger();
+    m_engine->resetLocation();
+    if (!m_isDying) {
+        // Be friendly the first time. This will change targetState().
+        showMessage("ABORTING DEBUGGER. FIRST TIME.");
+        quitDebugger();
+    } else {
+        // We already tried. Try harder.
+        showMessage("ABORTING DEBUGGER. SECOND TIME.");
+        m_engine->abortDebuggerProcess();
+        if (runControl())
+            runControl()->initiateFinish();
+    }
 }
 
 bool DebuggerRunTool::fixupParameters()
@@ -825,8 +834,13 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
                 QString(), QString(), optionalPrompt);
     });
 
-    if (runConfig)
+    if (runConfig) {
         m_runParameters.displayName = runConfig->displayName();
+        if (auto symbolsAspect = runConfig->extraAspect<SymbolFileAspect>())
+            m_runParameters.symbolFile = symbolsAspect->value();
+        if (auto terminalAspect = runConfig->extraAspect<TerminalAspect>())
+            m_runParameters.useTerminal = terminalAspect->useTerminal();
+    }
 
     if (runConfig && !kit)
         kit = runConfig->target()->kit();
@@ -848,14 +862,11 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
     if (m_runParameters.isCppDebugging)
         m_runParameters.cppEngineType = DebuggerKitInformation::engineType(kit);
 
-    Runnable r = runnable();
-    if (r.is<StandardRunnable>()) {
-        m_runParameters.inferior = r.as<StandardRunnable>();
-        // Normalize to work around QTBUG-17529 (QtDeclarative fails with 'File name case mismatch'...)
-        m_runParameters.inferior.workingDirectory =
-                FileUtils::normalizePathName(m_runParameters.inferior.workingDirectory);
-        setUseTerminal(allowTerminal && m_runParameters.inferior.runMode == ApplicationLauncher::Console);
-    }
+    m_runParameters.inferior = runnable();
+    // Normalize to work around QTBUG-17529 (QtDeclarative fails with 'File name case mismatch'...)
+    m_runParameters.inferior.workingDirectory =
+            FileUtils::normalizePathName(m_runParameters.inferior.workingDirectory);
+    setUseTerminal(allowTerminal && m_runParameters.useTerminal);
 
     const QByteArray envBinary = qgetenv("QTC_DEBUGGER_PATH");
     if (!envBinary.isEmpty())
@@ -864,7 +875,7 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
     Project *project = runConfig ? runConfig->target()->project() : nullptr;
     if (project) {
         m_runParameters.projectSourceDirectory = project->projectDirectory().toString();
-        m_runParameters.projectSourceFiles = transform(project->files(Project::SourceFiles), &FileName::toString);
+        m_runParameters.projectSourceFiles = project->files(Project::SourceFiles);
     }
 
     m_runParameters.toolChainAbi = ToolChainKitInformation::targetAbi(kit);
@@ -1001,8 +1012,7 @@ GdbServerRunner::GdbServerRunner(RunControl *runControl, GdbServerPortsGatherer 
    : SimpleTargetRunner(runControl), m_portsGatherer(portsGatherer)
 {
     setDisplayName("GdbServerRunner");
-    if (runControl->runnable().is<StandardRunnable>())
-        m_runnable = runControl->runnable().as<StandardRunnable>();
+    m_runnable = runControl->runnable();
     addStartDependency(m_portsGatherer);
 }
 
@@ -1010,7 +1020,7 @@ GdbServerRunner::~GdbServerRunner()
 {
 }
 
-void GdbServerRunner::setRunnable(const StandardRunnable &runnable)
+void GdbServerRunner::setRunnable(const Runnable &runnable)
 {
     m_runnable = runnable;
 }
@@ -1029,7 +1039,7 @@ void GdbServerRunner::start()
 {
     QTC_ASSERT(m_portsGatherer, reportFailure(); return);
 
-    StandardRunnable gdbserver;
+    Runnable gdbserver;
     gdbserver.environment = m_runnable.environment;
     gdbserver.workingDirectory = m_runnable.workingDirectory;
 

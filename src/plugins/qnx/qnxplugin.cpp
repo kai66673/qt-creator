@@ -35,7 +35,6 @@
 #include "qnxqtversion.h"
 #include "qnxqtversionfactory.h"
 #include "qnxrunconfiguration.h"
-#include "qnxrunconfigurationfactory.h"
 #include "qnxsettingspage.h"
 #include "qnxtoolchain.h"
 #include "qnxutils.h"
@@ -46,6 +45,7 @@
 #include <coreplugin/icontext.h>
 #include <coreplugin/icore.h>
 
+#include <projectexplorer/devicesupport/devicecheckbuildstep.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/projectexplorerconstants.h>
@@ -56,6 +56,9 @@
 #include <projectexplorer/target.h>
 #include <projectexplorer/toolchain.h>
 
+#include <remotelinux/genericdirectuploadstep.h>
+#include <remotelinux/remotelinuxcheckforfreediskspacestep.h>
+
 #include <qtsupport/qtkitinformation.h>
 
 #include <QAction>
@@ -64,6 +67,19 @@ using namespace ProjectExplorer;
 
 namespace Qnx {
 namespace Internal {
+
+template <class Step>
+class GenericQnxDeployStepFactory : public BuildStepFactory
+{
+public:
+    GenericQnxDeployStepFactory()
+    {
+        registerStep<Step>(Step::stepId());
+        setDisplayName(Step::displayName());
+        setSupportedConfiguration(Constants::QNX_QNX_DEPLOYCONFIGURATION_ID);
+        setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_DEPLOY);
+    }
+};
 
 class QnxPluginPrivate
 {
@@ -77,6 +93,9 @@ public:
     QnxQtVersionFactory qtVersionFactory;
     QnxDeviceFactory deviceFactory;
     QnxDeployConfigurationFactory deployConfigFactory;
+    GenericQnxDeployStepFactory<RemoteLinux::GenericDirectUploadStep> directUploadDeployFactory;
+    GenericQnxDeployStepFactory<RemoteLinux::RemoteLinuxCheckForFreeDiskSpaceStep> checkForFreeDiskSpaceDeployFactory;
+    GenericQnxDeployStepFactory<DeviceCheckBuildStep> checkBuildDeployFactory;
     QnxRunConfigurationFactory runConfigFactory;
     QnxSettingsPage settingsPage;
     QnxToolChainFactory toolChainFactory;
@@ -133,7 +152,7 @@ void QnxPlugin::extensionsInitialized()
     mstart->addAction(cmd, Constants::QNX_DEBUGGING_GROUP);
 
     connect(KitManager::instance(), &KitManager::kitsChanged,
-            this, [this] { dd->updateDebuggerActions(); });
+            this, [] { dd->updateDebuggerActions(); });
 }
 
 void QnxPluginPrivate::updateDebuggerActions()

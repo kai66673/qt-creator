@@ -41,13 +41,14 @@ namespace Internal {
 
 QmlProjectPlugin::~QmlProjectPlugin()
 {
+    delete m_rcFactory;
 }
 
 bool QmlProjectPlugin::initialize(const QStringList &, QString *errorMessage)
 {
     Q_UNUSED(errorMessage)
 
-    new Internal::QmlProjectRunConfigurationFactory(this);
+    m_rcFactory = new QmlProjectRunConfigurationFactory;
 
     ProjectManager::registerProjectType<QmlProject>(QmlJSTools::Constants::QMLPROJECT_MIMETYPE);
     Core::FileIconProvider::registerIconOverlayForSuffix(":/qmlproject/images/qmlproject.png", "qmlproject");

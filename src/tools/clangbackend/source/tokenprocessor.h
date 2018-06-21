@@ -25,9 +25,12 @@
 
 #pragma once
 
+#include "fulltokeninfo.h"
 #include "sourcerange.h"
 #include "tokenprocessoriterator.h"
 #include "tokeninfocontainer.h"
+
+#include <utils/algorithm.h>
 
 #include <clang-c/Index.h>
 
@@ -36,8 +39,6 @@
 #include <vector>
 
 namespace ClangBackEnd {
-
-using uint = unsigned int;
 
 template<class T>
 class TokenProcessor
@@ -54,14 +55,14 @@ public:
     TokenProcessor(CXTranslationUnit cxTranslationUnit, const SourceRange &range)
         : cxTranslationUnit(cxTranslationUnit)
     {
-        uint cxTokensCount = 0;
+        unsigned cxTokensCount = 0;
         clang_tokenize(cxTranslationUnit, range, &cxTokens, &cxTokensCount);
         cxCursors.resize(cxTokensCount);
         clang_annotateTokens(cxTranslationUnit, cxTokens, cxTokensCount, cxCursors.data());
     }
     ~TokenProcessor()
     {
-        clang_disposeTokens(cxTranslationUnit, cxTokens, cxCursors.size());
+        clang_disposeTokens(cxTranslationUnit, cxTokens, unsigned(cxCursors.size()));
     }
 
     bool isEmpty() const
@@ -72,7 +73,7 @@ public:
     {
         return cxTokens == nullptr;
     }
-    uint size() const
+    size_t size() const
     {
         return cxCursors.size();
     }
@@ -104,21 +105,7 @@ public:
 
     QVector<TokenInfoContainer> toTokenInfoContainers() const
     {
-        QVector<TokenInfoContainer> containers;
-        containers.reserve(size());
-
-        const auto isValidTokenInfo = [] (const T &tokenInfo) {
-            return !tokenInfo.hasInvalidMainType()
-                    && !tokenInfo.hasMainType(HighlightingType::NumberLiteral)
-                    && !tokenInfo.hasMainType(HighlightingType::Comment);
-        };
-        for (size_t index = 0; index < cxCursors.size(); ++index) {
-            T tokenInfo = (*this)[index];
-            if (isValidTokenInfo(tokenInfo))
-                containers.push_back(tokenInfo);
-        }
-
-        return containers;
+        return toTokens<TokenInfoContainer>();
     }
 
     bool currentOutputArgumentRangesAreEmpty() const
@@ -127,11 +114,57 @@ public:
     }
 
 private:
+    template<class TC>
+    QVector<TC> toTokens() const
+    {
+        QVector<TC> tokens;
+        tokens.reserve(int(size()));
+
+        const auto isValidTokenInfo = [](const T &tokenInfo) {
+            return !tokenInfo.hasInvalidMainType()
+                    && !tokenInfo.hasMainType(HighlightingType::NumberLiteral)
+                    && !tokenInfo.hasMainType(HighlightingType::Comment);
+        };
+
+        for (size_t index = 0; index < cxCursors.size(); ++index) {
+            T tokenInfo = (*this)[index];
+            if (isValidTokenInfo(tokenInfo))
+                tokens.push_back(tokenInfo);
+        }
+
+        return tokens;
+    }
+
     mutable std::vector<CXSourceRange> currentOutputArgumentRanges;
     CXTranslationUnit cxTranslationUnit = nullptr;
     CXToken *cxTokens = nullptr;
 
     std::vector<CXCursor> cxCursors;
 };
+
+template <>
+inline
+QVector<TokenInfoContainer> TokenProcessor<FullTokenInfo>::toTokenInfoContainers() const
+{
+    QVector<FullTokenInfo> tokens = toTokens<FullTokenInfo>();
+
+    return Utils::transform(tokens,
+                            [&tokens](FullTokenInfo &token) -> TokenInfoContainer {
+        if (!token.m_extraInfo.declaration || token.hasMainType(HighlightingType::LocalVariable))
+            return token;
+
+        const int index = tokens.indexOf(token);
+        const SourceLocationContainer &tokenStart = token.m_extraInfo.cursorRange.start;
+        for (auto it = tokens.rend() - index; it != tokens.rend(); ++it) {
+            if (it->m_extraInfo.declaration && !it->hasMainType(HighlightingType::LocalVariable)
+                    && it->m_originalCursor != token.m_originalCursor
+                    && it->m_extraInfo.cursorRange.contains(tokenStart)) {
+                token.m_extraInfo.lexicalParentIndex = std::distance(it, tokens.rend()) - 1;
+                break;
+            }
+        }
+        return token;
+    });
+}
 
 } // namespace ClangBackEnd

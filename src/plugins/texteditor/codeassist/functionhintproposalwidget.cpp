@@ -102,8 +102,8 @@ struct FunctionHintProposalWidgetPrivate
 
     const QWidget *m_underlyingWidget = nullptr;
     CodeAssistant *m_assistant = nullptr;
-    IFunctionHintProposalModel *m_model = nullptr;
-    QPointer<Utils::FakeToolTip> m_popupFrame;
+    FunctionHintProposalModelPtr m_model;
+    QPointer<Utils::FakeToolTip> m_popupFrame; // guard WA_DeleteOnClose widget
     QLabel *m_numberLabel = nullptr;
     QLabel *m_hintLabel = nullptr;
     QWidget *m_pager = nullptr;
@@ -161,7 +161,6 @@ FunctionHintProposalWidget::FunctionHintProposalWidget()
 
 FunctionHintProposalWidget::~FunctionHintProposalWidget()
 {
-    delete d->m_model;
     delete d;
 }
 
@@ -181,9 +180,9 @@ void FunctionHintProposalWidget::setUnderlyingWidget(const QWidget *underlyingWi
     d->m_underlyingWidget = underlyingWidget;
 }
 
-void FunctionHintProposalWidget::setModel(IAssistProposalModel *model)
+void FunctionHintProposalWidget::setModel(ProposalModelPtr model)
 {
-    d->m_model = static_cast<IFunctionHintProposalModel *>(model);
+    d->m_model = model.staticCast<IFunctionHintProposalModel>();
 }
 
 void FunctionHintProposalWidget::setDisplayRect(const QRect &rect)

@@ -64,7 +64,7 @@ static QIcon testTreeIcon(TestTreeItem::Type type)
         Utils::Icons::OPENFILE.icon(),
         CPlusPlus::Icons::iconForType(CPlusPlus::Icons::ClassIconType),
         CPlusPlus::Icons::iconForType(CPlusPlus::Icons::SlotPrivateIconType),
-        QIcon(":/images/data.png")
+        QIcon(":/autotest/images/data.png")
     };
 
     if (int(type) >= int(sizeof icons / sizeof *icons))
@@ -191,17 +191,17 @@ void TestTreeItem::markForRemovalRecursively(bool mark)
 {
     markForRemoval(mark);
     for (int row = 0, count = childCount(); row < count; ++row)
-        childItem(row)->markForRemovalRecursively(mark);
+        childAt(row)->markForRemovalRecursively(mark);
 }
 
 void TestTreeItem::markForRemovalRecursively(const QString &filePath)
 {
-    if (m_filePath == filePath)
-        markForRemoval(true);
-    for (int row = 0, count = childCount(); row < count; ++row) {
-        TestTreeItem *child = childItem(row);
+    bool mark = m_filePath == filePath;
+    forFirstLevelChildren([&mark, &filePath](TestTreeItem *child) {
         child->markForRemovalRecursively(filePath);
-    }
+        mark &= child->markedForRemoval();
+    });
+    markForRemoval(mark);
 }
 
 TestTreeItem *TestTreeItem::parentItem() const
@@ -209,30 +209,44 @@ TestTreeItem *TestTreeItem::parentItem() const
     return static_cast<TestTreeItem *>(parent());
 }
 
-TestTreeItem *TestTreeItem::childItem(int row) const
-{
-    return static_cast<TestTreeItem *>(childAt(row));
-}
-
 TestTreeItem *TestTreeItem::findChildByName(const QString &name)
 {
-    return findChildBy([name](const TestTreeItem *other) -> bool {
-        return other->name() == name;
-    });
+    return findFirstLevelChild([name](const TestTreeItem *other) { return other->name() == name; });
 }
 
 TestTreeItem *TestTreeItem::findChildByFile(const QString &filePath)
 {
-    return findChildBy([filePath](const TestTreeItem *other) -> bool {
+    return findFirstLevelChild([filePath](const TestTreeItem *other) {
         return other->filePath() == filePath;
+    });
+}
+
+TestTreeItem *TestTreeItem::findChildByFileAndType(const QString &filePath, Type tType)
+{
+    return findFirstLevelChild([filePath, tType](const TestTreeItem *other) {
+        return other->type() == tType && other->filePath() == filePath;
     });
 }
 
 TestTreeItem *TestTreeItem::findChildByNameAndFile(const QString &name, const QString &filePath)
 {
-    return findChildBy([name, filePath](const TestTreeItem *other) -> bool {
+    return findFirstLevelChild([name, filePath](const TestTreeItem *other) {
         return other->filePath() == filePath && other->name() == name;
     });
+}
+
+TestConfiguration *TestTreeItem::asConfiguration(TestRunMode mode) const
+{
+    switch (mode) {
+    case TestRunMode::Run:
+    case TestRunMode::RunWithoutDeploy:
+        return testConfiguration();
+    case TestRunMode::Debug:
+    case TestRunMode::DebugWithoutDeploy:
+        return debugConfiguration();
+    default:
+        return nullptr;
+    }
 }
 
 QList<TestConfiguration *> TestTreeItem::getAllTestConfigurations() const
@@ -241,6 +255,11 @@ QList<TestConfiguration *> TestTreeItem::getAllTestConfigurations() const
 }
 
 QList<TestConfiguration *> TestTreeItem::getSelectedTestConfigurations() const
+{
+    return QList<TestConfiguration *>();
+}
+
+QList<TestConfiguration *> TestTreeItem::getTestConfigurationsForFile(const Utils::FileName &) const
 {
     return QList<TestConfiguration *>();
 }
@@ -292,11 +311,25 @@ QSet<QString> TestTreeItem::internalTargets() const
         return TestTreeItem::dependingInternalTargets(cppMM, m_filePath);
     QSet<QString> targets;
     for (const CppTools::ProjectPart::Ptr part : projectParts) {
-        targets.insert(part->buildSystemTarget + '|' + part->projectFile);
+        targets.insert(part->buildSystemTarget);
         if (part->buildTargetType != CppTools::ProjectPart::Executable)
             targets.unite(TestTreeItem::dependingInternalTargets(cppMM, m_filePath));
     }
     return targets;
+}
+
+void TestTreeItem::copyBasicDataFrom(const TestTreeItem *other)
+{
+    if (!other)
+        return;
+    m_name = other->m_name;
+    m_filePath = other->m_filePath;
+    m_type = other->m_type;
+    m_checked = other->m_checked;
+    m_line = other->m_line;
+    m_column = other->m_column;
+    m_proFile = other->m_proFile;
+    m_status = other->m_status;
 }
 
 inline bool TestTreeItem::modifyFilePath(const QString &filePath)
@@ -317,16 +350,6 @@ inline bool TestTreeItem::modifyName(const QString &name)
     return false;
 }
 
-TestTreeItem *TestTreeItem::findChildBy(CompareFunction compare) const
-{
-    for (int row = 0, count = childCount(); row < count; ++row) {
-        TestTreeItem *child = childItem(row);
-        if (compare(child))
-            return child;
-    }
-    return nullptr;
-}
-
 /*
  * try to find build system target that depends on the given file - if the file is no header
  * try to find the corresponding header and use this instead to find the respective target
@@ -345,7 +368,7 @@ QSet<QString> TestTreeItem::dependingInternalTargets(CppTools::CppModelManager *
                 wasHeader ? file : correspondingFile);
     for (const Utils::FileName &fn : dependingFiles) {
         for (const CppTools::ProjectPart::Ptr part : cppMM->projectPart(fn))
-            result.insert(part->buildSystemTarget + '|' + part->projectFile);
+            result.insert(part->buildSystemTarget);
     }
     return result;
 }

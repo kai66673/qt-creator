@@ -35,6 +35,7 @@
 #include <projectexplorer/kit.h>
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/projectexplorerconstants.h>
+#include <projectexplorer/projectexplorericons.h>
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
 
@@ -72,9 +73,6 @@ QbsProfilesSettingsPage::QbsProfilesSettingsPage(QObject *parent)
     setId("Y.QbsProfiles");
     setDisplayName(QCoreApplication::translate("QbsProjectManager", "Qbs"));
     setCategory(ProjectExplorer::Constants::KITS_SETTINGS_CATEGORY);
-    setDisplayCategory(QCoreApplication::translate("ProjectExplorer",
-       ProjectExplorer::Constants::KITS_SETTINGS_TR_CATEGORY));
-    setCategoryIcon(Utils::Icon(ProjectExplorer::Constants::KITS_SETTINGS_CATEGORY_ICON));
 }
 
 QWidget *QbsProfilesSettingsPage::widget()
@@ -102,7 +100,7 @@ void QbsProfilesSettingsPage::finish()
 
 QbsProfilesSettingsWidget::QbsProfilesSettingsWidget(QWidget *parent)
     : QWidget(parent)
-    , m_model(QbsProjectManagerSettings::qbsSettingsBaseDir())
+    , m_model(QbsProjectManagerSettings::qbsSettingsBaseDir(), qbs::Settings::UserScope)
 {
     m_model.setEditable(false);
     m_ui.setupUi(this);

@@ -157,7 +157,7 @@ void KitManager::restoreKits()
             kitsToRegister.append(k);
     }
 
-    Kit *toStore = 0;
+    Kit *toStore = nullptr;
     foreach (Kit *current, kitsToValidate) {
         toStore = current;
         toStore->upgrade();
@@ -263,6 +263,7 @@ void KitManager::registerKitInformation(KitInformation *ki)
 {
     QTC_CHECK(!isLoaded());
     QTC_ASSERT(!d->m_informationList.contains(ki), return);
+    QTC_ASSERT(ki->id().isValid(), return);
 
     auto it = std::lower_bound(d->m_informationList.begin(), d->m_informationList.end(),
                                ki, greaterPriority);
@@ -321,7 +322,7 @@ QList<Kit *> KitManager::sortKits(const QList<Kit *> kits)
             return a.second < b.second;
         return a. first < b.first;
     });
-    return Utils::transform(sortList, [](const QPair<QString, Kit *> &a) { return a.second; });
+    return Utils::transform(sortList, &QPair<QString, Kit *>::second);
 }
 
 KitManager::KitList KitManager::restoreKits(const FileName &fileName)
@@ -383,7 +384,7 @@ QList<Kit *> KitManager::kits(const Kit::Predicate &predicate)
 Kit *KitManager::kit(Id id)
 {
     if (!id.isValid())
-        return 0;
+        return nullptr;
 
     return Utils::findOrDefault(kits(), Utils::equal(&Kit::id, id));
 }
@@ -505,7 +506,7 @@ void KitInformation::addToEnvironment(const Kit *k, Environment &env) const
 IOutputParser *KitInformation::createOutputParser(const Kit *k) const
 {
     Q_UNUSED(k);
-    return 0;
+    return nullptr;
 }
 
 QString KitInformation::displayNamePostfix(const Kit *k) const

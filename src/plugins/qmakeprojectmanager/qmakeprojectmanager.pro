@@ -10,7 +10,6 @@ HEADERS += \
     qmakekitconfigwidget.h \
     qmakeparsernodes.h \
     qmakeprojectimporter.h \
-    qmakerunconfigurationfactory.h \
     qmakeprojectmanagerplugin.h \
     qmakeprojectmanager.h \
     qmakeproject.h \
@@ -25,9 +24,6 @@ HEADERS += \
     wizards/librarywizard.h \
     wizards/librarywizarddialog.h \
     wizards/guiappwizarddialog.h \
-    wizards/testwizard.h \
-    wizards/testwizarddialog.h \
-    wizards/testwizardpage.h \
     wizards/modulespage.h \
     wizards/filespage.h \
     wizards/qtwizard.h \
@@ -35,7 +31,6 @@ HEADERS += \
     wizards/subdirsprojectwizarddialog.h \
     wizards/simpleprojectwizard.h \
     qmakeprojectmanagerconstants.h \
-    makestep.h \
     qmakestep.h \
     qtmodulesinfo.h \
     qmakeprojectconfigwidget.h \
@@ -47,14 +42,14 @@ HEADERS += \
     qmakeprojectmanager_global.h \
     desktopqmakerunconfiguration.h \
     profilecompletionassist.h \
-    makefileparse.h
+    makefileparse.h \
+    qmakemakestep.h
 
 SOURCES += \
     qmakekitconfigwidget.cpp \
     qmakekitinformation.cpp \
     qmakeparsernodes.cpp \
     qmakeprojectimporter.cpp \
-    qmakerunconfigurationfactory.cpp \
     qmakeprojectmanagerplugin.cpp \
     qmakeprojectmanager.cpp \
     qmakeproject.cpp \
@@ -69,16 +64,12 @@ SOURCES += \
     wizards/librarywizard.cpp \
     wizards/librarywizarddialog.cpp \
     wizards/guiappwizarddialog.cpp \
-    wizards/testwizard.cpp \
-    wizards/testwizarddialog.cpp \
-    wizards/testwizardpage.cpp \
     wizards/modulespage.cpp \
     wizards/filespage.cpp \
     wizards/qtwizard.cpp \
     wizards/subdirsprojectwizard.cpp \
     wizards/subdirsprojectwizarddialog.cpp \
     wizards/simpleprojectwizard.cpp \
-    makestep.cpp \
     qmakestep.cpp \
     qtmodulesinfo.cpp \
     qmakeprojectconfigwidget.cpp \
@@ -89,13 +80,13 @@ SOURCES += \
     librarydetailscontroller.cpp \
     desktopqmakerunconfiguration.cpp \
     profilecompletionassist.cpp \
-    makefileparse.cpp
+    makefileparse.cpp \
+    qmakemakestep.cpp
 
-FORMS += makestep.ui \
+FORMS += \
     qmakestep.ui \
     qmakeprojectconfigwidget.ui \
-    librarydetailswidget.ui \
-    wizards/testwizardpage.ui
+    librarydetailswidget.ui
 
 RESOURCES += qmakeprojectmanager.qrc \
     wizards/wizards.qrc

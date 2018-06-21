@@ -32,7 +32,7 @@
 #include "qmakeprojectmanagerconstants.h"
 #include "qmakenodes.h"
 #include "qmakestep.h"
-#include "makestep.h"
+#include "qmakemakestep.h"
 #include "makefileparse.h"
 
 #include <coreplugin/documentmanager.h>
@@ -98,8 +98,8 @@ const char BUILD_CONFIGURATION_KEY[] = "Qt4ProjectManager.Qt4BuildConfiguration.
 
 enum { debug = 0 };
 
-QmakeBuildConfiguration::QmakeBuildConfiguration(Target *target)
-    : BuildConfiguration(target, Constants::QMAKE_BC_ID)
+QmakeBuildConfiguration::QmakeBuildConfiguration(Target *target, Core::Id id)
+    : BuildConfiguration(target, id)
 {
     connect(this, &BuildConfiguration::buildDirectoryChanged,
             this, &QmakeBuildConfiguration::emitProFileEvaluateNeeded);
@@ -127,10 +127,10 @@ void QmakeBuildConfiguration::initialize(const BuildInfo *info)
     BuildStepList *buildSteps = stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
     auto qmakeStep = new QMakeStep(buildSteps);
     buildSteps->appendStep(qmakeStep);
-    buildSteps->appendStep(new MakeStep(buildSteps));
+    buildSteps->appendStep(new QmakeMakeStep(buildSteps));
 
     BuildStepList *cleanSteps = stepList(ProjectExplorer::Constants::BUILDSTEPS_CLEAN);
-    cleanSteps->appendStep(new MakeStep(cleanSteps));
+    cleanSteps->appendStep(new QmakeMakeStep(cleanSteps));
 
     const QmakeBuildInfo *qmakeInfo = static_cast<const QmakeBuildInfo *>(info);
     BaseQtVersion *version = QtKitInformation::qtVersion(target()->kit());
@@ -315,13 +315,13 @@ QMakeStep *QmakeBuildConfiguration::qmakeStep() const
     return 0;
 }
 
-MakeStep *QmakeBuildConfiguration::makeStep() const
+QmakeMakeStep *QmakeBuildConfiguration::makeStep() const
 {
-    MakeStep *ms = 0;
+    QmakeMakeStep *ms = 0;
     BuildStepList *bsl = stepList(Core::Id(ProjectExplorer::Constants::BUILDSTEPS_BUILD));
     Q_ASSERT(bsl);
     for (int i = 0; i < bsl->count(); ++i)
-        if ((ms = qobject_cast<MakeStep *>(bsl->at(i))) != 0)
+        if ((ms = qobject_cast<QmakeMakeStep *>(bsl->at(i))) != 0)
             return ms;
     return 0;
 }
@@ -357,9 +357,11 @@ QmakeBuildConfiguration::MakefileState QmakeBuildConfiguration::compareToImportF
         return MakefileForWrongProject;
     }
 
-    if (parse.srcProFile() != qs->project()->projectFilePath().toString()) {
+    const Utils::FileName projectPath =
+            m_subNodeBuild ? m_subNodeBuild->filePath() : qs->project()->projectFilePath();
+    if (parse.srcProFile() != projectPath.toString()) {
         qCDebug(logs) << "**Different profile used to generate the Makefile:"
-                      << parse.srcProFile() << " expected profile:" << qs->project()->projectFilePath();
+                      << parse.srcProFile() << " expected profile:" << projectPath;
         if (errorString)
             *errorString = tr("The Makefile is for a different project.");
         return MakefileIncompatible;
@@ -387,7 +389,7 @@ QmakeBuildConfiguration::MakefileState QmakeBuildConfiguration::compareToImportF
     // and compare that on its own
     QString workingDirectory = QFileInfo(makefile).absolutePath();
     QStringList actualArgs;
-    QString userArgs = qs->userArguments();
+    QString userArgs = macroExpander()->expandProcessArgs(qs->userArguments());
     // This copies the settings from userArgs to actualArgs (minus some we
     // are not interested in), splitting them up into individual strings:
     extractSpecFromArguments(&userArgs, workingDirectory, version, &actualArgs);

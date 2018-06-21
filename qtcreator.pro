@@ -1,9 +1,9 @@
 include(qtcreator.pri)
 
 #version check qt
-!minQtVersion(5, 6, 2) {
+!minQtVersion(5, 9, 0) {
     message("Cannot build $$IDE_DISPLAY_NAME with Qt version $${QT_VERSION}.")
-    error("Use at least Qt 5.6.2.")
+    error("Use at least Qt 5.9.0.")
 }
 
 include(doc/doc.pri)
@@ -19,7 +19,7 @@ DISTFILES += dist/copyright_template.txt \
     README.md \
     $$files(dist/changes-*) \
     qtcreator.qbs \
-    qbs/pluginjson/pluginjson.qbs \
+    $$files(qbs/*, true) \
     $$files(scripts/*.py) \
     $$files(scripts/*.sh) \
     $$files(scripts/*.pl)

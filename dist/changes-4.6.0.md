@@ -24,12 +24,27 @@ General
 Editing
 
 * Added option to display annotations between lines (QTCREATORBUG-19181)
+* Added shortcut setting for jumping to document start and end
 * Fixed that editor could jump to end of file when editing in a different split
   (QTCREATORBUG-19550)
+* Fixed order of items in list of recent documents when documents are suspended
+  (QTCREATORBUG-19758)
+* Fixed crash in generic highlighter (QTCREATORBUG-19916)
+* Fixed issue with snippet variables on Gnome (QTCREATORBUG-19571)
+* Fixed tool tips in binary editor (QTCREATORBUG-17573)
+
+Help
+
+* Improved startup performance
 
 All Projects
 
 * Added filtering to project kit setup page
+
+CMake Projects
+
+* Fixed that files could be shown multiple times in project tree
+  (QTCREATORBUG-19020)
 
 Qbs Projects
 
@@ -46,6 +61,7 @@ C++ Support
     * Integrated Clang-Tidy and Clazy.
       Enable checks in Options > C++ > Code Model > Clang Code Model Warnings
     * Added separate highlighting for function definitions (QTCREATORBUG-16625)
+    * Fixed issues with non-UTF-8 strings (QTCREATORBUG-16941)
 
 QML Support
 
@@ -54,12 +70,18 @@ QML Support
 Debugging
 
 * Split `Expressions` view from `Locals` view (QTCREATORBUG-19167)
+* LLDB
+    * Fixed attaching to core file (QTCREATORBUG-18722)
+    * Fixed issue when killing LLDB from the outside (QTCREATORBUG-18723)
 
 Qt Quick Designer
 
 * Added font and text properties from Qt 5.10
+* Added `Add New Resources` to item library
 * Fixed that items blurred when zooming in
 * Fixed crash when changing control focus policy (QTCREATORBUG-19563)
+* Fixed assert in backend process with Qt 5.9.4 & 5.10.1 and later
+  (QTCREATORBUG-19729)
 
 Version Control Systems
 
@@ -73,15 +95,19 @@ Version Control Systems
 Diff Viewer
 
 * Added folding for files and chunks
+* Fixed issue with repeated stage and unstage operation
 
 Test Integration
 
+* Added Qt Quick Test to auto test wizard
 * Added grouping of test cases (QTCREATORBUG-17979)
+* Fixed handling of `qCritical` output (QTCREATORBUG-19795)
 * Google Test
     * Fixed detection of crashed tests (QTCREATORBUG-19565)
 
 Model Editor
 
+* Removed experimental state
 * Added support for text alignment
 * Added support for multi-line object names
 * Added support for dragging items onto model editor from more panes
@@ -89,6 +115,8 @@ Model Editor
 * Added `Flat` visual role
 * Added `Add Related Elements` to diagram context menu
 * Added wizard for scratch models
+* Moved export actions to `File` menu
+* Moved zoom actions to editor tool bar
 * Fixed issue with selecting items (QTCREATORBUG-18368)
 
 Platform Specific
@@ -98,6 +126,7 @@ Windows
 * Added support for the [heob](https://github.com/ssbssa/heob/releases)
   memory analyzer
 * Fixed detection of CDB in non-default installation roots
+* Fixed issue with setting `PATH` versus `Path` environment variable
 
 Android
 

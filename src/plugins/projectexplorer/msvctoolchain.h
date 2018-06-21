@@ -92,6 +92,7 @@ private:
     static void environmentModifications(QFutureInterface<QList<Utils::EnvironmentItem> > &future,
                                          QString vcvarsBat, QString varsBatArg);
     void initEnvModWatcher(const QFuture<QList<Utils::EnvironmentItem>> &future);
+    void updateEnvironmentModifications(QList<Utils::EnvironmentItem> modifications);
 
     mutable QList<Utils::EnvironmentItem> m_environmentModifications;
     mutable QFutureWatcher<QList<Utils::EnvironmentItem>> m_envModWatcher;
@@ -113,7 +114,7 @@ public:
     QString typeDisplayName() const override;
     QList<Utils::FileName> suggestedMkspecList() const override;
     void addToEnvironment(Utils::Environment &env) const override;
-    Utils::FileName compilerCommand() const override { return m_compiler; }
+    Utils::FileName compilerCommand() const override;
     IOutputParser *outputParser() const override;
     ToolChain *clone() const override;
     QVariantMap toMap() const override;
@@ -124,7 +125,6 @@ public:
 
 private:
     QString m_llvmDir;
-    Utils::FileName m_compiler;
 };
 
 // --------------------------------------------------------------------------

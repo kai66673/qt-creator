@@ -49,9 +49,9 @@
 #include <projectexplorer/project.h>
 #include <projectexplorer/session.h>
 
-#include <clangsupport/cmbregisterprojectsforeditormessage.h>
 #include <clangsupport/filecontainer.h>
 #include <clangsupport/projectpartcontainer.h>
+#include <clangsupport/projectpartsupdatedmessage.h>
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
 
@@ -64,12 +64,6 @@ using namespace ClangCodeModel::Internal;
 
 static ModelManagerSupportClang *m_instance = 0;
 
-static bool useClangFollowSymbol()
-{
-    static bool use = qEnvironmentVariableIntValue("QTC_CLANG_FOLLOW_SYMBOL");
-    return use;
-}
-
 static CppTools::CppModelManager *cppModelManager()
 {
     return CppTools::CppModelManager::instance();
@@ -77,15 +71,11 @@ static CppTools::CppModelManager *cppModelManager()
 
 ModelManagerSupportClang::ModelManagerSupportClang()
     : m_completionAssistProvider(m_communicator)
+    , m_followSymbol(new ClangFollowSymbol)
     , m_refactoringEngine(new RefactoringEngine)
 {
     QTC_CHECK(!m_instance);
     m_instance = this;
-
-    if (useClangFollowSymbol())
-        m_followSymbol.reset(new ClangFollowSymbol);
-    else
-        m_followSymbol.reset(new CppTools::FollowSymbolUnderCursor);
 
     CppTools::CppModelManager::instance()->setCurrentDocumentFilter(
                 std::make_unique<ClangCurrentDocumentFilter>());
@@ -94,11 +84,9 @@ ModelManagerSupportClang::ModelManagerSupportClang()
     connect(editorManager, &Core::EditorManager::editorOpened,
             this, &ModelManagerSupportClang::onEditorOpened);
     connect(editorManager, &Core::EditorManager::currentEditorChanged,
-            this, &ModelManagerSupportClang::onCurrentEditorChanged,
-            Qt::QueuedConnection);
+            this, &ModelManagerSupportClang::onCurrentEditorChanged);
     connect(editorManager, &Core::EditorManager::editorsClosed,
-            this, &ModelManagerSupportClang::onEditorClosed,
-            Qt::QueuedConnection);
+            this, &ModelManagerSupportClang::onEditorClosed);
 
     CppTools::CppModelManager *modelManager = cppModelManager();
     connect(modelManager, &CppTools::CppModelManager::abstractEditorSupportContentsUpdated,
@@ -120,7 +108,7 @@ ModelManagerSupportClang::ModelManagerSupportClang()
     connect(settings, &CppTools::CppCodeModelSettings::clangDiagnosticConfigsInvalidated,
             this, &ModelManagerSupportClang::onDiagnosticConfigsInvalidated);
 
-    m_communicator.registerFallbackProjectPart();
+    m_communicator.projectPartsUpdatedForFallback();
 }
 
 ModelManagerSupportClang::~ModelManagerSupportClang()
@@ -160,9 +148,18 @@ CppTools::BaseEditorDocumentProcessor *ModelManagerSupportClang::createEditorDoc
     return new ClangEditorDocumentProcessor(m_communicator, baseTextDocument);
 }
 
-void ModelManagerSupportClang::onCurrentEditorChanged(Core::IEditor *)
+void ModelManagerSupportClang::onCurrentEditorChanged(Core::IEditor *editor)
 {
-    m_communicator.updateTranslationUnitVisiblity();
+    m_communicator.documentVisibilityChanged();
+
+    // Update task hub issues for current CppEditorDocument
+    ClangEditorDocumentProcessor::clearTaskHubIssues();
+    if (!editor || !editor->document() || !cppModelManager()->isCppEditor(editor))
+        return;
+
+    const ::Utils::FileName filePath = editor->document()->filePath();
+    if (auto processor = ClangEditorDocumentProcessor::get(filePath.toString()))
+        processor->generateTaskHubIssues();
 }
 
 void ModelManagerSupportClang::connectTextDocumentToTranslationUnit(TextEditor::TextDocument *textDocument)
@@ -235,7 +232,7 @@ void ModelManagerSupportClang::onEditorOpened(Core::IEditor *editor)
 
 void ModelManagerSupportClang::onEditorClosed(const QList<Core::IEditor *> &)
 {
-    m_communicator.updateTranslationUnitVisiblity();
+    m_communicator.documentVisibilityChanged();
 }
 
 void ModelManagerSupportClang::onCppDocumentAboutToReloadOnTranslationUnit()
@@ -250,7 +247,7 @@ void ModelManagerSupportClang::onCppDocumentReloadFinishedOnTranslationUnit(bool
     if (success) {
         TextEditor::TextDocument *textDocument = qobject_cast<TextEditor::TextDocument *>(sender());
         connectToTextDocumentContentsChangedForTranslationUnit(textDocument);
-        m_communicator.updateTranslationUnitWithRevisionCheck(textDocument);
+        m_communicator.documentsChangedWithRevisionCheck(textDocument);
     }
 }
 
@@ -271,7 +268,7 @@ void ModelManagerSupportClang::onCppDocumentContentsChangedOnTranslationUnit(int
 
     m_communicator.updateChangeContentStartPosition(document->filePath().toString(),
                                                        position);
-    m_communicator.updateTranslationUnitIfNotCurrentDocument(document);
+    m_communicator.documentsChangedIfNotCurrentDocument(document);
 
     clearDiagnosticFixIts(document->filePath().toString());
 }
@@ -288,14 +285,14 @@ void ModelManagerSupportClang::onCppDocumentReloadFinishedOnUnsavedFile(bool suc
     if (success) {
         TextEditor::TextDocument *textDocument = qobject_cast<TextEditor::TextDocument *>(sender());
         connectToTextDocumentContentsChangedForUnsavedFile(textDocument);
-        m_communicator.updateUnsavedFile(textDocument);
+        m_communicator.unsavedFilesUpdated(textDocument);
     }
 }
 
 void ModelManagerSupportClang::onCppDocumentContentsChangedOnUnsavedFile()
 {
     Core::IDocument *document = qobject_cast<Core::IDocument *>(sender());
-    m_communicator.updateUnsavedFile(document);
+    m_communicator.unsavedFilesUpdated(document);
 }
 
 void ModelManagerSupportClang::onAbstractEditorSupportContentsUpdated(const QString &filePath,
@@ -304,7 +301,7 @@ void ModelManagerSupportClang::onAbstractEditorSupportContentsUpdated(const QStr
     QTC_ASSERT(!filePath.isEmpty(), return);
 
     const QString mappedPath = m_uiHeaderOnDiskManager.createIfNeeded(filePath);
-    m_communicator.updateUnsavedFile(mappedPath, content, 0);
+    m_communicator.unsavedFilesUpdated(mappedPath, content, 0);
 }
 
 void ModelManagerSupportClang::onAbstractEditorSupportRemoved(const QString &filePath)
@@ -314,7 +311,7 @@ void ModelManagerSupportClang::onAbstractEditorSupportRemoved(const QString &fil
     if (!cppModelManager()->cppEditorDocument(filePath)) {
         const QString mappedPath = m_uiHeaderOnDiskManager.remove(filePath);
         const QString projectPartId = Utils::projectPartIdForFile(filePath);
-        m_communicator.unregisterUnsavedFilesForEditor({{mappedPath, projectPartId}});
+        m_communicator.unsavedFilesRemoved({{mappedPath, projectPartId}});
     }
 }
 
@@ -414,16 +411,16 @@ void ModelManagerSupportClang::onProjectPartsUpdated(ProjectExplorer::Project *p
     const CppTools::ProjectInfo projectInfo = cppModelManager()->projectInfo(project);
     QTC_ASSERT(projectInfo.isValid(), return);
 
-    m_communicator.registerProjectsParts(projectInfo.projectParts());
-    m_communicator.registerFallbackProjectPart();
+    m_communicator.projectPartsUpdated(projectInfo.projectParts());
+    m_communicator.projectPartsUpdatedForFallback();
 }
 
 void ModelManagerSupportClang::onProjectPartsRemoved(const QStringList &projectPartIds)
 {
     if (!projectPartIds.isEmpty()) {
-        unregisterTranslationUnitsWithProjectParts(projectPartIds);
-        m_communicator.unregisterProjectPartsForEditor(projectPartIds);
-        m_communicator.registerFallbackProjectPart();
+        closeBackendDocumentsWithProjectParts(projectPartIds);
+        m_communicator.projectPartsRemoved(projectPartIds);
+        m_communicator.projectPartsUpdatedForFallback();
     }
 }
 
@@ -448,12 +445,12 @@ clangProcessorsWithProjectParts(const QStringList &projectPartIds)
     });
 }
 
-void ModelManagerSupportClang::unregisterTranslationUnitsWithProjectParts(
+void ModelManagerSupportClang::closeBackendDocumentsWithProjectParts(
         const QStringList &projectPartIds)
 {
     const auto processors = clangProcessorsWithProjectParts(projectPartIds);
     foreach (ClangEditorDocumentProcessor *processor, processors) {
-        processor->unregisterTranslationUnitForEditor();
+        processor->closeBackendDocument();
         processor->clearProjectPart();
         processor->run();
     }

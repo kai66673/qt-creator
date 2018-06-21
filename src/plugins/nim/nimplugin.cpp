@@ -48,7 +48,7 @@ using namespace ProjectExplorer;
 
 namespace Nim {
 
-class NimPluginRunData
+class NimPluginPrivate
 {
 public:
     NimSettings settings;
@@ -62,11 +62,9 @@ public:
     NimToolChainFactory toolChainFactory;
 };
 
-static NimPluginRunData *m_runData = nullptr;
-
 NimPlugin::~NimPlugin()
 {
-    delete m_runData;
+    delete d;
 }
 
 bool NimPlugin::initialize(const QStringList &arguments, QString *errorMessage)
@@ -74,12 +72,9 @@ bool NimPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     Q_UNUSED(arguments)
     Q_UNUSED(errorMessage)
 
-    m_runData = new NimPluginRunData;
+    d = new NimPluginPrivate;
 
     ToolChainManager::registerLanguage(Constants::C_NIMLANGUAGE_ID, Constants::C_NIMLANGUAGE_NAME);
-
-    RunControl::registerWorker<NimRunConfiguration, SimpleTargetRunner>
-            (ProjectExplorer::Constants::NORMAL_RUN_MODE);
 
     TextEditor::SnippetProvider::registerGroup(Constants::C_NIMSNIPPETSGROUP_ID,
                                                tr("Nim", "SnippetProvider"),
@@ -93,7 +88,8 @@ bool NimPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 void NimPlugin::extensionsInitialized()
 {
     // Add MIME overlay icons (these icons displayed at Project dock panel)
-    const QIcon icon((QLatin1String(Constants::C_NIM_ICON_PATH)));
+    const QIcon icon = Utils::Icon({{":/nim/images/settingscategory_nim.png",
+                                     Utils::Theme::PanelTextColorDark}}, Utils::Icon::Tint).icon();
     if (!icon.isNull()) {
         Core::FileIconProvider::registerIconOverlayForMimeType(icon, Constants::C_NIM_MIMETYPE);
         Core::FileIconProvider::registerIconOverlayForMimeType(icon, Constants::C_NIM_SCRIPT_MIMETYPE);

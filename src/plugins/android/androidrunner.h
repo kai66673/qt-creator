@@ -26,7 +26,6 @@
 #pragma once
 
 #include "androidconfigurations.h"
-#include "androidrunnable.h"
 
 #include <projectexplorer/runconfiguration.h>
 #include <qmldebug/qmldebugcommandlinearguments.h>
@@ -56,9 +55,6 @@ public:
                            const Utils::Environment &extraEnvVars = Utils::Environment());
     ~AndroidRunner() override;
 
-    void setRunnable(const AndroidRunnable &runnable);
-    const AndroidRunnable &runnable() const { return m_androidRunnable; }
-
     Utils::Port gdbServerPort() const { return m_gdbServerPort; }
     QUrl qmlServer() const { return m_qmlServer; }
     Utils::ProcessHandle pid() const { return m_pid; }
@@ -69,9 +65,8 @@ public:
 signals:
     void asyncStart();
     void asyncStop();
-    void remoteDebuggerRunning();
     void qmlServerReady(const QUrl &serverUrl);
-    void androidRunnableChanged(const AndroidRunnable &runnable);
+    void androidDeviceInfoChanged(const Android::AndroidDeviceInfo &deviceInfo);
     void avdDetected();
 
 private:
@@ -84,7 +79,7 @@ private:
     void checkAVD();
     void launchAVD();
 
-    AndroidRunnable m_androidRunnable;
+    QString m_packageName;
     QString m_launchedAVDName;
     QThread m_thread;
     QTimer m_checkAVDTimer;

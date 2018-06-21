@@ -35,11 +35,10 @@ namespace Sqlite {
 class DatabaseBackend;
 class Database;
 
-class SQLITE_EXPORT TransactionInterface
+class TransactionInterface
 {
 public:
     TransactionInterface() = default;
-    virtual ~TransactionInterface();
     TransactionInterface(const TransactionInterface &) = delete;
     TransactionInterface &operator=(const TransactionInterface &) = delete;
 
@@ -48,6 +47,11 @@ public:
     virtual void exclusiveBegin() = 0;
     virtual void commit() = 0;
     virtual void rollback() = 0;
+    virtual void lock() = 0;
+    virtual void unlock() = 0;
+
+protected:
+    ~TransactionInterface() = default;
 };
 
 class AbstractTransaction
@@ -60,26 +64,33 @@ public:
     {
         m_interface.commit();
         m_isAlreadyCommited = true;
+        m_locker.unlock();
     }
 
 protected:
+    ~AbstractTransaction() = default;
     AbstractTransaction(TransactionInterface &interface)
         : m_interface(interface)
     {
     }
 
+
 protected:
     TransactionInterface &m_interface;
+    std::unique_lock<TransactionInterface> m_locker{m_interface};
     bool m_isAlreadyCommited = false;
+    bool m_rollback = false;
 };
 
 class AbstractThrowingTransaction : public AbstractTransaction
 {
 public:
+    AbstractThrowingTransaction(const AbstractThrowingTransaction &) = delete;
+    AbstractThrowingTransaction &operator=(const AbstractThrowingTransaction &) = delete;
     ~AbstractThrowingTransaction() noexcept(false)
     {
         try {
-            if (!m_isAlreadyCommited)
+            if (m_rollback)
                 m_interface.rollback();
         } catch (...) {
             if (!std::uncaught_exception())
@@ -97,10 +108,12 @@ protected:
 class AbstractNonThrowingDestructorTransaction : public AbstractTransaction
 {
 public:
+    AbstractNonThrowingDestructorTransaction(const AbstractNonThrowingDestructorTransaction &) = delete;
+    AbstractNonThrowingDestructorTransaction &operator=(const AbstractNonThrowingDestructorTransaction &) = delete;
     ~AbstractNonThrowingDestructorTransaction()
     {
         try {
-            if (!m_isAlreadyCommited)
+            if (m_rollback)
                 m_interface.rollback();
         } catch (...) {
         }
@@ -122,6 +135,11 @@ public:
     {
         interface.deferredBegin();
     }
+
+    ~BasicDeferredTransaction()
+    {
+        BaseTransaction::m_rollback = !BaseTransaction::m_isAlreadyCommited;
+    }
 };
 
 using DeferredTransaction = BasicDeferredTransaction<AbstractThrowingTransaction>;
@@ -136,6 +154,11 @@ public:
     {
         interface.immediateBegin();
     }
+
+    ~BasicImmediateTransaction()
+    {
+        BaseTransaction::m_rollback = !BaseTransaction::m_isAlreadyCommited;
+    }
 };
 
 using ImmediateTransaction = BasicImmediateTransaction<AbstractThrowingTransaction>;
@@ -149,6 +172,11 @@ public:
         : BaseTransaction(interface)
     {
         interface.exclusiveBegin();
+    }
+
+    ~BasicExclusiveTransaction()
+    {
+        BaseTransaction::m_rollback = !BaseTransaction::m_isAlreadyCommited;
     }
 };
 

@@ -207,7 +207,7 @@ int clangColumn(const QTextBlock &line, int cppEditorColumn)
 
 CPlusPlus::Icons::IconType iconTypeForToken(const ClangBackEnd::TokenInfoContainer &token)
 {
-    const ClangBackEnd::ExtraInfo &extraInfo = token.extraInfo();
+    const ClangBackEnd::ExtraInfo &extraInfo = token.extraInfo;
     if (extraInfo.signal)
         return CPlusPlus::Icons::SignalIconType;
 
@@ -224,10 +224,7 @@ CPlusPlus::Icons::IconType iconTypeForToken(const ClangBackEnd::TokenInfoContain
         }
     }
 
-    ClangBackEnd::HighlightingType mainType = token.types().mainHighlightingType;
-
-    if (mainType == ClangBackEnd::HighlightingType::Keyword)
-        return CPlusPlus::Icons::KeywordIconType;
+    ClangBackEnd::HighlightingType mainType = token.types.mainHighlightingType;
 
     if (mainType == ClangBackEnd::HighlightingType::QtProperty)
         return CPlusPlus::Icons::PropertyIconType;
@@ -240,20 +237,26 @@ CPlusPlus::Icons::IconType iconTypeForToken(const ClangBackEnd::TokenInfoContain
     if (mainType == ClangBackEnd::HighlightingType::Enumeration)
         return CPlusPlus::Icons::EnumeratorIconType;
 
-    if (mainType == ClangBackEnd::HighlightingType::Type) {
-        const ClangBackEnd::MixinHighlightingTypes &types = token.types().mixinHighlightingTypes;
+    if (mainType == ClangBackEnd::HighlightingType::Type
+            || mainType == ClangBackEnd::HighlightingType::Keyword) {
+        const ClangBackEnd::MixinHighlightingTypes &types = token.types.mixinHighlightingTypes;
         if (types.contains(ClangBackEnd::HighlightingType::Enum))
             return CPlusPlus::Icons::EnumIconType;
         if (types.contains(ClangBackEnd::HighlightingType::Struct))
             return CPlusPlus::Icons::StructIconType;
         if (types.contains(ClangBackEnd::HighlightingType::Namespace))
             return CPlusPlus::Icons::NamespaceIconType;
+        if (types.contains(ClangBackEnd::HighlightingType::Class))
+            return CPlusPlus::Icons::ClassIconType;
+        if (mainType == ClangBackEnd::HighlightingType::Keyword)
+            return CPlusPlus::Icons::KeywordIconType;
         return CPlusPlus::Icons::ClassIconType;
     }
 
     ClangBackEnd::StorageClass storageClass = extraInfo.storageClass;
     if (mainType == ClangBackEnd::HighlightingType::VirtualFunction
-            || mainType == ClangBackEnd::HighlightingType::Function) {
+            || mainType == ClangBackEnd::HighlightingType::Function
+            || mainType == ClangBackEnd::HighlightingType::Operator) {
         if (storageClass != ClangBackEnd::StorageClass::Static) {
             switch (access) {
             case ClangBackEnd::AccessSpecifier::Public:
@@ -302,6 +305,31 @@ CPlusPlus::Icons::IconType iconTypeForToken(const ClangBackEnd::TokenInfoContain
     }
 
     return CPlusPlus::Icons::UnknownIconType;
+}
+
+QString diagnosticCategoryPrefixRemoved(const QString &text)
+{
+    QString theText = text;
+
+    // Prefixes are taken from $LLVM_SOURCE_DIR/tools/clang/lib/Frontend/TextDiagnostic.cpp,
+    // function TextDiagnostic::printDiagnosticLevel (llvm-3.6.2).
+    static const QStringList categoryPrefixes = {
+        QStringLiteral("note"),
+        QStringLiteral("remark"),
+        QStringLiteral("warning"),
+        QStringLiteral("error"),
+        QStringLiteral("fatal error")
+    };
+
+    for (const QString &prefix : categoryPrefixes) {
+        const QString fullPrefix = prefix + QStringLiteral(": ");
+        if (theText.startsWith(fullPrefix)) {
+            theText.remove(0, fullPrefix.length());
+            return theText;
+        }
+    }
+
+    return text;
 }
 
 } // namespace Utils

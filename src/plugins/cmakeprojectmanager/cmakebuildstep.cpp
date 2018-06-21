@@ -62,7 +62,6 @@ using namespace CMakeProjectManager::Internal;
 using namespace ProjectExplorer;
 
 namespace {
-const char CLEAN_KEY[] = "CMakeProjectManager.MakeStep.Clean"; // Obsolete since QtC 3.7
 const char BUILD_TARGETS_KEY[] = "CMakeProjectManager.MakeStep.BuildTargets";
 const char TOOL_ARGUMENTS_KEY[] = "CMakeProjectManager.MakeStep.AdditionalArguments";
 const char ADD_RUNCONFIGURATION_ARGUMENT_KEY[] = "CMakeProjectManager.MakeStep.AddRunConfigurationArgument";
@@ -110,11 +109,6 @@ CMakeBuildConfiguration *CMakeBuildStep::cmakeBuildConfiguration() const
     return static_cast<CMakeBuildConfiguration *>(buildConfiguration());
 }
 
-CMakeBuildConfiguration *CMakeBuildStep::targetsActiveBuildConfiguration() const
-{
-    return static_cast<CMakeBuildConfiguration *>(target()->activeBuildConfiguration());
-}
-
 CMakeRunConfiguration *CMakeBuildStep::targetsActiveRunConfiguration() const
 {
     return qobject_cast<CMakeRunConfiguration *>(target()->activeRunConfiguration());
@@ -140,14 +134,10 @@ QVariantMap CMakeBuildStep::toMap() const
 
 bool CMakeBuildStep::fromMap(const QVariantMap &map)
 {
-    if (map.value(CLEAN_KEY, false).toBool()) {
-        m_buildTarget = CMakeBuildStep::cleanTarget();
-    } else {
-        const QStringList targetList = map.value(BUILD_TARGETS_KEY).toStringList();
-        if (!targetList.isEmpty())
-            m_buildTarget = targetList.last();
-        m_toolArguments = map.value(TOOL_ARGUMENTS_KEY).toString();
-    }
+    const QStringList targetList = map.value(BUILD_TARGETS_KEY).toStringList();
+    if (!targetList.isEmpty())
+        m_buildTarget = targetList.last();
+    m_toolArguments = map.value(TOOL_ARGUMENTS_KEY).toString();
     if (map.value(ADD_RUNCONFIGURATION_ARGUMENT_KEY, false).toBool())
         m_buildTarget = ADD_RUNCONFIGURATION_TEXT;
 
@@ -159,8 +149,6 @@ bool CMakeBuildStep::init(QList<const BuildStep *> &earlierSteps)
 {
     bool canInit = true;
     CMakeBuildConfiguration *bc = cmakeBuildConfiguration();
-    if (!bc)
-        bc = targetsActiveBuildConfiguration();
     if (!bc) {
         emit addTask(Task::buildConfigurationMissingTask());
         canInit = false;
@@ -184,7 +172,7 @@ bool CMakeBuildStep::init(QList<const BuildStep *> &earlierSteps)
     }
 
     CMakeRunConfiguration *rc = targetsActiveRunConfiguration();
-    if (isCurrentExecutableTarget(m_buildTarget) && (!rc || rc->buildSystemTarget().isEmpty())) {
+    if (isCurrentExecutableTarget(m_buildTarget) && (!rc || rc->buildKey().isEmpty())) {
         emit addTask(Task(Task::Error,
                           QCoreApplication::translate("ProjectExplorer::Task",
                                     "You asked to build the current Run Configuration's build target only, "
@@ -246,8 +234,6 @@ void CMakeBuildStep::run(QFutureInterface<bool> &fi)
 {
     // Make sure CMake state was written to disk before trying to build:
     CMakeBuildConfiguration *bc = cmakeBuildConfiguration();
-    if (!bc)
-        bc = targetsActiveBuildConfiguration();
     QTC_ASSERT(bc, return);
 
     bool mustDelay = false;
@@ -370,7 +356,7 @@ QString CMakeBuildStep::allArguments(const CMakeRunConfiguration *rc) const
 
     if (isCurrentExecutableTarget(m_buildTarget)) {
         if (rc)
-            target = rc->buildSystemTarget();
+            target = rc->buildKey();
         else
             target = "<i>&lt;" + tr(ADD_RUNCONFIGURATION_TEXT) + "&gt;</i>";
     } else {
@@ -540,8 +526,6 @@ void CMakeBuildStepConfigWidget::selectedBuildTargetsChanged()
 void CMakeBuildStepConfigWidget::updateDetails()
 {
     BuildConfiguration *bc = m_buildStep->buildConfiguration();
-    if (!bc)
-        bc = m_buildStep->targetsActiveBuildConfiguration();
     if (!bc) {
         m_summaryText = tr("<b>No build configuration found on this kit.</b>");
         emit updateSummary();
@@ -571,9 +555,8 @@ QString CMakeBuildStepConfigWidget::summaryText() const
 CMakeBuildStepFactory::CMakeBuildStepFactory()
 {
     registerStep<CMakeBuildStep>(Constants::CMAKE_BUILD_STEP_ID);
-    setDisplayName(tr("Build", "Display name for CMakeProjectManager::CMakeBuildStep id."));
+    setDisplayName(CMakeBuildStep::tr("Build", "Display name for CMakeProjectManager::CMakeBuildStep id."));
     setSupportedProjectType(Constants::CMAKEPROJECT_ID);
-    setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
 }
 
 void CMakeBuildStep::processStarted()

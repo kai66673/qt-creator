@@ -70,6 +70,8 @@ TextEditor::TextStyle toTextStyle(ClangBackEnd::HighlightingType type)
         return TextEditor::C_OUTPUT_ARGUMENT;
     case HighlightingType::Operator:
         return TextEditor::C_OPERATOR;
+    case HighlightingType::OverloadedOperator:
+        return TextEditor::C_OVERLOADED_OPERATOR;
     case HighlightingType::Comment:
         return TextEditor::C_COMMENT;
     case HighlightingType::StringLiteral:
@@ -130,11 +132,11 @@ TextEditor::TextStyles toTextStyles(ClangBackEnd::HighlightingTypes types)
 TextEditor::HighlightingResult toHighlightingResult(
         const ClangBackEnd::TokenInfoContainer &tokenInfo)
 {
-    const auto textStyles = toTextStyles(tokenInfo.types());
+    const auto textStyles = toTextStyles(tokenInfo.types);
 
-    return TextEditor::HighlightingResult(tokenInfo.line(),
-                                          tokenInfo.column(),
-                                          tokenInfo.length(),
+    return TextEditor::HighlightingResult(tokenInfo.line,
+                                          tokenInfo.column,
+                                          tokenInfo.length,
                                           textStyles);
 }
 
@@ -194,7 +196,7 @@ void HighlightingResultReporter::run_internal()
     using ClangBackEnd::HighlightingType;
 
     for (const auto &tokenInfo : m_tokenInfos) {
-        const HighlightingType mainType = tokenInfo.types().mainHighlightingType;
+        const HighlightingType mainType = tokenInfo.types.mainHighlightingType;
         if (mainType == HighlightingType::StringLiteral)
             continue;
 

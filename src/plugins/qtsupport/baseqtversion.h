@@ -232,6 +232,8 @@ public:
     QStringList qtConfigValues() const;
 
     Utils::MacroExpander *macroExpander() const; // owned by the Qt version
+    static std::unique_ptr<Utils::MacroExpander> createMacroExpander(
+        const std::function<BaseQtVersion *()> &qtVersion);
 
     static void populateQmlFileFinder(Utils::FileInProjectFinder *finder,
                                       const ProjectExplorer::Target *target);
@@ -263,9 +265,12 @@ private:
     QString findHostBinary(HostBinaries binary) const;
     void updateMkspec() const;
     QHash<ProKey, ProString> versionInfo() const;
-    static bool queryQMakeVariables(const Utils::FileName &binary, const Utils::Environment &env,
-                                    QHash<ProKey, ProString> *versionInfo, QString *error = 0);
-    static QString qmakeProperty(const QHash<ProKey, ProString> &versionInfo, const QByteArray &name,
+    static bool queryQMakeVariables(const Utils::FileName &binary,
+                                    const Utils::Environment &env,
+                                    QHash<ProKey, ProString> *versionInfo,
+                                    QString *error = nullptr);
+    static QString qmakeProperty(const QHash<ProKey, ProString> &versionInfo,
+                                 const QByteArray &name,
                                  PropertyVariant variant = PropertyVariantGet);
     static Utils::FileName mkspecDirectoryFromVersionInfo(const QHash<ProKey,ProString> &versionInfo);
     static Utils::FileName mkspecFromVersionInfo(const QHash<ProKey,ProString> &versionInfo);
@@ -315,7 +320,7 @@ private:
 
     mutable QList<ProjectExplorer::Abi> m_qtAbis;
 
-    mutable Utils::MacroExpander m_expander;
+    std::unique_ptr<Utils::MacroExpander> m_expander;
 };
 }
 

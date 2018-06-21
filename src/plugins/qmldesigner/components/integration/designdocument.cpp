@@ -214,7 +214,9 @@ void DesignDocument::updateFileName(const Utils::FileName & /*oldFileName*/, con
 
 Utils::FileName DesignDocument::fileName() const
 {
-    return editor()->document()->filePath();
+    if (editor())
+        return editor()->document()->filePath();
+    return Utils::FileName();
 }
 
 Kit *DesignDocument::currentKit() const
@@ -550,6 +552,16 @@ void DesignDocument::setEditor(Core::IEditor *editor)
 {
     m_textEditor = editor;
     // if the user closed the file explicit we do not want to do anything with it anymore
+
+
+    connect(Core::EditorManager::instance(), &Core::EditorManager::aboutToSave,
+            this, [this](Core::IDocument *document) {
+        if (m_textEditor && m_textEditor->document() == document) {
+            if (m_documentModel && m_documentModel->rewriterView())
+                m_documentModel->rewriterView()->writeAuxiliaryData();
+        }
+    });
+
     connect(Core::EditorManager::instance(), &Core::EditorManager::editorAboutToClose,
             this, [this](Core::IEditor *editor) {
         if (m_textEditor.data() == editor)
@@ -631,7 +643,7 @@ static inline Kit *getActiveKit(DesignDocument *designDocument)
     if (!target)
         return 0;
 
-    if (!target->kit()->isValid())
+    if (!target->kit() || !target->kit()->isValid())
         return 0;
     QObject::connect(target, &Target::kitChanged,
                      designDocument, &DesignDocument::updateActiveQtVersion, Qt::UniqueConnection);

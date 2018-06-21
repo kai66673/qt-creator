@@ -30,15 +30,13 @@
 
 namespace ClangBackEnd {
 
-template<typename Database,
-         typename ReadStatement,
-         typename WriteStatement>
+template<typename DatabaseType>
 class StorageSqliteStatementFactory
 {
 public:
-    using DatabaseType = Database;
-    using ReadStatementType = ReadStatement;
-    using WriteStatementType = WriteStatement;
+    using Database = DatabaseType;
+    using ReadStatement = typename Database::ReadStatement;
+    using WriteStatement = typename Database::WriteStatement;
 
     StorageSqliteStatementFactory(Database &database)
         : transaction(database),
@@ -56,6 +54,7 @@ public:
         const Sqlite::Column &symbolIdColumn = table.addColumn("symbolId", Sqlite::ColumnType::Integer);
         const Sqlite::Column &usrColumn = table.addColumn("usr", Sqlite::ColumnType::Text);
         const Sqlite::Column &symbolNameColumn = table.addColumn("symbolName", Sqlite::ColumnType::Text);
+        table.addColumn("symbolKind", Sqlite::ColumnType::Integer);
         table.addIndex({usrColumn, symbolNameColumn});
         table.addIndex({symbolIdColumn});
 
@@ -71,10 +70,11 @@ public:
         table.setUseTemporaryTable(true);
         table.addColumn("temporarySymbolId", Sqlite::ColumnType::Integer);
         table.addColumn("symbolId", Sqlite::ColumnType::Integer);
-        table.addColumn("line", Sqlite::ColumnType::Integer);
-        table.addColumn("column", Sqlite::ColumnType::Integer);
         const Sqlite::Column &sourceIdColumn = table.addColumn("sourceId", Sqlite::ColumnType::Integer);
-        table.addIndex({sourceIdColumn});
+        const Sqlite::Column &lineColumn = table.addColumn("line", Sqlite::ColumnType::Integer);
+        const Sqlite::Column &columnColumn = table.addColumn("column", Sqlite::ColumnType::Integer);
+        table.addColumn("locationKind", Sqlite::ColumnType::Integer);
+        table.addUniqueIndex({sourceIdColumn, lineColumn, columnColumn});
 
         table.initialize(database);
 
@@ -117,10 +117,10 @@ public:
     Sqlite::Table newUsedMacroTable{createNewUsedMacrosTable()};
     Sqlite::Table newNewSourceDependenciesTable{createNewSourceDependenciesTable()};
     WriteStatement insertSymbolsToNewSymbolsStatement{
-        "INSERT INTO newSymbols(temporarySymbolId, usr, symbolName) VALUES(?,?,?)",
+        "INSERT INTO newSymbols(temporarySymbolId, usr, symbolName, symbolKind) VALUES(?,?,?,?)",
         database};
     WriteStatement insertLocationsToNewLocationsStatement{
-        "INSERT INTO newLocations(temporarySymbolId, line, column, sourceId) VALUES(?,?,?,?)",
+        "INSERT OR IGNORE INTO newLocations(temporarySymbolId, line, column, sourceId, locationKind) VALUES(?,?,?,?,?)",
         database
     };
     ReadStatement selectNewSourceIdsStatement{
@@ -128,8 +128,8 @@ public:
         database
     };
     WriteStatement addNewSymbolsToSymbolsStatement{
-        "INSERT INTO symbols(usr, symbolName) "
-        "SELECT usr, symbolName FROM newSymbols WHERE NOT EXISTS "
+        "INSERT INTO symbols(usr, symbolName, symbolKind) "
+        "SELECT usr, symbolName, symbolKind FROM newSymbols WHERE NOT EXISTS "
         "(SELECT usr FROM symbols WHERE symbols.usr == newSymbols.usr)",
         database
     };
@@ -146,7 +146,7 @@ public:
         database
     };
     WriteStatement insertNewLocationsInLocationsStatement{
-        "INSERT INTO locations(symbolId, line, column, sourceId) SELECT symbolId, line, column, sourceId FROM newLocations",
+        "INSERT INTO locations(symbolId, line, column, sourceId, locationKind) SELECT symbolId, line, column, sourceId, locationKind FROM newLocations",
         database
     };
     WriteStatement deleteNewSymbolsTableStatement{
@@ -227,6 +227,10 @@ public:
    };
    ReadStatement getLowestLastModifiedTimeOfDependencies{
        "WITH RECURSIVE sourceIds(sourceId) AS (VALUES(?) UNION SELECT dependencySourceId FROM sourceDependencies, sourceIds WHERE sourceDependencies.sourceId = sourceIds.sourceId) SELECT min(lastModified) FROM fileStatuses, sourceIds WHERE fileStatuses.sourceId = sourceIds.sourceId",
+       database
+   };
+   ReadStatement getPrecompiledHeader{
+       "SELECT pchPath, pchBuildTime FROM precompiledHeaders WHERE projectPartId = ?",
        database
    };
 };

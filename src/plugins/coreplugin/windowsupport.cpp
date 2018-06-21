@@ -34,6 +34,7 @@
 #include <app/app_version.h>
 #include <utils/hostosinfo.h>
 #include <utils/qtcassert.h>
+#include <utils/stringutils.h>
 
 #include <QAction>
 #include <QEvent>
@@ -162,7 +163,7 @@ void WindowList::addWindow(QWidget *window)
     m_windows.append(window);
     Id id = Id("QtCreator.Window.").withSuffix(m_windows.size());
     m_windowActionIds.append(id);
-    auto action = new QAction(window->windowTitle(), 0);
+    auto action = new QAction(window->windowTitle(), ActionManager::instance());
     m_windowActions.append(action);
     QObject::connect(action, &QAction::triggered, [action]() { WindowList::activateWindow(action); });
     action->setCheckable(true);
@@ -194,7 +195,7 @@ void WindowList::updateTitle(QWidget *window)
     QString title = window->windowTitle();
     if (title.endsWith(QStringLiteral("- ") + Constants::IDE_DISPLAY_NAME))
         title.chop(12);
-    m_windowActions.at(index)->setText(title.trimmed());
+    m_windowActions.at(index)->setText(Utils::quoteAmpersands(title.trimmed()));
 }
 
 void WindowList::removeWindow(QWidget *window)

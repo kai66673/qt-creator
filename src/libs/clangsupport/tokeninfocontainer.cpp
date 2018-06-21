@@ -46,6 +46,7 @@ static const char *highlightingTypeToCStringLiteral(HighlightingType type)
         RETURN_TEXT_FOR_CASE(Field);
         RETURN_TEXT_FOR_CASE(Enumeration);
         RETURN_TEXT_FOR_CASE(Operator);
+        RETURN_TEXT_FOR_CASE(OverloadedOperator);
         RETURN_TEXT_FOR_CASE(Preprocessor);
         RETURN_TEXT_FOR_CASE(Label);
         RETURN_TEXT_FOR_CASE(FunctionDefinition);
@@ -67,6 +68,8 @@ static const char *highlightingTypeToCStringLiteral(HighlightingType type)
         RETURN_TEXT_FOR_CASE(ObjectiveCImplementation);
         RETURN_TEXT_FOR_CASE(ObjectiveCProperty);
         RETURN_TEXT_FOR_CASE(ObjectiveCMethod);
+        RETURN_TEXT_FOR_CASE(PrimitiveType);
+        RETURN_TEXT_FOR_CASE(Declaration);
         default: return "UnhandledHighlightingType";
     }
 }
@@ -77,9 +80,9 @@ QDebug operator<<(QDebug debug, const ExtraInfo &extraInfo)
     debug.nospace() << "ExtraInfo("
                     << extraInfo.token << ", "
                     << extraInfo.typeSpelling << ", "
-                    << extraInfo.resultTypeSpelling << ", "
                     << extraInfo.semanticParentTypeSpelling << ", "
                     << extraInfo.cursorRange << ", "
+                    << extraInfo.lexicalParentIndex << ", "
                     << static_cast<uint>(extraInfo.accessSpecifier) << ", "
                     << static_cast<uint>(extraInfo.storageClass) << ", "
                     << extraInfo.identifier << ", "
@@ -95,11 +98,11 @@ QDebug operator<<(QDebug debug, const ExtraInfo &extraInfo)
 QDebug operator<<(QDebug debug, const TokenInfoContainer &container)
 {
     debug.nospace() << "TokenInfosContainer("
-                    << container.line() << ", "
-                    << container.column() << ", "
-                    << container.length() << ", "
-                    << highlightingTypeToCStringLiteral(container.types().mainHighlightingType) << ", "
-                    << container.extraInfo()
+                    << container.line << ", "
+                    << container.column << ", "
+                    << container.length << ", "
+                    << highlightingTypeToCStringLiteral(container.types.mainHighlightingType) << ", "
+                    << container.extraInfo
                     << ")";
 
     return debug;

@@ -70,8 +70,6 @@ bool QbsCleanStep::init(QList<const BuildStep *> &earlierSteps)
         return false;
 
     QbsBuildConfiguration *bc = static_cast<QbsBuildConfiguration *>(buildConfiguration());
-    if (!bc)
-        bc = static_cast<QbsBuildConfiguration *>(target()->activeBuildConfiguration());
 
     if (!bc)
         return false;
@@ -297,7 +295,7 @@ QbsCleanStepFactory::QbsCleanStepFactory()
     registerStep<QbsCleanStep>(Constants::QBS_CLEANSTEP_ID);
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_CLEAN);
     setSupportedConfiguration(Constants::QBS_BC_ID);
-    setDisplayName(tr("Qbs Clean"));
+    setDisplayName(QbsCleanStep::tr("Qbs Clean"));
 }
 
 } // namespace Internal

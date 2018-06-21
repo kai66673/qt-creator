@@ -46,6 +46,12 @@ class CORE_EXPORT ModeManager : public QObject
     Q_OBJECT
 
 public:
+    enum class Style {
+        IconsAndText,
+        IconsOnly,
+        Hidden
+    };
+
     static ModeManager *instance();
 
     static Id currentMode();
@@ -55,10 +61,11 @@ public:
 
     static void activateMode(Id id);
     static void setFocusToCurrentMode();
-    static bool isModeSelectorVisible();
+    static Style modeStyle();
 
 public slots:
-    static void setModeSelectorVisible(bool visible);
+    static void setModeStyle(Style layout);
+    static void cycleModeStyle();
 
 signals:
     void currentModeAboutToChange(Core::Id mode);
@@ -68,7 +75,7 @@ signals:
 
 private:
     explicit ModeManager(Internal::MainWindow *mainWindow, Internal::FancyTabWidget *modeStack);
-    ~ModeManager();
+    ~ModeManager() override;
 
     static void extensionsInitialized();
 

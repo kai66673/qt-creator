@@ -56,6 +56,9 @@ public:
     static QString deviceSerialNumber(ProjectExplorer::Target *target);
     static void setDeviceSerialNumber(ProjectExplorer::Target *target, const QString &deviceSerialNumber);
 
+    static int deviceApiLevel(ProjectExplorer::Target *target);
+    static void setDeviceApiLevel(ProjectExplorer::Target *target, int level);
+
     static QString buildTargetSDK(ProjectExplorer::Target *target);
 
     static bool signPackage(ProjectExplorer::Target *target);
@@ -80,7 +83,6 @@ public:
     static bool checkCertificatePassword(const QString &keystorePath, const QString &keystorePasswd, const QString &alias, const QString &certificatePasswd);
     static bool checkCertificateExists(const QString &keystorePath, const QString &keystorePasswd,
                                        const QString &alias);
-    static bool checkForQt51Files(Utils::FileName fileName);
     static AndroidQtSupport *androidQtSupport(ProjectExplorer::Target *target);
     static bool updateGradleProperties(ProjectExplorer::Target *target);
     static int findApiLevel(const Utils::FileName &platformPath);

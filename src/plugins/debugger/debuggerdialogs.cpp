@@ -31,7 +31,6 @@
 
 #include <coreplugin/icore.h>
 #include <projectexplorer/projectexplorerconstants.h>
-#include <projectexplorer/runnables.h>
 #include <projectexplorer/toolchain.h>
 
 #include <app/app_version.h>
@@ -147,8 +146,9 @@ public:
     Id kitId;
     uint serverPort;
     QString serverAddress;
-    StandardRunnable runnable;
+    Runnable runnable;
     bool breakAtMain = false;
+    bool runInTerminal = false;
     QString serverStartScript;
     QString debugInfoLocation;
 };
@@ -160,7 +160,7 @@ bool StartApplicationParameters::equals(const StartApplicationParameters &rhs) c
         && runnable.commandLineArguments == rhs.runnable.commandLineArguments
         && runnable.workingDirectory == rhs.runnable.workingDirectory
         && breakAtMain == rhs.breakAtMain
-        && runnable.runMode == rhs.runnable.runMode
+        && runInTerminal == rhs.runInTerminal
         && serverStartScript == rhs.serverStartScript
         && kitId == rhs.kitId
         && debugInfoLocation == rhs.debugInfoLocation
@@ -196,7 +196,7 @@ void StartApplicationParameters::toSettings(QSettings *settings) const
     settings->setValue("LastExternalExecutableArguments", runnable.commandLineArguments);
     settings->setValue("LastExternalWorkingDirectory", runnable.workingDirectory);
     settings->setValue("LastExternalBreakAtMain", breakAtMain);
-    settings->setValue("LastExternalRunInTerminal", runnable.runMode == ApplicationLauncher::Console);
+    settings->setValue("LastExternalRunInTerminal", runInTerminal);
     settings->setValue("LastServerStartScript", serverStartScript);
     settings->setValue("LastDebugInfoLocation", debugInfoLocation);
 }
@@ -210,8 +210,7 @@ void StartApplicationParameters::fromSettings(const QSettings *settings)
     runnable.commandLineArguments = settings->value("LastExternalExecutableArguments").toString();
     runnable.workingDirectory = settings->value("LastExternalWorkingDirectory").toString();
     breakAtMain = settings->value("LastExternalBreakAtMain").toBool();
-    runnable.runMode = settings->value("LastExternalRunInTerminal").toBool()
-            ? ApplicationLauncher::Console : ApplicationLauncher::Gui;
+    runInTerminal = settings->value("LastExternalRunInTerminal").toBool();
     serverStartScript = settings->value("LastServerStartScript").toString();
     debugInfoLocation = settings->value("LastDebugInfoLocation").toString();
 }
@@ -424,7 +423,7 @@ void StartApplicationDialog::run(bool attachRemote)
         settings->endGroup();
     }
 
-    StandardRunnable inferior = newParameters.runnable;
+    Runnable inferior = newParameters.runnable;
     const QString inputAddress = dialog.d->channelOverrideEdit->text();
     if (!inputAddress.isEmpty())
         debugger->setRemoteChannel(inputAddress);
@@ -470,8 +469,7 @@ StartApplicationParameters StartApplicationDialog::parameters() const
     result.runnable.commandLineArguments = d->arguments->text();
     result.runnable.workingDirectory = d->workingDirectory->path();
     result.breakAtMain = d->breakAtMainCheckBox->isChecked();
-    result.runnable.runMode = d->runInTerminalCheckBox->isChecked()
-            ? ApplicationLauncher::Console : ApplicationLauncher::Gui;
+    result.runInTerminal = d->runInTerminalCheckBox->isChecked();
     return result;
 }
 
@@ -485,7 +483,7 @@ void StartApplicationDialog::setParameters(const StartApplicationParameters &p)
     d->debuginfoPathChooser->setPath(p.debugInfoLocation);
     d->arguments->setText(p.runnable.commandLineArguments);
     d->workingDirectory->setPath(p.runnable.workingDirectory);
-    d->runInTerminalCheckBox->setChecked(p.runnable.runMode == ApplicationLauncher::Console);
+    d->runInTerminalCheckBox->setChecked(p.runInTerminal);
     d->breakAtMainCheckBox->setChecked(p.breakAtMain);
     updateState();
 }

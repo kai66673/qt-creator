@@ -55,7 +55,7 @@ public:
                                        FilePathCachingInterface &filePathCache,
                                        const clang::SourceManager &sourceManager,
                                        std::shared_ptr<clang::Preprocessor> &&preprocessor)
-        : SymbolsVisitorBase(filePathCache, sourceManager),
+        : SymbolsVisitorBase(filePathCache, &sourceManager),
           m_preprocessor(std::move(preprocessor)),
           m_sourceDependencies(sourceDependencies),
           m_symbolEntries(symbolEntries),
@@ -73,8 +73,8 @@ public:
     {
         if (reason == clang::PPCallbacks::EnterFile)
         {
-            const clang::FileEntry *fileEntry = m_sourceManager.getFileEntryForID(
-                        m_sourceManager.getFileID(sourceLocation));
+            const clang::FileEntry *fileEntry = m_sourceManager->getFileEntryForID(
+                        m_sourceManager->getFileID(sourceLocation));
             if (fileEntry) {
                 addFileStatus(fileEntry);
                 addSourceFile(fileEntry);
@@ -112,7 +112,7 @@ public:
         addUsedMacro(macroNameToken, macroDefinition);
         addMacroAsSymbol(macroNameToken,
                          firstMacroInfo(macroDefinition.getLocalDirective()),
-                         SymbolType::MacroUsage);
+                         SourceLocationKind::MacroUsage);
     }
 
     void Ifdef(clang::SourceLocation,
@@ -122,7 +122,7 @@ public:
         addUsedMacro( macroNameToken, macroDefinition);
         addMacroAsSymbol(macroNameToken,
                          firstMacroInfo(macroDefinition.getLocalDirective()),
-                         SymbolType::MacroUsage);
+                         SourceLocationKind::MacroUsage);
     }
 
     void Defined(const clang::Token &macroNameToken,
@@ -132,13 +132,13 @@ public:
         addUsedMacro(macroNameToken, macroDefinition);
         addMacroAsSymbol(macroNameToken,
                          firstMacroInfo(macroDefinition.getLocalDirective()),
-                         SymbolType::MacroUsage);
+                         SourceLocationKind::MacroUsage);
     }
 
     void MacroDefined(const clang::Token &macroNameToken,
                       const clang::MacroDirective *macroDirective) override
     {
-        addMacroAsSymbol(macroNameToken, firstMacroInfo(macroDirective), SymbolType::MacroDefinition);
+        addMacroAsSymbol(macroNameToken, firstMacroInfo(macroDirective), SourceLocationKind::MacroDefinition);
     }
 
     void MacroUndefined(const clang::Token &macroNameToken,
@@ -147,7 +147,7 @@ public:
     {
         addMacroAsSymbol(macroNameToken,
                          firstMacroInfo(macroDefinition.getLocalDirective()),
-                         SymbolType::MacroUndefinition);
+                         SourceLocationKind::MacroUndefinition);
     }
 
     void MacroExpands(const clang::Token &macroNameToken,
@@ -158,7 +158,7 @@ public:
         addUsedMacro(macroNameToken, macroDefinition);
         addMacroAsSymbol(macroNameToken,
                          firstMacroInfo(macroDefinition.getLocalDirective()),
-                         SymbolType::MacroUsage);
+                         SourceLocationKind::MacroUsage);
     }
 
     void EndOfMainFile() override
@@ -192,6 +192,9 @@ public:
 
     static void addUsedMacro(UsedMacro &&usedMacro, UsedMacros &usedMacros)
     {
+        if (!usedMacro.filePathId.isValid())
+            return;
+
         auto found = std::lower_bound(usedMacros.begin(),
                                       usedMacros.end(), usedMacro);
 
@@ -228,7 +231,7 @@ public:
 
     void addMacroAsSymbol(const clang::Token &macroNameToken,
                           const clang::MacroInfo *macroInfo,
-                          SymbolType symbolType)
+                          SourceLocationKind symbolType)
     {
         clang::SourceLocation sourceLocation = macroNameToken.getLocation();
         if (macroInfo && sourceLocation.isFileID()) {
@@ -243,7 +246,9 @@ public:
                     if (usr) {
                         m_symbolEntries.emplace(std::piecewise_construct,
                                                 std::forward_as_tuple(globalId),
-                                                std::forward_as_tuple(std::move(usr.value()), macroName));
+                                                std::forward_as_tuple(std::move(usr.value()),
+                                                                      macroName,
+                                                                      SymbolKind::Macro));
                     }
                 }
 

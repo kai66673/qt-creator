@@ -58,10 +58,10 @@
 #include <coreplugin/vcsmanager.h>
 
 #include <coreplugin/messagebox.h>
-#include <utils/asconst.h>
-#include <utils/qtcassert.h>
 #include <utils/parameteraction.h>
 #include <utils/pathchooser.h>
+#include <utils/qtcassert.h>
+#include <utils/stringutils.h>
 #include <utils/utilsicons.h>
 #include <texteditor/texteditor.h>
 
@@ -289,7 +289,6 @@ QAction *GitPlugin::createRepositoryAction(ActionContainer *ac, const QString &t
 
 bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 {
-    Q_UNUSED(arguments)
     Q_UNUSED(errorMessage)
 
     Context context(Constants::GIT_CONTEXT);
@@ -667,6 +666,12 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     const bool ok = m_gerritPlugin->initialize(remoteRepositoryMenu);
     m_gerritPlugin->updateActions(currentState());
     m_gerritPlugin->addToLocator(m_commandLocator);
+
+    auto cmdContext = new QObject(this);
+    connect(Core::ICore::instance(), &Core::ICore::coreOpened, cmdContext, [this, cmdContext, arguments] {
+        remoteCommand(arguments, QDir::currentPath(), {});
+        cmdContext->deleteLater();
+    });
 
     return ok;
 }
@@ -1353,16 +1358,16 @@ void GitPlugin::updateActions(VcsBasePlugin::ActionState as)
         updateVersionWarning();
     // Note: This menu is visible if there is no repository. Only
     // 'Create Repository'/'Show' actions should be available.
-    const QString fileName = state.currentFileName();
-    for (ParameterAction *fileAction : Utils::asConst(m_fileActions))
+    const QString fileName = Utils::quoteAmpersands(state.currentFileName());
+    for (ParameterAction *fileAction : qAsConst(m_fileActions))
         fileAction->setParameter(fileName);
     // If the current file looks like a patch, offer to apply
     m_applyCurrentFilePatchAction->setParameter(state.currentPatchFileDisplayName());
     const QString projectName = state.currentProjectName();
-    for (ParameterAction *projectAction : Utils::asConst(m_projectActions))
+    for (ParameterAction *projectAction : qAsConst(m_projectActions))
         projectAction->setParameter(projectName);
 
-    for (QAction *repositoryAction : Utils::asConst(m_repositoryActions))
+    for (QAction *repositoryAction : qAsConst(m_repositoryActions))
         repositoryAction->setEnabled(repositoryEnabled);
 
     m_submoduleUpdateAction->setVisible(repositoryEnabled
@@ -1416,6 +1421,17 @@ void GitPlugin::updateBranches(const QString &repository)
 {
     if (m_branchDialog && m_branchDialog->isVisible())
         m_branchDialog->refreshIfSame(repository);
+}
+
+QObject *GitPlugin::remoteCommand(const QStringList &options, const QString &workingDirectory,
+                                  const QStringList &)
+{
+    if (!m_gitClient || options.size() < 2)
+        return nullptr;
+
+    if (options.first() == "-git-show")
+        m_gitClient->show(workingDirectory, options.at(1));
+    return nullptr;
 }
 
 void GitPlugin::updateRepositoryBrowserAction()

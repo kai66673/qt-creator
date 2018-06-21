@@ -25,8 +25,10 @@
 
 #include "modelnodeoperations.h"
 #include "modelnodecontextmenu_helper.h"
+#include "addimagesdialog.h"
 #include "layoutingridlayout.h"
 #include "findimplementation.h"
+
 
 #include "addsignalhandlerdialog.h"
 
@@ -874,7 +876,7 @@ PropertyName getIndexPropertyName(const ModelNode &modelNode)
     return PropertyName();
 }
 
-void static setIndexProperty(const AbstractProperty &property, const QVariant &value)
+static void setIndexProperty(const AbstractProperty &property, const QVariant &value)
 {
     if (!property.exists() || property.isVariantProperty()) {
         /* Using QmlObjectNode ensures we take states into account. */
@@ -1008,25 +1010,35 @@ void addTabBarToStackedContainer(const SelectionContext &selectionContext)
     }
 }
 
-bool addImageToProject(const QString &fileName, const QString &directory)
+bool addImageToProject(const QStringList &fileNames, const QString &defaultDirectory)
 {
-    const QString targetFile = directory + "/" + QFileInfo(fileName).fileName();
-    const bool success = QFile::copy(fileName, targetFile);
+    QString directory = AddImagesDialog::getDirectory(fileNames, defaultDirectory);
 
-    auto document = QmlDesignerPlugin::instance()->currentDesignDocument();
+    if (directory.isEmpty())
+        return true;
 
-    QTC_ASSERT(document, return false);
+    bool allSuccessful = true;
+    for (const QString &fileName : fileNames) {
+        const QString targetFile = directory + "/" + QFileInfo(fileName).fileName();
+        const bool success = QFile::copy(fileName, targetFile);
 
-    if (success) {
-        ProjectExplorer::Node *node = ProjectExplorer::ProjectTree::nodeForFile(document->fileName());
-        if (node) {
-            ProjectExplorer::FolderNode *containingFolder = node->parentFolderNode();
-            if (containingFolder)
-                containingFolder->addFiles(QStringList(targetFile));
+        auto document = QmlDesignerPlugin::instance()->currentDesignDocument();
+
+        QTC_ASSERT(document, return false);
+
+        if (success) {
+            ProjectExplorer::Node *node = ProjectExplorer::ProjectTree::nodeForFile(document->fileName());
+            if (node) {
+                ProjectExplorer::FolderNode *containingFolder = node->parentFolderNode();
+                if (containingFolder)
+                    containingFolder->addFiles(QStringList(targetFile));
+            }
+        } else {
+            allSuccessful = false;
         }
     }
 
-    return success;
+    return allSuccessful;
 }
 
 } // namespace Mode

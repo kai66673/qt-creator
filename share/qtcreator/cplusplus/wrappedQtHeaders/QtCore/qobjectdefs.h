@@ -29,8 +29,6 @@
 #ifndef WRAPPED_QOBJECT_DEFS_H
 #define WRAPPED_QOBJECT_DEFS_H
 
-#include <utility>
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmacro-redefined"
 #pragma clang diagnostic ignored "-Wgnu-string-literal-operator-template"
@@ -60,14 +58,11 @@
 #  define Q_SLOT __attribute__((annotate("qt_slot")))
 #endif
 
-template <char... chars>
-using QPropertyMagicString = std::integer_sequence<char, chars...>;
+// static_assert can be found as a class child but does not add extra AST nodes for completion
+#define Q_PROPERTY(arg) static_assert("Q_PROPERTY", #arg);
 
-template <class T, T... chars>
-constexpr QPropertyMagicString<chars...> operator""_qpropstr() { return { }; }
-
-// Create unique AST node for the property.
-#define Q_PROPERTY(arg) void QPropertyMagicFunction(decltype(#arg ## _qpropstr));
+#define SIGNAL(arg) #arg
+#define SLOT(arg) #arg
 
 #pragma clang diagnostic pop
 

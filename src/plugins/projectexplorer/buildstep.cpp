@@ -140,12 +140,20 @@ QVariantMap BuildStep::toMap() const
 
 BuildConfiguration *BuildStep::buildConfiguration() const
 {
-    return qobject_cast<BuildConfiguration *>(parent()->parent());
+    auto config = qobject_cast<BuildConfiguration *>(parent()->parent());
+    if (config)
+        return config;
+    // step is not part of a build configuration, use active build configuration of step's target
+    return target()->activeBuildConfiguration();
 }
 
 DeployConfiguration *BuildStep::deployConfiguration() const
 {
-    return qobject_cast<DeployConfiguration *>(parent()->parent());
+    auto config = qobject_cast<DeployConfiguration *>(parent()->parent());
+    if (config)
+        return config;
+    // step is not part of a deploy configuration, use active deploy configuration of step's target
+    return target()->activeDeployConfiguration();
 }
 
 ProjectConfiguration *BuildStep::projectConfiguration() const
@@ -329,24 +337,6 @@ BuildStep *BuildStepFactory::restore(BuildStepList *parent, const QVariantMap &m
     BuildStep *bs = m_info.creator(parent);
     if (!bs)
         return nullptr;
-    if (!bs->fromMap(map)) {
-        QTC_CHECK(false);
-        delete bs;
-        return nullptr;
-    }
-    return bs;
-}
-
-BuildStep *BuildStepFactory::clone(BuildStepList *parent, BuildStep *product)
-{
-    if ((m_info.flags & BuildStepInfo::Unclonable) != 0)
-        return nullptr;
-    if (m_info.id != product->id())
-        return nullptr;
-    BuildStep *bs = m_info.creator(parent);
-    if (!bs)
-        return nullptr;
-    const QVariantMap map = product->toMap();
     if (!bs->fromMap(map)) {
         QTC_CHECK(false);
         delete bs;

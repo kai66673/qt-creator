@@ -43,8 +43,6 @@
 #include <qmljstools/qmljsmodelmanager.h>
 #include <qmljstools/qmljsqtstylecodeformatter.h>
 
-#include <utils/asconst.h>
-
 using namespace QmlJSEditor;
 using namespace QmlJS;
 using namespace QmlJS::AST;
@@ -501,6 +499,10 @@ QmlJSEditorDocumentPrivate::~QmlJSEditorDocumentPrivate()
 {
     m_semanticInfoUpdater->abort();
     m_semanticInfoUpdater->wait();
+    // clean up all marks, otherwise a callback could try to access deleted members.
+    // see QTCREATORBUG-20199
+    cleanDiagnosticMarks();
+    cleanSemanticMarks();
 }
 
 void QmlJSEditorDocumentPrivate::invalidateFormatterCache()
@@ -593,6 +595,10 @@ void QmlJSEditorDocumentPrivate::updateOutlineModel()
 
 static void cleanMarks(QVector<TextEditor::TextMark *> *marks, TextEditor::TextDocument *doc)
 {
+    // if doc is null, this method is improperly called, so better do nothing that leave an
+    // inconsistent state where marks are cleared but not removed from doc.
+    if (!marks || !doc)
+        return;
     for (TextEditor::TextMark *mark : *marks) {
         doc->removeMark(mark);
         delete mark;
@@ -608,8 +614,7 @@ void QmlJSEditorDocumentPrivate::createTextMarks(const QList<DiagnosticMessage> 
             delete mark;
          };
 
-        auto mark = new QmlJSTextMark(q->filePath().toString(),
-                                      diagnostic, onMarkRemoved);
+        auto mark = new QmlJSTextMark(q->filePath(), diagnostic, onMarkRemoved);
         m_diagnosticMarks.append(mark);
         q->addMark(mark);
     }
@@ -627,14 +632,14 @@ void QmlJSEditorDocumentPrivate::createTextMarks(const SemanticInfo &info)
         m_semanticMarks.removeAll(mark);
         delete mark;
     };
-    for (const DiagnosticMessage &diagnostic : Utils::asConst(info.semanticMessages)) {
-        auto mark = new QmlJSTextMark(q->filePath().toString(),
+    for (const DiagnosticMessage &diagnostic : qAsConst(info.semanticMessages)) {
+        auto mark = new QmlJSTextMark(q->filePath(),
                                       diagnostic, onMarkRemoved);
         m_semanticMarks.append(mark);
         q->addMark(mark);
     }
-    for (const QmlJS::StaticAnalysis::Message &message : Utils::asConst(info.staticAnalysisMessages)) {
-        auto mark = new QmlJSTextMark(q->filePath().toString(),
+    for (const QmlJS::StaticAnalysis::Message &message : qAsConst(info.staticAnalysisMessages)) {
+        auto mark = new QmlJSTextMark(q->filePath(),
                                       message, onMarkRemoved);
         m_semanticMarks.append(mark);
         q->addMark(mark);

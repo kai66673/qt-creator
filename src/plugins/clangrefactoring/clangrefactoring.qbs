@@ -25,6 +25,7 @@ QtcPlugin {
         var resourceDir = FileInfo.joinPaths(libclang.llvmLibDir, "clang", libclang.llvmVersion,
                                              "include");
         defines.push('CLANG_RESOURCE_DIR="' + resourceDir + '"');
+        defines.push('CLANG_BINDIR="' + libclang.llvmBinDir + '"');
         return defines;
     }
 
@@ -52,30 +53,14 @@ QtcPlugin {
         "clangquerytexteditorwidget.h",
         "clangrefactoringplugin.cpp",
         "clangrefactoringplugin.h",
-        "class.h",
-        "classesfilter.cpp",
-        "classesfilter.h",
-        "enum.h",
-        "function.h",
-        "functionsfilter.cpp",
-        "functionsfilter.h",
-        "include.h",
-        "includesfilter.cpp",
-        "includesfilter.h",
         "locatorfilter.cpp",
         "locatorfilter.h",
         "projectpartutilities.cpp",
         "projectpartutilities.h",
         "qtcreatorclangqueryfindfilter.cpp",
         "qtcreatorclangqueryfindfilter.h",
-        "qtcreatorclassesfilter.cpp",
-        "qtcreatorclassesfilter.h",
-        "qtcreatorfunctionsfilter.cpp",
-        "qtcreatorfunctionsfilter.h",
-        "qtcreatorincludesfilter.cpp",
-        "qtcreatorincludesfilter.h",
-        "qtcreatorlocatorfilter.cpp",
-        "qtcreatorlocatorfilter.h",
+        "qtcreatoreditormanager.cpp",
+        "qtcreatoreditormanager.h",
         "qtcreatorsearch.cpp",
         "qtcreatorsearch.h",
         "qtcreatorsearchhandle.cpp",
@@ -93,7 +78,6 @@ QtcPlugin {
         "refactoringprojectupdater.h",
         "searchhandle.cpp",
         "searchhandle.h",
-        "searchinterface.cpp",
         "searchinterface.h",
         "sourcelocations.h",
         "symbol.h",
@@ -101,7 +85,6 @@ QtcPlugin {
         "symbolsfindfilter.h",
         "symbolsfindfilterconfigwidget.cpp",
         "symbolsfindfilterconfigwidget.h",
-        "symbolquery.cpp",
         "symbolquery.h",
         "symbolqueryinterface.h"
     ]

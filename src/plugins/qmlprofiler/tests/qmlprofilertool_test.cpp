@@ -98,21 +98,22 @@ void QmlProfilerToolTest::testClearEvents()
 
     stateManager->setCurrentState(QmlProfilerStateManager::AppRunning);
     stateManager->setServerRecording(true);
-    QCOMPARE(modelManager->numLoadedEventTypes(), 0u);
-    QCOMPARE(modelManager->numLoadedEvents(), 0u);
-    modelManager->addEventType(QmlEventType());
-    modelManager->addEvent(QmlEvent(0, 0, ""));
-    QCOMPARE(modelManager->numLoadedEventTypes(), 1u);
-    QCOMPARE(modelManager->numLoadedEvents(), 1u);
+    QCOMPARE(modelManager->numEventTypes(), 0);
+    QCOMPARE(modelManager->numEvents(), 0);
+    const int typeIndex = modelManager->appendEventType(QmlEventType());
+    QCOMPARE(typeIndex, 0);
+    modelManager->appendEvent(QmlEvent(0, typeIndex, ""));
+    QCOMPARE(modelManager->numEventTypes(), 1);
+    QCOMPARE(modelManager->numEvents(), 1);
     stateManager->setServerRecording(false);
-    QCOMPARE(modelManager->numLoadedEventTypes(), 1u);
-    QCOMPARE(modelManager->numLoadedEvents(), 1u);
+    QCOMPARE(modelManager->numEventTypes(), 1);
+    QCOMPARE(modelManager->numEvents(), 1);
     stateManager->setServerRecording(true); // clears previous events, but not types
-    QCOMPARE(modelManager->numLoadedEventTypes(), 1u);
-    QCOMPARE(modelManager->numLoadedEvents(), 0u);
-    modelManager->addEvent(QmlEvent(0, 0, ""));
-    QCOMPARE(modelManager->numLoadedEventTypes(), 1u);
-    QCOMPARE(modelManager->numLoadedEvents(), 1u);
+    QCOMPARE(modelManager->numEventTypes(), 1);
+    QCOMPARE(modelManager->numEvents(), 0);
+    modelManager->appendEvent(QmlEvent(0, typeIndex, ""));
+    QCOMPARE(modelManager->numEventTypes(), 1);
+    QCOMPARE(modelManager->numEvents(), 1);
 }
 
 } // namespace Internal

@@ -66,7 +66,7 @@ class DisassemblerBreakpointMarker : public TextMark
 {
 public:
     DisassemblerBreakpointMarker(const Breakpoint &bp, int lineNumber)
-        : TextMark(QString(), lineNumber, Constants::TEXT_MARK_CATEGORY_BREAKPOINT), m_bp(bp)
+        : TextMark(Utils::FileName(), lineNumber, Constants::TEXT_MARK_CATEGORY_BREAKPOINT), m_bp(bp)
     {
         setIcon(bp.icon());
         setPriority(TextMark::NormalPriority);
@@ -136,7 +136,7 @@ public:
 DisassemblerAgentPrivate::DisassemblerAgentPrivate(DebuggerEngine *engine)
   : document(0),
     engine(engine),
-    locationMark(engine, QString(), 0),
+    locationMark(engine, Utils::FileName(), 0),
     mimeType("text/x-qtcreator-generic-asm"),
     resetLocationScheduled(false)
 {}
@@ -331,8 +331,8 @@ void DisassemblerAgent::setContentsToDocument(const DisassemblerLines &contents)
     d->document->setPreferredDisplayName(QString("Disassembler (%1)")
         .arg(d->location.functionName()));
 
-    Breakpoints bps = breakHandler()->engineBreakpoints(d->engine);
-    foreach (Breakpoint bp, bps)
+    const Breakpoints bps = breakHandler()->engineBreakpoints(d->engine);
+    for (Breakpoint bp : bps)
         updateBreakpointMarker(bp);
 
     updateLocationMarker();

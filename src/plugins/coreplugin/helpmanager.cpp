@@ -156,7 +156,9 @@ void HelpManager::registerDocumentationNow(QFutureInterface<bool> &futureInterfa
     futureInterface.setProgressValue(0);
 
     QHelpEngineCore helpEngine(collectionFilePath());
+    helpEngine.setupData();
     bool docsChanged = false;
+    QStringList nameSpaces = helpEngine.registeredDocumentations();
     for (const QString &file : files) {
         if (futureInterface.isCanceled())
             break;
@@ -164,8 +166,9 @@ void HelpManager::registerDocumentationNow(QFutureInterface<bool> &futureInterfa
         const QString &nameSpace = helpEngine.namespaceName(file);
         if (nameSpace.isEmpty())
             continue;
-        if (!helpEngine.registeredDocumentations().contains(nameSpace)) {
+        if (!nameSpaces.contains(nameSpace)) {
             if (helpEngine.registerDocumentation(file)) {
+                nameSpaces.append(nameSpace);
                 docsChanged = true;
             } else {
                 qWarning() << "Error registering namespace '" << nameSpace
@@ -175,7 +178,7 @@ void HelpManager::registerDocumentationNow(QFutureInterface<bool> &futureInterfa
             const QLatin1String key("CreationDate");
             const QString &newDate = helpEngine.metaData(file, key).toString();
             const QString &oldDate = helpEngine.metaData(
-                d->m_helpEngine->documentationFileName(nameSpace), key).toString();
+                helpEngine.documentationFileName(nameSpace), key).toString();
             if (QDateTime::fromString(newDate, Qt::ISODate)
                 > QDateTime::fromString(oldDate, Qt::ISODate)) {
                 if (helpEngine.unregisterDocumentation(nameSpace)) {
@@ -540,7 +543,7 @@ void HelpManager::handleHelpRequest(const QString &, HelpViewerLocation) {}
 
 HelpManager::HelpManager(QObject *) {}
 HelpManager::~HelpManager() {}
-
+void HelpManager::aboutToShutdown() {}
 void HelpManager::setupHelpManager() {}
 
 } // namespace Core

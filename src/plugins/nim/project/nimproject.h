@@ -41,8 +41,7 @@ class NimProject : public ProjectExplorer::Project
 public:
     explicit NimProject(const Utils::FileName &fileName);
 
-    bool needsConfiguration() const final;
-    bool supportsKit(const ProjectExplorer::Kit *k, QString *errorMessage) const final;
+    QList<ProjectExplorer::Task> projectIssues(const ProjectExplorer::Kit *k) const final;
     Utils::FileNameList nimFiles() const;
     QVariantMap toMap() const final;
 

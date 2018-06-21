@@ -33,9 +33,7 @@
 
 namespace {
 
-using StatementFactory = ClangBackEnd::StorageSqliteStatementFactory<NiceMock<MockSqliteDatabase>,
-                                                                     MockSqliteReadStatement,
-                                                                     MockSqliteWriteStatement>;
+using StatementFactory = ClangBackEnd::StorageSqliteStatementFactory<NiceMock<MockSqliteDatabase>>;
 
 using Sqlite::Table;
 
@@ -50,7 +48,7 @@ TEST_F(StorageSqliteStatementFactory, AddNewSymbolsTable)
 {
     InSequence s;
 
-    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newSymbols(temporarySymbolId INTEGER PRIMARY KEY, symbolId INTEGER, usr TEXT, symbolName TEXT)")));
+    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newSymbols(temporarySymbolId INTEGER PRIMARY KEY, symbolId INTEGER, usr TEXT, symbolName TEXT, symbolKind INTEGER)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newSymbols_usr_symbolName ON newSymbols(usr, symbolName)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newSymbols_symbolId ON newSymbols(symbolId)")));
 
@@ -61,8 +59,8 @@ TEST_F(StorageSqliteStatementFactory, AddNewLocationsTable)
 {
     InSequence s;
 
-    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newLocations(temporarySymbolId INTEGER, symbolId INTEGER, line INTEGER, column INTEGER, sourceId INTEGER)")));
-    EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newLocations_sourceId ON newLocations(sourceId)")));
+    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newLocations(temporarySymbolId INTEGER, symbolId INTEGER, sourceId INTEGER, line INTEGER, column INTEGER, locationKind INTEGER)")));
+    EXPECT_CALL(mockDatabase, execute(Eq("CREATE UNIQUE INDEX IF NOT EXISTS index_newLocations_sourceId_line_column ON newLocations(sourceId, line, column)")));
 
     factory.createNewLocationsTable();
 }
@@ -92,11 +90,11 @@ TEST_F(StorageSqliteStatementFactory, AddTablesInConstructor)
     InSequence s;
 
     EXPECT_CALL(mockDatabase, immediateBegin());
-    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newSymbols(temporarySymbolId INTEGER PRIMARY KEY, symbolId INTEGER, usr TEXT, symbolName TEXT)")));
+    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newSymbols(temporarySymbolId INTEGER PRIMARY KEY, symbolId INTEGER, usr TEXT, symbolName TEXT, symbolKind INTEGER)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newSymbols_usr_symbolName ON newSymbols(usr, symbolName)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newSymbols_symbolId ON newSymbols(symbolId)")));
-    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newLocations(temporarySymbolId INTEGER, symbolId INTEGER, line INTEGER, column INTEGER, sourceId INTEGER)")));
-    EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newLocations_sourceId ON newLocations(sourceId)")));
+    EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newLocations(temporarySymbolId INTEGER, symbolId INTEGER, sourceId INTEGER, line INTEGER, column INTEGER, locationKind INTEGER)")));
+    EXPECT_CALL(mockDatabase, execute(Eq("CREATE UNIQUE INDEX IF NOT EXISTS index_newLocations_sourceId_line_column ON newLocations(sourceId, line, column)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newUsedMacros(sourceId INTEGER, macroName TEXT)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE INDEX IF NOT EXISTS index_newUsedMacros_sourceId_macroName ON newUsedMacros(sourceId, macroName)")));
     EXPECT_CALL(mockDatabase, execute(Eq("CREATE TEMPORARY TABLE newSourceDependencies(sourceId INTEGER, dependencySourceId TEXT)")));
@@ -109,13 +107,13 @@ TEST_F(StorageSqliteStatementFactory, AddTablesInConstructor)
 TEST_F(StorageSqliteStatementFactory, InsertNewSymbolsStatement)
 {
     ASSERT_THAT(factory.insertSymbolsToNewSymbolsStatement.sqlStatement,
-                Eq("INSERT INTO newSymbols(temporarySymbolId, usr, symbolName) VALUES(?,?,?)"));
+                Eq("INSERT INTO newSymbols(temporarySymbolId, usr, symbolName, symbolKind) VALUES(?,?,?,?)"));
 }
 
 TEST_F(StorageSqliteStatementFactory, InsertNewLocationsToLocations)
 {
     ASSERT_THAT(factory.insertLocationsToNewLocationsStatement.sqlStatement,
-                Eq("INSERT INTO newLocations(temporarySymbolId, line, column, sourceId) VALUES(?,?,?,?)"));
+                Eq("INSERT OR IGNORE INTO newLocations(temporarySymbolId, line, column, sourceId, locationKind) VALUES(?,?,?,?,?)"));
 }
 
 TEST_F(StorageSqliteStatementFactory, SelectNewSourceIdsStatement)
@@ -127,7 +125,7 @@ TEST_F(StorageSqliteStatementFactory, SelectNewSourceIdsStatement)
 TEST_F(StorageSqliteStatementFactory, AddNewSymbolsToSymbolsStatement)
 {
     ASSERT_THAT(factory.addNewSymbolsToSymbolsStatement.sqlStatement,
-                Eq("INSERT INTO symbols(usr, symbolName) SELECT usr, symbolName FROM newSymbols WHERE NOT EXISTS (SELECT usr FROM symbols WHERE symbols.usr == newSymbols.usr)"));
+                Eq("INSERT INTO symbols(usr, symbolName, symbolKind) SELECT usr, symbolName, symbolKind FROM newSymbols WHERE NOT EXISTS (SELECT usr FROM symbols WHERE symbols.usr == newSymbols.usr)"));
 }
 
 TEST_F(StorageSqliteStatementFactory, SyncNewSymbolsFromSymbolsStatement)
@@ -151,7 +149,7 @@ TEST_F(StorageSqliteStatementFactory, DeleteAllLocationsFromUpdatedFiles)
 TEST_F(StorageSqliteStatementFactory, InsertNewLocationsInLocations)
 {
     ASSERT_THAT(factory.insertNewLocationsInLocationsStatement.sqlStatement,
-                Eq("INSERT INTO locations(symbolId, line, column, sourceId) SELECT symbolId, line, column, sourceId FROM newLocations"));
+                Eq("INSERT INTO locations(symbolId, line, column, sourceId, locationKind) SELECT symbolId, line, column, sourceId, locationKind FROM newLocations"));
 }
 
 TEST_F(StorageSqliteStatementFactory, DeleteNewSymbolsTableStatement)
@@ -274,4 +272,11 @@ TEST_F(StorageSqliteStatementFactory, GetLowestLastModifiedTimeOfDependencies)
     ASSERT_THAT(factory.getLowestLastModifiedTimeOfDependencies.sqlStatement,
                 Eq("WITH RECURSIVE sourceIds(sourceId) AS (VALUES(?) UNION SELECT dependencySourceId FROM sourceDependencies, sourceIds WHERE sourceDependencies.sourceId = sourceIds.sourceId) SELECT min(lastModified) FROM fileStatuses, sourceIds WHERE fileStatuses.sourceId = sourceIds.sourceId"));
 }
+
+TEST_F(StorageSqliteStatementFactory, GetPrecompiledHeaderForProjectPartName)
+{
+    ASSERT_THAT(factory.getPrecompiledHeader.sqlStatement,
+                Eq("SELECT pchPath, pchBuildTime FROM precompiledHeaders WHERE projectPartId = ?"));
+}
+
 }

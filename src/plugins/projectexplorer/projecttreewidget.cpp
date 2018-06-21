@@ -55,6 +55,7 @@
 #include <QToolButton>
 #include <QPainter>
 #include <QAction>
+#include <QLineEdit>
 #include <QMenu>
 
 #include <memory>
@@ -92,12 +93,10 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
-        QStyleOptionViewItem opt = option;
-        if (!index.data(Project::EnabledRole).toBool())
-            opt.state &= ~QStyle::State_Enabled;
-        QStyledItemDelegate::paint(painter, opt, index);
+        QStyledItemDelegate::paint(painter, option, index);
 
         if (index.data(Project::isParsingRole).toBool()) {
+            QStyleOptionViewItem opt = option;
             initStyleOption(&opt, index);
             ProgressIndicatorPainter *indicator = findOrCreateIndicatorPainter(index);
 
@@ -288,7 +287,7 @@ ProjectTreeWidget::ProjectTreeWidget(QWidget *parent) : QWidget(parent)
             m_model, &FlatModel::onCollapsed);
 
     m_toggleSync = new QToolButton;
-    m_toggleSync->setIcon(Icons::LINK.icon());
+    m_toggleSync->setIcon(Icons::LINK_TOOLBAR.icon());
     m_toggleSync->setCheckable(true);
     m_toggleSync->setChecked(autoSynchronization());
     m_toggleSync->setToolTip(tr("Synchronize with Editor"));
@@ -415,8 +414,23 @@ void ProjectTreeWidget::collapseAll()
 void ProjectTreeWidget::editCurrentItem()
 {
     m_delayedRename.clear();
-    if (m_view->selectionModel()->currentIndex().isValid())
-        m_view->edit(m_view->selectionModel()->currentIndex());
+    const QModelIndex currentIndex = m_view->selectionModel()->currentIndex();
+    if (!currentIndex.isValid())
+        return;
+
+    m_view->edit(currentIndex);
+    // Select complete file basename for renaming
+    const Node *node = m_model->nodeForIndex(currentIndex);
+    if (!node)
+        return;
+    QLineEdit *editor = qobject_cast<QLineEdit*>(m_view->indexWidget(currentIndex));
+    if (!editor)
+        return;
+
+    const QString text = editor->text();
+    const int dotIndex = text.lastIndexOf(QLatin1Char('.'));
+    if (dotIndex > 0)
+        editor->setSelection(0, dotIndex);
 }
 
 void ProjectTreeWidget::renamed(const FileName &oldPath, const FileName &newPath)

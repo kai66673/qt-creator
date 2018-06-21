@@ -56,8 +56,8 @@ using namespace ProjectExplorer::Constants;
 
 // AutotoolsBuildConfiguration
 
-AutotoolsBuildConfiguration::AutotoolsBuildConfiguration(Target *parent)
-    : BuildConfiguration(parent, Constants::AUTOTOOLS_BC_ID)
+AutotoolsBuildConfiguration::AutotoolsBuildConfiguration(Target *parent, Core::Id id)
+    : BuildConfiguration(parent, id)
 {
     // /<foobar> is used so the un-changed check in setBuildDirectory() works correctly.
     // The leading / is to avoid the relative the path expansion in BuildConfiguration::buildDirectory.
@@ -89,14 +89,12 @@ void AutotoolsBuildConfiguration::initialize(const BuildInfo *info)
             configureStep, &ConfigureStep::notifyBuildDirectoryChanged);
 
     // make
-    MakeStep *makeStep = new MakeStep(buildSteps);
+    MakeStep *makeStep = new MakeStep(buildSteps, "all");
     buildSteps->insertStep(2, makeStep);
-    makeStep->setBuildTarget(QLatin1String("all"),  /*on =*/ true);
 
     // ### Build Steps Clean ###
     BuildStepList *cleanSteps = stepList(BUILDSTEPS_CLEAN);
-    MakeStep *cleanMakeStep = new MakeStep(cleanSteps);
-    cleanMakeStep->setAdditionalArguments("clean");
+    MakeStep *cleanMakeStep = new MakeStep(cleanSteps, "clean");
     cleanMakeStep->setClean(true);
     cleanSteps->insertStep(0, cleanMakeStep);
 }
@@ -111,7 +109,9 @@ NamedWidget *AutotoolsBuildConfiguration::createConfigWidget()
 
 AutotoolsBuildConfigurationFactory::AutotoolsBuildConfigurationFactory()
 {
-    registerBuildConfiguration<AutotoolsBuildConfiguration>(AUTOTOOLS_BC_ID);
+    registerBuildConfiguration<AutotoolsBuildConfiguration>
+            ("AutotoolsProjectManager.AutotoolsBuildConfiguration");
+
     setSupportedProjectType(Constants::AUTOTOOLS_PROJECT_ID);
     setSupportedProjectMimeTypeName(Constants::MAKEFILE_MIMETYPE);
 }

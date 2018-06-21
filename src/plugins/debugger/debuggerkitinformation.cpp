@@ -61,8 +61,8 @@ QVariant DebuggerKitInformation::defaultValue(const Kit *k) const
     const Abi toolChainAbi = ToolChainKitInformation::targetAbi(k);
     const Utils::FileNameList paths = Environment::systemEnvironment().path();
     QVariant nextBestFit;
-    foreach (const DebuggerItem &item, DebuggerItemManager::debuggers()) {
-        foreach (const Abi targetAbi, item.abis()) {
+    for (const DebuggerItem &item : DebuggerItemManager::debuggers()) {
+        for (const Abi &targetAbi : item.abis()) {
             if (targetAbi.isCompatibleWith(toolChainAbi)) {
                 if (paths.contains(item.command()))
                     return item.id(); // prefer debuggers found in PATH over those found elsewhere
@@ -103,13 +103,20 @@ void DebuggerKitInformation::setup(Kit *k)
 
     DebuggerItem bestItem;
     DebuggerItem::MatchLevel bestLevel = DebuggerItem::DoesNotMatch;
-
-    foreach (const DebuggerItem &item, DebuggerItemManager::debuggers()) {
+    const Environment systemEnvironment = Environment::systemEnvironment();
+    for (const DebuggerItem &item : DebuggerItemManager::debuggers()) {
         DebuggerItem::MatchLevel level = DebuggerItem::DoesNotMatch;
 
         if (rawId.isNull()) {
             // Initial setup of a kit.
             level = item.matchTarget(tcAbi);
+            // Hack to prefer a debugger from PATH (e.g. autodetected) over other matches.
+            // This improves the situation a bit if a cross-compilation tool chain has the
+            // same ABI as the host.
+            if (level == DebuggerItem::MatchesPerfectly
+                    && systemEnvironment.path().contains(item.command().parentDir())) {
+                level = DebuggerItem::MatchesPerfectlyInPath;
+            }
         } else if (rawId.type() == QVariant::String) {
             // New structure.
             if (item.id() == rawId) {
@@ -247,9 +254,9 @@ const DebuggerItem *DebuggerKitInformation::debugger(const Kit *kit)
     return DebuggerItemManager::findById(id);
 }
 
-StandardRunnable DebuggerKitInformation::runnable(const Kit *kit)
+Runnable DebuggerKitInformation::runnable(const Kit *kit)
 {
-    StandardRunnable runnable;
+    Runnable runnable;
     if (const DebuggerItem *item = debugger(kit)) {
         runnable.executable = item->command().toString();
         runnable.workingDirectory = item->workingDirectory().toString();

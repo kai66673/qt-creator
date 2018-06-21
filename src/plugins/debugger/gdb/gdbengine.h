@@ -61,7 +61,7 @@ struct CoreInfo
     QString foundExecutableName; // empty if no corresponding exec could be found
     bool isCore = false;
 
-    static CoreInfo readExecutableNameFromCore(const ProjectExplorer::StandardRunnable &debugger,
+    static CoreInfo readExecutableNameFromCore(const ProjectExplorer::Runnable &debugger,
                                                const QString &coreFile);
 };
 
@@ -158,8 +158,6 @@ private: ////////// General Interface //////////
     // out of date and discarded.
     int m_oldestAcceptableToken = -1;
     int m_nonDiscardableCount = 0;
-
-    int m_pendingBreakpointRequests = 0; // Watch updating commands in flight
 
     typedef void (GdbEngine::*CommandsDoneCallback)();
     // This function is called after all previous responses have been received.
@@ -381,11 +379,6 @@ private: ////////// General Interface //////////
 
     QHash<int, QString> m_scheduledTestResponses;
     QSet<int> m_testCases;
-
-    // Debug information
-    friend class DebugInfoTaskHandler;
-    void requestDebugInformation(const DebugInfoTask &task);
-    DebugInfoTaskHandler *m_debugInfoTaskHandler;
 
     bool m_systemDumpersLoaded = false;
 

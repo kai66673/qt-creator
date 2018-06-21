@@ -149,8 +149,6 @@ bool QbsBuildStep::init(QList<const BuildStep *> &earlierSteps)
         return false;
 
     QbsBuildConfiguration *bc = static_cast<QbsBuildConfiguration *>(buildConfiguration());
-    if (!bc)
-        bc = static_cast<QbsBuildConfiguration *>(target()->activeBuildConfiguration());
 
     if (!bc)
         return false;
@@ -207,6 +205,8 @@ QVariantMap QbsBuildStep::qbsConfiguration(VariableHandling variableHandling) co
     config.insert(Constants::QBS_FORCE_PROBES_KEY, m_forceProbes);
     if (m_enableQmlDebugging)
         config.insert(Constants::QBS_CONFIG_QUICK_DEBUG_KEY, true);
+    else
+        config.remove(Constants::QBS_CONFIG_QUICK_DEBUG_KEY);
     if (variableHandling == ExpandVariables) {
         const Utils::MacroExpander *expander = Utils::globalMacroExpander();
         for (auto it = config.begin(), end = config.end(); it != end; ++it) {
@@ -547,7 +547,7 @@ QbsBuildStepConfigWidget::QbsBuildStepConfigWidget(QbsBuildStep *step) :
             this, &QbsBuildStepConfigWidget::updateState);
     step->target()->subscribeSignal(&ProjectExplorer::BuildConfiguration::buildDirectoryChanged,
                                     this, [this]() {
-        if (m_step->target()->activeBuildConfiguration() == sender())
+        if (m_step->buildConfiguration() == sender())
             updateState();
     });
 
@@ -634,7 +634,7 @@ void QbsBuildStepConfigWidget::updateState()
     }
 
     if (m_step->isQmlDebuggingEnabled())
-        command.append(Constants::QBS_CONFIG_QUICK_DEBUG_KEY).append(":true");
+        command.append(' ').append(Constants::QBS_CONFIG_QUICK_DEBUG_KEY).append(":true");
     m_ui->commandLineTextEdit->setPlainText(command);
 
     QString summary = tr("<b>Qbs:</b> %1").arg(command);
@@ -832,7 +832,7 @@ bool QbsBuildStepConfigWidget::validateProperties(Utils::FancyLineEdit *edit, QS
 QbsBuildStepFactory::QbsBuildStepFactory()
 {
     registerStep<QbsBuildStep>(Constants::QBS_BUILDSTEP_ID);
-    setDisplayName(tr("Qbs Build"));
+    setDisplayName(QbsBuildStep::tr("Qbs Build"));
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
     setSupportedConfiguration(Constants::QBS_BC_ID);
     setSupportedProjectType(Constants::PROJECT_ID);

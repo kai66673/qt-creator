@@ -707,7 +707,7 @@ FileNameList GccToolChain::suggestedMkspecList() const
     }
 
     if (abi.os() == Abi::LinuxOS) {
-        if (abi.osFlavor() != Abi::GenericLinuxFlavor)
+        if (abi.osFlavor() != Abi::GenericFlavor)
             return FileNameList(); // most likely not a desktop, so leave the mkspec alone.
         if (abi.wordWidth() == host.wordWidth()) {
             // no need to explicitly set the word width, but provide that mkspec anyway to make sure
@@ -831,12 +831,12 @@ bool GccToolChain::fromMap(const QVariantMap &data)
     m_compilerCommand = FileName::fromString(data.value(compilerCommandKeyC).toString());
     m_platformCodeGenFlags = data.value(compilerPlatformCodeGenFlagsKeyC).toStringList();
     m_platformLinkerFlags = data.value(compilerPlatformLinkerFlagsKeyC).toStringList();
-    m_targetAbi = Abi(data.value(targetAbiKeyC).toString());
+    m_targetAbi = Abi::fromString(data.value(targetAbiKeyC).toString());
     m_originalTargetTriple = data.value(originalTargetTripleKeyC).toString();
     const QStringList abiList = data.value(supportedAbisKeyC).toStringList();
     m_supportedAbis.clear();
     for (const QString &a : abiList) {
-        Abi abi(a);
+        Abi abi = Abi::fromString(a);
         if (!abi.isValid())
             continue;
         m_supportedAbis.append(abi);
@@ -1185,7 +1185,7 @@ void GccToolChainConfigWidget::handleCompilerCommandChange()
 {
     bool haveCompiler = false;
     Abi currentAbi = m_abiWidget->currentAbi();
-    bool customAbi = m_abiWidget->isCustomAbi();
+    bool customAbi = m_abiWidget->isCustomAbi() && m_abiWidget->isEnabled();
     FileName path = m_compilerCommand->fileName();
     QList<Abi> abiList;
 
@@ -1625,11 +1625,11 @@ void ProjectExplorerPlugin::testGccAbiGuessing_data()
     QTest::newRow("broken input -- 64bit")
             << QString::fromLatin1("arm-none-foo-gnueabi")
             << QByteArray("#define __SIZEOF_SIZE_T__ 8\n#define __Something\n")
-            << QStringList({"arm-unknown-unknown-unknown-64bit"});
+            << QStringList({"arm-unknown-unknown-elf-64bit"});
     QTest::newRow("broken input -- 32bit")
             << QString::fromLatin1("arm-none-foo-gnueabi")
             << QByteArray("#define __SIZEOF_SIZE_T__ 4\n#define __Something\n")
-            << QStringList({"arm-unknown-unknown-unknown-32bit"});
+            << QStringList({"arm-unknown-unknown-elf-32bit"});
     QTest::newRow("totally broken input -- 32bit")
             << QString::fromLatin1("foo-bar-foo")
             << QByteArray("#define __SIZEOF_SIZE_T__ 4\n#define __Something\n")

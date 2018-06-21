@@ -1032,9 +1032,7 @@ void AndroidConfigurations::updateAutomaticKitList()
             && tc->typeId() == Constants::ANDROID_TOOLCHAIN_ID
             && !static_cast<const AndroidToolChain *>(tc)->isSecondaryToolChain();
     });
-    const QList<AndroidToolChain *> toolchains = Utils::transform(tmp, [](ToolChain *tc) {
-            return static_cast<AndroidToolChain *>(tc);
-    });
+    const auto toolchains = Utils::static_container_cast<AndroidToolChain *>(tmp);
     for (AndroidToolChain *tc : toolchains) {
         if (tc->isSecondaryToolChain() || tc->language() != Core::Id(ProjectExplorer::Constants::CXX_LANGUAGE_ID))
             continue;
@@ -1228,13 +1226,12 @@ void AndroidConfigurations::load()
                                                               QSettings::NativeFormat));
             allVersions = settings->childGroups();
 #ifdef Q_OS_WIN
-#if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
             if (allVersions.isEmpty()) {
                 settings.reset(new QSettings(jdkSettingsPath, QSettings::Registry64Format));
                 allVersions = settings->childGroups();
             }
-#endif
-#endif
+#endif // Q_OS_WIN
+
             QString javaHome;
             int major = -1;
             int minor = -1;

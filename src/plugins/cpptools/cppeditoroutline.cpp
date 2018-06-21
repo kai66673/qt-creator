@@ -109,7 +109,7 @@ CppEditorOutline::CppEditorOutline(TextEditor::TextEditorWidget *editorWidget)
     // Set up combo box
     m_combo->setModel(m_proxyModel);
 
-    m_combo->setMinimumContentsLength(22);
+    m_combo->setMinimumContentsLength(13);
     QSizePolicy policy = m_combo->sizePolicy();
     policy.setHorizontalPolicy(QSizePolicy::Expanding);
     m_combo->setSizePolicy(policy);
@@ -133,6 +133,8 @@ CppEditorOutline::CppEditorOutline(TextEditor::TextEditorWidget *editorWidget)
     m_updateTimer = newSingleShotTimer(this, UpdateOutlineIntervalInMs,
                                        QLatin1String("CppEditorOutline::m_updateTimer"));
     connect(m_updateTimer, &QTimer::timeout, this, &CppEditorOutline::updateNow);
+    connect(m_model.get(), &CppTools::AbstractOverviewModel::needsUpdate, this,
+            &CppEditorOutline::updateNow);
 
     m_updateIndexTimer = newSingleShotTimer(this, UpdateOutlineIntervalInMs,
                                             QLatin1String("CppEditorOutline::m_updateIndexTimer"));
@@ -261,6 +263,17 @@ void CppEditorOutline::gotoSymbolInEditor()
     emit m_editorWidget->activateEditor();
 }
 
+static bool contains(const AbstractOverviewModel::Range &range, int line, int column)
+{
+    if (line < range.first.line || line > range.second.line)
+        return false;
+    if (line == range.first.line && column < range.first.column)
+        return false;
+    if (line == range.second.line && column > range.second.column)
+        return false;
+    return true;
+}
+
 QModelIndex CppEditorOutline::indexForPosition(int line, int column,
                                                const QModelIndex &rootIndex) const
 {
@@ -268,8 +281,12 @@ QModelIndex CppEditorOutline::indexForPosition(int line, int column,
     const int rowCount = m_model->rowCount(rootIndex);
     for (int row = 0; row < rowCount; ++row) {
         const QModelIndex index = m_model->index(row, 0, rootIndex);
-        if (m_model->lineColumnFromIndex(index).line > line)
+        const AbstractOverviewModel::Range range = m_model->rangeFromIndex(index);
+        if (range.first.line > line)
             break;
+        // Skip ranges that do not include current line and column.
+        if (range.second != range.first && !contains(range, line, column))
+            continue;
         lastIndex = index;
     }
 

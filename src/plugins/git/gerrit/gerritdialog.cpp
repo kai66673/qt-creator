@@ -33,7 +33,6 @@
 
 #include <coreplugin/icore.h>
 
-#include <utils/asconst.h>
 #include <utils/hostosinfo.h>
 #include <utils/progressindicator.h>
 #include <utils/qtcassert.h>
@@ -225,7 +224,8 @@ void GerritDialog::remoteChanged()
            return;
     }
     *m_server = server;
-    refresh();
+    if (isVisible())
+        refresh();
 }
 
 void GerritDialog::updateRemotes(bool forceReload)

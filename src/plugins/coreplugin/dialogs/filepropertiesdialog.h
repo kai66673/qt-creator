@@ -30,9 +30,11 @@
 #include <QDialog>
 #include <QFile>
 
+QT_BEGIN_NAMESPACE
 namespace Ui {
 class FilePropertiesDialog;
 }
+QT_END_NAMESPACE
 
 class FilePropertiesDialog : public QDialog
 {
@@ -40,7 +42,7 @@ class FilePropertiesDialog : public QDialog
 
 public:
     explicit FilePropertiesDialog(const Utils::FileName &fileName, QWidget *parent = nullptr);
-    ~FilePropertiesDialog();
+    ~FilePropertiesDialog() override;
 
 private:
     void refresh();

@@ -26,8 +26,7 @@
 #include "googletest.h"
 
 #include "mockfilepathcaching.h"
-#include "mocksqlitereadstatement.h"
-#include "mocksqlitewritestatement.h"
+#include "mocksqlitedatabase.h"
 
 #include <storagesqlitestatementfactory.h>
 #include <symbolstorage.h>
@@ -48,13 +47,12 @@ using ClangBackEnd::SourceLocationEntries;
 using ClangBackEnd::SourceLocationEntry;
 using ClangBackEnd::StorageSqliteStatementFactory;
 using ClangBackEnd::SymbolIndex;
-using ClangBackEnd::SymbolType;
+using ClangBackEnd::SourceLocationKind;
+using ClangBackEnd::SymbolKind;
 using Sqlite::Database;
 using Sqlite::Table;
 
-using StatementFactory = StorageSqliteStatementFactory<MockSqliteDatabase,
-                                                MockSqliteReadStatement,
-                                                MockSqliteWriteStatement>;
+using StatementFactory = StorageSqliteStatementFactory<MockSqliteDatabase>;
 using Storage = ClangBackEnd::SymbolStorage<StatementFactory>;
 
 class SymbolStorage : public testing::Test
@@ -90,10 +88,12 @@ protected:
     MockSqliteReadStatement &getProjectPartArtefactsBySourceId = statementFactory.getProjectPartArtefactsBySourceId;
     MockSqliteReadStatement &getProjectPartArtefactsByProjectPartName = statementFactory.getProjectPartArtefactsByProjectPartName;
     MockSqliteReadStatement &getLowestLastModifiedTimeOfDependencies = statementFactory.getLowestLastModifiedTimeOfDependencies;
-    SymbolEntries symbolEntries{{1, {"functionUSR", "function"}},
-                                {2, {"function2USR", "function2"}}};
-    SourceLocationEntries sourceLocations{{1, {1, 3}, {42, 23}, SymbolType::Declaration},
-                                          {2, {1, 4}, {7, 11}, SymbolType::Declaration}};
+    MockSqliteReadStatement &getPrecompiledHeader = statementFactory.getPrecompiledHeader;
+
+    SymbolEntries symbolEntries{{1, {"functionUSR", "function", SymbolKind::Function}},
+                                {2, {"function2USR", "function2", SymbolKind::Function}}};
+    SourceLocationEntries sourceLocations{{1, {1, 3}, {42, 23}, SourceLocationKind::Declaration},
+                                          {2, {1, 4}, {7, 11}, SourceLocationKind::Definition}};
     ClangBackEnd::ProjectPartArtefact artefact{"[\"-DFOO\"]", "{\"FOO\":\"1\"}", "[\"/includes\"]", 74};
     Storage storage{statementFactory, filePathCache};
 };
@@ -102,8 +102,8 @@ TEST_F(SymbolStorage, CreateAndFillTemporaryLocationsTable)
 {
     InSequence sequence;
 
-    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(1), TypedEq<int>(42), TypedEq<int>(23), TypedEq<int>(3)));
-    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(2), TypedEq<int>(7), TypedEq<int>(11), TypedEq<int>(4)));
+    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(1), TypedEq<int>(42), TypedEq<int>(23), TypedEq<int>(3), TypedEq<int>(int(SourceLocationKind::Declaration))));
+    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(2), TypedEq<int>(7), TypedEq<int>(11), TypedEq<int>(4), TypedEq<int>(int(SourceLocationKind::Definition))));
 
     storage.fillTemporaryLocationsTable(sourceLocations);
 }
@@ -161,9 +161,9 @@ TEST_F(SymbolStorage, AddSymbolsAndSourceLocationsCallsWrite)
 {
     InSequence sequence;
 
-    EXPECT_CALL(insertSymbolsToNewSymbolsStatement, write(An<uint>(), An<Utils::SmallStringView>(), _)).Times(2);
-    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(1), TypedEq<int>(42), TypedEq<int>(23), TypedEq<int>(3)));
-    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(2), TypedEq<int>(7), TypedEq<int>(11), TypedEq<int>(4)));
+    EXPECT_CALL(insertSymbolsToNewSymbolsStatement, write(An<uint>(), An<Utils::SmallStringView>(), An<Utils::SmallStringView>(), An<uint>())).Times(2);
+    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(1), TypedEq<int>(42), TypedEq<int>(23), TypedEq<int>(3), TypedEq<int>(int(SourceLocationKind::Declaration))));
+    EXPECT_CALL(insertLocationsToNewLocationsStatement, write(TypedEq<SymbolIndex>(2), TypedEq<int>(7), TypedEq<int>(11), TypedEq<int>(4), TypedEq<int>(int(SourceLocationKind::Definition))));
     EXPECT_CALL(addNewSymbolsToSymbolsStatement, execute());
     EXPECT_CALL(syncNewSymbolsFromSymbolsStatement, execute());
     EXPECT_CALL(syncSymbolsIntoNewLocationsStatement, execute());
@@ -215,8 +215,8 @@ TEST_F(SymbolStorage, UpdateProjectPart)
     EXPECT_CALL(updateProjectPartStatement,
                 write(TypedEq<Utils::SmallStringView>("[\"foo\"]"),
                       TypedEq<Utils::SmallStringView>("{\"FOO\":\"1\"}"),
-                      TypedEq<Utils::SmallStringView>("project"),
-                      TypedEq<Utils::SmallStringView>("[\"/includes\"]")));
+                      TypedEq<Utils::SmallStringView>("[\"/includes\"]"),
+                      TypedEq<Utils::SmallStringView>("project")));
 
     storage.insertOrUpdateProjectPart("project",  {"foo"}, {{"FOO", "1"}}, {"/includes"});
 }
@@ -237,8 +237,8 @@ TEST_F(SymbolStorage, InsertOrUpdateUsedMacros)
 {
     InSequence sequence;
 
-    EXPECT_CALL(insertIntoNewUsedMacrosStatement, write(TypedEq<uint>(42), TypedEq<Utils::SmallStringView>("FOO")));
-    EXPECT_CALL(insertIntoNewUsedMacrosStatement, write(TypedEq<uint>(43), TypedEq<Utils::SmallStringView>("BAR")));
+    EXPECT_CALL(insertIntoNewUsedMacrosStatement, write(TypedEq<uint>(42u), TypedEq<Utils::SmallStringView>("FOO")));
+    EXPECT_CALL(insertIntoNewUsedMacrosStatement, write(TypedEq<uint>(43u), TypedEq<Utils::SmallStringView>("BAR")));
     EXPECT_CALL(syncNewUsedMacrosStatement, execute());
     EXPECT_CALL(deleteOutdatedUsedMacrosStatement, execute());
     EXPECT_CALL(deleteNewUsedMacrosTableStatement, execute());
@@ -321,6 +321,24 @@ TEST_F(SymbolStorage, FetchLowestLastModifiedTime)
 
     ASSERT_THAT(lowestLastModified, Eq(12));
 }
+TEST_F(SymbolStorage, FetchPrecompiledHeaderCallsValueInStatement)
+{
+    EXPECT_CALL(getPrecompiledHeader, valueReturnProjectPartPch(Eq(25)));
+
+    storage.fetchPrecompiledHeader(25);
+}
+
+TEST_F(SymbolStorage, FetchPrecompiledHeader)
+{
+    ClangBackEnd::ProjectPartPch pch{"", "/path/to/pch", 131};
+    EXPECT_CALL(getPrecompiledHeader, valueReturnProjectPartPch(Eq(25)))
+            .WillRepeatedly(Return(pch));
+
+    auto precompiledHeader = storage.fetchPrecompiledHeader(25);
+
+    ASSERT_THAT(precompiledHeader.value(), Eq(pch));
+}
+
 
 
 }

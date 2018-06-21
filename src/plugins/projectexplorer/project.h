@@ -88,7 +88,6 @@ public:
     enum ModelRoles {
         // Absolute file path
         FilePathRole = QFileSystemModel::FilePathRole,
-        EnabledRole,
         isParsingRole
     };
 
@@ -115,7 +114,7 @@ public:
     EditorConfiguration *editorConfiguration() const;
 
     // Target:
-    void addTarget(Target *target);
+    void addTarget(std::unique_ptr<Target> &&target);
     bool removeTarget(Target *target);
 
     QList<Target *> targets() const;
@@ -123,11 +122,11 @@ public:
     Target *activeTarget() const;
     Target *target(Core::Id id) const;
     Target *target(Kit *k) const;
-    virtual bool supportsKit(const Kit *k, QString *errorMessage = nullptr) const;
+    virtual QList<Task> projectIssues(const Kit *k) const;
 
-    Target *createTarget(Kit *k);
+    std::unique_ptr<Target> createTarget(Kit *k);
     static bool copySteps(Target *sourceTarget, Target *newTarget);
-    Target *restoreTarget(const QVariantMap &data);
+    std::unique_ptr<Target> restoreTarget(const QVariantMap &data);
 
     void saveSettings();
     enum class RestoreResult { Ok, Error, UserAbort };
@@ -142,8 +141,6 @@ public:
     virtual QStringList filesGeneratedFrom(const QString &sourceFile) const;
     bool isKnownFile(const Utils::FileName &filename) const;
 
-    static QString makeUnique(const QString &preferredName, const QStringList &usedNames);
-
     virtual QVariantMap toMap() const;
 
     Core::Context projectContext() const;
@@ -153,6 +150,7 @@ public:
     void setNamedSettings(const QString &name, const QVariant &value);
 
     virtual bool needsConfiguration() const;
+    virtual bool needsBuildConfigurations() const;
     virtual void configureAsExampleProject(const QSet<Core::Id> &platforms);
 
     virtual ProjectImporter *projectImporter() const;
@@ -165,7 +163,7 @@ public:
     // of configuration.
     virtual bool knowsAllBuildExecutables() const;
 
-    void setup(QList<const BuildInfo *> infoList);
+    void setup(const QList<const BuildInfo *> &infoList);
     Utils::MacroExpander *macroExpander() const;
 
     bool isParsing() const;
@@ -234,12 +232,15 @@ protected:
     void setPreferredKitPredicate(const Kit::Predicate &predicate);
 
     void setId(Core::Id id);
-    void setRootProjectNode(ProjectNode *root); // takes ownership!
+    void setRootProjectNode(std::unique_ptr<ProjectNode> &&root); // takes ownership!
     void setProjectLanguages(Core::Context language);
     void addProjectLanguage(Core::Id id);
     void removeProjectLanguage(Core::Id id);
     void setProjectLanguage(Core::Id id, bool enabled);
     virtual void projectLoaded(); // Called when the project is fully loaded.
+
+    static ProjectExplorer::Task createProjectTask(ProjectExplorer::Task::TaskType type,
+                                                   const QString &description);
 
 private:
     // The predicate used to select kits available in TargetSetupPage.

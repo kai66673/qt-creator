@@ -263,6 +263,18 @@ private:
     QVariantList m_sticky;
 };
 
+// Version 18 renames "AutotoolsProjectManager.MakeStep.AdditionalArguments" to
+// "AutotoolsProjectManager.MakeStep.MakeArguments" to account for
+// sharing the MakeStep implementation
+class UserFileVersion18Upgrader : public VersionUpgrader
+{
+public:
+    UserFileVersion18Upgrader() : VersionUpgrader(18, "4.8-pre1") { }
+    QVariantMap upgrade(const QVariantMap &map) final;
+
+    static QVariant process(const QVariant &entry);
+};
+
 } // namespace
 
 //
@@ -453,6 +465,7 @@ UserFileAccessor::UserFileAccessor(Project *project) :
     auto secondary
             = std::make_unique<SettingsAccessor>(docType, displayName, applicationDisplayName);
     secondary->setBaseFilePath(sharedFile());
+    secondary->setReadOnly();
     setSecondaryAccessor(std::move(secondary));
 
     setSettingsId(ProjectExplorerPlugin::projectExplorerSettings().environmentId.toByteArray());
@@ -475,6 +488,7 @@ UserFileAccessor::UserFileAccessor(Project *project) :
     addVersionUpgrader(std::make_unique<UserFileVersion15Upgrader>());
     addVersionUpgrader(std::make_unique<UserFileVersion16Upgrader>());
     addVersionUpgrader(std::make_unique<UserFileVersion17Upgrader>());
+    addVersionUpgrader(std::make_unique<UserFileVersion18Upgrader>());
 }
 
 Project *UserFileAccessor::project() const
@@ -1574,7 +1588,7 @@ QVariantMap UserFileVersion11Upgrader::upgrade(const QVariantMap &map)
             Abi compilerAbi;
             int debuggerEngine = 1; // GDB
             for (int i = 1; i < split.count() - 1; ++i) {
-                compilerAbi = Abi(split.at(i));
+                compilerAbi = Abi::fromString(split.at(i));
                 if (!compilerAbi.isValid())
                     continue;
                 if (compilerAbi.os() == Abi::WindowsOS
@@ -2187,6 +2201,30 @@ QVariant UserFileVersion17Upgrader::process(const QVariant &entry)
     }
 }
 
+QVariantMap UserFileVersion18Upgrader::upgrade(const QVariantMap &map)
+{
+    return process(map).toMap();
+}
+
+QVariant UserFileVersion18Upgrader::process(const QVariant &entry)
+{
+    switch (entry.type()) {
+    case QVariant::List:
+        return Utils::transform(entry.toList(), &UserFileVersion18Upgrader::process);
+    case QVariant::Map:
+        return Utils::transform<QMap<QString, QVariant>>(
+            entry.toMap().toStdMap(), [](const std::pair<const QString, QVariant> &item) {
+                const QString key = (item.first
+                                             == "AutotoolsProjectManager.MakeStep.AdditionalArguments"
+                                         ? QString("AutotoolsProjectManager.MakeStep.MakeArguments")
+                                         : item.first);
+                return qMakePair(key, UserFileVersion18Upgrader::process(item.second));
+            });
+    default:
+        return entry;
+    }
+}
+
 #if defined(WITH_TESTS)
 
 #include <QTest>
@@ -2219,6 +2257,8 @@ public:
     TestProject() : Project("x-test/testproject", Utils::FileName::fromString("/test/project")) {
         setDisplayName("Test Project");
     }
+
+    bool needsConfiguration() const final { return false; }
 };
 
 } // namespace

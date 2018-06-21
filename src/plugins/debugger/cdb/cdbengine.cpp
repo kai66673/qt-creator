@@ -243,6 +243,9 @@ CdbEngine::CdbEngine() :
             this, &CdbEngine::readyReadStandardOut);
     connect(action(UseDebuggingHelpers), &SavedAction::valueChanged,
             this, &CdbEngine::updateLocals);
+
+    if (action(UseCodeModel)->isChecked())
+        m_codeModelSnapshot = CppTools::CppModelManager::instance()->snapshot();
 }
 
 void CdbEngine::init()
@@ -410,7 +413,7 @@ void CdbEngine::setupEngine()
         sp.inferior.commandLineArguments.clear();
         sp.attachPID = ProcessHandle(terminal()->applicationPid());
         sp.startMode = AttachExternal;
-        sp.inferior.runMode = ApplicationLauncher::Gui; // Force no terminal.
+        sp.useTerminal = false; // Force no terminal.
         showMessage(QString("Attaching to %1...").arg(sp.attachPID.pid()), LogMisc);
     } else {
         m_effectiveStartMode = sp.startMode;
@@ -459,7 +462,7 @@ void CdbEngine::setupEngine()
     // register idle (debuggee stop) notification
               << "-c"
               << ".idle_cmd " + m_extensionCommandPrefix + "idle";
-    if (sp.inferior.runMode == ApplicationLauncher::Console) // Separate console
+    if (sp.useTerminal) // Separate console
         arguments << "-2";
     if (boolSetting(IgnoreFirstChanceAccessViolation))
         arguments << "-x";
@@ -527,8 +530,7 @@ void CdbEngine::setupEngine()
 
     // Make sure that QTestLib uses OutputDebugString for logging.
     const QString qtLoggingToConsoleKey = QStringLiteral("QT_LOGGING_TO_CONSOLE");
-    if (sp.inferior.runMode != ApplicationLauncher::Console
-            && !inferiorEnvironment.hasKey(qtLoggingToConsoleKey))
+    if (!sp.useTerminal && !inferiorEnvironment.hasKey(qtLoggingToConsoleKey))
         inferiorEnvironment.set(qtLoggingToConsoleKey, QString(QLatin1Char('0')));
 
     m_process.setEnvironment(mergeEnvironment(inferiorEnvironment.toStringList(),
@@ -643,7 +645,7 @@ void CdbEngine::runEngine()
         qDebug("runEngine");
 
     const QStringList breakEvents = stringListSetting(CdbBreakEvents);
-    foreach (const QString &breakEvent, breakEvents)
+    for (const QString &breakEvent : breakEvents)
         runCommand({"sxe " + breakEvent, NoFlags});
     // Break functions: each function must be fully qualified,
     // else the debugger will slow down considerably.
@@ -994,7 +996,7 @@ void CdbEngine::handleJumpToLineAddressResolution(const DebuggerResponse &respon
 
 static inline bool isAsciiWord(const QString &s)
 {
-    foreach (const QChar &c, s) {
+    for (const QChar &c : s) {
         if (!c.isLetterOrNumber() || c.toLatin1() == 0)
             return false;
     }
@@ -1165,10 +1167,9 @@ void CdbEngine::doUpdateLocals(const UpdateParameters &updateParameters)
         cmd.arg("displaystringlimit", action(DisplayStringLimit)->value().toString());
 
         if (boolSetting(UseCodeModel)) {
-            QStringList uninitializedVariables;
-            getUninitializedVariables(Internal::cppCodeModelSnapshot(),
-                                      frame.function, frame.file, frame.line, &uninitializedVariables);
-            cmd.arg("uninitialized", uninitializedVariables);
+            QStringList variables = getUninitializedVariables(m_codeModelSnapshot,
+                                                              frame.function, frame.file, frame.line);
+            cmd.arg("uninitialized", variables);
         }
 
         cmd.callback = [this](const DebuggerResponse &response) {
@@ -1215,7 +1216,7 @@ void CdbEngine::doUpdateLocals(const UpdateParameters &updateParameters)
             if (!expanded.isEmpty()) {
                 str << blankSeparator << "-e ";
                 int i = 0;
-                foreach (const QString &e, expanded) {
+                for (const QString &e : expanded) {
                     if (i++)
                         str << ',';
                     str << e;
@@ -1236,13 +1237,12 @@ void CdbEngine::doUpdateLocals(const UpdateParameters &updateParameters)
         // Uninitialized variables if desired. Quote as safeguard against shadowed
         // variables in case of errors in uninitializedVariables().
         if (boolSetting(UseCodeModel)) {
-            QStringList uninitializedVariables;
-            getUninitializedVariables(Internal::cppCodeModelSnapshot(),
-                                      frame.function, frame.file, frame.line, &uninitializedVariables);
-            if (!uninitializedVariables.isEmpty()) {
+            const QStringList variables = getUninitializedVariables(m_codeModelSnapshot,
+                                                                    frame.function, frame.file, frame.line);
+            if (!variables.isEmpty()) {
                 str << blankSeparator << "-u \"";
                 int i = 0;
-                foreach (const QString &u, uninitializedVariables) {
+                for (const QString &u : variables) {
                     if (i++)
                         str << ',';
                     str << localsPrefixC << u;
@@ -1946,7 +1946,7 @@ void CdbEngine::handleBreakInsert(const DebuggerResponse &response, const Breakp
     const QStringList reply = response.data.data().split('\n');
     if (reply.isEmpty())
         return;
-    foreach (const QString &line, reply)
+    for (const QString &line : reply)
         showMessage(line);
     if (!reply.last().startsWith("Ambiguous symbol error") &&
             (reply.length() < 2 || !reply.at(reply.length() - 2).startsWith("Ambiguous symbol error"))) {
@@ -2467,7 +2467,7 @@ static QByteArray multiBreakpointCommand(const char *cmdC, const Breakpoints &bp
 {
     QByteArray cmd(cmdC);
     ByteArrayInputStream str(cmd);
-    foreach (const BreakpointData *bp, bps)
+    for (const BreakpointData *bp : bps)
         str << ' ' << bp->bpNumber;
     return cmd;
 }
@@ -2569,7 +2569,7 @@ void CdbEngine::attemptBreakpointSynchronization()
     // Check if there is anything to be done at all.
     BreakHandler *handler = breakHandler();
     // Take ownership of the breakpoint. Requests insertion. TODO: Cpp only?
-    foreach (Breakpoint bp, handler->unclaimedBreakpoints())
+    for (Breakpoint bp : handler->unclaimedBreakpoints())
         if (acceptsBreakpoint(bp))
             bp.setEngine(this);
 
@@ -2577,7 +2577,7 @@ void CdbEngine::attemptBreakpointSynchronization()
     bool changed = !m_insertSubBreakpointMap.isEmpty();
     const Breakpoints bps = handler->engineBreakpoints(this);
     if (!changed) {
-        foreach (Breakpoint bp, bps) {
+        for (Breakpoint bp : bps) {
             switch (bp.state()) {
             case BreakpointInsertRequested:
             case BreakpointRemoveRequested:
@@ -2615,7 +2615,7 @@ void CdbEngine::attemptBreakpointSynchronization()
     // handleBreakPoints will the complete that information and set it on the break handler.
     bool addedChanged = false;
     QScopedPointer<BreakpointCorrectionContext> lineCorrection;
-    foreach (Breakpoint bp, bps) {
+    for (Breakpoint bp : bps) {
         BreakpointParameters parameters = bp.parameters();
         BreakpointModelId id = bp.id();
         const auto handleBreakInsertCB = [this, id](const DebuggerResponse &r) { handleBreakInsert(r, id); };
@@ -2634,7 +2634,7 @@ void CdbEngine::attemptBreakpointSynchronization()
                     && parameters.type == BreakpointByFileAndLine
                     && boolSetting(CdbBreakPointCorrection)) {
                 if (lineCorrection.isNull())
-                    lineCorrection.reset(new BreakpointCorrectionContext(Internal::cppCodeModelSnapshot(),
+                    lineCorrection.reset(new BreakpointCorrectionContext(m_codeModelSnapshot,
                                                                          CppTools::CppModelManager::instance()->workingCopy()));
                 response.lineNumber = lineCorrection->fixLineNumber(parameters.fileName, parameters.lineNumber);
                 QString cmd = cdbAddBreakpointCommand(response, m_sourcePathMappings, id, false);

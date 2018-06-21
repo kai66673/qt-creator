@@ -62,6 +62,21 @@ using namespace ProjectExplorer::Constants;
 namespace Android {
 namespace Internal {
 
+class AndroidRunConfigurationFactory : public RunConfigurationFactory
+{
+public:
+    AndroidRunConfigurationFactory()
+    {
+        registerRunConfiguration<Android::AndroidRunConfiguration>
+                ("Qt4ProjectManager.AndroidRunConfiguration:");
+        addSupportedTargetDeviceType(Android::Constants::ANDROID_DEVICE_TYPE);
+        addRunWorkerFactory<AndroidRunSupport>(NORMAL_RUN_MODE);
+        addRunWorkerFactory<AndroidDebugSupport>(DEBUG_RUN_MODE);
+        addRunWorkerFactory<AndroidQmlToolingSupport>(QML_PROFILER_RUN_MODE);
+        addRunWorkerFactory<AndroidQmlToolingSupport>(QML_PREVIEW_RUN_MODE);
+    }
+};
+
 class AndroidPluginPrivate
 {
 public:
@@ -76,6 +91,7 @@ public:
     JavaEditorFactory javaEditorFactory;
     AndroidPackageInstallationFactory packackeInstallationFactory;
     AndroidManifestEditorFactory manifestEditorFactory;
+    AndroidRunConfigurationFactory runConfigFactory;
 };
 
 AndroidPlugin::~AndroidPlugin()
@@ -88,19 +104,9 @@ bool AndroidPlugin::initialize(const QStringList &arguments, QString *errorMessa
     Q_UNUSED(arguments);
     Q_UNUSED(errorMessage);
 
-    RunControl::registerWorker<AndroidRunConfiguration, AndroidRunSupport>(NORMAL_RUN_MODE);
-    RunControl::registerWorker<AndroidRunConfiguration, AndroidDebugSupport>(DEBUG_RUN_MODE);
-    RunControl::registerWorker<AndroidRunConfiguration, AndroidQmlToolingSupport>(
-                QML_PROFILER_RUN_MODE);
-    RunControl::registerWorker<AndroidRunConfiguration, AndroidQmlToolingSupport>(
-                QML_PREVIEW_RUN_MODE);
-
     RunControl::registerWorker(QML_PREVIEW_RUN_MODE, [](RunControl *runControl) -> RunWorker* {
         const Runnable runnable = runControl->runConfiguration()->runnable();
-        QTC_ASSERT(runnable.is<StandardRunnable>(), return nullptr);
-        const StandardRunnable standardRunnable = runnable.as<StandardRunnable>();
-        return new AndroidQmlToolingSupport(runControl, standardRunnable.executable,
-                                            standardRunnable.commandLineArguments);
+        return new AndroidQmlToolingSupport(runControl, runnable.executable, runnable.commandLineArguments);
     }, [](RunConfiguration *runConfig) {
         return runConfig->isEnabled()
                 && runConfig->id().name().startsWith("QmlProjectManager.QmlRunConfiguration")
@@ -123,7 +129,7 @@ void AndroidPlugin::kitsRestored()
     AndroidConfigurations::updateAutomaticKitList();
     connect(QtSupport::QtVersionManager::instance(), &QtSupport::QtVersionManager::qtVersionsChanged,
             AndroidConfigurations::instance(), &AndroidConfigurations::updateAutomaticKitList);
-    disconnect(KitManager::instance(), &KitManager::kitsChanged,
+    disconnect(KitManager::instance(), &KitManager::kitsLoaded,
                this, &AndroidPlugin::kitsRestored);
 }
 

@@ -27,6 +27,7 @@
 
 #include "pchmanagerconnectionclient.h"
 #include "pchmanagerclient.h"
+#include "precompiledheaderstorage.h"
 #include "qtcreatorprojectupdater.h"
 
 #include <filepathcaching.h>
@@ -37,6 +38,10 @@
 #include <extensionsystem/pluginmanager.h>
 
 #include <utils/hostosinfo.h>
+
+#include <chrono>
+
+using namespace std::chrono_literals;
 
 namespace ClangPchManager {
 
@@ -54,14 +59,12 @@ QString backendProcessPath()
 class ClangPchManagerPluginData
 {
 public:
-    Sqlite::Database database{Utils::PathString{Core::ICore::userResourcePath() + "/symbol-experimental-v1.db"}};
+    Sqlite::Database database{Utils::PathString{Core::ICore::userResourcePath() + "/symbol-experimental-v1.db"}, 1000ms};
     ClangBackEnd::RefactoringDatabaseInitializer<Sqlite::Database> databaseInitializer{database};
     ClangBackEnd::FilePathCaching filePathCache{database};
-    PchManagerClient pchManagerClient;
+    PrecompiledHeaderStorage<> preCompiledHeaderStorage{database};
+    PchManagerClient pchManagerClient{preCompiledHeaderStorage};
     PchManagerConnectionClient connectionClient{&pchManagerClient};
-    QtCreatorProjectUpdater<PchManagerProjectUpdater> projectUpdate{connectionClient.serverProxy(),
-                                                                    pchManagerClient,
-                                                                    filePathCache};
 };
 
 std::unique_ptr<ClangPchManagerPluginData> ClangPchManagerPlugin::d;
@@ -71,7 +74,7 @@ ClangPchManagerPlugin::~ClangPchManagerPlugin() = default;
 
 bool ClangPchManagerPlugin::initialize(const QStringList & /*arguments*/, QString * /*errorMessage*/)
 {
-    d.reset(new ClangPchManagerPluginData);
+    d = std::make_unique<ClangPchManagerPluginData>();
 
     startBackend();
 

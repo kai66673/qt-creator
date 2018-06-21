@@ -411,8 +411,15 @@ void AppOutputPane::createNewOutputWindow(RunControl *rc)
             this, &AppOutputPane::appendMessage);
 
     // First look if we can reuse a tab
-    const int tabIndex = Utils::indexOf(m_runControlTabs, [rc](const RunControlTab &tab) {
-        return rc->canReUseOutputPane(tab.runControl);
+    const Runnable thisRunnable = rc->runnable();
+    const int tabIndex = Utils::indexOf(m_runControlTabs, [&](const RunControlTab &tab) {
+        if (!tab.runControl || tab.runControl->isRunning())
+            return false;
+        const Runnable otherRunnable = tab.runControl->runnable();
+        return thisRunnable.executable == otherRunnable.executable
+                && thisRunnable.commandLineArguments == otherRunnable.commandLineArguments
+                && thisRunnable.workingDirectory == otherRunnable.workingDirectory
+                && thisRunnable.environment == otherRunnable.environment;
     });
     if (tabIndex != -1) {
         RunControlTab &tab = m_runControlTabs[tabIndex];
@@ -482,7 +489,13 @@ void AppOutputPane::appendMessage(RunControl *rc, const QString &out, Utils::Out
     const int index = indexOf(rc);
     if (index != -1) {
         Core::OutputWindow *window = m_runControlTabs.at(index).window;
-        window->appendMessage(out, format);
+        QString stringToWrite;
+        if (format == Utils::NormalMessageFormat || format == Utils::ErrorMessageFormat) {
+            stringToWrite = QTime::currentTime().toString();
+            stringToWrite += QLatin1String(": ");
+        }
+        stringToWrite += out;
+        window->appendMessage(stringToWrite, format);
         if (format != Utils::NormalMessageFormat) {
             if (m_runControlTabs.at(index).behaviorOnOutput == Flash)
                 flash();
@@ -727,7 +740,7 @@ void AppOutputPane::slotRunControlFinished2(RunControl *sender)
 
 #ifdef Q_OS_WIN
     const bool isRunning = Utils::anyOf(m_runControlTabs, [](const RunControlTab &rt) {
-        return rt.runControl->isRunning();
+        return rt.runControl && rt.runControl->isRunning();
     });
     if (!isRunning)
         WinDebugInterface::instance()->stop();

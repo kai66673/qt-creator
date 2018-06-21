@@ -39,9 +39,7 @@ using enable_if_has_char_data_pointer = typename std::enable_if_t<
                                             std::is_same<
                                                 std::remove_const_t<
                                                     std::remove_pointer_t<
-                                                        std::result_of_t<
-                                                            decltype(&String::data)(String)
-                                                            >
+                                                        decltype(std::declval<const String>().data())
                                                         >
                                                     >, char>::value
                                             , int>;
@@ -76,6 +74,12 @@ public:
     SmallStringView(const char *const string, const size_type size) noexcept
         : m_pointer(string),
           m_size(size)
+    {
+    }
+
+    SmallStringView(const const_iterator begin, const const_iterator end) noexcept
+        : m_pointer(begin.data()),
+          m_size(std::size_t(end - begin))
     {
     }
 

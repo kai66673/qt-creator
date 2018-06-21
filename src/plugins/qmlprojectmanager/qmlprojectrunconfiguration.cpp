@@ -48,16 +48,15 @@ using namespace Core;
 using namespace ProjectExplorer;
 using namespace QtSupport;
 
-using namespace QmlProjectManager::Internal;
-
 namespace QmlProjectManager {
 
 const char M_CURRENT_FILE[] = "CurrentFile";
 
-QmlProjectRunConfiguration::QmlProjectRunConfiguration(Target *target)
-    : RunConfiguration(target, Constants::QML_SCENE_RC_ID)
+QmlProjectRunConfiguration::QmlProjectRunConfiguration(Target *target, Id id)
+    : RunConfiguration(target, id)
 {
     addExtraAspect(new QmlProjectEnvironmentAspect(this));
+    setOutputFormatter<QtSupport::QtOutputFormatter>();
 
     // reset default settings in constructor
     connect(EditorManager::instance(), &EditorManager::currentEditorChanged,
@@ -75,10 +74,9 @@ QmlProjectRunConfiguration::QmlProjectRunConfiguration(Target *target)
 
 Runnable QmlProjectRunConfiguration::runnable() const
 {
-    StandardRunnable r;
+    Runnable r;
     r.executable = executable();
     r.commandLineArguments = commandLineArguments();
-    r.runMode = ApplicationLauncher::Gui;
     r.environment = extraAspect<QmlProjectEnvironmentAspect>()->environment();
     r.workingDirectory = static_cast<QmlProject *>(project())->targetDirectory(target()).toString();
     return r;
@@ -125,18 +123,20 @@ QString QmlProjectRunConfiguration::commandLineArguments() const
 {
     // arguments in .user file
     QString args = m_qmlViewerArgs;
-    const IDevice::ConstPtr device = DeviceKitInformation::device(target()->kit());
+    const Target *currentTarget = target();
+    const IDevice::ConstPtr device = DeviceKitInformation::device(currentTarget->kit());
     const Utils::OsType osType = device ? device->osType() : Utils::HostOsInfo::hostOs();
 
     // arguments from .qmlproject file
-    QmlProject *project = static_cast<QmlProject *>(target()->project());
-    foreach (const QString &importPath, project->customImportPaths()) {
+    const QmlProject *project = static_cast<QmlProject *>(currentTarget->project());
+    foreach (const QString &importPath,
+             QmlProject::makeAbsolute(project->targetDirectory(currentTarget), project->customImportPaths())) {
         Utils::QtcProcess::addArg(&args, QLatin1String("-I"), osType);
         Utils::QtcProcess::addArg(&args, importPath, osType);
     }
 
-    const QString main
-            = project->targetFile(Utils::FileName::fromString(mainScript()), target()).toString();                                             ;
+    const QString main = project->targetFile(Utils::FileName::fromString(mainScript()),
+                                             currentTarget).toString();
     if (!main.isEmpty())
         Utils::QtcProcess::addArg(&args, main, osType);
     return args;
@@ -144,12 +144,7 @@ QString QmlProjectRunConfiguration::commandLineArguments() const
 
 QWidget *QmlProjectRunConfiguration::createConfigurationWidget()
 {
-    return new QmlProjectRunConfigurationWidget(this);
-}
-
-Utils::OutputFormatter *QmlProjectRunConfiguration::createOutputFormatter() const
-{
-    return new QtSupport::QtOutputFormatter(target()->project());
+    return wrapWidget(new Internal::QmlProjectRunConfigurationWidget(this));
 }
 
 QmlProjectRunConfiguration::MainScriptSource QmlProjectRunConfiguration::mainScriptSource() const
@@ -295,4 +290,17 @@ void QmlProjectRunConfiguration::updateEnabledState()
     }
 }
 
+namespace Internal {
+
+QmlProjectRunConfigurationFactory::QmlProjectRunConfigurationFactory()
+    : FixedRunConfigurationFactory(QmlProjectRunConfiguration::tr("QML Scene"), false)
+{
+    registerRunConfiguration<QmlProjectRunConfiguration>
+            ("QmlProjectManager.QmlRunConfiguration.QmlScene");
+    addSupportedProjectType(QmlProjectManager::Constants::QML_PROJECT_ID);
+
+    addRunWorkerFactory<SimpleTargetRunner>(ProjectExplorer::Constants::NORMAL_RUN_MODE);
+}
+
+} // namespace Internal
 } // namespace QmlProjectManager

@@ -254,6 +254,14 @@ HelpPluginPrivate::HelpPluginPrivate()
     ActionManager::actionContainer(Core::Constants::M_HELP)->addAction(cmd, Core::Constants::G_HELP_HELP);
     cmd->setDefaultKeySequence(QKeySequence(Qt::Key_F1));
     connect(action, &QAction::triggered, this, &HelpPluginPrivate::requestContextHelp);
+    ActionContainer *textEditorContextMenu = ActionManager::actionContainer(
+        TextEditor::Constants::M_STANDARDCONTEXTMENU);
+    if (textEditorContextMenu) {
+        textEditorContextMenu->insertGroup(TextEditor::Constants::G_BOM,
+                                           Core::Constants::G_HELP);
+        textEditorContextMenu->addSeparator(Core::Constants::G_HELP);
+        textEditorContextMenu->addAction(cmd, Core::Constants::G_HELP);
+    }
 
     action = new QAction(HelpPlugin::tr("Technical Support"), this);
     cmd = ActionManager::registerAction(action, "Help.TechSupport");
@@ -732,7 +740,7 @@ void HelpPluginPrivate::handleHelpRequest(const QUrl &url, HelpManager::HelpView
 class DialogClosingOnEscape : public QDialog
 {
 public:
-    DialogClosingOnEscape(QWidget *parent = 0) : QDialog(parent) {}
+    DialogClosingOnEscape(QWidget *parent = nullptr) : QDialog(parent) {}
     bool event(QEvent *event)
     {
         if (event->type() == QEvent::ShortcutOverride) {
@@ -750,7 +758,6 @@ void HelpPluginPrivate::slotSystemInformation()
 {
     auto dialog = new DialogClosingOnEscape(ICore::dialogParent());
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowFlags(Qt::Window);
     dialog->setModal(true);
     dialog->setWindowTitle(HelpPlugin::tr("System Information"));
     auto layout = new QVBoxLayout;

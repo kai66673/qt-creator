@@ -26,13 +26,13 @@
 #include "compileroptionsbuilder.h"
 
 #include <coreplugin/icore.h>
+#include <coreplugin/vcsmanager.h>
 
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorerconstants.h>
 
 #include <utils/fileutils.h>
 #include <utils/qtcassert.h>
-#include <utils/qtcfallthrough.h>
 
 #include <QDir>
 #include <QRegularExpression>
@@ -53,6 +53,11 @@ CompilerOptionsBuilder::CompilerOptionsBuilder(const ProjectPart &projectPart,
 QStringList CompilerOptionsBuilder::build(CppTools::ProjectFile::Kind fileKind, PchUsage pchUsage)
 {
     m_options.clear();
+
+    if (fileKind == ProjectFile::CHeader || fileKind == ProjectFile::CSource) {
+        QTC_ASSERT(m_projectPart.languageVersion <= ProjectPart::LatestCVersion,
+                   return QStringList(););
+    }
 
     addWordWidth();
     addTargetTriple();
@@ -119,7 +124,8 @@ void CompilerOptionsBuilder::addExtraCodeModelFlags()
 
 void CompilerOptionsBuilder::enableExceptions()
 {
-    add(QLatin1String("-fcxx-exceptions"));
+    if (m_projectPart.languageVersion > ProjectPart::LatestCVersion)
+        add(QLatin1String("-fcxx-exceptions"));
     add(QLatin1String("-fexceptions"));
 }
 
@@ -132,7 +138,12 @@ static Utils::FileName projectTopLevelDirectory(const ProjectPart &projectPart)
 {
     if (!projectPart.project)
         return Utils::FileName();
-    return projectPart.project->projectDirectory();
+    const Utils::FileName result = projectPart.project->projectDirectory();
+    const Utils::FileName vcsTopLevel = Utils::FileName::fromString(
+                Core::VcsManager::findTopLevelForDirectory(result.toString()));
+    if (result.isChildOf(vcsTopLevel))
+        return vcsTopLevel;
+    return result;
 }
 
 void CompilerOptionsBuilder::addHeaderPathOptions()
@@ -160,10 +171,13 @@ void CompilerOptionsBuilder::addHeaderPathOptions()
             // intentional fall-through:
         case HeaderPath::IncludePath:
             path = absoluteDirectory(headerPath.path);
-            if (path == projectDirectory || path.isChildOf(projectDirectory))
+            if (projectDirectory.isEmpty()
+                    || path == projectDirectory
+                    || path.isChildOf(projectDirectory)) {
                 prefix = defaultPrefix;
-            else
+            } else {
                 prefix = SYSTEM_INCLUDE_PREFIX;
+            }
             break;
         }
 
@@ -287,6 +301,7 @@ void CompilerOptionsBuilder::addOptionsForLanguage(bool checkForBorlandExtension
     QStringList opts;
     const ProjectPart::LanguageExtensions languageExtensions = m_projectPart.languageExtensions;
     const bool gnuExtensions = languageExtensions & ProjectPart::GnuExtensions;
+
     switch (m_projectPart.languageVersion) {
     case ProjectPart::C89:
         opts << (gnuExtensions ? QLatin1String("-std=gnu89") : QLatin1String("-std=c89"));
@@ -472,8 +487,7 @@ QString CompilerOptionsBuilder::includeOption() const
 
 bool CompilerOptionsBuilder::excludeDefineDirective(const ProjectExplorer::Macro &macro) const
 {
-    // This is a quick fix for QTCREATORBUG-11501.
-    // TODO: do a proper fix, see QTCREATORBUG-11709.
+    // TODO: Remove in QtCreator 4.7
     if (macro.key == "__cplusplus")
         return true;
 
@@ -529,7 +543,7 @@ void CompilerOptionsBuilder::addClangIncludeFolder()
 {
     QTC_CHECK(!m_clangVersion.isEmpty());
     add(SYSTEM_INCLUDE_PREFIX);
-    add(clangIncludeDirectory());
+    add(clangIncludeDirectory(m_clangVersion, m_clangResourceDirectory));
 }
 
 void CompilerOptionsBuilder::addProjectConfigFileInclude()
@@ -549,12 +563,21 @@ static QString creatorLibexecPath()
 #endif
 }
 
-QString CompilerOptionsBuilder::clangIncludeDirectory() const
+QString clangIncludeDirectory(const QString &clangVersion, const QString &clangResourceDirectory)
 {
-    QDir dir(creatorLibexecPath() + "/clang" + clangIncludePath(m_clangVersion));
+    QDir dir(creatorLibexecPath() + "/clang" + clangIncludePath(clangVersion));
     if (!dir.exists() || !QFileInfo(dir, "stdint.h").exists())
-        dir = QDir(m_clangResourceDirectory);
+        dir = QDir(clangResourceDirectory);
     return QDir::toNativeSeparators(dir.canonicalPath());
+}
+
+QString clangExecutable(const QString &clangBinDirectory)
+{
+    const QString hostExeSuffix(QTC_HOST_EXE_SUFFIX);
+    QFileInfo executable(creatorLibexecPath() + "/clang/bin/clang" + hostExeSuffix);
+    if (!executable.exists())
+        executable = QFileInfo(clangBinDirectory + "/clang" + hostExeSuffix);
+    return QDir::toNativeSeparators(executable.canonicalFilePath());
 }
 
 void CompilerOptionsBuilder::undefineClangVersionMacrosForMsvc()

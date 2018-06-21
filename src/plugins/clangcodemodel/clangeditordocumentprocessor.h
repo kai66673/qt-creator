@@ -97,21 +97,29 @@ public:
                                                int line,
                                                int column) override;
 
-    void unregisterTranslationUnitForEditor();
+    void closeBackendDocument();
 
     void clearDiagnosticsWithFixIts();
 
     const QVector<ClangBackEnd::TokenInfoContainer> &tokenInfos() const;
 
+    static void clearTaskHubIssues();
+    void generateTaskHubIssues();
+
 public:
     static ClangEditorDocumentProcessor *get(const QString &filePath);
 
+signals:
+    void tokenInfosUpdated();
+
 private:
     void onParserFinished();
-    void updateProjectPartAndTranslationUnitForEditor();
-    void registerTranslationUnitForEditor(CppTools::ProjectPart &projectPart);
-    void updateTranslationUnitIfProjectPartExists();
-    void requestDocumentAnnotations(const QString &projectpartId);
+
+    void updateBackendProjectPartAndDocument();
+    void updateBackendDocument(CppTools::ProjectPart &projectPart);
+    void updateBackendDocumentIfProjectPartExists();
+    void requestAnnotationsFromBackend(const QString &projectpartId);
+
     HeaderErrorDiagnosticWidgetCreator creatorForHeaderErrorDiagnosticWidget(
             const ClangBackEnd::DiagnosticContainer &firstHeaderErrorDiagnostic);
     ClangBackEnd::FileContainer simpleFileContainer(const QByteArray &codecName = QByteArray()) const;
@@ -128,7 +136,7 @@ private:
     Core::Id m_diagnosticConfigId;
     bool m_isProjectFile = false;
     QFutureWatcher<void> m_parserWatcher;
-    QTimer m_updateTranslationUnitTimer;
+    QTimer m_updateBackendDocumentTimer;
     unsigned m_parserRevision;
 
     QVector<ClangBackEnd::TokenInfoContainer> m_tokenInfos;

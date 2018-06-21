@@ -92,9 +92,8 @@ TextEditorSettings::TextEditorSettings()
     // Add font preference page
     FormatDescriptions formatDescr;
     formatDescr.reserve(C_LAST_STYLE_SENTINEL);
-    formatDescr.emplace_back(C_TEXT, tr("Text"), tr("Generic text.\nApplied to "
-                                                    "text, if no other "
-                                                    "rules matching."));
+    formatDescr.emplace_back(C_TEXT, tr("Text"), tr("Generic text and punctuation tokens.\n"
+                                                    "Applied to text that matched no other rule."));
 
     // Special categories
     const QPalette p = QApplication::palette();
@@ -226,7 +225,8 @@ TextEditorSettings::TextEditorSettings()
                              tr("Reserved keywords of the programming language except "
                                 "keywords denoting primitive types."), Qt::darkYellow);
     formatDescr.emplace_back(C_OPERATOR, tr("Operator"),
-                             tr("Operators (for example operator++ or operator-=)."));
+                             tr("Non user-defined language operators.\n"
+                                "To style user-defined operators, use Overloaded Operator."));
     formatDescr.emplace_back(C_PREPROCESSOR, tr("Preprocessor"),
                              tr("Preprocessor directives."), Qt::darkBlue);
     formatDescr.emplace_back(C_LABEL, tr("Label"), tr("Labels for goto statements."),
@@ -313,6 +313,10 @@ TextEditorSettings::TextEditorSettings()
                              QColor(255, 190, 0),
                              QTextCharFormat::DotLine,
                              FormatDescription::ShowUnderlineControl);
+    formatDescr.emplace_back(C_OVERLOADED_OPERATOR,
+                             tr("Overloaded Operators"),
+                             tr("Calls and declarations of overloaded (user-defined) operators."),
+                             Format::createMixinFormat());
     Format declarationFormat = Format::createMixinFormat();
     declarationFormat.setBold(true);
     formatDescr.emplace_back(C_DECLARATION,
@@ -335,7 +339,6 @@ TextEditorSettings::TextEditorSettings()
     d->m_fontSettingsPage = new FontSettingsPage(formatDescr,
                                                    Constants::TEXT_EDITOR_FONT_SETTINGS,
                                                    this);
-    ExtensionSystem::PluginManager::addObject(d->m_fontSettingsPage);
 
     // Add the GUI used to configure the tab, storage and interaction settings
     BehaviorSettingsPageParameters behaviorSettingsPageParameters;
@@ -343,25 +346,18 @@ TextEditorSettings::TextEditorSettings()
     behaviorSettingsPageParameters.displayName = tr("Behavior");
     behaviorSettingsPageParameters.settingsPrefix = QLatin1String("text");
     d->m_behaviorSettingsPage = new BehaviorSettingsPage(behaviorSettingsPageParameters, this);
-    ExtensionSystem::PluginManager::addObject(d->m_behaviorSettingsPage);
 
     DisplaySettingsPageParameters displaySettingsPageParameters;
     displaySettingsPageParameters.id = Constants::TEXT_EDITOR_DISPLAY_SETTINGS;
     displaySettingsPageParameters.displayName = tr("Display");
     displaySettingsPageParameters.settingsPrefix = QLatin1String("text");
     d->m_displaySettingsPage = new DisplaySettingsPage(displaySettingsPageParameters, this);
-    ExtensionSystem::PluginManager::addObject(d->m_displaySettingsPage);
 
     d->m_highlighterSettingsPage =
         new HighlighterSettingsPage(Constants::TEXT_EDITOR_HIGHLIGHTER_SETTINGS, this);
-    ExtensionSystem::PluginManager::addObject(d->m_highlighterSettingsPage);
-
     d->m_snippetsSettingsPage =
         new SnippetsSettingsPage(Constants::TEXT_EDITOR_SNIPPETS_SETTINGS, this);
-    ExtensionSystem::PluginManager::addObject(d->m_snippetsSettingsPage);
-
     d->m_completionSettingsPage = new CompletionSettingsPage(this);
-    ExtensionSystem::PluginManager::addObject(d->m_completionSettingsPage);
 
     connect(d->m_fontSettingsPage, &FontSettingsPage::changed,
             this, &TextEditorSettings::fontSettingsChanged);
@@ -385,13 +381,6 @@ TextEditorSettings::TextEditorSettings()
 
 TextEditorSettings::~TextEditorSettings()
 {
-    ExtensionSystem::PluginManager::removeObject(d->m_fontSettingsPage);
-    ExtensionSystem::PluginManager::removeObject(d->m_behaviorSettingsPage);
-    ExtensionSystem::PluginManager::removeObject(d->m_displaySettingsPage);
-    ExtensionSystem::PluginManager::removeObject(d->m_highlighterSettingsPage);
-    ExtensionSystem::PluginManager::removeObject(d->m_snippetsSettingsPage);
-    ExtensionSystem::PluginManager::removeObject(d->m_completionSettingsPage);
-
     delete d;
 
     m_instance = 0;

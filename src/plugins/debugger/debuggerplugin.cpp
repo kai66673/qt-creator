@@ -88,19 +88,18 @@
 
 #include <cppeditor/cppeditorconstants.h>
 #include <qmljseditor/qmljseditorconstants.h>
-#include <cpptools/cppmodelmanager.h>
 
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/buildmanager.h>
 #include <projectexplorer/devicesupport/deviceprocessesdialog.h>
 #include <projectexplorer/devicesupport/deviceprocesslist.h>
+#include <projectexplorer/itaskhandler.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/projectexplorericons.h>
 #include <projectexplorer/projectexplorersettings.h>
 #include <projectexplorer/projecttree.h>
 #include <projectexplorer/runconfiguration.h>
-#include <projectexplorer/runnables.h>
 #include <projectexplorer/session.h>
 #include <projectexplorer/target.h>
 #include <projectexplorer/taskhub.h>
@@ -571,6 +570,42 @@ static Kit *findUniversalCdbKit()
 
 ///////////////////////////////////////////////////////////////////////
 //
+// Debuginfo Taskhandler
+//
+///////////////////////////////////////////////////////////////////////
+
+class DebugInfoTaskHandler : public ITaskHandler
+{
+public:
+    bool canHandle(const Task &task) const final
+    {
+        return m_debugInfoTasks.contains(task.taskId);
+    }
+
+    void handle(const Task &task) final
+    {
+        QString cmd = m_debugInfoTasks.value(task.taskId);
+        QProcess::startDetached(cmd);
+    }
+
+    void addTask(unsigned id, const QString &cmd)
+    {
+        m_debugInfoTasks[id] = cmd;
+    }
+
+    QAction *createAction(QObject *parent) const final
+    {
+        QAction *action = new QAction(DebuggerPlugin::tr("Install &Debug Information"), parent);
+        action->setToolTip(DebuggerPlugin::tr("Tries to install missing debug information."));
+        return action;
+    }
+
+private:
+    QHash<unsigned, QString> m_debugInfoTasks;
+};
+
+///////////////////////////////////////////////////////////////////////
+//
 // DebuggerPluginPrivate
 //
 ///////////////////////////////////////////////////////////////////////
@@ -612,7 +647,7 @@ public:
     {
         QSignalBlocker blocker(m_threadBox);
         m_threadBox->clear();
-        foreach (const QString &item, list)
+        for (const QString &item : list)
             m_threadBox->addItem(item);
         m_threadBox->setCurrentIndex(index);
     }
@@ -710,7 +745,7 @@ public:
     void runControlFinished(DebuggerRunTool *runTool);
     void remoteCommand(const QStringList &options);
 
-    void displayDebugger(DebuggerRunTool *runTool, bool updateEngine = true);
+    void displayDebugger(DebuggerRunTool *runTool);
 
     void dumpLog();
     void cleanupViews();
@@ -748,8 +783,8 @@ public:
 
     void handleAbort()
     {
-        currentEngine()->resetLocation();
-        currentEngine()->abortDebugger();
+        if (dd->m_currentRunTool)
+            dd->m_currentRunTool->abortDebugger();
     }
 
     void handleReset()
@@ -1005,7 +1040,6 @@ public:
     bool m_busy = false;
     QString m_lastPermanentStatusMessage;
 
-    mutable CPlusPlus::Snapshot m_codeModelSnapshot;
     DebuggerPlugin *m_plugin = nullptr;
 
     SnapshotHandler *m_snapshotHandler = nullptr;
@@ -1022,6 +1056,8 @@ public:
     DebuggerItemManager m_debuggerItemManager;
     QList<IOptionsPage *> m_optionPages;
     IContext m_debugModeContext;
+
+    DebugInfoTaskHandler m_debugInfoTaskHandler;
 };
 
 DebuggerPluginPrivate::DebuggerPluginPrivate(DebuggerPlugin *plugin)
@@ -1034,11 +1070,12 @@ DebuggerPluginPrivate::DebuggerPluginPrivate(DebuggerPlugin *plugin)
     dd = this;
 
     m_plugin = plugin;
+    debuggerConsole(); // ensure Debugger Console is created before settings are taken into account
 }
 
 DebuggerPluginPrivate::~DebuggerPluginPrivate()
 {
-    delete debuggerConsole();
+    destroyDebuggerConsole();
 
     qDeleteAll(m_optionPages);
     m_optionPages.clear();
@@ -1118,7 +1155,7 @@ bool DebuggerPluginPrivate::parseArgument(QStringList::const_iterator &it,
         bool useTerminal = false;
 
         if (!pid) {
-            foreach (const QString &arg, args) {
+            for (const QString &arg : args) {
                 const QString key = arg.section('=', 0, 0);
                 const QString val = arg.section('=', 1, 1);
                 if (val.isEmpty()) {
@@ -1148,7 +1185,8 @@ bool DebuggerPluginPrivate::parseArgument(QStringList::const_iterator &it,
         if (!kit)
             kit = guessKitFromAbis(Abi::abisOfBinary(FileName::fromString(executable)));
 
-        auto runControl = new RunControl(nullptr, ProjectExplorer::Constants::DEBUG_RUN_MODE);
+        IDevice::ConstPtr device = DeviceKitInformation::device(kit);
+        auto runControl = new RunControl(device, ProjectExplorer::Constants::DEBUG_RUN_MODE);
         auto debugger = new DebuggerRunTool(runControl, kit);
         debugger->setInferiorExecutable(executable);
         if (pid) {
@@ -1913,7 +1951,8 @@ void DebuggerPluginPrivate::attachCore()
     setConfigValue("LastExternalStartScript", dlg.overrideStartScript());
     setConfigValue("LastForceLocalCoreFile", dlg.forcesLocalCoreFile());
 
-    auto runControl = new RunControl(nullptr, ProjectExplorer::Constants::DEBUG_RUN_MODE);
+    IDevice::ConstPtr device = DeviceKitInformation::device(dlg.kit());
+    auto runControl = new RunControl(device, ProjectExplorer::Constants::DEBUG_RUN_MODE);
     auto debugger = new DebuggerRunTool(runControl, dlg.kit());
     debugger->setInferiorExecutable(dlg.localExecutableFile());
     debugger->setCoreFileName(dlg.localCoreFile());
@@ -1940,7 +1979,8 @@ void DebuggerPluginPrivate::startRemoteCdbSession()
         return;
     setConfigValue(connectionKey, dlg.connection());
 
-    auto runControl = new RunControl(nullptr, ProjectExplorer::Constants::DEBUG_RUN_MODE);
+    IDevice::ConstPtr device = DeviceKitInformation::device(kit);
+    auto runControl = new RunControl(device, ProjectExplorer::Constants::DEBUG_RUN_MODE);
     auto debugger = new DebuggerRunTool(runControl, kit);
     debugger->setStartMode(AttachToRemoteServer);
     debugger->setCloseMode(KillAtClose);
@@ -1998,7 +2038,7 @@ void DebuggerPluginPrivate::attachToRunningApplication()
     if (device->type() == PE::DESKTOP_DEVICE_TYPE) {
         attachToRunningProcess(kit, process, false);
     } else {
-        auto runControl = new RunControl(nullptr, ProjectExplorer::Constants::DEBUG_RUN_MODE);
+        auto runControl = new RunControl(device, ProjectExplorer::Constants::DEBUG_RUN_MODE);
         auto debugger = new RemoteAttachRunner(runControl, kit, process.pid);
         debugger->startRunControl();
     }
@@ -2336,7 +2376,7 @@ void DebuggerPluginPrivate::requestMark(TextEditorWidget *widget, int lineNumber
 }
 
 // If updateEngine is set, the engine will update its threads/modules and so forth.
-void DebuggerPluginPrivate::displayDebugger(DebuggerRunTool *runTool, bool updateEngine)
+void DebuggerPluginPrivate::displayDebugger(DebuggerRunTool *runTool)
 {
     QTC_ASSERT(runTool, return);
     DebuggerEngine *engine = runTool ? runTool->engine() : dummyEngine();
@@ -2344,8 +2384,7 @@ void DebuggerPluginPrivate::displayDebugger(DebuggerRunTool *runTool, bool updat
 
     disconnectEngine();
     connectEngine(runTool);
-    if (updateEngine)
-        engine->updateAll();
+    engine->updateAll();
     engine->updateViews();
 }
 
@@ -2565,7 +2604,6 @@ void DebuggerPluginPrivate::updateState(DebuggerRunTool *runTool)
         m_debugWithoutDeployAction->setEnabled(canRun);
         setProxyAction(m_visibleStartAction, Id(Constants::DEBUG));
         m_hiddenStopAction->setAction(m_undisturbableAction);
-        m_codeModelSnapshot = CPlusPlus::Snapshot();
         setBusyCursor(false);
         cleanupViews();
     } else if (state == InferiorUnrunnable) {
@@ -2761,20 +2799,13 @@ void DebuggerPluginPrivate::aboutToShutdown()
     m_shutdownTimer.setInterval(0);
     m_shutdownTimer.setSingleShot(true);
     connect(&m_shutdownTimer, &QTimer::timeout, this, &DebuggerPluginPrivate::doShutdown);
-    if (DebuggerEngine *engine = currentEngine()) {
-        if (engine->state() != Debugger::DebuggerNotReady) {
-            engine->abortDebugger();
+    if (dd->m_currentRunTool) {
+        if (dd->m_currentRunTool->engine()->state() != Debugger::DebuggerNotReady) {
+            dd->m_currentRunTool->abortDebugger();
             m_shutdownTimer.setInterval(3000);
         }
     }
     m_shutdownTimer.start();
-}
-
-const CPlusPlus::Snapshot &cppCodeModelSnapshot()
-{
-    if (dd->m_codeModelSnapshot.isEmpty() && action(UseCodeModel)->isChecked())
-        dd->m_codeModelSnapshot = CppTools::CppModelManager::instance()->snapshot();
-    return dd->m_codeModelSnapshot;
 }
 
 void setSessionValue(const QByteArray &key, const QVariant &value)
@@ -2823,21 +2854,8 @@ void DebuggerPluginPrivate::showMessage(const QString &msg, int channel, int tim
 
 static void createNewDock(QWidget *widget)
 {
-//    m_mainWindow->registerDockWidget(dockId, widget);
-
-//    QDockWidget *dockWidget = qobject_cast<QDockWidget *>(widget->parentWidget());
-//    //dockWidget->installEventFilter(&m_resizeEventFilter);
-
-//    QAction *toggleViewAction = dockWidget->toggleViewAction();
-//    Command *cmd = ActionManager::registerAction(toggleViewAction,
-//             Id("Debugger.").withSuffix(widget->objectName()));
-//    cmd->setAttribute(Command::CA_Hide);
-//    dd->createDockWidget(Core::Id::fromString(widget->objectName()), widget);
-//    QDockWidget *dockWidget = qobject_cast<QDockWidget *>(widget->parentWidget());
-//    QDockWidget *dockWidget = Debugger::registerDockWidget(Id::fromString(widget->objectName()), widget);
-    QDockWidget *dockWidget = new QDockWidget;
+    auto dockWidget = new QDockWidget;
     dockWidget->setWidget(widget);
-
     dockWidget->setWindowTitle(widget->windowTitle());
     dockWidget->setFeatures(QDockWidget::DockWidgetClosable);
     dockWidget->show();
@@ -2947,6 +2965,11 @@ QMessageBox *showMessageBox(int icon, const QString &title,
     return mb;
 }
 
+void addDebugInfoTask(unsigned id, const QString &cmd)
+{
+    dd->m_debugInfoTaskHandler.addTask(id, cmd);
+}
+
 bool isReverseDebuggingEnabled()
 {
     static bool enabled = qEnvironmentVariableIsSet("QTC_DEBUGGER_ENABLE_REVERSE");
@@ -2976,11 +2999,8 @@ void DebuggerPluginPrivate::extensionsInitialized()
 
     auto constraint = [](RunConfiguration *runConfig) {
         Runnable runnable = runConfig->runnable();
-        if (runnable.is<StandardRunnable>()) {
-            IDevice::ConstPtr device = runnable.as<StandardRunnable>().device;
-            if (device && device->type() == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE)
-                return true;
-        }
+        if (runnable.device && runnable.device->type() == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE)
+            return true;
 
         if (DeviceTypeKitInformation::deviceTypeId(runConfig->target()->kit())
                     == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE)
@@ -3045,7 +3065,7 @@ void showModuleSymbols(const QString &moduleName, const Symbols &symbols)
     header.append(DebuggerPlugin::tr("Name"));
     w->setHeaderLabels(header);
     w->setWindowTitle(DebuggerPlugin::tr("Symbols in \"%1\"").arg(moduleName));
-    foreach (const Symbol &s, symbols) {
+    for (const Symbol &s : symbols) {
         QTreeWidgetItem *it = new QTreeWidgetItem;
         it->setData(0, Qt::DisplayRole, s.name);
         it->setData(1, Qt::DisplayRole, s.address);
@@ -3074,7 +3094,7 @@ void showModuleSections(const QString &moduleName, const Sections &sections)
     header.append(DebuggerPlugin::tr("Flags"));
     w->setHeaderLabels(header);
     w->setWindowTitle(DebuggerPlugin::tr("Sections in \"%1\"").arg(moduleName));
-    foreach (const Section &s, sections) {
+    for (const Section &s : sections) {
         QTreeWidgetItem *it = new QTreeWidgetItem;
         it->setData(0, Qt::DisplayRole, s.name);
         it->setData(1, Qt::DisplayRole, s.from);
@@ -3149,9 +3169,9 @@ void runControlFinished(DebuggerRunTool *runTool)
     dd->runControlFinished(runTool);
 }
 
-void displayDebugger(DebuggerRunTool *runTool, bool updateEngine)
+void displayDebugger(DebuggerRunTool *runTool)
 {
-    dd->displayDebugger(runTool, updateEngine);
+    dd->displayDebugger(runTool);
 }
 
 void synchronizeBreakpoints()
@@ -3615,7 +3635,7 @@ void DebuggerUnitTests::testStateMachine()
     auto runControl = new RunControl(rc, ProjectExplorer::Constants::DEBUG_RUN_MODE);
     auto debugger = new DebuggerRunTool(runControl);
 
-    debugger->setInferior(rc->runnable().as<StandardRunnable>());
+    debugger->setInferior(rc->runnable());
     debugger->setTestCase(TestNoBoundsOfCurrentFunction);
 
     connect(debugger, &DebuggerRunTool::stopped,
@@ -3734,12 +3754,12 @@ void DebuggerUnitTests::testDebuggerMatching()
 
     QList<Abi> debuggerAbis;
     foreach (const QString &abi, debugger)
-        debuggerAbis << Abi(abi);
+        debuggerAbis << Abi::fromString(abi);
 
     DebuggerItem item;
     item.setAbis(debuggerAbis);
 
-    DebuggerItem::MatchLevel level = item.matchTarget(Abi(target));
+    DebuggerItem::MatchLevel level = item.matchTarget(Abi::fromString(target));
     if (level == DebuggerItem::MatchesPerfectly)
         level = DebuggerItem::MatchesWell;
 

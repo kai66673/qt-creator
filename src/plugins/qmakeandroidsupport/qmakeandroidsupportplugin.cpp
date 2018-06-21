@@ -27,8 +27,9 @@
 
 #include "androidqmakebuildconfigurationfactory.h"
 #include "qmakeandroidbuildapkstep.h"
-#include "qmakeandroidrunfactories.h"
 #include "qmakeandroidsupport.h"
+
+using namespace ProjectExplorer;
 
 namespace QmakeAndroidSupport {
 namespace Internal {
@@ -38,7 +39,6 @@ class QmakeAndroidSupportPluginPrivate
 public:
     AndroidQmakeBuildConfigurationFactory buildConfigFactory;
     QmakeAndroidBuildApkStepFactory buildApkStepFactory;
-    QmakeAndroidRunConfigurationFactory runConfigFactory;
     QmakeAndroidSupport androidSupport;
 };
 

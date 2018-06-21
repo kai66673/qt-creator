@@ -27,8 +27,6 @@
 #include "ObjectiveCTypeQualifiers.h"
 #include "QtContextKeywords.h"
 
-#include <utils/qtcfallthrough.h>
-
 #include <unordered_map>
 #include <utility>
 
@@ -5000,7 +4998,7 @@ bool Parser::parseNameId(NameAST *&name)
         return parseName(name, false);
 
     default:
-        if (tok().isLiteral() || tok().isOperator()) {
+        if (tok().isLiteral() || tok().isPunctuationOrOperator()) {
             rewind(start);
             return parseName(name, false);
         }

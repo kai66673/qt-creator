@@ -95,7 +95,7 @@ DebuggerItem::DebuggerItem(const QVariantMap &data)
     m_lastModified = data.value(QLatin1String(DEBUGGER_INFORMATION_LASTMODIFIED)).toDateTime();
 
     foreach (const QString &a, data.value(QLatin1String(DEBUGGER_INFORMATION_ABIS)).toStringList()) {
-        Abi abi(a);
+        Abi abi = Abi::fromString(a);
         if (!abi.isNull())
             m_abis.append(abi);
     }
@@ -212,7 +212,7 @@ QString DebuggerItem::engineTypeName() const
 QStringList DebuggerItem::abiNames() const
 {
     QStringList list;
-    foreach (const Abi &abi, m_abis)
+    for (const Abi &abi : m_abis)
         list.append(abi.toString());
     return list;
 }
@@ -368,7 +368,7 @@ static DebuggerItem::MatchLevel matchSingle(const Abi &debuggerAbi, const Abi &t
 DebuggerItem::MatchLevel DebuggerItem::matchTarget(const Abi &targetAbi) const
 {
     MatchLevel bestMatch = DoesNotMatch;
-    foreach (const Abi &debuggerAbi, m_abis) {
+    for (const Abi &debuggerAbi : m_abis) {
         MatchLevel currentMatch = matchSingle(debuggerAbi, targetAbi, m_engineType);
         if (currentMatch > bestMatch)
             bestMatch = currentMatch;

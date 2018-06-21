@@ -381,6 +381,8 @@ public:
     void gotoBlockStartWithSelection();
     void gotoBlockEndWithSelection();
 
+    void gotoDocumentStart();
+    void gotoDocumentEnd();
     void gotoLineStart();
     void gotoLineStartWithSelection();
     void gotoLineEnd();
@@ -474,6 +476,7 @@ protected:
     QTextBlock blockForVisibleRow(int row) const;
     QTextBlock blockForVerticalOffset(int offset) const;
     bool event(QEvent *e) override;
+    void contextMenuEvent(QContextMenuEvent *e) override;
     void inputMethodEvent(QInputMethodEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
@@ -546,8 +549,10 @@ protected:
        \a resolveTarget is set to true when the target of the link is relevant
        (it isn't until the link is used).
      */
-    virtual Utils::Link findLinkAt(const QTextCursor &, bool resolveTarget = true,
-                                   bool inNextSplit = false);
+    virtual void findLinkAt(const QTextCursor &,
+                            Utils::ProcessLinkCallback &&processLinkCallback,
+                            bool resolveTarget = true,
+                            bool inNextSplit = false);
 
     /*!
        Returns whether the link was opened successfully.

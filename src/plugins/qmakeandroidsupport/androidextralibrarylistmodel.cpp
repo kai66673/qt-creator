@@ -25,12 +25,13 @@
 ****************************************************************************/
 
 #include "androidextralibrarylistmodel.h"
-#include "qmakeandroidrunconfiguration.h"
 
+#include <projectexplorer/runconfiguration.h>
 #include <projectexplorer/target.h>
 
 #include <qmakeprojectmanager/qmakeproject.h>
 #include <qmakeprojectmanager/qmakenodes.h>
+
 #include <proparser/prowriter.h>
 
 
@@ -43,15 +44,14 @@ AndroidExtraLibraryListModel::AndroidExtraLibraryListModel(ProjectExplorer::Targ
     : QAbstractItemModel(parent),
       m_target(target)
 {
+    updateModel();
 
-    activeRunConfigurationChanged();
-
-    auto project = static_cast<QmakeProject *>(target->project());
-    connect(project, &QmakeProject::proFileUpdated,
-            this, &AndroidExtraLibraryListModel::proFileUpdated);
-
+    connect(target->project(), &ProjectExplorer::Project::parsingStarted,
+            this, &AndroidExtraLibraryListModel::updateModel);
+    connect(target->project(), &ProjectExplorer::Project::parsingFinished,
+            this, &AndroidExtraLibraryListModel::updateModel);
     connect(target, &ProjectExplorer::Target::activeRunConfigurationChanged,
-            this, &AndroidExtraLibraryListModel::activeRunConfigurationChanged);
+            this, &AndroidExtraLibraryListModel::updateModel);
 }
 
 QModelIndex AndroidExtraLibraryListModel::index(int row, int column, const QModelIndex &) const
@@ -84,7 +84,7 @@ QVariant AndroidExtraLibraryListModel::data(const QModelIndex &index, int role) 
     };
 }
 
-void AndroidExtraLibraryListModel::activeRunConfigurationChanged()
+void AndroidExtraLibraryListModel::updateModel()
 {
     QmakeProjectManager::QmakeProFile *pro = activeProFile();
     if (!pro || pro->parseInProgress()) {
@@ -114,18 +114,10 @@ void AndroidExtraLibraryListModel::activeRunConfigurationChanged()
 QmakeProjectManager::QmakeProFile *AndroidExtraLibraryListModel::activeProFile() const
 {
     ProjectExplorer::RunConfiguration *rc = m_target->activeRunConfiguration();
-    QmakeAndroidRunConfiguration *qarc = qobject_cast<QmakeAndroidRunConfiguration *>(rc);
-    if (!qarc)
-        return 0;
+    if (!rc)
+        return nullptr;
     auto project = static_cast<QmakeProject *>(m_target->project());
-    return project->rootProFile()->findProFile(qarc->proFilePath());
-}
-
-void AndroidExtraLibraryListModel::proFileUpdated(QmakeProjectManager::QmakeProFile *pro)
-{
-    if (activeProFile() != pro)
-        return;
-    activeRunConfigurationChanged();
+    return project->rootProFile()->findProFile(Utils::FileName::fromString(rc->buildKey()));
 }
 
 bool AndroidExtraLibraryListModel::isEnabled() const

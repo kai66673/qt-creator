@@ -33,7 +33,6 @@
 #include "androiddeployqtstep.h"
 #include "androidqtsupport.h"
 #include "androidqtversion.h"
-#include "androidbuildapkstep.h"
 #include "androidavdmanager.h"
 #include "androidsdkmanager.h"
 
@@ -69,6 +68,9 @@ namespace {
     const QLatin1String ApiLevelKey("AndroidVersion.ApiLevel");
 
 } // anonymous namespace
+
+
+using namespace Utils;
 
 namespace Android {
 
@@ -204,9 +206,12 @@ Utils::FileName AndroidManager::dirPath(ProjectExplorer::Target *target)
 Utils::FileName AndroidManager::manifestSourcePath(ProjectExplorer::Target *target)
 {
     if (AndroidQtSupport *androidQtSupport = AndroidManager::androidQtSupport(target)) {
-        Utils::FileName source = androidQtSupport->manifestSourcePath(target);
-        if (!source.isEmpty())
-            return source;
+        const QString packageSource = androidQtSupport->targetDataItem(Android::Constants::AndroidPackageSourceDir, target);
+        if (!packageSource.isEmpty()) {
+            const FileName manifest = FileName::fromUserInput(packageSource + "/AndroidManifest.xml");
+            if (manifest.exists())
+                return manifest;
+        }
     }
     return manifestPath(target);
 }
@@ -239,6 +244,16 @@ QString AndroidManager::deviceSerialNumber(ProjectExplorer::Target *target)
 void AndroidManager::setDeviceSerialNumber(ProjectExplorer::Target *target, const QString &deviceSerialNumber)
 {
     target->setNamedSettings(AndroidDeviceSn, deviceSerialNumber);
+}
+
+int AndroidManager::deviceApiLevel(ProjectExplorer::Target *target)
+{
+    return target->namedSettings(ApiLevelKey).toInt();
+}
+
+void AndroidManager::setDeviceApiLevel(ProjectExplorer::Target *target, int level)
+{
+    target->setNamedSettings(ApiLevelKey, level);
 }
 
 QPair<int, int> AndroidManager::apiLevelRange()
@@ -444,17 +459,6 @@ bool AndroidManager::checkCertificateExists(const QString &keystorePath,
     return response.result == Utils::SynchronousProcessResponse::Finished && response.exitCode == 0;
 }
 
-bool AndroidManager::checkForQt51Files(Utils::FileName fileName)
-{
-    fileName.appendPath(QLatin1String("android")).appendPath(QLatin1String("version.xml"));
-    if (!fileName.exists())
-        return false;
-    QDomDocument dstVersionDoc;
-    if (!openXmlFile(dstVersionDoc, fileName))
-        return false;
-    return dstVersionDoc.documentElement().attribute(QLatin1String("value")).toDouble() < 5.2;
-}
-
 AndroidQtSupport *AndroidManager::androidQtSupport(ProjectExplorer::Target *target)
 {
     for (AndroidQtSupport *provider : g_androidQtSupportProviders) {
@@ -532,13 +536,16 @@ bool AndroidManager::updateGradleProperties(ProjectExplorer::Target *target)
     if (!version)
         return false;
 
-    AndroidBuildApkStep *buildApkStep
-        = AndroidGlobal::buildStep<AndroidBuildApkStep>(target->activeBuildConfiguration());
-
-    if (!buildApkStep || !buildApkStep->androidPackageSourceDir().appendPath(QLatin1String("gradlew")).exists())
+    AndroidQtSupport *qtSupport = androidQtSupport(target);
+    if (!qtSupport)
         return false;
 
-    Utils::FileName wrapperProps(buildApkStep->androidPackageSourceDir());
+    QFileInfo sourceDirInfo(qtSupport->targetDataItem(Constants::AndroidPackageSourceDir, target));
+    FileName packageSourceDir = FileName::fromString(sourceDirInfo.canonicalFilePath());
+    if (!packageSourceDir.appendPath("gradlew").exists())
+        return false;
+
+    Utils::FileName wrapperProps = packageSourceDir;
     wrapperProps.appendPath(QLatin1String("gradle/wrapper/gradle-wrapper.properties"));
     if (wrapperProps.exists()) {
         GradleProperties wrapperProperties = readGradleProperties(wrapperProps.toString());
@@ -552,10 +559,10 @@ bool AndroidManager::updateGradleProperties(ProjectExplorer::Target *target)
 
     GradleProperties localProperties;
     localProperties["sdk.dir"] = AndroidConfigurations::currentConfig().sdkLocation().toString().toLocal8Bit();
-    if (!mergeGradleProperties(buildApkStep->androidPackageSourceDir().appendPath(QLatin1String("local.properties")).toString(), localProperties))
+    if (!mergeGradleProperties(packageSourceDir.appendPath("local.properties").toString(), localProperties))
         return false;
 
-    QString gradlePropertiesPath = buildApkStep->androidPackageSourceDir().appendPath(QLatin1String("gradle.properties")).toString();
+    QString gradlePropertiesPath = packageSourceDir.appendPath("gradle.properties").toString();
     GradleProperties gradleProperties = readGradleProperties(gradlePropertiesPath);
     gradleProperties["qt5AndroidDir"] = version->qmakeProperty("QT_INSTALL_PREFIX")
             .append(QLatin1String("/src/android/java")).toLocal8Bit();

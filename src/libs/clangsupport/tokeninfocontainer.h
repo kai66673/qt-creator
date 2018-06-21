@@ -60,16 +60,16 @@ struct ExtraInfo
         , slot(false)
     {
     }
-    ExtraInfo(Utf8String token, Utf8String typeSpelling, Utf8String resultTypeSpelling,
+    ExtraInfo(Utf8String token, Utf8String typeSpelling,
               Utf8String semanticParentTypeSpelling, SourceRangeContainer cursorRange,
-              AccessSpecifier accessSpecifier, StorageClass storageClass,
+              int lexicalParentIndex, AccessSpecifier accessSpecifier, StorageClass storageClass,
               bool isIdentifier, bool isInclusion, bool isDeclaration, bool isDefinition,
               bool isSignal, bool isSlot)
         : token(token)
         , typeSpelling(typeSpelling)
-        , resultTypeSpelling(resultTypeSpelling)
         , semanticParentTypeSpelling(semanticParentTypeSpelling)
         , cursorRange(cursorRange)
+        , lexicalParentIndex(lexicalParentIndex)
         , accessSpecifier(accessSpecifier)
         , storageClass(storageClass)
         , identifier(isIdentifier)
@@ -82,9 +82,9 @@ struct ExtraInfo
     }
     Utf8String token;
     Utf8String typeSpelling;
-    Utf8String resultTypeSpelling;
     Utf8String semanticParentTypeSpelling;
     SourceRangeContainer cursorRange;
+    int lexicalParentIndex = -1;
     AccessSpecifier accessSpecifier = AccessSpecifier::Invalid;
     StorageClass storageClass = StorageClass::Invalid;
     bool identifier : 1;
@@ -104,112 +104,94 @@ class TokenInfoContainer
 public:
     TokenInfoContainer() = default;
     TokenInfoContainer(uint line, uint column, uint length, HighlightingTypes types)
-        : line_(line)
-        , column_(column)
-        , length_(length)
-        , types_(types)
+        : line(line)
+        , column(column)
+        , length(length)
+        , types(types)
     {
     }
 
     TokenInfoContainer(uint line, uint column, uint length, HighlightingTypes types,
                        const ExtraInfo &extraInfo)
-        : line_(line)
-        , column_(column)
-        , length_(length)
-        , types_(types)
-        , extraInfo_(extraInfo)
-        , noExtraInfo_(false)
+        : line(line)
+        , column(column)
+        , length(length)
+        , types(types)
+        , extraInfo(extraInfo)
+        , noExtraInfo(false)
     {
-    }
-
-    uint line() const
-    {
-        return line_;
-    }
-
-    uint column() const
-    {
-        return column_;
-    }
-
-    uint length() const
-    {
-        return length_;
-    }
-
-    HighlightingTypes types() const
-    {
-        return types_;
-    }
-
-    const ExtraInfo &extraInfo() const
-    {
-        return extraInfo_;
     }
 
     bool isInvalid() const
     {
-        return line_ == 0 && column_ == 0 && length_ == 0;
+        return line == 0 && column == 0 && length == 0;
+    }
+
+    bool isGlobalDeclaration() const
+    {
+        return extraInfo.declaration
+                && types.mainHighlightingType != HighlightingType::LocalVariable
+                && ((types.mainHighlightingType == HighlightingType::Operator)
+                    == extraInfo.token.startsWith("operator"));
     }
 
     friend QDataStream &operator<<(QDataStream &out, const TokenInfoContainer &container)
     {
-        out << container.line_;
-        out << container.column_;
-        out << container.length_;
-        out << container.types_;
-        out << container.noExtraInfo_;
+        out << container.line;
+        out << container.column;
+        out << container.length;
+        out << container.types;
+        out << container.noExtraInfo;
 
-        if (container.noExtraInfo_)
+        if (container.noExtraInfo)
             return out;
 
-        out << container.extraInfo_;
+        out << container.extraInfo;
 
         return out;
     }
 
     friend QDataStream &operator>>(QDataStream &in, TokenInfoContainer &container)
     {
-        in >> container.line_;
-        in >> container.column_;
-        in >> container.length_;
-        in >> container.types_;
-        in >> container.noExtraInfo_;
+        in >> container.line;
+        in >> container.column;
+        in >> container.length;
+        in >> container.types;
+        in >> container.noExtraInfo;
 
-        if (container.noExtraInfo_)
+        if (container.noExtraInfo)
             return in;
 
-        in >> container.extraInfo_;
+        in >> container.extraInfo;
 
         return in;
     }
 
     friend bool operator==(const TokenInfoContainer &first, const TokenInfoContainer &second)
     {
-        return first.line_ == second.line_
-            && first.column_ == second.column_
-            && first.length_ == second.length_
-            && first.types_ == second.types_
-            && first.noExtraInfo_ == second.noExtraInfo_
-            && first.extraInfo_ == second.extraInfo_;
+        return first.line == second.line
+            && first.column == second.column
+            && first.length == second.length
+            && first.types == second.types
+            && first.noExtraInfo == second.noExtraInfo
+            && first.extraInfo == second.extraInfo;
     }
 
-private:
-    uint line_ = 0;
-    uint column_ = 0;
-    uint length_ = 0;
-    HighlightingTypes types_;
-    ExtraInfo extraInfo_;
-    bool noExtraInfo_ = true;
+    uint line = 0;
+    uint column = 0;
+    uint length = 0;
+    HighlightingTypes types;
+    ExtraInfo extraInfo;
+    bool noExtraInfo = true;
 };
 
 inline QDataStream &operator<<(QDataStream &out, const ExtraInfo &extraInfo)
 {
     out << extraInfo.token;
     out << extraInfo.typeSpelling;
-    out << extraInfo.resultTypeSpelling;
     out << extraInfo.semanticParentTypeSpelling;
     out << extraInfo.cursorRange;
+    out << extraInfo.lexicalParentIndex;
     out << static_cast<uint>(extraInfo.accessSpecifier);
     out << static_cast<uint>(extraInfo.storageClass);
     out << extraInfo.identifier;
@@ -225,9 +207,9 @@ inline QDataStream &operator>>(QDataStream &in, ExtraInfo &extraInfo)
 {
     in >> extraInfo.token;
     in >> extraInfo.typeSpelling;
-    in >> extraInfo.resultTypeSpelling;
     in >> extraInfo.semanticParentTypeSpelling;
     in >> extraInfo.cursorRange;
+    in >> extraInfo.lexicalParentIndex;
 
     uint accessSpecifier;
     uint storageClass;
@@ -262,9 +244,9 @@ inline bool operator==(const ExtraInfo &first, const ExtraInfo &second)
 {
     return first.token == second.token
             && first.typeSpelling == second.typeSpelling
-            && first.resultTypeSpelling == second.resultTypeSpelling
             && first.semanticParentTypeSpelling == second.semanticParentTypeSpelling
             && first.cursorRange == second.cursorRange
+            && first.lexicalParentIndex == second.lexicalParentIndex
             && first.accessSpecifier == second.accessSpecifier
             && first.storageClass == second.storageClass
             && first.identifier == second.identifier
@@ -277,7 +259,7 @@ inline bool operator==(const ExtraInfo &first, const ExtraInfo &second)
 
 inline QDataStream &operator<<(QDataStream &out, HighlightingType highlightingType)
 {
-    out << static_cast<const quint8>(highlightingType);
+    out << static_cast<quint8>(highlightingType);
 
     return out;
 }

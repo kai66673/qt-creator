@@ -309,7 +309,7 @@ public:
     QSize sizeHint() const final
     {
         int width = sizeHintForColumn(0) + frameWidth() * 2 + 5;
-        width += verticalScrollBar()->width();
+        width += verticalScrollBar()->sizeHint().width();
         return QSize(width, 100);
     }
 
@@ -426,10 +426,10 @@ private:
     Utils::FancyLineEdit *m_filterLineEdit;
     QListView *m_categoryList;
     QLabel *m_headerLabel;
+    std::vector<QEventLoop *> m_eventLoops;
     bool m_running = false;
     bool m_applied = false;
     bool m_finished = false;
-    QList<QEventLoop *> m_eventLoops;
 };
 
 static QPointer<SettingsDialog> m_instance = nullptr;
@@ -546,7 +546,9 @@ void SettingsDialog::createGui()
     headerHLayout->addWidget(m_headerLabel);
 
     m_stackedLayout->setMargin(0);
-    m_stackedLayout->addWidget(new QWidget(this)); // no category selected, for example when filtering
+    QWidget *emptyWidget = new QWidget(this);
+    emptyWidget->setMinimumSize(QSize(500, 500));
+    m_stackedLayout->addWidget(emptyWidget); // no category selected, for example when filtering
 
     QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok |
                                                        QDialogButtonBox::Apply |
@@ -722,13 +724,10 @@ void SettingsDialog::done(int val)
 
     ICore::saveSettings(); // save all settings
 
-    // exit all additional event loops, see comment in execDialog()
-    QListIterator<QEventLoop *> it(m_eventLoops);
-    it.toBack();
-    while (it.hasPrevious()) {
-        QEventLoop *loop = it.previous();
-        loop->exit();
-    }
+    // exit event loops in reverse order of addition
+    for (QEventLoop *eventLoop : m_eventLoops)
+        eventLoop->exit();
+    m_eventLoops.clear();
 
     QDialog::done(val);
 }
@@ -757,9 +756,10 @@ bool SettingsDialog::execDialog()
         // a break point it will complain about missing helper, and offer the
         // option to open the settings dialog.
         // Keep the UI running by creating another event loop.
-        QEventLoop *loop = new QEventLoop(this);
-        m_eventLoops.append(loop);
-        loop->exec();
+        QEventLoop eventLoop;
+        m_eventLoops.emplace(m_eventLoops.begin(), &eventLoop);
+        eventLoop.exec();
+        QTC_ASSERT(m_eventLoops.empty(), return m_applied;);
     }
     return m_applied;
 }

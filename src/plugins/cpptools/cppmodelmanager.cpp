@@ -61,7 +61,6 @@
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/projectmacro.h>
 #include <projectexplorer/session.h>
-#include <extensionsystem/pluginmanager.h>
 #include <utils/fileutils.h>
 #include <utils/qtcassert.h>
 
@@ -328,17 +327,18 @@ void CppModelManager::findUsages(const CppTools::CursorInEditor &data,
     engine->findUsages(data, std::move(showUsagesCallback));
 }
 
-CppModelManager::Link CppModelManager::globalFollowSymbol(
+void CppModelManager::globalFollowSymbol(
         const CursorInEditor &data,
+        Utils::ProcessLinkCallback &&processLinkCallback,
         const CPlusPlus::Snapshot &snapshot,
         const CPlusPlus::Document::Ptr &documentFromSemanticInfo,
         SymbolFinder *symbolFinder,
         bool inNextSplit) const
 {
     RefactoringEngineInterface *engine = getRefactoringEngine(d->m_refactoringEngines);
-    QTC_ASSERT(engine, return Link(););
-    return engine->globalFollowSymbol(data, snapshot, documentFromSemanticInfo,
-            symbolFinder, inNextSplit);
+    QTC_ASSERT(engine, return;);
+    engine->globalFollowSymbol(data, std::move(processLinkCallback), snapshot, documentFromSemanticInfo,
+                               symbolFinder, inNextSplit);
 }
 
 void CppModelManager::addRefactoringEngine(RefactoringEngineType type,
@@ -356,14 +356,8 @@ template<class FilterClass>
 static void setFilter(std::unique_ptr<FilterClass> &filter,
                       std::unique_ptr<FilterClass> &&newFilter)
 {
-    if (!ExtensionSystem::PluginManager::instance())
-        return;
-    if (filter)
-        ExtensionSystem::PluginManager::removeObject(filter.get());
-    if (!newFilter)
-        return;
+    QTC_ASSERT(newFilter, return;);
     filter = std::move(newFilter);
-    ExtensionSystem::PluginManager::addObject(filter.get());
 }
 
 void CppModelManager::setLocatorFilter(std::unique_ptr<Core::ILocatorFilter> &&filter)
@@ -439,16 +433,6 @@ CppModelManager *CppModelManager::instance()
     return m_instance;
 }
 
-void CppModelManager::resetFilters()
-{
-    setLocatorFilter();
-    setClassesFilter();
-    setIncludesFilter();
-    setFunctionsFilter();
-    setSymbolsFindFilter();
-    setCurrentDocumentFilter();
-}
-
 void CppModelManager::createCppModelManager(Internal::CppToolsPlugin *parent)
 {
     QTC_ASSERT(!m_instance, return;);
@@ -472,9 +456,6 @@ void CppModelManager::initCppTools()
 
     connect(this, &CppModelManager::aboutToRemoveFiles,
             &d->m_locatorData, &CppLocatorData::onAboutToRemoveFiles);
-
-    ExtensionSystem::PluginManager *pluginManager = ExtensionSystem::PluginManager::instance();
-    QTC_ASSERT(pluginManager, return;);
 
     // Set up builtin filters
     setLocatorFilter(std::make_unique<CppLocatorFilter>(&d->m_locatorData));
@@ -545,7 +526,6 @@ CppModelManager::CppModelManager()
 CppModelManager::~CppModelManager()
 {
     delete d->m_internalIndexingSupport;
-    resetFilters();
     delete d;
 }
 
@@ -976,9 +956,10 @@ void CppModelManager::watchForCanceledProjectIndexer(const QVector<QFuture<void>
             continue;
 
         QFutureWatcher<void> *watcher = new QFutureWatcher<void>();
-        connect(watcher, &QFutureWatcher<void>::canceled, this, [this, project]() {
+        connect(watcher, &QFutureWatcher<void>::canceled, this, [this, project, watcher]() {
             if (d->m_projectToIndexerCanceled.contains(project)) // Project not yet removed
                 d->m_projectToIndexerCanceled.insert(project, true);
+            watcher->deleteLater();
         });
         connect(watcher, &QFutureWatcher<void>::finished, this, [watcher]() {
             watcher->deleteLater();
@@ -1119,19 +1100,6 @@ QFuture<void> CppModelManager::updateProjectInfo(QFutureInterface<void> &futureI
                                                            ForcedProgressNotification);
     watchForCanceledProjectIndexer({futureInterface.future(), indexingFuture}, project);
     return indexingFuture;
-}
-
-ProjectInfo CppModelManager::updateCompilerCallDataForProject(
-        ProjectExplorer::Project *project,
-        ProjectInfo::CompilerCallData &compilerCallData)
-{
-    QMutexLocker locker(&d->m_projectMutex);
-
-    ProjectInfo projectInfo = d->m_projectToProjectsInfo.value(project, ProjectInfo());
-    projectInfo.setCompilerCallData(compilerCallData);
-    d->m_projectToProjectsInfo.insert(project, projectInfo);
-
-    return projectInfo;
 }
 
 ProjectPart::Ptr CppModelManager::projectPartForId(const QString &projectPartId) const

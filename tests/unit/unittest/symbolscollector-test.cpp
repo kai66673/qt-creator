@@ -53,7 +53,9 @@ using ClangBackEnd::V2::FileContainers;
 using ClangBackEnd::SourceDependency;
 using ClangBackEnd::SourceLocationEntry;
 using ClangBackEnd::SymbolEntry;
-using ClangBackEnd::SymbolType;
+using ClangBackEnd::SymbolKind;
+using ClangBackEnd::SymbolTag;
+using ClangBackEnd::SourceLocationKind;
 using ClangBackEnd::SymbolIndex;
 using ClangBackEnd::UsedMacro;
 
@@ -61,9 +63,9 @@ using Sqlite::Database;
 
 namespace {
 
-MATCHER_P5(IsSourceLocationEntry, symbolId, filePathId, line, column, symbolType,
+MATCHER_P5(IsSourceLocationEntry, symbolId, filePathId, line, column, kind,
            std::string(negation ? "isn't" : "is")
-           + PrintToString(SourceLocationEntry{symbolId, filePathId, {line, column}, symbolType})
+           + PrintToString(SourceLocationEntry{symbolId, filePathId, {line, column}, kind})
            )
 {
     const SourceLocationEntry &entry = arg;
@@ -71,7 +73,7 @@ MATCHER_P5(IsSourceLocationEntry, symbolId, filePathId, line, column, symbolType
     return entry.filePathId == filePathId
         && entry.lineColumn.line == line
         && entry.lineColumn.column == column
-        && entry.symbolType == symbolType
+        && entry.kind == kind
         && entry.symbolId == symbolId;
 }
 
@@ -95,6 +97,28 @@ MATCHER_P(HasSymbolName, symbolName,
     const SymbolEntry &entry = arg.second;
 
     return entry.symbolName == symbolName;
+}
+
+MATCHER_P(HasSymbolKind, symbolKind,
+           std::string(negation ? "hasn't" : "has")
+           + " and symbol kind: "
+           + PrintToString(symbolKind)
+           )
+{
+    const SymbolEntry &entry = arg.second;
+
+    return entry.symbolKind == symbolKind;
+}
+
+MATCHER_P(HasSymbolTag, symbolTag,
+          std::string(negation ? "hasn't" : "has")
+          + " and symbol tag: "
+          + PrintToString(symbolTag)
+          )
+{
+    const SymbolEntry &entry = arg.second;
+
+    return entry.symbolTags.contains(symbolTag);
 }
 
 class SymbolsCollector : public testing::Test
@@ -181,7 +205,7 @@ TEST_F(SymbolsCollector, CollectFilePath)
                 Contains(
                     AllOf(Field(&SourceLocationEntry::filePathId,
                                 filePathId(TESTDATA_DIR"/symbolscollector_simple.cpp")),
-                          Field(&SourceLocationEntry::symbolType, SymbolType::Declaration))));
+                          Field(&SourceLocationEntry::kind, SourceLocationKind::Declaration))));
 }
 
 TEST_F(SymbolsCollector, CollectLineColumn)
@@ -193,7 +217,7 @@ TEST_F(SymbolsCollector, CollectLineColumn)
     ASSERT_THAT(collector.sourceLocations(),
                 Contains(
                     AllOf(HasLineColumn(1, 6),
-                          Field(&SourceLocationEntry::symbolType, SymbolType::Declaration))));
+                          Field(&SourceLocationEntry::kind, SourceLocationKind::Declaration))));
 }
 
 TEST_F(SymbolsCollector, CollectReference)
@@ -205,7 +229,7 @@ TEST_F(SymbolsCollector, CollectReference)
     ASSERT_THAT(collector.sourceLocations(),
                 Contains(
                     AllOf(HasLineColumn(14, 5),
-                          Field(&SourceLocationEntry::symbolType, SymbolType::DeclarationReference))));
+                          Field(&SourceLocationEntry::kind, SourceLocationKind::DeclarationReference))));
 }
 
 TEST_F(SymbolsCollector, ReferencedSymboldMatchesLocation)
@@ -428,7 +452,7 @@ TEST_F(SymbolsCollector, CollectMacroDefinitionSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("IF_NOT_DEFINE"), fileId, 4, 9, SymbolType::MacroDefinition)));
+                Contains(IsSourceLocationEntry(symbolId("IF_NOT_DEFINE"), fileId, 4, 9, SourceLocationKind::MacroDefinition)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageInIfNotDefSourceLocation)
@@ -439,7 +463,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageInIfNotDefSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("IF_NOT_DEFINE"), fileId, 6, 9, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("IF_NOT_DEFINE"), fileId, 6, 9, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectSecondMacroUsageInIfNotDefSourceLocation)
@@ -450,7 +474,7 @@ TEST_F(SymbolsCollector, CollectSecondMacroUsageInIfNotDefSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("IF_NOT_DEFINE"), fileId, 9, 9, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("IF_NOT_DEFINE"), fileId, 9, 9, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageCompilerArgumentSourceLocation)
@@ -461,7 +485,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageCompilerArgumentSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("COMPILER_ARGUMENT"), fileId, 12, 9, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("COMPILER_ARGUMENT"), fileId, 12, 9, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageInIfDefSourceLocation)
@@ -472,7 +496,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageInIfDefSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("IF_DEFINE"), fileId, 17, 8, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("IF_DEFINE"), fileId, 17, 8, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageInDefinedSourceLocation)
@@ -483,7 +507,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageInDefinedSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("DEFINED"), fileId, 22, 13, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("DEFINED"), fileId, 22, 13, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageExpansionSourceLocation)
@@ -494,7 +518,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageExpansionSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("MACRO_EXPANSION"), fileId, 27, 10, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("MACRO_EXPANSION"), fileId, 27, 10, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageUndefSourceLocation)
@@ -505,7 +529,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageUndefSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("UN_DEFINE"), fileId, 34, 8, SymbolType::MacroUndefinition)));
+                Contains(IsSourceLocationEntry(symbolId("UN_DEFINE"), fileId, 34, 8, SourceLocationKind::MacroUndefinition)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroUsageBuiltInSourceLocation)
@@ -516,7 +540,7 @@ TEST_F(SymbolsCollector, CollectMacroUsageBuiltInSourceLocation)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.sourceLocations(),
-                Contains(IsSourceLocationEntry(symbolId("__clang__"), fileId, 29, 9, SymbolType::MacroUsage)));
+                Contains(IsSourceLocationEntry(symbolId("__clang__"), fileId, 29, 9, SourceLocationKind::MacroUsage)));
 }
 
 TEST_F(SymbolsCollector, CollectMacroDefinitionSymbols)
@@ -527,7 +551,7 @@ TEST_F(SymbolsCollector, CollectMacroDefinitionSymbols)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.symbols(),
-                Contains(HasSymbolName("IF_NOT_DEFINE")));
+                Contains(AllOf(HasSymbolName("IF_NOT_DEFINE"), HasSymbolKind(SymbolKind::Macro))));
 }
 
 TEST_F(SymbolsCollector, CollectMacroBuiltInSymbols)
@@ -538,7 +562,7 @@ TEST_F(SymbolsCollector, CollectMacroBuiltInSymbols)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.symbols(),
-                Contains(HasSymbolName("__clang__")));
+                Contains(AllOf(HasSymbolName("__clang__"), HasSymbolKind(SymbolKind::Macro))));
 }
 
 TEST_F(SymbolsCollector, CollectMacroCompilerArgumentSymbols)
@@ -549,7 +573,7 @@ TEST_F(SymbolsCollector, CollectMacroCompilerArgumentSymbols)
     collector.collectSymbols();
 
     ASSERT_THAT(collector.symbols(),
-                Contains(HasSymbolName("COMPILER_ARGUMENT")));
+                Contains(AllOf(HasSymbolName("COMPILER_ARGUMENT"), HasSymbolKind(SymbolKind::Macro))));
 }
 
 TEST_F(SymbolsCollector, CollectFileStatuses)
@@ -581,6 +605,106 @@ TEST_F(SymbolsCollector, CollectSourceDependencies)
                                      SourceDependency(mainFileId, header3FileId),
                                      SourceDependency(header3FileId, header2FileId),
                                      SourceDependency(header1FileId, header2FileId)));
+}
+
+TEST_F(SymbolsCollector, IsClassSymbol)
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                Contains(
+                    AllOf(
+                        HasSymbolName("Class"),
+                        HasSymbolKind(SymbolKind::Record),
+                        HasSymbolTag(SymbolTag::Class))));
+}
+
+TEST_F(SymbolsCollector, IsStructSymbol)
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                Contains(
+                    AllOf(
+                        HasSymbolName("Struct"),
+                        HasSymbolKind(SymbolKind::Record),
+                        HasSymbolTag(SymbolTag::Struct))));
+}
+
+TEST_F(SymbolsCollector, IsEnumerationSymbol)
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                AllOf(
+                    Contains(
+                        AllOf(
+                            HasSymbolName("Enumeration"),
+                            HasSymbolKind(SymbolKind::Enumeration))),
+                    Contains(
+                        AllOf(
+                            HasSymbolName("ScopedEnumeration"),
+                            HasSymbolKind(SymbolKind::Enumeration)))));
+}
+
+TEST_F(SymbolsCollector, IsUnionSymbol)
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                Contains(
+                    AllOf(
+                        HasSymbolName("Union"),
+                        HasSymbolKind(SymbolKind::Record),
+                        HasSymbolTag(SymbolTag::Union))));
+}
+
+TEST_F(SymbolsCollector, DISABLED_ON_NON_WINDOWS(IsMsvcInterfaceSymbol))
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                Contains(
+                    AllOf(
+                        HasSymbolName("MsvcInterface"),
+                        HasSymbolKind(SymbolKind::Record),
+                        HasSymbolTag(SymbolTag::MsvcInterface))));
+}
+
+TEST_F(SymbolsCollector, IsFunctionSymbol)
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                Contains(
+                    AllOf(
+                        HasSymbolName("Function"),
+                        HasSymbolKind(SymbolKind::Function))));
+}
+
+TEST_F(SymbolsCollector, IsVariableSymbol)
+{
+    collector.addFiles({filePathId(TESTDATA_DIR "/symbolscollector_symbolkind.cpp")}, {"cc"});
+
+    collector.collectSymbols();
+
+    ASSERT_THAT(collector.symbols(),
+                Contains(
+                    AllOf(
+                        HasSymbolName("Variable"),
+                        HasSymbolKind(SymbolKind::Variable))));
 }
 
 }

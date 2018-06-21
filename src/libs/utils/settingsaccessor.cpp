@@ -26,7 +26,6 @@
 #include "settingsaccessor.h"
 
 #include "algorithm.h"
-#include "asconst.h"
 #include "qtcassert.h"
 
 #include <QApplication>
@@ -82,9 +81,7 @@ QVariantMap SettingsAccessor::restoreSettings(QWidget *parent) const
 {
     QTC_ASSERT(!m_baseFilePath.isEmpty(), return QVariantMap());
 
-    const RestoreData result = readData(m_baseFilePath, parent);
-    const ProceedInfo pi = result.hasIssue() ? reportIssues(result.issue.value(), result.path, parent) : ProceedInfo::Continue;
-    return pi == ProceedInfo::DiscardAndContinue ? QVariantMap() : result.data;
+    return restoreSettings(m_baseFilePath, parent);
 }
 
 /*!
@@ -93,6 +90,7 @@ QVariantMap SettingsAccessor::restoreSettings(QWidget *parent) const
 bool SettingsAccessor::saveSettings(const QVariantMap &data, QWidget *parent) const
 {
     const optional<Issue> result = writeData(m_baseFilePath, data, parent);
+
     const ProceedInfo pi = result ? reportIssues(result.value(), m_baseFilePath, parent) : ProceedInfo::Continue;
     return pi == ProceedInfo::Continue;
 }
@@ -119,6 +117,15 @@ SettingsAccessor::writeData(const FileName &path, const QVariantMap &data, QWidg
     return writeFile(path, prepareToWriteSettings(data));
 }
 
+QVariantMap SettingsAccessor::restoreSettings(const FileName &settingsPath, QWidget *parent) const
+{
+    const RestoreData result = readData(settingsPath, parent);
+
+    const ProceedInfo pi = result.hasIssue() ? reportIssues(result.issue.value(), result.path, parent)
+                                             : ProceedInfo::Continue;
+    return pi == ProceedInfo::DiscardAndContinue ? QVariantMap() : result.data;
+}
+
 /*!
  * Read a file at \a path from disk and extract the data into a RestoreData set.
  *
@@ -133,7 +140,14 @@ SettingsAccessor::RestoreData SettingsAccessor::readFile(const FileName &path) c
                                  .arg(path.toUserOutput()), Issue::Type::ERROR));
     }
 
-    return RestoreData(path, reader.restoreValues());
+    const QVariantMap data = reader.restoreValues();
+    if (!m_readOnly && path == m_baseFilePath) {
+        if (!m_writer)
+            m_writer = std::make_unique<PersistentSettingsWriter>(m_baseFilePath, docType);
+        m_writer->setContents(data);
+    }
+
+    return RestoreData(path, data);
 }
 
 /*!
@@ -151,7 +165,7 @@ SettingsAccessor::writeFile(const FileName &path, const QVariantMap &data) const
     }
 
     QString errorMessage;
-    if (!m_writer || m_writer->fileName() != path)
+    if (!m_readOnly && (!m_writer || m_writer->fileName() != path))
         m_writer = std::make_unique<PersistentSettingsWriter>(path, docType);
 
     if (!m_writer->save(data, &errorMessage)) {
@@ -350,10 +364,10 @@ int VersionedBackUpStrategy::compare(const SettingsAccessor::RestoreData &data1,
 optional<FileName>
 VersionedBackUpStrategy::backupName(const QVariantMap &oldData, const FileName &path, const QVariantMap &data) const
 {
-    Q_UNUSED(oldData);
+    Q_UNUSED(data);
     FileName backupName = path;
-    const QByteArray oldEnvironmentId = settingsIdFromMap(data);
-    const int oldVersion = versionFromMap(data);
+    const QByteArray oldEnvironmentId = settingsIdFromMap(oldData);
+    const int oldVersion = versionFromMap(oldData);
 
     if (!oldEnvironmentId.isEmpty() && oldEnvironmentId != m_accessor->settingsId())
         backupName.appendString('.' + QString::fromLatin1(oldEnvironmentId).mid(1, 7));
@@ -414,7 +428,8 @@ QVariantMap VersionUpgrader::renameKeys(const QList<Change> &changes, QVariantMa
  * The UpgradingSettingsAccessor keeps version information in the settings file and will
  * upgrade the settings on load to the latest supported version (if possible).
  */
-UpgradingSettingsAccessor::UpgradingSettingsAccessor(const QString &displayName,
+UpgradingSettingsAccessor::UpgradingSettingsAccessor(const QString &docType,
+                                                     const QString &displayName,
                                                      const QString &applicationDisplayName) :
     UpgradingSettingsAccessor(std::make_unique<VersionedBackUpStrategy>(this), docType,
                               displayName, applicationDisplayName)
@@ -446,7 +461,7 @@ bool UpgradingSettingsAccessor::isValidVersionAndId(const int version, const QBy
 {
     return (version >= 0
             && version >= firstSupportedVersion() && version <= currentVersion())
-            && (id == m_id || m_id.isEmpty());
+            && (id.isEmpty() || id == m_id || m_id.isEmpty());
 }
 
 SettingsAccessor::RestoreData UpgradingSettingsAccessor::readData(const FileName &path,

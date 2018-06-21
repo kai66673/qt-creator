@@ -74,8 +74,8 @@ static FileName defaultBuildDirectory(const QString &projectFilePath, const Kit 
 // QbsBuildConfiguration:
 // ---------------------------------------------------------------------------
 
-QbsBuildConfiguration::QbsBuildConfiguration(Target *target)
-    : BuildConfiguration(target, Constants::QBS_BC_ID)
+QbsBuildConfiguration::QbsBuildConfiguration(Target *target, Core::Id id)
+    : BuildConfiguration(target, id)
 {
     connect(project(), &Project::parsingStarted, this, &BuildConfiguration::enabledChanged);
     connect(project(), &Project::parsingFinished, this, &BuildConfiguration::enabledChanged);
@@ -109,6 +109,8 @@ void QbsBuildConfiguration::initialize(const BuildInfo *info)
 
     BuildStepList *buildSteps = stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
     auto bs = new QbsBuildStep(buildSteps);
+    if (info->buildType == Release)
+        bs->setQmlDebuggingEnabled(false);
     bs->setQbsConfiguration(bd);
     buildSteps->appendStep(bs);
 
@@ -372,7 +374,7 @@ QString QbsBuildConfiguration::equivalentCommandLine(const BuildStep *buildStep)
     const QString profileName = QbsManager::profileForKit(buildStep->target()->kit());
     const QString buildVariant = qbsConfiguration()
             .value(QLatin1String(Constants::QBS_CONFIG_VARIANT_KEY)).toString();
-    Utils::QtcProcess::addArg(&commandLine, configurationName());
+    Utils::QtcProcess::addArg(&commandLine, QLatin1String("config:") + configurationName());
     Utils::QtcProcess::addArg(&commandLine, QLatin1String(Constants::QBS_CONFIG_VARIANT_KEY)
                                   + QLatin1Char(':') + buildVariant);
     const Utils::FileName installRoot = stepProxy.installRoot();

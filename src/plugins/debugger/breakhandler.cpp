@@ -159,7 +159,7 @@ private:
 class BreakpointMarker : public TextEditor::TextMark
 {
 public:
-    BreakpointMarker(BreakpointItem *b, const QString &fileName, int lineNumber)
+    BreakpointMarker(BreakpointItem *b, const FileName &fileName, int lineNumber)
         : TextMark(fileName, lineNumber, Constants::TEXT_MARK_CATEGORY_BREAKPOINT), m_bp(b)
     {
         setColor(Theme::Debugger_Breakpoint_TextMarkColor);
@@ -180,10 +180,10 @@ public:
         m_bp->updateLineNumberFromMarker(lineNumber);
     }
 
-    void updateFileName(const QString &fileName)
+    void updateFileName(const FileName &fileName)
     {
         TextMark::updateFileName(fileName);
-        m_bp->updateFileNameFromMarker(fileName);
+        m_bp->updateFileNameFromMarker(fileName.toString());
     }
 
     bool isDraggable() const { return true; }
@@ -1064,9 +1064,9 @@ void BreakHandler::saveBreakpoints()
 
 void BreakHandler::loadBreakpoints()
 {
-    QVariant value = sessionValue("Breakpoints");
-    QList<QVariant> list = value.toList();
-    foreach (const QVariant &var, list) {
+    const QVariant value = sessionValue("Breakpoints");
+    const QList<QVariant> list = value.toList();
+    for (const QVariant &var : list) {
         const QMap<QString, QVariant> map = var.toMap();
         BreakpointParameters params(BreakpointByFileAndLine);
         QVariant v = map.value("filename");
@@ -1137,7 +1137,7 @@ Breakpoint BreakHandler::findBreakpointByIndex(const QModelIndex &index) const
 Breakpoints BreakHandler::findBreakpointsByIndex(const QList<QModelIndex> &list) const
 {
     QSet<Breakpoint> ids;
-    foreach (const QModelIndex &index, list) {
+    for (const QModelIndex &index : list) {
         if (Breakpoint b = findBreakpointByIndex(index))
             ids.insert(b);
     }
@@ -1830,19 +1830,19 @@ void BreakHandler::changeLineNumberFromMarkerHelper(BreakpointModelId id)
     appendBreakpoint(params);
 }
 
-Breakpoints BreakHandler::allBreakpoints() const
+const Breakpoints BreakHandler::allBreakpoints() const
 {
     Breakpoints items;
     forItemsAtLevel<1>([&items](BreakpointItem *b) { items.append(Breakpoint(b)); });
     return items;
 }
 
-Breakpoints BreakHandler::unclaimedBreakpoints() const
+const Breakpoints BreakHandler::unclaimedBreakpoints() const
 {
     return engineBreakpoints(0);
 }
 
-Breakpoints BreakHandler::engineBreakpoints(DebuggerEngine *engine) const
+const Breakpoints BreakHandler::engineBreakpoints(DebuggerEngine *engine) const
 {
     Breakpoints items;
     forItemsAtLevel<1>([&items, engine](BreakpointItem *b) {
@@ -1930,7 +1930,7 @@ bool BreakHandler::setData(const QModelIndex &idx, const QVariant &value, int ro
                     const bool isEnabled = items.isEmpty() || items.at(0).isEnabled();
                     setBreakpointsEnabled(items, !isEnabled);
 // FIXME
-//                    foreach (const QModelIndex &id, selectedIds)
+//                    for (const QModelIndex &id : selectedIds)
 //                        update(id);
                     return true;
                 }
@@ -2069,7 +2069,7 @@ bool BreakHandler::contextMenuEvent(const ItemViewEvent &ev)
 
 void BreakHandler::setBreakpointsEnabled(const Breakpoints &bps, bool enabled)
 {
-    foreach (Breakpoint b, bps)
+    for (Breakpoint b : bps)
         b.setEnabled(enabled);
 }
 
@@ -2088,7 +2088,7 @@ void BreakHandler::deleteAllBreakpoints()
 
 void BreakHandler::deleteBreakpoints(const Breakpoints &bps)
 {
-    foreach (Breakpoint bp, bps)
+    for (Breakpoint bp : bps)
         bp.removeBreakpoint();
 }
 
@@ -2141,7 +2141,7 @@ void BreakHandler::editBreakpoints(const Breakpoints &bps, QWidget *parent)
     const int newIgnoreCount = dialog.ignoreCount();
     const int newThreadSpec = dialog.threadSpec();
 
-    foreach (Breakpoint bp, bps) {
+    for (Breakpoint bp : bps) {
         if (bp) {
             bp.setCondition(newCondition);
             bp.setIgnoreCount(newIgnoreCount);
@@ -2256,7 +2256,7 @@ void BreakpointItem::updateMarkerIcon()
 
 void BreakpointItem::updateMarker()
 {
-    QString file = markerFileName();
+    FileName file = FileName::fromString(markerFileName());
     int line = markerLineNumber();
     if (m_marker && (file != m_marker->fileName() || line != m_marker->lineNumber()))
         destroyMarker();

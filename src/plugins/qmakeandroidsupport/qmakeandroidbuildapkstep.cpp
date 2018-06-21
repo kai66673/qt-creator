@@ -26,7 +26,6 @@
 
 #include "qmakeandroidbuildapkstep.h"
 #include "qmakeandroidbuildapkwidget.h"
-#include "qmakeandroidrunconfiguration.h"
 
 #include <android/androidconfigurations.h>
 #include <android/androidconstants.h>
@@ -40,17 +39,11 @@
 #include <projectexplorer/target.h>
 #include <qtsupport/qtkitinformation.h>
 
-#include <qmakeprojectmanager/qmakenodes.h>
-#include <qmakeprojectmanager/qmakeproject.h>
 #include <qmakeprojectmanager/qmakeprojectmanagerconstants.h>
 
 #include <utils/qtcprocess.h>
 
-#include <QHBoxLayout>
-
 using namespace Android;
-using QmakeProjectManager::QmakeProject;
-using QmakeProjectManager::QmakeProFileNode;
 
 namespace QmakeAndroidSupport {
 namespace Internal {
@@ -66,7 +59,7 @@ QmakeAndroidBuildApkStepFactory::QmakeAndroidBuildApkStepFactory()
     setSupportedProjectType(QmakeProjectManager::Constants::QMAKEPROJECT_ID);
     setSupportedDeviceType(Constants::ANDROID_DEVICE_TYPE);
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
-    setDisplayName(tr("Build Android APK"));
+    setDisplayName(QmakeAndroidBuildApkStep::tr("Build Android APK"));
     setRepeatable(false);
 }
 
@@ -77,31 +70,8 @@ QmakeAndroidBuildApkStep::QmakeAndroidBuildApkStep(ProjectExplorer::BuildStepLis
 {
 }
 
-Utils::FileName QmakeAndroidBuildApkStep::proFilePathForInputFile() const
-{
-    ProjectExplorer::RunConfiguration *rc = target()->activeRunConfiguration();
-    if (auto *arc = qobject_cast<QmakeAndroidRunConfiguration *>(rc))
-        return arc->proFilePath();
-    return Utils::FileName();
-}
-
-Utils::FileName QmakeAndroidBuildApkStep::androidPackageSourceDir() const
-{
-    QmakeProjectManager::QmakeProject *pro = static_cast<QmakeProjectManager::QmakeProject *>(project());
-    const QmakeProjectManager::QmakeProFileNode *node
-            = pro->rootProjectNode()->findProFileFor(proFilePathForInputFile());
-    if (!node)
-        return Utils::FileName();
-
-    QFileInfo sourceDirInfo(node->singleVariableValue(QmakeProjectManager::Variable::AndroidPackageSourceDir));
-    return Utils::FileName::fromString(sourceDirInfo.canonicalFilePath());
-}
-
 bool QmakeAndroidBuildApkStep::init(QList<const BuildStep *> &earlierSteps)
 {
-    if (AndroidManager::checkForQt51Files(project()->projectDirectory()))
-        emit addOutput(tr("Found old folder \"android\" in source directory. Qt 5.2 does not use that folder by default."), OutputFormat::Stderr);
-
     if (!AndroidBuildApkStep::init(earlierSteps))
         return false;
 
@@ -119,13 +89,8 @@ bool QmakeAndroidBuildApkStep::init(QList<const BuildStep *> &earlierSteps)
     ProjectExplorer::BuildConfiguration *bc = buildConfiguration();
     QString outputDir = bc->buildDirectory().appendPath(Constants::ANDROID_BUILDDIRECTORY).toString();
 
-    const auto *pro = static_cast<QmakeProjectManager::QmakeProject *>(project());
-    const QmakeProjectManager::QmakeProFileNode *node = pro->rootProjectNode()->findProFileFor(proFilePathForInputFile());
-    m_skipBuilding = !node;
-    if (m_skipBuilding)
-        return true;
-
-    QString inputFile = node->singleVariableValue(QmakeProjectManager::Variable::AndroidDeploySettingsFile);
+    QString inputFile = AndroidManager::androidQtSupport(target())
+            ->targetDataItem(Constants::AndroidDeploySettingsFile, target());
     if (inputFile.isEmpty()) {
         m_skipBuilding = true;
         return true;

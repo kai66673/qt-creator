@@ -33,11 +33,6 @@
 
 namespace CppTools {
 
-static QStringList commonWarnings()
-{
-    return { QStringLiteral("-Wno-unknown-pragmas") };
-}
-
 static void addConfigForQuestionableConstructs(ClangDiagnosticConfigsModel &model)
 {
     ClangDiagnosticConfig config;
@@ -48,7 +43,7 @@ static void addConfigForQuestionableConstructs(ClangDiagnosticConfigsModel &mode
     config.setClangOptions(QStringList{
         QStringLiteral("-Wall"),
         QStringLiteral("-Wextra"),
-    } + commonWarnings());
+    });
 
     model.appendOrUpdate(config);
 }
@@ -60,7 +55,7 @@ static void addConfigForPedanticWarnings(ClangDiagnosticConfigsModel &model)
     config.setDisplayName(QCoreApplication::translate("ClangDiagnosticConfigsModel",
                                                       "Pedantic Warnings"));
     config.setIsReadOnly(true);
-    config.setClangOptions(QStringList{QStringLiteral("-Wpedantic")} + commonWarnings());
+    config.setClangOptions(QStringList{QStringLiteral("-Wpedantic")});
 
     model.appendOrUpdate(config);
 }
@@ -86,7 +81,7 @@ static void addConfigForAlmostEveryWarning(ClangDiagnosticConfigsModel &model)
         QStringLiteral("-Wno-switch-enum"),
         QStringLiteral("-Wno-missing-prototypes"), // Not optimal for C projects.
         QStringLiteral("-Wno-used-but-marked-unused"), // e.g. QTest::qWait
-    } + commonWarnings());
+    });
 
     model.appendOrUpdate(config);
 }
@@ -112,11 +107,6 @@ int ClangDiagnosticConfigsModel::size() const
 const ClangDiagnosticConfig &ClangDiagnosticConfigsModel::at(int index) const
 {
     return m_diagnosticConfigs.at(index);
-}
-
-void ClangDiagnosticConfigsModel::prepend(const ClangDiagnosticConfig &config)
-{
-    m_diagnosticConfigs.prepend(config);
 }
 
 void ClangDiagnosticConfigsModel::appendOrUpdate(const ClangDiagnosticConfig &config)
@@ -173,6 +163,18 @@ QVector<Core::Id> ClangDiagnosticConfigsModel::changedOrRemovedConfigs(
     }
 
     return changedConfigs;
+}
+
+QStringList ClangDiagnosticConfigsModel::globalDiagnosticOptions()
+{
+    return {
+        // Avoid undesired warnings from e.g. Q_OBJECT
+        QStringLiteral("-Wno-unknown-pragmas"),
+        QStringLiteral("-Wno-unknown-warning-option"),
+
+        // qdoc commands
+        QStringLiteral("-Wno-documentation-unknown-command")
+    };
 }
 
 int ClangDiagnosticConfigsModel::indexOfConfig(const Core::Id &id) const

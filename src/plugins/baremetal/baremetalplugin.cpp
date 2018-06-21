@@ -26,10 +26,10 @@
 
 #include "baremetalplugin.h"
 #include "baremetalconstants.h"
+#include "baremetalcustomrunconfiguration.h"
 #include "baremetaldeviceconfigurationfactory.h"
 #include "baremetaldebugsupport.h"
 #include "baremetalrunconfiguration.h"
-#include "baremetalrunconfigurationfactory.h"
 
 #include "gdbserverproviderssettingspage.h"
 #include "gdbserverprovidermanager.h"
@@ -75,7 +75,9 @@ bool BareMetalPlugin::initialize(const QStringList &arguments, QString *errorStr
 
     auto constraint = [](RunConfiguration *runConfig) {
         const QByteArray idStr = runConfig->id().name();
-        return runConfig->isEnabled() && idStr.startsWith(BareMetalRunConfiguration::IdPrefix);
+        const bool res = idStr.startsWith(BareMetalRunConfiguration::IdPrefix)
+                || idStr == BareMetalCustomRunConfiguration::Id;
+        return res;
     };
 
     RunControl::registerWorker<BareMetalDebugSupport>

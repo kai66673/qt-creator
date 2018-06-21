@@ -55,7 +55,6 @@
 #include <coreplugin/messagebox.h>
 
 #include <projectexplorer/devicesupport/deviceprocess.h>
-#include <projectexplorer/itaskhandler.h>
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/taskhub.h>
 
@@ -133,52 +132,6 @@ static bool isMostlyHarmlessMessage(const QStringRef &msg)
 
 ///////////////////////////////////////////////////////////////////////
 //
-// Debuginfo Taskhandler
-//
-///////////////////////////////////////////////////////////////////////
-
-class DebugInfoTask
-{
-public:
-    QString command;
-};
-
-class DebugInfoTaskHandler : public ITaskHandler
-{
-public:
-    explicit DebugInfoTaskHandler(GdbEngine *engine)
-        : m_engine(engine)
-    {}
-
-    bool canHandle(const Task &task) const override
-    {
-        return m_debugInfoTasks.contains(task.taskId);
-    }
-
-    void handle(const Task &task) override
-    {
-        m_engine->requestDebugInformation(m_debugInfoTasks.value(task.taskId));
-    }
-
-    void addTask(unsigned id, const DebugInfoTask &task)
-    {
-        m_debugInfoTasks[id] = task;
-    }
-
-    QAction *createAction(QObject *parent) const override
-    {
-        QAction *action = new QAction(DebuggerPlugin::tr("Install &Debug Information"), parent);
-        action->setToolTip(DebuggerPlugin::tr("Tries to install missing debug information."));
-        return action;
-    }
-
-private:
-    GdbEngine *m_engine;
-    QHash<unsigned, DebugInfoTask> m_debugInfoTasks;
-};
-
-///////////////////////////////////////////////////////////////////////
-//
 // GdbEngine
 //
 ///////////////////////////////////////////////////////////////////////
@@ -189,9 +142,6 @@ GdbEngine::GdbEngine()
 
     m_gdbOutputCodec = QTextCodec::codecForLocale();
     m_inferiorOutputCodec = QTextCodec::codecForLocale();
-
-    m_debugInfoTaskHandler = new DebugInfoTaskHandler(this);
-    //ExtensionSystem::PluginManager::addObject(m_debugInfoTaskHandler);
 
     m_commandTimer.setSingleShot(true);
     connect(&m_commandTimer, &QTimer::timeout,
@@ -222,10 +172,6 @@ GdbEngine::GdbEngine()
 
 GdbEngine::~GdbEngine()
 {
-    //ExtensionSystem::PluginManager::removeObject(m_debugInfoTaskHandler);
-    delete m_debugInfoTaskHandler;
-    m_debugInfoTaskHandler = 0;
-
     // Prevent sending error messages afterwards.
     disconnect();
 }
@@ -434,10 +380,7 @@ void GdbEngine::handleResponse(const QString &buff)
                         FileName(), 0, Debugger::Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
 
                     TaskHub::addTask(task);
-
-                    DebugInfoTask dit;
-                    dit.command = cmd;
-                    m_debugInfoTaskHandler->addTask(task.taskId, dit);
+                    Internal::addDebugInfoTask(task.taskId, cmd);
                 }
             }
 
@@ -617,7 +560,7 @@ void GdbEngine::handleAsyncOutput(const QString &asyncClass, const GdbMi &result
         BreakHandler *handler = breakHandler();
         Breakpoint bp;
         BreakpointResponse br;
-        foreach (const GdbMi &bkpt, res.children()) {
+        for (const GdbMi &bkpt : res.children()) {
             const QString nr = bkpt["number"].data();
             BreakpointResponseId rid(nr);
             if (nr.contains('.')) {
@@ -642,7 +585,7 @@ void GdbEngine::handleAsyncOutput(const QString &asyncClass, const GdbMi &result
         // {bkpt={number="2",type="hw watchpoint",disp="keep",enabled="y",
         // what="*0xbfffed48",times="0",original-location="*0xbfffed48"}}
         BreakHandler *handler = breakHandler();
-        foreach (const GdbMi &bkpt, result.children()) {
+        for (const GdbMi &bkpt : result.children()) {
             BreakpointResponse br;
             br.type = BreakpointByFileAndLine;
             updateResponse(br, bkpt);
@@ -753,7 +696,6 @@ void GdbEngine::interruptInferior()
         showStatusMessage(tr("Stop requested..."), 5000);
         showMessage("TRYING TO INTERRUPT INFERIOR");
         if (HostOsInfo::isWindowsHost() && !m_isQnxGdb) {
-            QTC_ASSERT(state() == InferiorStopRequested, qDebug() << state(); notifyInferiorStopFailed());
             IDevice::ConstPtr device = runTool()->device();
             if (!device)
                 device = runParameters().inferior.device;
@@ -796,15 +738,6 @@ void GdbEngine::runCommand(const DebuggerCommand &command)
         return;
     }
 
-    if (cmd.flags & RebuildBreakpointModel) {
-        ++m_pendingBreakpointRequests;
-        PENDING_DEBUG("   BREAKPOINT MODEL:" << cmd.function
-                      << "INCREMENTS PENDING TO" << m_pendingBreakpointRequests);
-    } else {
-        PENDING_DEBUG("   OTHER (IN):" << cmd.function
-                      << "LEAVES PENDING BREAKPOINT AT" << m_pendingBreakpointRequests);
-    }
-
     if (cmd.flags & (NeedsTemporaryStop|NeedsFullStop)) {
         showMessage("RUNNING NEEDS-STOP COMMAND " + cmd.function);
         const bool wantContinue = bool(cmd.flags & NeedsTemporaryStop);
@@ -823,10 +756,11 @@ void GdbEngine::runCommand(const DebuggerCommand &command)
         if (state() == InferiorRunOk) {
             showStatusMessage(tr("Stopping temporarily."), 1000);
             m_onStop.append(cmd, wantContinue);
-            requestInterruptInferior();
+            interruptInferior();
             return;
         }
-        showMessage("UNSAFE STATE FOR QUEUED COMMAND. EXECUTING IMMEDIATELY");
+        if (state() != InferiorStopOk)
+            showMessage("UNSAFE STATE FOR QUEUED COMMAND. EXECUTING IMMEDIATELY");
     }
 
     if (!(cmd.flags & Discardable))
@@ -1065,18 +999,6 @@ void GdbEngine::handleResultRecord(DebuggerResponse *response)
     if (cmd.callback)
         cmd.callback(*response);
 
-    if (flags & RebuildBreakpointModel) {
-        --m_pendingBreakpointRequests;
-        PENDING_DEBUG("   BREAKPOINT" << cmd.function);
-        if (m_pendingBreakpointRequests <= 0) {
-            PENDING_DEBUG("\n\n ... AND TRIGGERS BREAKPOINT MODEL UPDATE\n");
-            attemptBreakpointSynchronization();
-        }
-    } else {
-        PENDING_DEBUG("   OTHER (OUT):" << cmd.function
-                      << "LEAVES PENDING BREAKPOINT AT" << m_pendingBreakpointRequests);
-    }
-
     // Continue only if there are no commands wire anymore, so this will
     // be fully synchronous.
     // This is somewhat inefficient, as it makes the last command synchronous.
@@ -1137,7 +1059,7 @@ void GdbEngine::handleQuerySources(const DebuggerResponse &response)
         // "^done,files=[{file="../../../../bin/dumper/dumper.cpp",
         // fullname="/data5/dev/ide/main/bin/dumper/dumper.cpp"},
         GdbMi files = response.data["files"];
-        foreach (const GdbMi &item, files.children()) {
+        for (const GdbMi &item : files.children()) {
             GdbMi fileName = item["file"];
             if (fileName.data().endsWith("<built-in>"))
                 continue;
@@ -2164,7 +2086,7 @@ void GdbEngine::updateResponse(BreakpointResponse &response, const GdbMi &bkpt)
     response.enabled = true;
     response.pending = false;
     response.condition.clear();
-    foreach (const GdbMi &child, bkpt.children()) {
+    for (const GdbMi &child : bkpt.children()) {
         if (child.hasName("number")) {
             response.id = BreakpointResponseId(child.data());
         } else if (child.hasName("func")) {
@@ -2397,7 +2319,7 @@ void GdbEngine::handleBkpt(const GdbMi &bkpt, Breakpoint bp)
     // http://permalink.gmane.org/gmane.comp.gdb.patches/83936
     const GdbMi locations = bkpt["locations"];
     if (locations.isValid()) {
-        foreach (const GdbMi &loc, locations.children()) {
+        for (const GdbMi &loc : locations.children()) {
             // A sub-breakpoint.
             const QString subnr = loc["number"].data();
             const BreakpointResponseId subrid(subnr);
@@ -2423,7 +2345,7 @@ void GdbEngine::handleBreakInsert1(const DebuggerResponse &response, Breakpoint 
             const GdbMi mainbkpt = response.data["bkpt"];
             bp.notifyBreakpointRemoveProceeding();
             DebuggerCommand cmd("-break-delete " + mainbkpt["number"].data());
-            cmd.flags = NeedsTemporaryStop | RebuildBreakpointModel;
+            cmd.flags = NeedsTemporaryStop;
             runCommand(cmd);
             bp.notifyBreakpointRemoveOk();
             return;
@@ -2435,7 +2357,7 @@ void GdbEngine::handleBreakInsert1(const DebuggerResponse &response, Breakpoint 
         // the "main" entry. Use the "main" entry to retrieve the
         // already known data from the BreakpointManager, and then
         // iterate over all items to update main- and sub-data.
-        foreach (const GdbMi &bkpt, response.data.children())
+        for (const GdbMi &bkpt : response.data.children())
             handleBkpt(bkpt, bp);
         if (bp.needsChange()) {
             bp.notifyBreakpointChangeAfterInsertNeeded();
@@ -2450,14 +2372,14 @@ void GdbEngine::handleBreakInsert1(const DebuggerResponse &response, Breakpoint 
         const int lineNumber = bp.lineNumber();
         DebuggerCommand cmd("trace \"" + GdbMi::escapeCString(fileName) + "\":"
                             + QString::number(lineNumber),
-                            NeedsTemporaryStop | RebuildBreakpointModel);
+                            NeedsTemporaryStop);
         runCommand(cmd);
     } else {
         // Some versions of gdb like "GNU gdb (GDB) SUSE (6.8.91.20090930-2.4)"
         // know how to do pending breakpoints using CLI but not MI. So try
         // again with MI.
         DebuggerCommand cmd("break " + breakpointLocation2(bp.parameters()),
-                            NeedsTemporaryStop | RebuildBreakpointModel);
+                            NeedsTemporaryStop);
         cmd.callback = [this, bp](const DebuggerResponse &r) { handleBreakInsert2(r, bp); };
         runCommand(cmd);
     }
@@ -2616,7 +2538,7 @@ void GdbEngine::insertBreakpoint(Breakpoint bp)
     } else if (type == BreakpointAtFork) {
         cmd.function = "catch fork";
         cmd.callback = handleCatch;
-        cmd.flags = NeedsTemporaryStop | RebuildBreakpointModel;
+        cmd.flags = NeedsTemporaryStop;
         runCommand(cmd);
         // Another one...
         cmd.function = "catch vfork";
@@ -2653,7 +2575,7 @@ void GdbEngine::insertBreakpoint(Breakpoint bp)
         cmd.function += breakpointLocation(bp.parameters());
         cmd.callback = [this, bp](const DebuggerResponse &r) { handleBreakInsert1(r, bp); };
     }
-    cmd.flags = NeedsTemporaryStop | RebuildBreakpointModel;
+    cmd.flags = NeedsTemporaryStop;
     runCommand(cmd);
 }
 
@@ -2702,7 +2624,7 @@ void GdbEngine::changeBreakpoint(Breakpoint bp)
         bp.notifyBreakpointChangeOk();
         return;
     }
-    cmd.flags = NeedsTemporaryStop | RebuildBreakpointModel;
+    cmd.flags = NeedsTemporaryStop;
     runCommand(cmd);
 }
 
@@ -2730,7 +2652,7 @@ void GdbEngine::removeBreakpoint(Breakpoint bp)
         // We already have a fully inserted breakpoint.
         bp.notifyBreakpointRemoveProceeding();
         showMessage(QString("DELETING BP %1 IN %2").arg(br.id.toString()).arg(bp.fileName()));
-        DebuggerCommand cmd("-break-delete " + br.id.toString(), NeedsTemporaryStop | RebuildBreakpointModel);
+        DebuggerCommand cmd("-break-delete " + br.id.toString(), NeedsTemporaryStop);
         runCommand(cmd);
 
         // Pretend it succeeds without waiting for response. Feels better.
@@ -2781,10 +2703,10 @@ void GdbEngine::loadSymbolsForStack()
 {
     bool needUpdate = false;
     const Modules &modules = modulesHandler()->modules();
-    foreach (const StackFrame &frame, stackHandler()->frames()) {
+    for (const StackFrame &frame : stackHandler()->frames()) {
         if (frame.function == "??") {
             //qDebug() << "LOAD FOR " << frame.address;
-            foreach (const Module &module, modules) {
+            for (const Module &module : modules) {
                 if (module.startAddress <= frame.address
                         && frame.address < module.endAddress) {
                     runCommand({"sharedlibrary " + dotEscape(module.modulePath)});
@@ -2977,7 +2899,7 @@ void GdbEngine::handleModulesList(const DebuggerResponse &response)
             // state="Y",path="/usr/lib/dyld",description="/usr/lib/dyld",
             // loaded_addr="0x8fe00000",slide="0x0",prefix="__dyld_"},
             // shlib-info={...}...
-            foreach (const GdbMi &item, response.data.children()) {
+            for (const GdbMi &item : response.data.children()) {
                 module.modulePath = item["path"].data();
                 module.moduleName = nameFromPath(module.modulePath);
                 module.symbolsRead = (item["state"].data() == "Y")
@@ -2994,7 +2916,7 @@ void GdbEngine::handleModulesList(const DebuggerResponse &response)
 void GdbEngine::examineModules()
 {
     ModulesHandler *handler = modulesHandler();
-    foreach (const Module &module, handler->modules()) {
+    for (const Module &module : handler->modules()) {
         if (module.elfData.symbolsType == UnknownSymbols)
             handler->updateModule(module);
     }
@@ -3020,7 +2942,7 @@ void GdbEngine::reloadSourceFiles()
                 // "^done,files=[{file="../../../../bin/dumper/dumper.cpp",
                 // fullname="/data5/dev/ide/main/bin/dumper/dumper.cpp"},
                 GdbMi files = response.data["files"];
-                foreach (const GdbMi &item, files.children()) {
+                for (const GdbMi &item : files.children()) {
                     GdbMi fileName = item["file"];
                     if (fileName.data().endsWith("<built-in>"))
                         continue;
@@ -3193,7 +3115,7 @@ void GdbEngine::handleThreadNames(const DebuggerResponse &response)
         ThreadsHandler *handler = threadsHandler();
         GdbMi names;
         names.fromString(response.consoleStreamOutput);
-        foreach (const GdbMi &name, names.children()) {
+        for (const GdbMi &name : names.children()) {
             ThreadData thread;
             thread.id = ThreadId(name["id"].toInt());
             thread.name = decodeData(name["value"].data(), name["valueencoded"].data());
@@ -3360,7 +3282,7 @@ void GdbEngine::handleRegisterListNames(const DebuggerResponse &response)
     GdbMi names = response.data["register-names"];
     m_registers.clear();
     int gdbRegisterNumber = 0;
-    foreach (const GdbMi &item, names.children()) {
+    for (const GdbMi &item : names.children()) {
         if (!item.data().isEmpty()) {
             Register reg;
             reg.name = item.data();
@@ -3406,7 +3328,7 @@ void GdbEngine::handleRegisterListValues(const DebuggerResponse &response)
     RegisterHandler *handler = registerHandler();
     // 24^done,register-values=[{number="0",value="0xf423f"},...]
     const GdbMi values = response.data["register-values"];
-    foreach (const GdbMi &item, values.children()) {
+    for (const GdbMi &item : values.children()) {
         const int number = item["number"].toInt();
         Register reg = m_registers[number];
         QString data = item["value"].data();
@@ -3503,7 +3425,7 @@ void GdbEngine::changeMemory(MemoryAgent *agent, quint64 addr, const QByteArray 
 {
     Q_UNUSED(agent)
     DebuggerCommand cmd("-data-write-memory 0x" + QString::number(addr, 16) + " d 1", NeedsTemporaryStop);
-    foreach (unsigned char c, data)
+    for (unsigned char c : data)
         cmd.function += ' ' + QString::number(uint(c));
     cmd.callback = CB(handleVarAssign);
     runCommand(cmd);
@@ -3875,7 +3797,7 @@ void GdbEngine::setupEngine()
     }
 
     // Spaces just will not work.
-    foreach (const QString &src, rp.debugSourceLocation) {
+    for (const QString &src : rp.debugSourceLocation) {
         if (QDir(src).exists())
             runCommand({"directory " + src});
         else
@@ -4112,7 +4034,7 @@ void GdbEngine::handleDebugInfoLocation(const DebuggerResponse &response)
 {
     if (response.resultClass == ResultDone) {
         const QString debugInfoLocation = runParameters().debugInfoLocation;
-        if (QFile::exists(debugInfoLocation)) {
+        if (!debugInfoLocation.isEmpty() && QFile::exists(debugInfoLocation)) {
             const QString curDebugInfoLocations = response.consoleStreamOutput.split('"').value(1);
             QString cmd = "set debug-file-directory " + debugInfoLocation;
             if (!curDebugInfoLocations.isEmpty())
@@ -4182,11 +4104,6 @@ void GdbEngine::scheduleTestResponse(int testCase, const QString &response)
     showMessage(QString("SCHEDULING TEST RESPONSE (CASE: %1, TOKEN: %2, RESPONSE: %3)")
         .arg(testCase).arg(token).arg(response));
     m_scheduledTestResponses[token] = response;
-}
-
-void GdbEngine::requestDebugInformation(const DebugInfoTask &task)
-{
-    QProcess::startDetached(task.command);
 }
 
 QString GdbEngine::msgGdbStopFailed(const QString &why)
@@ -4914,7 +4831,7 @@ static QString findExecutableFromName(const QString &fileNameFromCore, const QSt
     return QString();
 }
 
-CoreInfo CoreInfo::readExecutableNameFromCore(const StandardRunnable &debugger, const QString &coreFile)
+CoreInfo CoreInfo::readExecutableNameFromCore(const Runnable &debugger, const QString &coreFile)
 {
     CoreInfo cinfo;
 #if 0
@@ -4984,8 +4901,6 @@ void GdbEngine::handleCoreRoundTrip(const DebuggerResponse &response)
 
 void GdbEngine::doUpdateLocals(const UpdateParameters &params)
 {
-    m_pendingBreakpointRequests = 0;
-
     watchHandler()->notifyUpdateStarted(params);
 
     DebuggerCommand cmd("fetchVariables", Discardable|InUpdateLocals);

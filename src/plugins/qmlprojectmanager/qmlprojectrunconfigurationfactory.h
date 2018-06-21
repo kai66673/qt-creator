@@ -32,10 +32,8 @@ namespace Internal {
 
 class QmlProjectRunConfigurationFactory : public ProjectExplorer::FixedRunConfigurationFactory
 {
-    Q_OBJECT
-
 public:
-    explicit QmlProjectRunConfigurationFactory(QObject *parent = nullptr);
+    QmlProjectRunConfigurationFactory();
 };
 
 } // namespace Internal

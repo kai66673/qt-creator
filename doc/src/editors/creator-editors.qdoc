@@ -803,16 +803,6 @@
             \l{http://linterrors.com/js/the-array-literal-notation-is-preferrable}
             {The array literal notation [] is preferable}.
 
-    \row
-        \li M324
-        \li Warning
-        \li Using Qt Quick 1 code model instead of Qt Quick 2
-        \li The code model might be corrupt or the QML emulation layer might
-            have been built with a different Qt version than the one selected in
-            the build and run kit. For more information, see
-            \l {Resetting the Code Model} and
-            \l {Running QML Modules in Qt Quick Designer}.
-
     \endtable
 
     \section1 Resetting the Code Model
@@ -1278,6 +1268,7 @@
         \li \c :substitute substitutes an expression in a range
         \li \c :'<,'>!cmd filters through an external command (for example,
             sorts the lines in a file with \c :%!sort)
+        \li \c :<range>sor[t][!]
         \li \c :.!cmd inserts the standard output of an external command
         \li \c :read
         \li \c :yank, \c :delete, \c :change
@@ -1858,6 +1849,12 @@
     The search results are stored in the search history from which you can
     select earlier searches.
 
+    To clear the search results, select the \inlineimage clean_pane_small.png
+    (\uicontrol Clear) button.
+
+    To start a new search, select the \inlineimage qtcreator-new-search-icon.png
+    (\uicontrol {New Search}) button.
+
     \note You can use \uicontrol {Advanced Find} also to search for symbols. For
     more information, see \l{Finding Symbols}.
 
@@ -2009,6 +2006,9 @@
             \inlineimage clean_pane_small.png
             (\uicontrol Clear) button.
 
+        \li To start a new search, click the
+            \inlineimage qtcreator-new-search-icon.png
+            (\uicontrol {New Search}) button.
     \endlist
 
     \section1 Renaming Symbols
@@ -3112,11 +3112,11 @@
             \li  log(x)
             \li  Returns the natural logarithm (base E) of x
         \row
-            \li  max(x, y)
-            \li  Returns the higher value of x and y
+            \li  max([value1[, value2[, ...]]])
+            \li  Returns the highest value of the given numbers
         \row
-            \li  min(x, y)
-            \li  Returns the lower value of x and y
+            \li  min([value1[, value2[, ...]]])
+            \li  Returns the lowest value of the given numbers
         \row
             \li  oct(x)
             \li  Returns the octal representation of x

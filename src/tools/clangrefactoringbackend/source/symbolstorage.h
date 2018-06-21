@@ -40,9 +40,9 @@ namespace ClangBackEnd {
 template <typename StatementFactory>
 class SymbolStorage final : public SymbolStorageInterface
 {
-    using ReadStatement = typename StatementFactory::ReadStatementType;
-    using WriteStatement = typename StatementFactory::WriteStatementType;
-    using Database = typename StatementFactory::DatabaseType;
+    using ReadStatement = typename StatementFactory::ReadStatement;
+    using WriteStatement = typename StatementFactory::WriteStatement;
+    using Database = typename StatementFactory::Database;
 
 public:
     SymbolStorage(StatementFactory &statementFactory,
@@ -87,8 +87,8 @@ public:
             WriteStatement &updateStatement = m_statementFactory.updateProjectPartStatement;
             updateStatement.write(compilerArguementsAsJson,
                                   compilerMacrosAsJson,
-                                  projectPartName,
-                                  includeSearchPathsAsJason);
+                                  includeSearchPathsAsJason,
+                                  projectPartName);
         }
     }
 
@@ -201,7 +201,8 @@ public:
         for (const auto &symbolEntry : symbolEntries) {
             statement.write(symbolEntry.first,
                             symbolEntry.second.usr,
-                            symbolEntry.second.symbolName);
+                            symbolEntry.second.symbolName,
+                            static_cast<uint>(symbolEntry.second.symbolKind));
         }
     }
 
@@ -209,11 +210,12 @@ public:
     {
         WriteStatement &statement = m_statementFactory.insertLocationsToNewLocationsStatement;
 
-        for (const auto &locationsEntry : sourceLocations) {
-            statement.write(locationsEntry.symbolId,
-                            locationsEntry.lineColumn.line,
-                            locationsEntry.lineColumn.column,
-                            locationsEntry.filePathId.filePathId);
+        for (const auto &locationEntry : sourceLocations) {
+            statement.write(locationEntry.symbolId,
+                            locationEntry.lineColumn.line,
+                            locationEntry.lineColumn.column,
+                            locationEntry.filePathId.filePathId,
+                            int(locationEntry.kind));
         }
     }
 
@@ -250,6 +252,11 @@ public:
     void deleteNewLocationsTable()
     {
         m_statementFactory.deleteNewLocationsTableStatement.execute();
+    }
+
+    Utils::optional<ProjectPartPch> fetchPrecompiledHeader(int projectPartId) const
+    {
+        return m_statementFactory.getPrecompiledHeader.template value<ProjectPartPch, 2>(projectPartId);
     }
 
     SourceLocationEntries sourceLocations() const

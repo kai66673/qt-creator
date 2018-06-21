@@ -27,6 +27,7 @@
 
 #include "filestatus.h"
 #include "projectpartentry.h"
+#include "projectpartpch.h"
 #include "projectpartartefact.h"
 #include "sourcelocationentry.h"
 #include "sourcedependency.h"
@@ -43,7 +44,6 @@ class SymbolStorageInterface
 {
 public:
     SymbolStorageInterface() = default;
-    virtual ~SymbolStorageInterface();
     SymbolStorageInterface(const SymbolStorageInterface &) = delete;
     SymbolStorageInterface &operator=(const SymbolStorageInterface &) = delete;
 
@@ -63,6 +63,10 @@ public:
     virtual Utils::optional<ProjectPartArtefact> fetchProjectPartArtefact(FilePathId sourceId) const = 0;
     virtual Utils::optional<ProjectPartArtefact> fetchProjectPartArtefact(Utils::SmallStringView projectPartName) const = 0;
     virtual long long fetchLowestLastModifiedTime(FilePathId sourceId) const = 0;
+    virtual Utils::optional<ProjectPartPch> fetchPrecompiledHeader(int projectPartId) const = 0;
+
+protected:
+    ~SymbolStorageInterface() = default;
 };
 
 } // namespace ClangBackEnd

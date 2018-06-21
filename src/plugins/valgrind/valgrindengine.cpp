@@ -38,6 +38,7 @@
 
 #include <projectexplorer/projectexplorericons.h>
 #include <projectexplorer/runconfiguration.h>
+#include <projectexplorer/runconfigurationaspects.h>
 
 #include <QApplication>
 
@@ -83,8 +84,10 @@ void ValgrindToolRunner::start()
     m_runner.setValgrindExecutable(m_settings->valgrindExecutable());
     m_runner.setValgrindArguments(genericToolArguments() + toolArguments());
     m_runner.setDevice(device());
-    QTC_ASSERT(runnable().is<StandardRunnable>(), reportFailure());
-    m_runner.setDebuggee(runnable().as<StandardRunnable>());
+    m_runner.setDebuggee(runnable());
+
+    if (auto aspect = runControl()->runConfiguration()->extraAspect<TerminalAspect>())
+        m_runner.setUseTerminal(aspect->useTerminal());
 
     connect(&m_runner, &ValgrindRunner::processOutputReceived,
             this, &ValgrindToolRunner::receiveProcessOutput);
@@ -114,8 +117,7 @@ void ValgrindToolRunner::stop()
 
 QString ValgrindToolRunner::executable() const
 {
-    QTC_ASSERT(runnable().is<StandardRunnable>(), return QString());
-    return runnable().as<StandardRunnable>().executable;
+    return runnable().executable;
 }
 
 QStringList ValgrindToolRunner::genericToolArguments() const

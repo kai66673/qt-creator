@@ -50,6 +50,7 @@ public:
         createUsedMacrosTable();
         createFileStatusesTable();
         createSourceDependenciesTable();
+        createPrecompiledHeadersTable();
 
         transaction.commit();
     }
@@ -61,8 +62,11 @@ public:
         table.setName("symbols");
         table.addColumn("symbolId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
         const Sqlite::Column &usrColumn = table.addColumn("usr", Sqlite::ColumnType::Text);
-        table.addColumn("symbolName", Sqlite::ColumnType::Text);
+        const Sqlite::Column &symbolNameColumn = table.addColumn("symbolName", Sqlite::ColumnType::Text);
+        const Sqlite::Column &symbolKindColumn = table.addColumn("symbolKind", Sqlite::ColumnType::Integer);
+        table.addColumn("signature", Sqlite::ColumnType::Text);
         table.addIndex({usrColumn});
+        table.addIndex({symbolKindColumn, symbolNameColumn});
 
         table.initialize(database);
     }
@@ -76,7 +80,9 @@ public:
         const Sqlite::Column &lineColumn = table.addColumn("line", Sqlite::ColumnType::Integer);
         const Sqlite::Column &columnColumn = table.addColumn("column", Sqlite::ColumnType::Integer);
         const Sqlite::Column &sourceIdColumn = table.addColumn("sourceId", Sqlite::ColumnType::Integer);
-        table.addIndex({sourceIdColumn, lineColumn, columnColumn});
+        const Sqlite::Column &locationKindColumn = table.addColumn("locationKind", Sqlite::ColumnType::Integer);
+        table.addUniqueIndex({sourceIdColumn, lineColumn, columnColumn});
+        table.addIndex({sourceIdColumn, locationKindColumn});
 
         table.initialize(database);
     }
@@ -90,7 +96,7 @@ public:
         const Sqlite::Column &directoryIdColumn = table.addColumn("directoryId", Sqlite::ColumnType::Integer);
         const Sqlite::Column &sourceNameColumn = table.addColumn("sourceName", Sqlite::ColumnType::Text);
         table.addColumn("sourceType", Sqlite::ColumnType::Integer);
-        table.addIndex({directoryIdColumn, sourceNameColumn});
+        table.addUniqueIndex({directoryIdColumn, sourceNameColumn});
 
         table.initialize(database);
     }
@@ -102,7 +108,7 @@ public:
         table.setName("directories");
         table.addColumn("directoryId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
         const Sqlite::Column &directoryPathColumn = table.addColumn("directoryPath", Sqlite::ColumnType::Text);
-        table.addIndex({directoryPathColumn});
+        table.addUniqueIndex({directoryPathColumn});
 
         table.initialize(database);
     }
@@ -117,7 +123,7 @@ public:
         table.addColumn("compilerArguments", Sqlite::ColumnType::Text);
         table.addColumn("compilerMacros", Sqlite::ColumnType::Text);
         table.addColumn("includeSearchPaths", Sqlite::ColumnType::Text);
-        table.addIndex({projectPartNameColumn});
+        table.addUniqueIndex({projectPartNameColumn});
 
         table.initialize(database);
     }
@@ -172,6 +178,19 @@ public:
 
         table.initialize(database);
     }
+
+    void createPrecompiledHeadersTable()
+    {
+        Sqlite::Table table;
+        table.setUseIfNotExists(true);
+        table.setName("precompiledHeaders");
+        table.addColumn("projectPartId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
+        table.addColumn("pchPath", Sqlite::ColumnType::Text);
+        table.addColumn("pchBuildTime", Sqlite::ColumnType::Integer);
+
+        table.initialize(database);
+    }
+
 public:
     DatabaseType &database;
 };

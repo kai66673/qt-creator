@@ -59,18 +59,14 @@ ClangCurrentDocumentFilter::ClangCurrentDocumentFilter()
 
     Core::EditorManager *editorManager = Core::EditorManager::instance();
     connect(editorManager, &Core::EditorManager::currentEditorChanged,
-            this, &ClangCurrentDocumentFilter::onCurrentEditorChanged,
-            Qt::QueuedConnection);
+            this, &ClangCurrentDocumentFilter::onCurrentEditorChanged);
     connect(editorManager, &Core::EditorManager::editorAboutToClose,
-            this, &ClangCurrentDocumentFilter::onEditorAboutToClose,
-            Qt::QueuedConnection);
+            this, &ClangCurrentDocumentFilter::onEditorAboutToClose);
 }
 
-static QString addResultTypeToFunctionSignature(const QString &signature,
-                                                const ClangBackEnd::ExtraInfo &extraInfo)
+static QString addType(const QString &signature, const ClangBackEnd::ExtraInfo &extraInfo)
 {
-    return signature + extraInfo.typeSpelling.toString() + QLatin1String(" -> ", 4)
-            + extraInfo.resultTypeSpelling.toString();
+    return signature + QLatin1String(" -> ", 4) + extraInfo.typeSpelling.toString();
 }
 
 static QString addTypeToVariableName(const QString &name, const ClangBackEnd::ExtraInfo &extraInfo)
@@ -81,16 +77,15 @@ static QString addTypeToVariableName(const QString &name, const ClangBackEnd::Ex
 static Core::LocatorFilterEntry makeEntry(Core::ILocatorFilter *filter,
                                           const ClangBackEnd::TokenInfoContainer &info)
 {
-    const ClangBackEnd::ExtraInfo &extraInfo = info.extraInfo();
+    const ClangBackEnd::ExtraInfo &extraInfo = info.extraInfo;
     QString displayName = extraInfo.token;
-    ::Utils::LineColumn lineColumn(static_cast<int>(info.line()),
-                                   static_cast<int>(info.column()));
+    ::Utils::LineColumn lineColumn(static_cast<int>(info.line), static_cast<int>(info.column));
     Core::LocatorFilterEntry entry(filter, displayName, qVariantFromValue(lineColumn));
     QString extra;
-    ClangBackEnd::HighlightingType mainType = info.types().mainHighlightingType;
+    ClangBackEnd::HighlightingType mainType = info.types.mainHighlightingType;
     if (mainType == ClangBackEnd::HighlightingType::VirtualFunction
             || mainType == ClangBackEnd::HighlightingType::Function) {
-        displayName = addResultTypeToFunctionSignature(displayName, extraInfo);
+        displayName = addType(displayName, extraInfo);
         extra = extraInfo.semanticParentTypeSpelling.toString();
     } else if (mainType == ClangBackEnd::HighlightingType::GlobalVariable
                || mainType == ClangBackEnd::HighlightingType::Field
@@ -129,11 +124,9 @@ QList<Core::LocatorFilterEntry> ClangCurrentDocumentFilter::matchesFor(
     const QVector<TokInfoContainer> &infos = processor->tokenInfos();
 
     for (const TokInfoContainer &info : infos) {
-        if (!info.extraInfo().declaration)
+        if (!info.isGlobalDeclaration())
             continue;
-        if (info.types().mainHighlightingType == ClangBackEnd::HighlightingType::LocalVariable)
-            continue;
-        QRegularExpressionMatch match = regexp.match(info.extraInfo().token);
+        QRegularExpressionMatch match = regexp.match(info.extraInfo.token);
         if (match.hasMatch())
             goodEntries.push_back(makeEntry(this, info));
     }
@@ -176,11 +169,12 @@ void ClangCurrentDocumentFilter::onCurrentEditorChanged(Core::IEditor *newCurren
         m_currentEditor = newCurrent;
         Core::IDocument *document = m_currentEditor->document();
         QTC_ASSERT(document, return;);
-        auto *textDocument = qobject_cast<TextEditor::TextDocument *>(document);
-        m_currentPath = textDocument->filePath().toString();
-    } else {
-        reset();
+        if (auto *textDocument = qobject_cast<TextEditor::TextDocument *>(document)) {
+            m_currentPath = textDocument->filePath().toString();
+            return;
+        }
     }
+    reset();
 }
 
 } // namespace ClangCodeModel

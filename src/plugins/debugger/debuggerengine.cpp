@@ -125,7 +125,7 @@ Location::Location(const StackFrame &frame, bool marker)
 }
 
 
-LocationMark::LocationMark(DebuggerEngine *engine, const QString &file, int line)
+LocationMark::LocationMark(DebuggerEngine *engine, const FileName &file, int line)
     : TextMark(file, line, Constants::TEXT_MARK_CATEGORY_LOCATION), m_engine(engine)
 {
     setIcon(Icons::LOCATION.icon());
@@ -544,7 +544,7 @@ void DebuggerEngine::gotoLocation(const Location &loc)
         editor->document()->setProperty(Constants::OPENED_BY_DEBUGGER, true);
 
     if (loc.needsMarker())
-        d->m_locationMark.reset(new LocationMark(this, file, line));
+        d->m_locationMark.reset(new LocationMark(this, FileName::fromString(file), line));
 }
 
 const DebuggerRunParameters &DebuggerEngine::runParameters() const
@@ -650,12 +650,9 @@ void DebuggerEngine::notifyEngineSetupOk()
     d->m_progress.setProgressValue(250);
     QTC_ASSERT(state() == EngineSetupRequested, qDebug() << this << state());
     setState(EngineSetupOk);
-    if (isMasterEngine() && runTool()) {
-        runTool()->aboutToNotifyInferiorSetupOk(); // FIXME: Remove, only used for Android.
-        runTool()->reportStarted();
-    }
-
     if (isMasterEngine()) {
+        if (runTool())
+            runTool()->reportStarted();
         // Slaves will get called setupSlaveInferior() below.
         setState(EngineRunRequested);
         showMessage("CALL: RUN ENGINE");
@@ -979,7 +976,7 @@ void DebuggerEngine::setState(DebuggerState state, bool forced)
 
     if (state == DebuggerFinished) {
         // Give up ownership on claimed breakpoints.
-        foreach (Breakpoint bp, breakHandler()->engineBreakpoints(this))
+        for (Breakpoint bp : breakHandler()->engineBreakpoints(this))
             bp.notifyBreakpointReleased();
         DebuggerToolTipManager::deregisterEngine(this);
         d->m_memoryAgents.handleDebuggerFinished();
@@ -1160,21 +1157,6 @@ void DebuggerEngine::quitDebugger()
     }
 }
 
-void DebuggerEngine::abortDebugger()
-{
-    if (!isDying()) {
-        // Be friendly the first time. This will change targetState().
-        showMessage("ABORTING DEBUGGER. FIRST TIME.");
-        quitDebugger();
-    } else {
-        // We already tried. Try harder.
-        showMessage("ABORTING DEBUGGER. SECOND TIME.");
-        abortDebuggerProcess();
-        if (d->m_runTool && d->m_runTool->runControl())
-            d->m_runTool->runControl()->initiateFinish();
-    }
-}
-
 void DebuggerEngine::requestInterruptInferior()
 {
     QTC_CHECK(isMasterEngine());
@@ -1336,7 +1318,7 @@ void DebuggerEngine::attemptBreakpointSynchronization()
 
     BreakHandler *handler = breakHandler();
 
-    foreach (Breakpoint bp, handler->unclaimedBreakpoints()) {
+    for (Breakpoint bp : handler->unclaimedBreakpoints()) {
         // Take ownership of the breakpoint. Requests insertion.
         if (acceptsBreakpoint(bp)) {
             showMessage(QString("TAKING OWNERSHIP OF BREAKPOINT %1 IN STATE %2")
@@ -1349,7 +1331,7 @@ void DebuggerEngine::attemptBreakpointSynchronization()
     }
 
     bool done = true;
-    foreach (Breakpoint bp, handler->engineBreakpoints(this)) {
+    for (Breakpoint bp : handler->engineBreakpoints(this)) {
         switch (bp.state()) {
         case BreakpointNew:
             // Should not happen once claimed.
@@ -1609,8 +1591,8 @@ void DebuggerRunParameters::validateExecutable()
         }
 
         Utils::ElfReader reader(symbolFile);
-        Utils::ElfData elfData = reader.readHeaders();
-        QString error = reader.errorString();
+        const ElfData elfData = reader.readHeaders();
+        const QString error = reader.errorString();
 
         Internal::showMessage("EXAMINING " + symbolFile, LogDebug);
         QByteArray msg = "ELF SECTIONS: ";
@@ -1629,7 +1611,7 @@ void DebuggerRunParameters::validateExecutable()
         };
 
         QSet<QByteArray> seen;
-        foreach (const Utils::ElfSectionHeader &header, elfData.sectionHeaders) {
+        for (const ElfSectionHeader &header : elfData.sectionHeaders) {
             msg.append(header.name);
             msg.append(' ');
             if (interesting.contains(header.name))

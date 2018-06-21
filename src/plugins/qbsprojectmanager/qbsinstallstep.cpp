@@ -146,8 +146,7 @@ bool QbsInstallStep::keepGoing() const
 
 const QbsBuildConfiguration *QbsInstallStep::buildConfig() const
 {
-    return static_cast<QbsBuildConfiguration *>(
-                deployConfiguration()->target()->activeBuildConfiguration());
+    return static_cast<QbsBuildConfiguration *>(buildConfiguration());
 }
 
 bool QbsInstallStep::fromMap(const QVariantMap &map)
@@ -339,7 +338,7 @@ QbsInstallStepFactory::QbsInstallStepFactory()
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_DEPLOY);
     setSupportedDeviceType(ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE);
     setSupportedProjectType(Constants::PROJECT_ID);
-    setDisplayName(tr("Qbs Install"));
+    setDisplayName(QbsInstallStep::tr("Qbs Install"));
 }
 
 } // namespace Internal
