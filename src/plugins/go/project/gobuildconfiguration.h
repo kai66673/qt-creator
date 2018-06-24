@@ -37,24 +37,19 @@ class GoBuildConfiguration : public ProjectExplorer::BuildConfiguration
 {
     Q_OBJECT
 
-public:
+    friend class ProjectExplorer::IBuildConfigurationFactory;
     GoBuildConfiguration(ProjectExplorer::Target *target, Core::Id id);
 
+    void initialize(const ProjectExplorer::BuildInfo *info) override;
     ProjectExplorer::NamedWidget *createConfigWidget() override;
-
     ProjectExplorer::BuildConfiguration::BuildType buildType() const override;
 
     bool fromMap(const QVariantMap &map) override;
     QVariantMap toMap() const override;
 
+public:
     Utils::FileName outFilePath() const;
     Utils::FileName cacheDirectory() const;
-
-    static bool canRestore(const QVariantMap &map);
-
-    bool hasGoCompilerGetStep() const;
-    bool hasGoCompilerBuildStep() const;
-    bool hasGoCompilerCleanStep() const;
 
 signals:
     void outFilePathChanged(const Utils::FileName &outFilePath);

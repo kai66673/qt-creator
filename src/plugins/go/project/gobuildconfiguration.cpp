@@ -27,6 +27,7 @@
 #include "gobuildconfigurationwidget.h"
 #include "gocompilerbuildstep.h"
 #include "golangconstants.h"
+#include "goproject.h"
 
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/buildsteplist.h>
@@ -41,6 +42,27 @@ GoBuildConfiguration::GoBuildConfiguration(ProjectExplorer::Target *target, Core
     : BuildConfiguration(target, id)
 { }
 
+void GoBuildConfiguration::initialize(const BuildInfo *info)
+{
+    BuildConfiguration::initialize(info);
+
+    GoProject *project = qobject_cast<GoProject *>(target()->project());
+    QTC_ASSERT(project, return);
+
+    // Add nim compiler build step
+    {
+        BuildStepList *buildSteps = stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
+        buildSteps->appendStep(new GoCompilerGetStep(buildSteps));
+        buildSteps->appendStep(new GoCompilerBuildStep(buildSteps));
+    }
+
+    // Add clean step
+    {
+        BuildStepList *cleanSteps = stepList(ProjectExplorer::Constants::BUILDSTEPS_CLEAN);
+        cleanSteps->appendStep(new GoCompilerCleanStep(cleanSteps));
+    }
+}
+
 NamedWidget *GoBuildConfiguration::createConfigWidget()
 {
     return new GoBuildConfigurationWidget(this);
@@ -54,9 +76,6 @@ BuildConfiguration::BuildType GoBuildConfiguration::buildType() const
 bool GoBuildConfiguration::fromMap(const QVariantMap &map)
 {
     if (!BuildConfiguration::fromMap(map))
-        return false;
-
-    if (!canRestore(map))
         return false;
 
     const QString displayName = map[Constants::C_GOBUILDCONFIGURATION_DISPLAY_KEY].toString();
@@ -86,32 +105,6 @@ FileName GoBuildConfiguration::outFilePath() const
 FileName GoBuildConfiguration::cacheDirectory() const
 {
     return buildDirectory().appendPath(QStringLiteral("gocache"));
-}
-
-bool GoBuildConfiguration::canRestore(const QVariantMap &map)
-{
-    return idFromMap(map) == Constants::C_GOBUILDCONFIGURATION_ID;
-}
-
-bool GoBuildConfiguration::hasGoCompilerGetStep() const
-{
-    BuildStepList *steps = stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
-    QTC_ASSERT(steps, return false);
-    return steps->contains(Constants::C_GOCOMPILERGETSTEP_ID);
-}
-
-bool GoBuildConfiguration::hasGoCompilerBuildStep() const
-{
-    BuildStepList *steps = stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
-    QTC_ASSERT(steps, return false);
-    return steps->contains(Constants::C_GOCOMPILERBUILDSTEP_ID);
-}
-
-bool GoBuildConfiguration::hasGoCompilerCleanStep() const
-{
-    BuildStepList *steps = stepList(ProjectExplorer::Constants::BUILDSTEPS_CLEAN);
-    QTC_ASSERT(steps, return false);
-    return steps ? steps->contains(Constants::C_GOCOMPILERCLEANSTEP_ID) : false;
 }
 
 const GoCompilerBuildStep *GoBuildConfiguration::goCompilerBuildStep() const

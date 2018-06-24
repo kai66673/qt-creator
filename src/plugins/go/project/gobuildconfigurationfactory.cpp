@@ -76,12 +76,14 @@ QList<BuildInfo *> GoBuildConfigurationFactory::availableSetups(const Kit *k, co
 BuildInfo *GoBuildConfigurationFactory::createBuildInfo(const Kit *k, const QString &projectPath) const
 {
     QFileInfo projFileInfo(projectPath);
+
     ProjectExplorer::BuildInfo *goBuild = new ProjectExplorer::BuildInfo(this);
-    goBuild->displayName = tr("Default");
+    goBuild->buildType = ProjectExplorer::BuildConfiguration::Debug;
+    goBuild->displayName = ProjectExplorer::BuildConfiguration::buildTypeName(ProjectExplorer::BuildConfiguration::Debug);
     goBuild->buildDirectory = Utils::FileName::fromString(projFileInfo.absolutePath());
     goBuild->kitId = k->id();
-    goBuild->typeName = QStringLiteral("Default");
-    return { goBuild };
+    goBuild->typeName = tr("Default");
+    return  goBuild;
 }
 
 }   // namespace GoLang
