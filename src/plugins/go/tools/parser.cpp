@@ -48,9 +48,9 @@ Parser::Parser(GoSource *source, unsigned mode)
     inRhs = false;
     syncTokenIndex = 0;
     syncCnt = 0;
-    topScope = 0;
-    structScope = 0;
-    fileScope = 0;
+    topScope = nullptr;
+    structScope = nullptr;
+    fileScope = nullptr;
 }
 
 FileAST *Parser::parseFile()
@@ -60,17 +60,17 @@ FileAST *Parser::parseFile()
     CommentGroupAST *doc = leadComment;
     unsigned t_package = expectStrict(PACKAGE);
     if (!t_package)
-        return 0;
+        return nullptr;
     unsigned t_package_name = expectStrict(IDENT);
     if (!t_package_name)
-        return 0;
+        return nullptr;
     IdentAST *packageName = new (_pool) IdentAST(t_package_name, _tokens->at(t_package_name).identifier);
     expectSemi();
 
-    DeclListAST *decls = 0;
+    DeclListAST *decls = nullptr;
     DeclListAST **decls_ptr = &decls;
 
-    DeclListAST *import_decls = 0;
+    DeclListAST *import_decls = nullptr;
     DeclListAST **import_decls_ptr = &import_decls;
 
     fileScope = _control->newFileScope(_source);
@@ -107,19 +107,19 @@ FileAST *Parser::parsePackageFile(const QString &wantedPackageName)
     CommentGroupAST *doc = leadComment;
     unsigned t_package = expectStrict(PACKAGE);
     if (!t_package)
-        return 0;
+        return nullptr;
     unsigned t_package_name = expectStrict(IDENT);
     if (!t_package_name)
-        return 0;
+        return nullptr;
     IdentAST *packageName = new (_pool) IdentAST(t_package_name, _tokens->at(t_package_name).identifier);
     if (wantedPackageName != packageName->ident->toString())
-        return 0;
+        return nullptr;
     expectSemi();
 
-    DeclListAST *decls = 0;
+    DeclListAST *decls = nullptr;
     DeclListAST **decls_ptr = &decls;
 
-    DeclListAST *import_decls = 0;
+    DeclListAST *import_decls = nullptr;
     DeclListAST **import_decls_ptr = &import_decls;
 
     fileScope = _control->newFileScope(_source);
@@ -155,7 +155,7 @@ DeclAST *Parser::parseDeclSyncDecl()
         case CONST:
         case TYPE:
         case VAR:
-            return parseGenDecl((TokenKind)tok.kindAndPos.kind);
+            return parseGenDecl(static_cast<TokenKind>(tok.kindAndPos.kind));
         case FUNC:
             return parseFuncDecl();
     }
@@ -172,7 +172,7 @@ DeclAST *Parser::parseDeclSyncStmt()
         case CONST:
         case TYPE:
         case VAR:
-            return parseGenDecl((TokenKind)tok.kindAndPos.kind);
+            return parseGenDecl(static_cast<TokenKind>(tok.kindAndPos.kind));
         case FUNC:
             return parseFuncDecl();
     }
@@ -188,7 +188,7 @@ GenDeclAST *Parser::parseGenDecl(TokenKind kind)
     CommentGroupAST *doc = leadComment;
     unsigned t_token = expect(kind);
     unsigned t_lparen = 0;
-    SpecListAST *specs = 0;
+    SpecListAST *specs = nullptr;
     unsigned t_rparen = 0;
     SpecListAST **specs_ptr = &specs;
 
@@ -228,12 +228,12 @@ SpecAST *Parser::parseGenDeclSpec(TokenKind kind, CommentGroupAST *doc, int inde
         default: break; // prevent -Wswitch warning
     }
 
-    return 0;
+    return nullptr;
 }
 
 SpecAST *Parser::parseGenDeclImportSpec(CommentGroupAST *doc)
 {
-    IdentAST *ident = 0;
+    IdentAST *ident = nullptr;
 
     switch (tok.kindAndPos.kind) {
         case PERIOD:
@@ -259,7 +259,7 @@ SpecAST *Parser::parseGenDeclConstSpec(CommentGroupAST *doc, int index)
     DeclIdentListAST *idents = parseDeclIdentList();
     TypeAST *type = tryType();
 
-    ExprListAST *values = 0;
+    ExprListAST *values = nullptr;
     if (tok.kindAndPos.kind == ASSIGN) {
         next();
         values = parseRhsList();
@@ -283,7 +283,7 @@ SpecAST *Parser::parseGenDeclVarSpec(CommentGroupAST *doc)
     DeclIdentListAST *idents = parseDeclIdentList();
     TypeAST *type = tryType();
 
-    ExprListAST *values = 0;
+    ExprListAST *values = nullptr;
     if (tok.kindAndPos.kind == ASSIGN) {
         next();
         values = parseRhsList();
@@ -332,23 +332,23 @@ FuncDeclAST *Parser::parseFuncDecl()
 
     Scope *scope = _control->newScope(topScope);
 
-    FieldGroupAST *recv = 0;
+    FieldGroupAST *recv = nullptr;
     if (tok.kindAndPos.kind == LPAREN)
         recv = parseParameters(scope, false);
 
     DeclIdentAST *ident = parseDeclIdent();
 
-    FieldGroupAST *params = 0;
-    FieldGroupAST *results = 0;
+    FieldGroupAST *params = nullptr;
+    FieldGroupAST *results = nullptr;
     parseSignature(params, results, scope);
 
-    BlockStmtAST *body = 0;
+    BlockStmtAST *body = nullptr;
     if (tok.kindAndPos.kind == LBRACE)
         body = parseBody(scope);
 
     expectSemi();
 
-    FuncTypeAST *type = new (_pool) FuncTypeAST(pos, params, results, results ? results->callType(_pool) : 0);
+    FuncTypeAST *type = new (_pool) FuncTypeAST(pos, params, results, results ? results->callType(_pool) : nullptr);
     FuncDeclAST *decl = new (_pool) FuncDeclAST(doc, recv, ident, type, body);
     scope->setAst(decl);
     decl->scope = scope;
@@ -439,7 +439,7 @@ TypeAST *Parser::parseType()
 
 ExprListAST *Parser::parseTypeList()
 {
-    ExprListAST *list = 0;
+    ExprListAST *list = nullptr;
     ExprListAST **list_ptr = &list;
 
     if (ExprAST *x = parseType()) {
@@ -468,7 +468,7 @@ TypeAST *Parser::parseTypeName()
             return typeIdent;
         }
         unsigned t_dot = next();
-        const Identifier *id2 = 0;
+        const Identifier *id2 = nullptr;
         if (tok.kindAndPos.kind != IDENT) {
             _translationUnit->error(tokenIndex, "expected identifier");
             id2 = _control->underscoreIdentifier();
@@ -491,7 +491,7 @@ TypeAST *Parser::parseArrayType()
     unsigned t_lbracket = expect(LBRACK);
 
     exprLev++;
-    ExprAST *len = 0;
+    ExprAST *len = nullptr;
     if (tok.kindAndPos.kind == ELLIPSIS) {
         len = new (_pool) EllipsisAST(next());
     } else if (tok.kindAndPos.kind != RBRACK) {
@@ -511,7 +511,7 @@ TypeAST *Parser::parseStructType()
     unsigned pos = expect(STRUCT);
     unsigned lbrace = expect(LBRACE);
 
-    FieldListAST *list = 0;
+    FieldListAST *list = nullptr;
     FieldListAST **list_ptr = &list;
 
     openStructScope();
@@ -548,11 +548,11 @@ QPair<FuncTypeAST *, Scope *> Parser::parseFuncType()
 
     Scope *scope = _control->newScope(topScope);
 
-    FieldGroupAST *params = 0;
-    FieldGroupAST *results = 0;
+    FieldGroupAST *params = nullptr;
+    FieldGroupAST *results = nullptr;
     parseSignature(params, results, scope);
 
-    return qMakePair(new (_pool) FuncTypeAST(pos, params, results, results ? results->callType(_pool) : 0), scope);
+    return qMakePair(new (_pool) FuncTypeAST(pos, params, results, results ? results->callType(_pool) : nullptr), scope);
 }
 
 InterfaceTypeAST *Parser::parseInterfaceType()
@@ -563,7 +563,7 @@ InterfaceTypeAST *Parser::parseInterfaceType()
 
     Scope *scope = _control->newScope(fileScope);
 
-    FieldListAST *list = 0;
+    FieldListAST *list = nullptr;
     FieldListAST **list_ptr = &list;
 
     while (tok.kindAndPos.kind == IDENT) {
@@ -618,19 +618,18 @@ FieldAST *Parser::parseMethodSpec(Scope *scope)
 {
     CommentGroupAST *doc = leadComment;
 
-    DeclIdentListAST *idents = 0;
-
-    TypeAST *typ = 0;
+    DeclIdentListAST *idents = nullptr;
+    TypeAST *typ = nullptr;
 
     TypeAST *x = parseTypeName();
     IdentAST *ident = x->asIdent();
     if (tok.kindAndPos.kind == LPAREN && ident) {
         idents = new (_pool) DeclIdentListAST(new (_pool) DeclIdentAST(ident->t_identifier, ident->ident));
         scope = _control->newScope(fileScope);
-        FieldGroupAST *params = 0;
-        FieldGroupAST *results = 0;
+        FieldGroupAST *params = nullptr;
+        FieldGroupAST *results = nullptr;
         parseSignature(params, results, scope);
-        FuncTypeAST *funcTyp = new (_pool) FuncTypeAST(0, params, results, results ? results->callType(_pool) : 0);
+        FuncTypeAST *funcTyp = new (_pool) FuncTypeAST(0, params, results, results ? results->callType(_pool) : nullptr);
         declareFunc(funcTyp, scope, idents);
         typ = funcTyp;
     } else {
@@ -639,7 +638,7 @@ FieldAST *Parser::parseMethodSpec(Scope *scope)
 
     expectSemi();
 
-    FieldAST *spec = new (_pool) FieldAST(doc, idents, typ, 0, lineComment);
+    FieldAST *spec = new (_pool) FieldAST(doc, idents, typ, nullptr, lineComment);
     return spec;
 }
 
@@ -653,7 +652,7 @@ FieldGroupAST *Parser::parseParameters(Scope *scope, bool ellipsisOk)
 {
     unsigned lparen = expect(LPAREN);
 
-    FieldListAST *params = 0;
+    FieldListAST *params = nullptr;
     if (tok.kindAndPos.kind != RPAREN)
         params = parseParameterList(scope, ellipsisOk);
 
@@ -668,22 +667,22 @@ FieldGroupAST *Parser::parseResult(Scope *scope)
         return parseParameters(scope, false);
 
     if (TypeAST *typ = tryType()) {
-        FieldListAST *params = 0;
+        FieldListAST *params = nullptr;
         FieldListAST **params_ptr = &params;
-        FieldAST *field = new (_pool) FieldAST(0, 0, typ);
+        FieldAST *field = new (_pool) FieldAST(nullptr, nullptr, typ);
         *params_ptr = new (_pool) FieldListAST(field);
         return new (_pool) FieldGroupAST(0, params);
     }
 
-    return 0;
+    return nullptr;
 }
 
 FieldListAST *Parser::parseParameterList(Scope *scope, bool ellipsisOk)
 {
-    TypeListAST *list = 0;
+    TypeListAST *list = nullptr;
     TypeListAST **list_ptr = &list;
 
-    FieldListAST *params = 0;
+    FieldListAST *params = nullptr;
     FieldListAST **params_ptr = &params;
 
     while (true) {
@@ -700,7 +699,7 @@ FieldListAST *Parser::parseParameterList(Scope *scope, bool ellipsisOk)
 
     if (TypeAST *typ = tryVarType(ellipsisOk)) {
         DeclIdentListAST *idents = makeDeclIdentList(list);
-        FieldAST *field = new (_pool) FieldAST(0, idents, typ);
+        FieldAST *field = new (_pool) FieldAST(nullptr, idents, typ);
         *params_ptr = new (_pool) FieldListAST(field);
         params_ptr = &(*params_ptr)->next;
         declareVar(typ, scope, idents);
@@ -710,7 +709,7 @@ FieldListAST *Parser::parseParameterList(Scope *scope, bool ellipsisOk)
         while (tok.kindAndPos.kind != RPAREN && tok.kindAndPos.kind != T_EOF) {
             idents = parseDeclIdentList();
             typ = parseVarType(ellipsisOk);
-            field = new (_pool) FieldAST(0, idents, typ);
+            field = new (_pool) FieldAST(nullptr, idents, typ);
             *params_ptr = new (_pool) FieldListAST(field);
             params_ptr = &(*params_ptr)->next;
             declareVar(typ, scope, idents);
@@ -723,7 +722,7 @@ FieldListAST *Parser::parseParameterList(Scope *scope, bool ellipsisOk)
 
     for (TypeListAST *it = list; it; it = it->next) {
         if (TypeAST *typ = it->value) {
-            FieldAST *field = new (_pool) FieldAST(0, 0, typ);
+            FieldAST *field = new (_pool) FieldAST(nullptr, nullptr, typ);
             *params_ptr = new (_pool) FieldListAST(field);
             params_ptr = &(*params_ptr)->next;
         }
@@ -757,7 +756,7 @@ ExprAST *Parser::tryParseMakeExpr(bool &isNewOrMakeExpr)
     isNewOrMakeExpr = true;
     unsigned t_lparen = next();
 
-    ExprListAST *args = 0;
+    ExprListAST *args = nullptr;
     ExprListAST **args_ptr = &args;
 
     exprLev++;
@@ -819,7 +818,7 @@ ExprAST *Parser::parseExpr()
 
 ExprListAST *Parser::parseExprList()
 {
-    ExprListAST *node = 0;
+    ExprListAST *node = nullptr;
     ExprListAST **node_ptr = &node;
 
     if (ExprAST *x = checkExpr(parseExpr())) {
@@ -955,8 +954,6 @@ ExprAST *Parser::parsePrimaryExpr()
                 return x;
         }
     }
-
-    return x;
 }
 
 ExprAST *Parser::parseOperand(bool &isNewOrMakeExpr)
@@ -1012,7 +1009,7 @@ ExprAST *Parser::parseTypeAssertion(ExprAST *x)
 {
     unsigned t_lparen =  next();
 
-    TypeAST *typ = 0;
+    TypeAST *typ = nullptr;
     if (tok.kindAndPos.kind == TYPE)
         next();
     else
@@ -1031,7 +1028,7 @@ ExprAST *Parser::parseIndexOrSlice(ExprAST *x)
 
     ExprAST *index[N];
     for (int i = 0; i < N; i++)
-        index[i] = 0;
+        index[i] = nullptr;
     unsigned t_colons[N-1];
 
     exprLev++;
@@ -1077,7 +1074,7 @@ CallExprAST *Parser::parseCallOrConversion(ExprAST *fun)
     unsigned t_lparen = next();
 
     unsigned t_ellipsis = 0;
-    ExprListAST *args = 0;
+    ExprListAST *args = nullptr;
     ExprListAST **args_ptr = &args;
 
     exprLev++;
@@ -1103,7 +1100,7 @@ ExprAST *Parser::parseLiteralValue(ExprAST *type)
 {
     unsigned t_lbrace = next();
 
-    ExprListAST *elements = 0;
+    ExprListAST *elements = nullptr;
     ExprListAST **elements_ptr = &elements;
 
     exprLev++;
@@ -1136,7 +1133,7 @@ ExprAST *Parser::parseElement()
 ExprAST *Parser::parseValue()
 {
     if (tok.kindAndPos.kind == LBRACE)
-        return parseLiteralValue(0);
+        return parseLiteralValue(nullptr);
 
     return  checkExpr(parseExpr());
 }
@@ -1145,7 +1142,7 @@ FieldAST *Parser::parseStructFieldDecl()
 {
     CommentGroupAST *doc = leadComment;
 
-    TypeListAST *list = 0;
+    TypeListAST *list = nullptr;
     TypeListAST **list_ptr = &list;
     while (true) {
         if (TypeAST *ident = parseVarType(false)) {
@@ -1159,7 +1156,7 @@ FieldAST *Parser::parseStructFieldDecl()
 
     TypeAST *typ = tryVarType(false);
 
-    DeclIdentListAST *idents = 0;
+    DeclIdentListAST *idents = nullptr;
     if (typ) {
         idents = makeDeclIdentList(list);
     } else {
@@ -1175,7 +1172,7 @@ FieldAST *Parser::parseStructFieldDecl()
         }
     }
 
-    StringLitAST *tag = 0;
+    StringLitAST *tag = nullptr;
     if (tok.kindAndPos.kind == STRING)
         tag = new (_pool) StringLitAST(next());
 
@@ -1214,7 +1211,7 @@ BlockStmtAST *Parser::parseBody(Scope *scope)
 
 StmtListAST *Parser::parseStmtList()
 {
-    StmtListAST *list = 0;
+    StmtListAST *list = nullptr;
     StmtListAST **list_ptr = &list;
 
     while (true) {
@@ -1231,13 +1228,11 @@ StmtListAST *Parser::parseStmtList()
             list_ptr = &(*list_ptr)->next;
         }
     }
-
-    return list;
 }
 
 StmtAST *Parser::parseStmt()
 {
-    StmtAST *s = 0;
+    StmtAST *s = nullptr;
 
     switch (tok.kindAndPos.kind) {
         case CONST: case TYPE: case VAR:
@@ -1265,7 +1260,7 @@ StmtAST *Parser::parseStmt()
             break;
 
         case BREAK: case CONTINUE: case GOTO: case FALLTHROUGH:
-            s = parseBranchStmt((TokenKind) tok.kindAndPos.kind);
+            s = parseBranchStmt(static_cast<TokenKind>(tok.kindAndPos.kind));
             break;
 
         case LBRACE:
@@ -1314,7 +1309,7 @@ QPair<StmtAST *, bool> Parser::parseSimpleStmt(Parser::ParseSimpleStmtMode mode)
     ExprListAST *x = parseLhsList();
 
     if (!x || !x->value)
-        return qMakePair((StmtAST *)0, false);   // WTF
+        return qMakePair(static_cast<StmtAST *>(nullptr), false);   // WTF
 
     switch (tok.kindAndPos.kind) {
         case DEFINE: case ASSIGN: case ADD_ASSIGN:
@@ -1324,7 +1319,7 @@ QPair<StmtAST *, bool> Parser::parseSimpleStmt(Parser::ParseSimpleStmtMode mode)
             unsigned kind = tok.kindAndPos.kind;
             bool isRange = false;
             unsigned pos = next();
-            ExprListAST *y = 0;
+            ExprListAST *y = nullptr;
             ExprListAST **y_ptr = &y;
             if (mode == rangeOk && tok.kindAndPos.kind == RANGE && (kind == DEFINE || kind == ASSIGN)) {
                 pos = next();
@@ -1333,7 +1328,7 @@ QPair<StmtAST *, bool> Parser::parseSimpleStmt(Parser::ParseSimpleStmtMode mode)
             } else {
                 y = parseRhsList();
             }
-            StmtAST *stmt = 0;
+            StmtAST *stmt = nullptr;
             if (kind == DEFINE) {
                 DefineStmtAST *as = new (_pool) DefineStmtAST(x, pos, y);
                 if (!isRange)
@@ -1409,14 +1404,14 @@ CallExprAST *Parser::parseCallExpr(unsigned pos, const char *callType)
         return cx;
     if (!x->asBadExpr())
         _translationUnit->error(pos + 1, "function must be invoked in %s statement", callType);
-    return 0;
+    return nullptr;
 }
 
 ReturnStmtAST *Parser::parseReturnStmt()
 {
     unsigned pos = expect(RETURN);
 
-    ExprListAST *x = 0;
+    ExprListAST *x = nullptr;
     if (tok.kindAndPos.kind != SEMICOLON && tok.kindAndPos.kind != RBRACE)
         x = parseRhsList();
     expectSemi();
@@ -1428,7 +1423,7 @@ BranchStmtAST *Parser::parseBranchStmt(TokenKind kind)
 {
     unsigned pos = expect(kind);
 
-    IdentAST *label = 0;
+    IdentAST *label = nullptr;
     if (kind != FALLTHROUGH && tok.kindAndPos.kind == IDENT)
         label = parseIdent();
 
@@ -1458,8 +1453,8 @@ IfStmtAST *Parser::parseIfStmt()
 
     openScope();
 
-    StmtAST *s = 0;
-    ExprAST *x = 0;
+    StmtAST *s = nullptr;
+    ExprAST *x = nullptr;
     {
         int prevLev = exprLev;
         exprLev = -1;
@@ -1473,7 +1468,7 @@ IfStmtAST *Parser::parseIfStmt()
                 x = parseRhs();
             } else {
                 x = makeExpr(s, "boolean expression");
-                s = 0;
+                s = nullptr;
             }
         }
         exprLev = prevLev;
@@ -1481,7 +1476,7 @@ IfStmtAST *Parser::parseIfStmt()
 
     BlockStmtAST *body = parseBlockStmt();
 
-    StmtAST *else_ = 0;
+    StmtAST *else_ = nullptr;
     if (tok.kindAndPos.kind == ELSE) {
         next();
         switch (tok.kindAndPos.kind) {
@@ -1514,17 +1509,17 @@ StmtAST *Parser::parseSwitchStmt()
 
     openScope();
 
-    StmtAST *s1 = 0;
-    StmtAST *s2 = 0;
+    StmtAST *s1 = nullptr;
+    StmtAST *s2 = nullptr;
     if (tok.kindAndPos.kind != LBRACE) {
-        unsigned prevLev = exprLev;
+        int prevLev = exprLev;
         exprLev = -1;
         if (tok.kindAndPos.kind != SEMICOLON)
             s2 = parseSimpleStmt(basic).first;
         if (tok.kindAndPos.kind == SEMICOLON) {
             next();
             s1 = s2;
-            s2 = 0;
+            s2 = nullptr;
             if (tok.kindAndPos.kind != LBRACE) {
                 openScope();
                 s2 = parseSimpleStmt(basic).first;
@@ -1534,12 +1529,12 @@ StmtAST *Parser::parseSwitchStmt()
         exprLev = prevLev;
     }
 
-    IdentAST *declForTypeSwitch = 0;
+    IdentAST *declForTypeSwitch = nullptr;
     bool typeSwitch = isTypeSwitchGuard(s2, declForTypeSwitch);
 
     unsigned lbrace = expect(LBRACE);
 
-    StmtListAST *list = 0;
+    StmtListAST *list = nullptr;
     StmtListAST **list_ptr = &list;
     while (tok.kindAndPos.kind == CASE || tok.kindAndPos.kind == DEFAULT) {
         if (CaseClauseAST *cc = parseCaseClause(typeSwitch)) {
@@ -1576,7 +1571,7 @@ CaseClauseAST *Parser::parseCaseClause(bool typeSwitch)
 {
     unsigned pos = tokenIndex;
 
-    ExprListAST *list = 0;
+    ExprListAST *list = nullptr;
     if (tok.kindAndPos.kind == CASE) {
         next();
         if (typeSwitch)
@@ -1605,7 +1600,7 @@ SelectStmtAST *Parser::parseSelectStmt()
     unsigned pos = expect(SELECT);
     unsigned lbrace = expect(LBRACE);
 
-    StmtListAST *list = 0;
+    StmtListAST *list = nullptr;
     StmtListAST **list_ptr = &list;
 
     while (tok.kindAndPos.kind == CASE || tok.kindAndPos.kind == DEFAULT) {
@@ -1629,14 +1624,14 @@ CommClauseAST *Parser::parseCommClause()
 
     openScope();
 
-    StmtAST *comm = 0;
+    StmtAST *comm = nullptr;
     if (tok.kindAndPos.kind == CASE) {
         next();
         ExprListAST *lhs = parseLhsList();
 
         if (!lhs || !lhs->value) {  // WTF
             closeScope();
-            return 0;
+            return nullptr;
         }
 
         if (tok.kindAndPos.kind == ARROW) {
@@ -1650,7 +1645,7 @@ CommClauseAST *Parser::parseCommClause()
             if (kind == ASSIGN || kind == DEFINE) {
                 if (lhs->next && lhs->next->next) {
                     _translationUnit->error(lhs->firstToken(), "expected 1 or 2 expressions");
-                    lhs->next->next = 0;
+                    lhs->next->next = nullptr;
                 }
                 unsigned pp = next();
                 ExprAST *rhs = parseRhs();
@@ -1686,9 +1681,9 @@ StmtAST *Parser::parseForStmt()
 
     openScope();
 
-    StmtAST *s1 = 0;
-    StmtAST *s2 = 0;
-    StmtAST *s3 = 0;
+    StmtAST *s1 = nullptr;
+    StmtAST *s2 = nullptr;
+    StmtAST *s3 = nullptr;
     bool isRange = false;
 
     if (tok.kindAndPos.kind != LBRACE) {
@@ -1698,7 +1693,7 @@ StmtAST *Parser::parseForStmt()
             if (tok.kindAndPos.kind == RANGE) {
                 unsigned pp = next();
                 ExprAST *y = new (_pool) UnaryExprAST(pp, parseRhs());
-                s2 = new (_pool) AssignStmtAST(0, 0, new (_pool) ExprListAST(y));
+                s2 = new (_pool) AssignStmtAST(nullptr, 0, new (_pool) ExprListAST(y));
                 isRange = true;
             } else {
                 QPair<StmtAST *, bool> r = parseSimpleStmt(rangeOk);
@@ -1709,7 +1704,7 @@ StmtAST *Parser::parseForStmt()
         if (!isRange && tok.kindAndPos.kind == SEMICOLON) {
             next();
             s1 = s2;
-            s2 = 0;
+            s2 = nullptr;
             if (tok.kindAndPos.kind != SEMICOLON)
                 s2 = parseSimpleStmt(basic).first;
             expectSemi();
@@ -1727,8 +1722,8 @@ StmtAST *Parser::parseForStmt()
 
     if (isRange) {
         AssignStmtAST *as = s2->asAssignStmt();
-        ExprAST *key = 0;
-        ExprAST *value = 0;
+        ExprAST *key = nullptr;
+        ExprAST *value = nullptr;
         if (!as->lhs) {
             // nothing to do
         } else if (!as->lhs->next) {
@@ -1797,7 +1792,7 @@ TypeAST *Parser::tryIdentOrType()
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 TypeAST *Parser::tryVarType(bool isParam)
@@ -1891,7 +1886,7 @@ void Parser::declareConst(Scope *scope, DeclIdentListAST *idents, ExprListAST *v
             declareConst(scope, it->value, values_it->value);
             values_it = values_it->next;
         } else {
-            declareConst(scope, it->value, 0);
+            declareConst(scope, it->value, nullptr);
         }
     }
 }
@@ -2002,8 +1997,8 @@ void Parser::shortVarDecl(DeclIdentListAST *lhs, ExprListAST *rhs)
 
 void Parser::declareRange(ExprAST *&key, ExprAST *&value, Scope *scope, ExprAST *range)
 {
-    IdentAST *keyIdent = key ? key->asIdent() : 0;
-    IdentAST *valueIdent = value ? value->asIdent() : 0;
+    IdentAST *keyIdent = key ? key->asIdent() : nullptr;
+    IdentAST *valueIdent = value ? value->asIdent() : nullptr;
 
     if (!keyIdent && !valueIdent)
         return;
@@ -2063,7 +2058,7 @@ ExprAST *Parser::checkExprOrType(ExprAST *x)
 ExprAST *Parser::makeExpr(StmtAST *s, const char *kind)
 {
     if (!s)
-        return 0;
+        return nullptr;
 
     if (ExprStmtAST *es = s->asExprStmt())
         return checkExpr(es->x);
@@ -2089,12 +2084,12 @@ ExprAST *Parser::deref(ExprAST *x)
 
 DeclIdentListAST *Parser::makeDeclIdentList(TypeListAST *list)
 {
-    DeclIdentListAST *idents = 0;
+    DeclIdentListAST *idents = nullptr;
     DeclIdentListAST **idents_ptr = &idents;
 
     for (TypeListAST *it = list; it; it = it->next) {
         if (TypeAST *x = it->value) {
-            DeclIdentAST *ident = 0;
+            DeclIdentAST *ident = nullptr;
             if (IdentAST *id = x->asIdent()) {
                 ident = new (_pool) DeclIdentAST(id->t_identifier, id->ident);
             } else {
@@ -2112,7 +2107,7 @@ DeclIdentListAST *Parser::makeDeclIdentList(TypeListAST *list)
 
 void Parser::tokPrec(TokenKind &kind, int &prec)
 {
-    kind = (TokenKind)tok.kindAndPos.kind;
+    kind = static_cast<TokenKind>(tok.kindAndPos.kind);
     if (inRhs && kind == ASSIGN)
         kind = EQL;
     prec = Token::precedence(kind);
@@ -2208,8 +2203,6 @@ unsigned Parser::skipBlock()
         }
         next();
     }
-
-    return 0;
 }
 
 void Parser::openScope()
@@ -2228,7 +2221,7 @@ void Parser::closeStructScope()
 {
     structScope = structScope->outer();
     if (structScope == topScope)
-        structScope = 0;
+        structScope = nullptr;
 }
 
 unsigned Parser::next()
@@ -2246,7 +2239,7 @@ unsigned Parser::next()
     next0();
 
     if (tok.kindAndPos.kind == COMMENT) {
-        CommentGroupAST *comment = 0;
+        CommentGroupAST *comment = nullptr;
         unsigned endline;
 
         if (prevLineNumber == tok.kindAndPos.line) {
@@ -2290,7 +2283,7 @@ void Parser::consumeCommentGroup(unsigned offset, CommentGroupAST *&node, unsign
     endline = tok.kindAndPos.line;
     CommentGroupAST **node_ptr = &node;
     while (tok.kindAndPos.kind == COMMENT && tok.kindAndPos.line <= endline + offset) {
-        CommentAST *comment = 0;
+        CommentAST *comment = nullptr;
         consumeComment(comment, endline);
         if (comment) {
             *node_ptr = new (_pool) CommentGroupAST(comment);

@@ -370,7 +370,7 @@ unsigned ArrayTypeAST::lastToken() const
 }
 
 ResolvedType ArrayTypeAST::elementsType(ResolveContext *, int refLvl) const
-{ return !refLvl ? elementType->asType() : 0; }
+{ return !refLvl ? elementType->asType() : nullptr; }
 
 QString ArrayTypeAST::describe() const
 { return QStringLiteral("[]") + (elementType ? elementType->describe() : QString()); }
@@ -591,7 +591,7 @@ const TypeSpecAST *StarTypeAST::typeSpec(ResolveContext *resolver) const
         if (!typ->asStarType())
             if (const NamedType *namedTy = typ->asNamedType())
                 return namedTy->typeSpec(resolver);
-    return 0;
+    return nullptr;
 }
 
 void StarTypeAST::accept0(ASTVisitor *visitor)
@@ -836,7 +836,7 @@ unsigned CallExprAST::lastToken() const
 ResolvedType CallExprAST::resolve(ResolveContext *resolver) const
 {
     if (fun) {
-        bool mayBeTypeConvertion = fun->asParenExpr() != 0;
+        bool mayBeTypeConvertion = fun->asParenExpr() != nullptr;
         ResolvedType typ = fun->resolve(resolver);
         ResolvedType callTyp = typ.type()->callType(resolver, typ.referenceLevel());
         if (mayBeTypeConvertion && callTyp.type() == Control::unresolvedTupleType())
@@ -852,7 +852,7 @@ ResolvedType CallExprAST::check(GoCheckSymbols *resolver) const
     resolver->accept(args);
 
     if (fun) {
-        bool mayBeTypeConvertion = fun->asParenExpr() != 0;
+        bool mayBeTypeConvertion = fun->asParenExpr() != nullptr;
         ResolvedType typ = fun->check(resolver);
         ResolvedType callTyp = typ.type()->callType(resolver, typ.referenceLevel());
         if (mayBeTypeConvertion && callTyp.type() == Control::unresolvedTupleType())
@@ -1216,7 +1216,7 @@ Symbol *StructTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolve
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 void StructTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
@@ -1382,7 +1382,7 @@ Symbol *InterfaceTypeAST::lookupMember(const IdentAST *ast,
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 void InterfaceTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
@@ -1451,10 +1451,10 @@ unsigned MapTypeAST::lastToken() const
 }
 
 ResolvedType MapTypeAST::elementsType(ResolveContext *, int refLvl) const
-{ return !refLvl ? value->asType() : 0; }
+{ return !refLvl ? value->asType() : nullptr; }
 
 ResolvedType MapTypeAST::indexType(ResolveContext *, int refLvl) const
-{ return !refLvl ? key->asType() : 0; }
+{ return !refLvl ? key->asType() : nullptr; }
 
 QString MapTypeAST::describe() const
 {
@@ -2152,7 +2152,7 @@ unsigned TypeSpecAST::lastToken() const
 Symbol *TypeSpecAST::lookupMember(const IdentAST *ast, ResolveContext *resolver, int refLvl) const
 {
     if (!name || !name->ident || !type)
-        return 0;
+        return nullptr;
 
     if (scope && (refLvl == 0 || refLvl == -1)) {
         PackageType *pkg = resolver->fileScopePackageType(scope);
@@ -2180,16 +2180,16 @@ void TypeSpecAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInte
 }
 
 ResolvedType TypeSpecAST::indexType(ResolveContext *resolver, int refLvl) const
-{ return type ? type->indexType(resolver, refLvl) : 0; }
+{ return type ? type->indexType(resolver, refLvl) : nullptr; }
 
 ResolvedType TypeSpecAST::elementsType(ResolveContext *resolver, int refLvl) const
-{ return type ? type->elementsType(resolver, refLvl) : 0; }
+{ return type ? type->elementsType(resolver, refLvl) : nullptr; }
 
 ResolvedType TypeSpecAST::callType(ResolveContext *resolver, int refLvl) const
 { return type ? type->callType(resolver, refLvl) : Control::unresolvedTupleType(); }
 
 ResolvedType TypeSpecAST::chanValueType(ResolveContext *resolver, int refLvl) const
-{ return type ? type->chanValueType(resolver, refLvl) : 0; }
+{ return type ? type->chanValueType(resolver, refLvl) : nullptr; }
 
 QString TypeSpecAST::describe() const
 { return name ? name->ident->toString() : QString(); }
@@ -2334,7 +2334,7 @@ Symbol *PackageTypeAST::lookupMember(const IdentAST *ast, ResolveContext *resolv
                 if (symbol->kind() == Symbol::Typ)
                     return symbol->type(resolver).lookupMember(ast, resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 void PackageTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
@@ -2357,7 +2357,7 @@ ResolvedType PackageTypeAST::elementsType(ResolveContext *resolver, int refLvl) 
                 if (symbol->kind() == Symbol::Typ)
                     return symbol->type(resolver).rangeValue(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 ResolvedType PackageTypeAST::indexType(ResolveContext *resolver, int refLvl) const
@@ -2368,7 +2368,7 @@ ResolvedType PackageTypeAST::indexType(ResolveContext *resolver, int refLvl) con
                 if (symbol->kind() == Symbol::Typ)
                     return symbol->type(resolver).rangeKey(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 QString PackageTypeAST::describe() const
@@ -2413,7 +2413,7 @@ Symbol *PackageTypeAST::declaration(ResolveContext *resolver)
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 const TypeSpecAST *PackageTypeAST::typeSpec(ResolveContext *resolver) const
@@ -2427,7 +2427,7 @@ const TypeSpecAST *PackageTypeAST::typeSpec(ResolveContext *resolver) const
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 void PackageTypeAST::accept0(ASTVisitor *visitor)
@@ -2448,7 +2448,7 @@ Symbol *TypeIdentAST::lookupMember(const IdentAST *ast, ResolveContext *resolver
         if (symbol->kind() == Symbol::Typ)
             return symbol->type(resolver).lookupMember(ast, resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 void TypeIdentAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
@@ -2473,7 +2473,7 @@ ResolvedType TypeIdentAST::elementsType(ResolveContext *resolver, int refLvl) co
         if (symbol->kind() == Symbol::Typ)
             return symbol->type(resolver).rangeValue(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 ResolvedType TypeIdentAST::indexType(ResolveContext *resolver, int refLvl) const
@@ -2482,7 +2482,7 @@ ResolvedType TypeIdentAST::indexType(ResolveContext *resolver, int refLvl) const
         if (symbol->kind() == Symbol::Typ)
             return symbol->type(resolver).rangeKey(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 ResolvedType TypeIdentAST::callType(ResolveContext *resolver, int refLvl) const
@@ -2500,7 +2500,7 @@ ResolvedType TypeIdentAST::chanValueType(ResolveContext *resolver, int refLvl) c
         if (symbol->kind() == Symbol::Typ)
             return symbol->type(resolver).chanValue(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 QString TypeIdentAST::describe() const
@@ -2526,7 +2526,7 @@ Symbol *TypeIdentAST::declaration(ResolveContext *resolver)
         if (symbol->kind() == Symbol::Typ)
             return symbol;
 
-    return 0;
+    return nullptr;
 }
 
 const TypeSpecAST *TypeIdentAST::typeSpec(ResolveContext *resolver) const
@@ -2534,7 +2534,7 @@ const TypeSpecAST *TypeIdentAST::typeSpec(ResolveContext *resolver) const
     if (Symbol *symbol = usingScope->lookupMember(ident, resolver))
         return symbol->typeSpec();
 
-    return 0;
+    return nullptr;
 }
 
 QString BadTypeAST::describe() const
@@ -2666,7 +2666,7 @@ unsigned EllipsisTypeAST::lastToken() const
 }
 
 ResolvedType EllipsisTypeAST::elementsType(ResolveContext *, int refLvl) const
-{ return ellipsisElement && !refLvl ? ellipsisElement->asType() : 0; }
+{ return ellipsisElement && !refLvl ? ellipsisElement->asType() : nullptr; }
 
 QString EllipsisTypeAST::describe() const
 { return QStringLiteral("...") + (ellipsisElement ? ellipsisElement->describe() : QString()); }
@@ -2692,7 +2692,7 @@ Symbol *TupleTypeAST::lookupMember(const IdentAST *ident,
     if (types && types->value && !types->next && !refLvl)
         return types->value->lookupMember(ident, resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 void TupleTypeAST::fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
@@ -2738,7 +2738,7 @@ ResolvedType TupleTypeAST::indexType(ResolveContext *resolver, int refLvl) const
     if (types && types->value && !types->next)
         return types->value->indexType(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 ResolvedType TupleTypeAST::elementsType(ResolveContext *resolver, int refLvl) const
@@ -2746,7 +2746,7 @@ ResolvedType TupleTypeAST::elementsType(ResolveContext *resolver, int refLvl) co
     if (types && types->value && !types->next)
         return types->value->elementsType(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 ResolvedType TupleTypeAST::chanValueType(ResolveContext *resolver, int refLvl) const
@@ -2754,7 +2754,7 @@ ResolvedType TupleTypeAST::chanValueType(ResolveContext *resolver, int refLvl) c
     if (types && types->value && !types->next)
         return types->value->chanValueType(resolver, refLvl);
 
-    return 0;
+    return nullptr;
 }
 
 QString TupleTypeAST::describe() const

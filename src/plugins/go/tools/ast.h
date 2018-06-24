@@ -73,7 +73,7 @@ public:
 
     _Tp lastValue() const
     {
-        _Tp lastValue = 0;
+        _Tp lastValue = nullptr;
 
         for (const List *it = this; it; it = it->next) {
             if (it->value)
@@ -119,82 +119,82 @@ public:
             accept(it->value, visitor);
     }
 
-    virtual FileAST *asFile() { return 0; }
-    virtual CommentAST *asComment() { return 0; }
-    virtual SpecAST *asSpec() { return 0; }
-    virtual FieldAST *asField() { return 0; }
-    virtual FieldGroupAST *asFieldGroup() { return 0; }
-    virtual ImportSpecAST *asImportSpec() { return 0; }
-    virtual VarSpecWithTypeAST *asValueSpecWithType() { return 0; }
-    virtual VarSpecWithValuesAST *asVarSpecWithValues() { return 0; }
-    virtual ConstSpecAST *asConstSpec() { return 0; }
-    virtual TypeSpecAST *asTypeSpec() { return 0; }
-    virtual DeclAST *asDecl() { return 0; }
-    virtual BadDeclAST *asBadDecl() { return 0; }
-    virtual GenDeclAST *asGenDecl() { return 0; }
-    virtual FuncDeclAST *asFuncDecl() { return 0; }
-    virtual ExprAST *asExpr() { return 0; }
-    virtual BadExprAST *asBadExpr() { return 0; }
-    virtual ParenExprAST *asParenExpr() { return 0; }
-    virtual RhsExprListAST *asRhsExprList() { return 0; }
-    virtual RangeExpAST *asRangeExp() { return 0; }
-    virtual IdentAST *asIdent() { return 0; }
-    virtual TypeIdentAST *asTypeIdent() { return 0; }
-    virtual PackageTypeAST *asPackageType() { return 0; }
-    virtual SelectorExprAST *asSelectorExpr() { return 0; }
-    virtual IndexExprAST *asIndexExpr() { return 0; }
-    virtual SliceExprAST *asSliceExpr() { return 0; }
-    virtual TypeAssertExprAST *asTypeAssertExpr() { return 0; }
-    virtual EllipsisAST *asEllipsis() { return 0; }
-    virtual EllipsisTypeAST *asEllipsisType() { return 0; }
-    virtual CallExprAST *asCallExpr() { return 0; }
-    virtual StarTypeAST *asStarType() { return 0; }
-    virtual StarExprAST *asStarExpr() { return 0; }
-    virtual NewExprAST *asNewExpr() { return 0; }
-    virtual MakeExprAST *asMakeExpr() { return 0; }
-    virtual UnaryExprAST *asUnaryExpr() { return 0; }
-    virtual ArrowUnaryExprAST *asArrowUnaryExpr() { return 0; }
-    virtual RefUnaryExprAST *asRefUnaryExpr() { return 0; }
-    virtual BinaryExprAST *asBinaryExpr() { return 0; }
-    virtual KeyValueExprAST *asKeyValueExpr() { return 0; }
-    virtual TypeAST *asType() { return 0; }
-    virtual TupleTypeAST *asTupleType() { return 0; }
-    virtual BadTypeAST *asBadType() { return 0; }
-    virtual ParenTypeAST *asParenType() { return 0; }
-    virtual ArrayTypeAST *asArrayType() { return 0; }
-    virtual StructTypeAST *asStructType() { return 0; }
-    virtual ChanTypeAST *asChanType() { return 0; }
-    virtual FuncTypeAST *asFuncType() { return 0; }
-    virtual InterfaceTypeAST *asInterfaceType() { return 0; }
-    virtual MapTypeAST *asMapType() { return 0; }
-    virtual LitAST *asLit() { return 0; }
-    virtual BasicLitAST *asBasicLit() { return 0; }
-    virtual StringLitAST *asStringLit() { return 0; }
-    virtual FuncLitAST *asFuncLit() { return 0; }
-    virtual CompositeLitAST *asCompositeLit() { return 0; }
-    virtual StmtAST *asStmt() { return 0; }
-    virtual EmptyStmtAST *asEmptyStmt() { return 0; }
-    virtual BadStmtAST *asBadStmt() { return 0; }
-    virtual DeclStmtAST *asDeclStmt() { return 0; }
-    virtual LabeledStmtAST *asLabeledStmt() { return 0; }
-    virtual ExprStmtAST *asExprStmt() { return 0; }
-    virtual SendStmtAST *asSendStmt() { return 0; }
-    virtual IncDecStmtAST *asIncDecStmt() { return 0; }
-    virtual BlockStmtAST *asBlockStmt() { return 0; }
-    virtual AssignStmtAST *asAssignStmt() { return 0; }
-    virtual DefineStmtAST *asDefineStmt() { return 0; }
-    virtual GoStmtAST *asGoStmt() { return 0; }
-    virtual DeferStmtAST *asDeferStmt() { return 0; }
-    virtual ReturnStmtAST *asReturnStmt() { return 0; }
-    virtual BranchStmtAST *asBranchStmt() { return 0; }
-    virtual IfStmtAST *asIfStmt() { return 0; }
-    virtual CaseClauseAST *asCaseClause() { return 0; }
-    virtual SwitchStmtAST *asSwitchStmt() { return 0; }
-    virtual TypeSwitchStmtAST *asTypeSwitchStmt() { return 0; }
-    virtual CommClauseAST *asCommClause() { return 0; }
-    virtual SelectStmtAST *asSelectStmt() { return 0; }
-    virtual ForStmtAST *asForStmt() { return 0; }
-    virtual RangeStmtAST *asRangeStmt() { return 0; }
+    virtual FileAST *asFile() { return nullptr; }
+    virtual CommentAST *asComment() { return nullptr; }
+    virtual SpecAST *asSpec() { return nullptr; }
+    virtual FieldAST *asField() { return nullptr; }
+    virtual FieldGroupAST *asFieldGroup() { return nullptr; }
+    virtual ImportSpecAST *asImportSpec() { return nullptr; }
+    virtual VarSpecWithTypeAST *asValueSpecWithType() { return nullptr; }
+    virtual VarSpecWithValuesAST *asVarSpecWithValues() { return nullptr; }
+    virtual ConstSpecAST *asConstSpec() { return nullptr; }
+    virtual TypeSpecAST *asTypeSpec() { return nullptr; }
+    virtual DeclAST *asDecl() { return nullptr; }
+    virtual BadDeclAST *asBadDecl() { return nullptr; }
+    virtual GenDeclAST *asGenDecl() { return nullptr; }
+    virtual FuncDeclAST *asFuncDecl() { return nullptr; }
+    virtual ExprAST *asExpr() { return nullptr; }
+    virtual BadExprAST *asBadExpr() { return nullptr; }
+    virtual ParenExprAST *asParenExpr() { return nullptr; }
+    virtual RhsExprListAST *asRhsExprList() { return nullptr; }
+    virtual RangeExpAST *asRangeExp() { return nullptr; }
+    virtual IdentAST *asIdent() { return nullptr; }
+    virtual TypeIdentAST *asTypeIdent() { return nullptr; }
+    virtual PackageTypeAST *asPackageType() { return nullptr; }
+    virtual SelectorExprAST *asSelectorExpr() { return nullptr; }
+    virtual IndexExprAST *asIndexExpr() { return nullptr; }
+    virtual SliceExprAST *asSliceExpr() { return nullptr; }
+    virtual TypeAssertExprAST *asTypeAssertExpr() { return nullptr; }
+    virtual EllipsisAST *asEllipsis() { return nullptr; }
+    virtual EllipsisTypeAST *asEllipsisType() { return nullptr; }
+    virtual CallExprAST *asCallExpr() { return nullptr; }
+    virtual StarTypeAST *asStarType() { return nullptr; }
+    virtual StarExprAST *asStarExpr() { return nullptr; }
+    virtual NewExprAST *asNewExpr() { return nullptr; }
+    virtual MakeExprAST *asMakeExpr() { return nullptr; }
+    virtual UnaryExprAST *asUnaryExpr() { return nullptr; }
+    virtual ArrowUnaryExprAST *asArrowUnaryExpr() { return nullptr; }
+    virtual RefUnaryExprAST *asRefUnaryExpr() { return nullptr; }
+    virtual BinaryExprAST *asBinaryExpr() { return nullptr; }
+    virtual KeyValueExprAST *asKeyValueExpr() { return nullptr; }
+    virtual TypeAST *asType() { return nullptr; }
+    virtual TupleTypeAST *asTupleType() { return nullptr; }
+    virtual BadTypeAST *asBadType() { return nullptr; }
+    virtual ParenTypeAST *asParenType() { return nullptr; }
+    virtual ArrayTypeAST *asArrayType() { return nullptr; }
+    virtual StructTypeAST *asStructType() { return nullptr; }
+    virtual ChanTypeAST *asChanType() { return nullptr; }
+    virtual FuncTypeAST *asFuncType() { return nullptr; }
+    virtual InterfaceTypeAST *asInterfaceType() { return nullptr; }
+    virtual MapTypeAST *asMapType() { return nullptr; }
+    virtual LitAST *asLit() { return nullptr; }
+    virtual BasicLitAST *asBasicLit() { return nullptr; }
+    virtual StringLitAST *asStringLit() { return nullptr; }
+    virtual FuncLitAST *asFuncLit() { return nullptr; }
+    virtual CompositeLitAST *asCompositeLit() { return nullptr; }
+    virtual StmtAST *asStmt() { return nullptr; }
+    virtual EmptyStmtAST *asEmptyStmt() { return nullptr; }
+    virtual BadStmtAST *asBadStmt() { return nullptr; }
+    virtual DeclStmtAST *asDeclStmt() { return nullptr; }
+    virtual LabeledStmtAST *asLabeledStmt() { return nullptr; }
+    virtual ExprStmtAST *asExprStmt() { return nullptr; }
+    virtual SendStmtAST *asSendStmt() { return nullptr; }
+    virtual IncDecStmtAST *asIncDecStmt() { return nullptr; }
+    virtual BlockStmtAST *asBlockStmt() { return nullptr; }
+    virtual AssignStmtAST *asAssignStmt() { return nullptr; }
+    virtual DefineStmtAST *asDefineStmt() { return nullptr; }
+    virtual GoStmtAST *asGoStmt() { return nullptr; }
+    virtual DeferStmtAST *asDeferStmt() { return nullptr; }
+    virtual ReturnStmtAST *asReturnStmt() { return nullptr; }
+    virtual BranchStmtAST *asBranchStmt() { return nullptr; }
+    virtual IfStmtAST *asIfStmt() { return nullptr; }
+    virtual CaseClauseAST *asCaseClause() { return nullptr; }
+    virtual SwitchStmtAST *asSwitchStmt() { return nullptr; }
+    virtual TypeSwitchStmtAST *asTypeSwitchStmt() { return nullptr; }
+    virtual CommClauseAST *asCommClause() { return nullptr; }
+    virtual SelectStmtAST *asSelectStmt() { return nullptr; }
+    virtual ForStmtAST *asForStmt() { return nullptr; }
+    virtual RangeStmtAST *asRangeStmt() { return nullptr; }
 
     virtual unsigned firstToken() const = 0;
     virtual unsigned lastToken() const = 0;
@@ -214,7 +214,7 @@ protected:
 class FileAST: public AST
 {
 public:
-    FileScope *scope = 0;
+    FileScope *scope = nullptr;
 
 public:
     CommentGroupAST *doc;
@@ -224,8 +224,8 @@ public:
     DeclListAST *decls;
 
 public:
-    FileAST(CommentGroupAST *doc_ = 0, unsigned t_package_ = 0, IdentAST *packageName_ = 0,
-            DeclListAST *importDecls_ = 0, DeclListAST *decls_ = 0)
+    FileAST(CommentGroupAST *doc_ = nullptr, unsigned t_package_ = 0, IdentAST *packageName_ = nullptr,
+            DeclListAST *importDecls_ = nullptr, DeclListAST *decls_ = nullptr)
         : doc(doc_), t_package(t_package_), packageName(packageName_)
         , importDecls(importDecls_), decls(decls_)
     { }
@@ -275,7 +275,8 @@ public:
     CommentGroupAST *comment;
 
 public:
-    FieldAST(CommentGroupAST *doc_ = 0, DeclIdentListAST *names_ = 0, TypeAST *type_ = 0, StringLitAST *tag_ = 0, CommentGroupAST *comment_ = 0)
+    FieldAST(CommentGroupAST *doc_ = nullptr, DeclIdentListAST *names_ = nullptr, TypeAST *type_ = nullptr,
+             StringLitAST *tag_ = nullptr, CommentGroupAST *comment_ = nullptr)
         : doc(doc_), names(names_), type(type_), tag(tag_), comment(comment_)
     { }
 
@@ -298,7 +299,7 @@ public:
     unsigned t_rparen;
 
 public:
-    FieldGroupAST(unsigned t_lparen_ = 0, FieldListAST *fields_ = 0, unsigned t_rparen_ = 0)
+    FieldGroupAST(unsigned t_lparen_ = 0, FieldListAST *fields_ = nullptr, unsigned t_rparen_ = 0)
         : t_lparen(t_lparen_), fields(fields_), t_rparen(t_rparen_)
     { }
 
@@ -324,8 +325,8 @@ public:
     CommentGroupAST *comment;
 
 public:
-    ImportSpecAST(CommentGroupAST *doc_ = 0, IdentAST *name_ = 0,
-                  unsigned t_path_ = 0, CommentGroupAST *comment_ = 0)
+    ImportSpecAST(CommentGroupAST *doc_ = nullptr, IdentAST *name_ = nullptr,
+                  unsigned t_path_ = 0, CommentGroupAST *comment_ = nullptr)
         : doc(doc_), name(name_), t_path(t_path_), comment(comment_)
     { }
 
@@ -347,8 +348,8 @@ public:
     CommentGroupAST *comment;
 
 public:
-    VarSpecWithTypeAST(CommentGroupAST *doc_ = 0, DeclIdentListAST *names_ = 0,
-                       TypeAST *type_ = 0, CommentGroupAST *comment_ = 0)
+    VarSpecWithTypeAST(CommentGroupAST *doc_ = nullptr, DeclIdentListAST *names_ = nullptr,
+                       TypeAST *type_ = nullptr, CommentGroupAST *comment_ = nullptr)
         : doc(doc_), names(names_), type(type_), comment(comment_)
     { }
 
@@ -370,7 +371,8 @@ public:
     CommentGroupAST *comment;
 
 public:
-    VarSpecWithValuesAST(CommentGroupAST *doc_ = 0, DeclIdentListAST *names_ = 0, ExprListAST *values_ = 0, CommentGroupAST *comment_ = 0)
+    VarSpecWithValuesAST(CommentGroupAST *doc_ = nullptr, DeclIdentListAST *names_ = nullptr,
+                         ExprListAST *values_ = nullptr, CommentGroupAST *comment_ = nullptr)
         : doc(doc_), names(names_), values(values_), comment(comment_)
     { }
 
@@ -394,8 +396,8 @@ public:
     CommentGroupAST *comment;
 
 public:
-    ConstSpecAST(CommentGroupAST *doc_ = 0, DeclIdentListAST *names_ = 0, TypeAST *type_ = 0,
-                 ExprListAST *values_ = 0, CommentGroupAST *comment_ = 0)
+    ConstSpecAST(CommentGroupAST *doc_ = nullptr, DeclIdentListAST *names_ = nullptr, TypeAST *type_ = nullptr,
+                 ExprListAST *values_ = nullptr, CommentGroupAST *comment_ = nullptr)
         : doc(doc_), names(names_), type(type_), values(values_), comment(comment_)
     { }
 
@@ -411,7 +413,7 @@ protected:
 class TypeSpecAST: public SpecAST, public Type, public NamedType
 {
 public:
-    FileScope *scope = 0;
+    FileScope *scope = nullptr;
 
 public:
     CommentGroupAST *doc;
@@ -420,14 +422,15 @@ public:
     CommentGroupAST *comment;
 
 public:
-    TypeSpecAST(CommentGroupAST *doc_ = 0, DeclIdentAST *name_ = 0, TypeAST *type_ = 0, CommentGroupAST *comment_ = 0)
+    TypeSpecAST(CommentGroupAST *doc_ = nullptr, DeclIdentAST *name_ = nullptr,
+                TypeAST *type_ = nullptr, CommentGroupAST *comment_ = nullptr)
         : doc(doc_), name(name_), type(type_), comment(comment_)
     { }
 
-    virtual TypeSpecAST *asTypeSpec() { return this; }
+    virtual TypeSpecAST *asTypeSpec() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     // LookupContext implemntation
     virtual Symbol *lookupMember(const IdentAST *ident,
@@ -437,7 +440,7 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate = 0) const override;
+                                       Predicate = nullptr) const override;
 
 
     // Type implementation
@@ -455,7 +458,7 @@ public:
     bool hasEmbedOrEqualToType(const Type *typ, ResolveContext *ctx) const;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class DeclAST: public AST
@@ -498,8 +501,8 @@ public:
     unsigned t_rparen;
 
 public:
-    GenDeclAST(CommentGroupAST *doc_ = 0, unsigned t_token_ = 0,
-               unsigned t_lparen_ = 0, SpecListAST *specs_ = 0, unsigned t_rparen_ = 0)
+    GenDeclAST(CommentGroupAST *doc_ = nullptr, unsigned t_token_ = 0,
+               unsigned t_lparen_ = 0, SpecListAST *specs_ = nullptr, unsigned t_rparen_ = 0)
         : doc(doc_), t_token(t_token_), t_lparen(t_lparen_), specs(specs_), t_rparen(t_rparen_)
     { }
 
@@ -515,8 +518,8 @@ protected:
 class FuncDeclAST: public DeclAST
 {
 public:
-    Scope *scope = 0;
-    Symbol *symbol = 0;
+    Scope *scope = nullptr;
+    Symbol *symbol = nullptr;
 
 public:
     CommentGroupAST *doc;
@@ -526,7 +529,8 @@ public:
     BlockStmtAST *body;
 
 public:
-    FuncDeclAST(CommentGroupAST *doc_ = 0, FieldGroupAST *recv_ = 0, DeclIdentAST *name_ = 0, FuncTypeAST *type_ = 0, BlockStmtAST *body_ = 0)
+    FuncDeclAST(CommentGroupAST *doc_ = nullptr, FieldGroupAST *recv_ = nullptr, DeclIdentAST *name_ = nullptr,
+                FuncTypeAST *type_ = nullptr, BlockStmtAST *body_ = nullptr)
         : doc(doc_), recv(recv_), name(name_), type(type_), body(body_)
     { }
 
@@ -560,16 +564,16 @@ public:
         : t_first(t_first_), t_last(t_last_)
     { }
 
-    virtual BadExprAST *asBadExpr() { return this; }
+    virtual BadExprAST *asBadExpr() override { return this; }
 
-    virtual unsigned firstToken() const { return t_first; }
-    virtual unsigned lastToken() const { return t_last; }
+    virtual unsigned firstToken() const override { return t_first; }
+    virtual unsigned lastToken() const override { return t_last; }
 
     virtual ResolvedType resolve(ResolveContext *) const override { return ResolvedType(); }
     virtual ResolvedType check(GoCheckSymbols *) const override { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class ParenExprAST: public ExprAST
@@ -580,20 +584,20 @@ public:
     unsigned t_rparen;
 
 public:
-    ParenExprAST(unsigned t_lparen_, ExprAST *x_ = 0, unsigned t_rparen_ = 0)
+    ParenExprAST(unsigned t_lparen_, ExprAST *x_ = nullptr, unsigned t_rparen_ = 0)
         : t_lparen(t_lparen_), x(x_), t_rparen(t_rparen_)
     { }
 
-    virtual ParenExprAST *asParenExpr() { return this; }
+    virtual ParenExprAST *asParenExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class RhsExprListAST: public ExprAST
@@ -606,10 +610,10 @@ public:
         : list(list_)
     { }
 
-    virtual RhsExprListAST *asRhsExprList() { return this; }
+    virtual RhsExprListAST *asRhsExprList() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     ResolvedType type(ResolveContext *resolver, int index);
 
@@ -617,7 +621,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class RangeExpAST: public ExprAST
@@ -628,10 +632,10 @@ public:
 public:
     RangeExpAST(ExprAST *x_) : x(x_) { }
 
-    virtual RangeExpAST *asRangeExp() { return this; }
+    virtual RangeExpAST *asRangeExp() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     ResolvedType rangeValueType(ResolveContext *resolver) const;
     ResolvedType rangeKeyType(ResolveContext *resolver) const;
@@ -640,7 +644,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class IdentAST: public ExprAST
@@ -656,58 +660,58 @@ public:
         : ident(ident_), t_identifier(t_identifier_)
     { }
 
-    virtual IdentAST *asIdent() { return this; }
+    virtual IdentAST *asIdent() override { return this; }
 
     bool isLookable() const;
     bool isNewKeyword() const;
     bool isMakeKeyword() const;
     bool isNewOrMakeKeyword() const;
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class DeclIdentAST: public IdentAST
 {
 public:
-    Symbol *symbol = 0;
+    Symbol *symbol = nullptr;
 
 public:
-    DeclIdentAST(unsigned t_identifier_, const Identifier *ident_ = 0)
+    DeclIdentAST(unsigned t_identifier_, const Identifier *ident_ = nullptr)
         : IdentAST(t_identifier_, ident_)
     { }
 
     virtual DeclIdentAST *asDeclIdent() { return this; }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class TypeAST: public ExprAST, public Type
 {
 public:
     TypeAST() {}
-    virtual TypeAST *asType() { return this; }
+    virtual TypeAST *asType() override { return this; }
 
     virtual bool isValidCompositeLiteralType() const = 0;
 
     // LookupContext implemntation
-    virtual Symbol *lookupMember(const IdentAST *, ResolveContext *, int = 0) const override { return 0; }
+    virtual Symbol *lookupMember(const IdentAST *, ResolveContext *, int = 0) const override { return nullptr; }
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &,
-                                       ResolveContext *, int = 0, Predicate = 0) const override { }
+                                       ResolveContext *, int = 0, Predicate = nullptr) const override { }
 
     // Type implementation
-    virtual ResolvedType indexType(ResolveContext *, int = 0) const override { return 0; }
-    virtual ResolvedType elementsType(ResolveContext *, int = 0) const override { return 0; }
-    virtual ResolvedType chanValueType(ResolveContext *, int = 0) const override { return 0; }
+    virtual ResolvedType indexType(ResolveContext *, int = 0) const override { return nullptr; }
+    virtual ResolvedType elementsType(ResolveContext *, int = 0) const override { return nullptr; }
+    virtual ResolvedType chanValueType(ResolveContext *, int = 0) const override { return nullptr; }
 
-    virtual Symbol *declaration(ResolveContext *) { return 0; }
+    virtual Symbol *declaration(ResolveContext *) { return nullptr; }
 
     virtual ResolvedType resolve(ResolveContext *) const override;
     virtual ResolvedType check(GoCheckSymbols *) const override;
@@ -719,10 +723,10 @@ public:
     TypeListAST *types;
 
 public:
-    TupleTypeAST() : types(0) {}
-    virtual TupleTypeAST *asTupleType() { return this; }
+    TupleTypeAST() : types(nullptr) {}
+    virtual TupleTypeAST *asTupleType() override { return this; }
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     // LookupContext implemntation
     virtual Symbol *lookupMember(const IdentAST *ident,
@@ -732,7 +736,7 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate predicate = 0) const override;
+                                       Predicate predicate = nullptr) const override;
 
     // Type implementation
     virtual int countInTurple() const override;
@@ -741,14 +745,14 @@ public:
     virtual ResolvedType elementsType(ResolveContext *resolver, int refLvl = 0) const override;
     virtual ResolvedType chanValueType(ResolveContext *resolver, int refLvl = 0) const override;
 
-    virtual unsigned firstToken() const { return types ? types->firstToken() : 0; }
-    virtual unsigned lastToken() const { return types ? types->lastToken() : 1; }
+    virtual unsigned firstToken() const override { return types ? types->firstToken() : 0; }
+    virtual unsigned lastToken() const override { return types ? types->lastToken() : 1; }
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *resolver, int refLvl = 0) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *);
+    virtual void accept0(ASTVisitor *) override;
 };
 
 class BadTypeAST: public TypeAST
@@ -762,12 +766,12 @@ public:
         : t_first(t_first_), t_last(t_last_)
     { }
 
-    virtual BadTypeAST *asBadType() { return this; }
+    virtual BadTypeAST *asBadType() override { return this; }
 
-    virtual unsigned firstToken() const { return t_first; }
-    virtual unsigned lastToken() const { return t_last; }
+    virtual unsigned firstToken() const override { return t_first; }
+    virtual unsigned lastToken() const override { return t_last; }
 
-    virtual bool isValidCompositeLiteralType() const { return true; }
+    virtual bool isValidCompositeLiteralType() const override { return true; }
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *, int = 0) const override { return Other; }
@@ -775,7 +779,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *) const override { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class ParenTypeAST: public TypeAST
@@ -786,16 +790,16 @@ public:
     unsigned t_rparen;
 
 public:
-    ParenTypeAST(unsigned t_lparen_, TypeAST *x_ = 0, unsigned t_rparen_ = 0)
+    ParenTypeAST(unsigned t_lparen_, TypeAST *x_ = nullptr, unsigned t_rparen_ = 0)
         : t_lparen(t_lparen_), x(x_), t_rparen(t_rparen_)
     { }
 
-    virtual ParenTypeAST *asParenType() { return this; }
+    virtual ParenTypeAST *asParenType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *resolver, int refLvl = 0) const override
@@ -805,13 +809,13 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class TypeIdentAST: public TypeAST, public NamedType
 {
 public:
-    Scope *usingScope = 0;
+    Scope *usingScope = nullptr;
 
 public:
     IdentAST *ident;
@@ -821,13 +825,13 @@ public:
         : ident(ident_)
     { }
 
-    virtual TypeIdentAST *asTypeIdent() { return this; }
-    virtual IdentAST *asIdent() { return ident; }
+    virtual TypeIdentAST *asTypeIdent() override { return this; }
+    virtual IdentAST *asIdent() override { return ident; }
 
-    virtual unsigned firstToken() const { return ident->firstToken(); }
-    virtual unsigned lastToken() const { return ident->lastToken(); }
+    virtual unsigned firstToken() const override { return ident->firstToken(); }
+    virtual unsigned lastToken() const override { return ident->lastToken(); }
 
-    virtual bool isValidCompositeLiteralType() const { return true; }
+    virtual bool isValidCompositeLiteralType() const override { return true; }
 
     // LookupContext implementation
     virtual Symbol *lookupMember(const IdentAST *ast,
@@ -837,7 +841,7 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate = 0) const override;
+                                       Predicate = nullptr) const override;
 
     virtual ResolvedType elementsType(ResolveContext *resolver, int refLvl = 0) const override;
     virtual ResolvedType indexType(ResolveContext *resolver, int refLvl = 0) const override;
@@ -855,13 +859,13 @@ public:
     virtual const TypeSpecAST *typeSpec(ResolveContext *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class PackageTypeAST: public TypeAST, public NamedType
 {
 public:
-    FileScope *fileScope = 0;
+    FileScope *fileScope = nullptr;
 
 public:
     IdentAST *packageAlias;
@@ -873,12 +877,12 @@ public:
         : packageAlias(packageAlias_), t_dot(t_dot_), typeName(typeName_)
     { }
 
-    virtual PackageTypeAST *asPackageType() { return this; }
+    virtual PackageTypeAST *asPackageType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return true; }
+    virtual bool isValidCompositeLiteralType() const override { return true; }
 
     // LookupContext implementation
     virtual Symbol *lookupMember(const IdentAST *ast,
@@ -888,7 +892,7 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate = 0) const override;
+                                       Predicate = nullptr) const override;
 
     virtual ResolvedType elementsType(ResolveContext *resolver, int refLvl = 0) const override;
     virtual ResolvedType indexType(ResolveContext *resolver, int refLvl = 0) const override;
@@ -904,7 +908,7 @@ public:
     virtual const TypeSpecAST *typeSpec(ResolveContext *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class SelectorExprAST: public ExprAST
@@ -914,20 +918,20 @@ public:
     IdentAST *sel;
 
 public:
-    SelectorExprAST(ExprAST *x_, IdentAST *sel_ = 0)
+    SelectorExprAST(ExprAST *x_, IdentAST *sel_ = nullptr)
         : x(x_), sel(sel_)
     { }
 
-    virtual SelectorExprAST *asSelectorExpr() { return this; }
+    virtual SelectorExprAST *asSelectorExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class IndexExprAST: public ExprAST
@@ -939,20 +943,20 @@ public:
     unsigned t_rbracket;
 
 public:
-    IndexExprAST(ExprAST *x_ = 0, unsigned t_lbracket_ = 0, ExprAST *index_ = 0, unsigned t_rbracket_ = 0)
+    IndexExprAST(ExprAST *x_ = nullptr, unsigned t_lbracket_ = 0, ExprAST *index_ = nullptr, unsigned t_rbracket_ = 0)
         : x(x_), t_lbracket(t_lbracket_), index(index_), t_rbracket(t_rbracket_)
     { }
 
-    virtual IndexExprAST *asIndexExpr() { return this; }
+    virtual IndexExprAST *asIndexExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class SliceExprAST: public ExprAST
@@ -969,20 +973,21 @@ public:
     unsigned t_rbracket;
 
 public:
-    SliceExprAST(ExprAST *x_ = 0, unsigned t_lbracket_ = 0, ExprAST *low_ = 0, ExprAST *high_ = 0, ExprAST *max_ = 0, unsigned t_rbracket_ = 0)
+    SliceExprAST(ExprAST *x_ = nullptr, unsigned t_lbracket_ = 0, ExprAST *low_ = nullptr,
+                 ExprAST *high_ = nullptr, ExprAST *max_ = nullptr, unsigned t_rbracket_ = 0)
         : x(x_), t_lbracket(t_lbracket_), low(low_), high(high_), max(max_), t_rbracket(t_rbracket_)
     { }
 
-    virtual SliceExprAST *asSliceExpr() { return this; }
+    virtual SliceExprAST *asSliceExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class TypeAssertExprAST: public ExprAST
@@ -994,21 +999,21 @@ public:
     unsigned t_rparen;
 
 public:
-    TypeAssertExprAST(ExprAST *x_ = 0, unsigned t_lparen_ = 0, TypeAST *typ_ = 0, unsigned t_rparen_ = 0)
+    TypeAssertExprAST(ExprAST *x_ = nullptr, unsigned t_lparen_ = 0, TypeAST *typ_ = nullptr, unsigned t_rparen_ = 0)
         : x(x_), t_lparen(t_lparen_), typ(typ_), t_rparen(t_rparen_)
     { }
 
-    virtual TypeAssertExprAST *asTypeAssertExpr() { return this; }
-    virtual TypeAST *asType() { return typ ? typ->asType() : 0; }
+    virtual TypeAssertExprAST *asTypeAssertExpr() override { return this; }
+    virtual TypeAST *asType() override { return typ ? typ->asType() : nullptr; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class EllipsisAST: public ExprAST
@@ -1021,16 +1026,16 @@ public:
         : t_ellipsis(t_ellipsis_)
     { }
 
-    virtual EllipsisAST *asEllipsis() { return this; }
+    virtual EllipsisAST *asEllipsis() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *) const override { return ResolvedType(); }
     virtual ResolvedType check(GoCheckSymbols *) const override { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class CallExprAST: public ExprAST
@@ -1043,20 +1048,20 @@ public:
     unsigned t_rparen;
 
 public:
-    CallExprAST(ExprAST *fun_ = 0, unsigned t_lparen_ = 0, ExprListAST *args_ = 0, unsigned t_ellipsis_ = 0, unsigned t_rparen_ = 0)
+    CallExprAST(ExprAST *fun_ = nullptr, unsigned t_lparen_ = 0, ExprListAST *args_ = nullptr, unsigned t_ellipsis_ = 0, unsigned t_rparen_ = 0)
         : fun(fun_), t_lparen(t_lparen_), args(args_), t_ellipsis(t_ellipsis_), t_rparen(t_rparen_)
     { }
 
-    virtual CallExprAST *asCallExpr() { return this; }
+    virtual CallExprAST *asCallExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class StarTypeAST: public TypeAST, public NamedType
@@ -1070,37 +1075,37 @@ public:
         : t_star(t_star_), typ(x_)
     { }
 
-    virtual StarTypeAST *asStarType() { return this; }
+    virtual StarTypeAST *asStarType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     // LookupContext implementation
     virtual Symbol *lookupMember(const IdentAST *ident,
                                  ResolveContext *resolver,
                                  int refLvl = 0) const override
-    { return typ ? typ->lookupMember(ident, resolver, refLvl - 1) : 0; }
+    { return typ ? typ->lookupMember(ident, resolver, refLvl - 1) : nullptr; }
 
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate = 0) const override
+                                       Predicate = nullptr) const override
     { if (typ) typ->fillMemberCompletions(completions, resolver, refLvl - 1); }
 
     // Type implementation
     virtual ResolvedType callType(ResolveContext *resolver, int refLvl = 0) const override
-    { return typ ? typ->callType(resolver, refLvl - 1) : 0; }
+    { return typ ? typ->callType(resolver, refLvl - 1) : nullptr; }
 
     virtual ResolvedType elementsType(ResolveContext *resolver, int refLvl = 0) const override
-    { return typ ? typ->elementsType(resolver, refLvl - 1) : 0; }
+    { return typ ? typ->elementsType(resolver, refLvl - 1) : nullptr; }
 
     virtual ResolvedType indexType(ResolveContext *resolver, int refLvl = 0) const override
-    { return typ ? typ->indexType(resolver, refLvl - 1) : 0; }
+    { return typ ? typ->indexType(resolver, refLvl - 1) : nullptr; }
 
     virtual ResolvedType chanValueType(ResolveContext *resolver, int refLvl = 0) const override
-    { return typ ? typ->chanValueType(resolver, refLvl - 1) : 0; }
+    { return typ ? typ->chanValueType(resolver, refLvl - 1) : nullptr; }
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *resolver, int refLvl = 0) const override
@@ -1112,7 +1117,7 @@ public:
     virtual const TypeSpecAST *typeSpec(ResolveContext *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class StarExprAST: public ExprAST
@@ -1126,11 +1131,11 @@ public:
         : t_star(t_star_), x(x_)
     { }
 
-    virtual StarExprAST *asStarExpr() { return this; }
-    virtual TypeAST *asType() { return x ? x->asType() : 0; }
+    virtual StarExprAST *asStarExpr() override { return this; }
+    virtual TypeAST *asType() override { return x ? x->asType() : nullptr; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
@@ -1138,7 +1143,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class NewExprAST: public ExprAST
@@ -1150,14 +1155,14 @@ public:
     unsigned t_rparen;
 
 public:
-    NewExprAST(unsigned t_new_, unsigned t_lparen_ = 0, TypeAST *typ_ = 0, unsigned t_rparen_ = 0)
+    NewExprAST(unsigned t_new_, unsigned t_lparen_ = 0, TypeAST *typ_ = nullptr, unsigned t_rparen_ = 0)
         : t_new(t_new_), t_lparen(t_lparen_), typ(typ_), t_rparen(t_rparen_)
     { }
 
-    virtual NewExprAST *asNewExpr() { return this; }
+    virtual NewExprAST *asNewExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
@@ -1165,7 +1170,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class MakeExprAST: public ExprAST
@@ -1177,14 +1182,14 @@ public:
     unsigned t_rparen;
 
 public:
-    MakeExprAST(unsigned t_make_, unsigned t_lparen_ = 0, ExprListAST *list_ = 0, unsigned t_rparen_ = 0)
+    MakeExprAST(unsigned t_make_, unsigned t_lparen_ = 0, ExprListAST *list_ = nullptr, unsigned t_rparen_ = 0)
         : t_make(t_make_), t_lparen(t_lparen_), list(list_), t_rparen(t_rparen_)
     { }
 
-    virtual MakeExprAST *asMakeExpr() { return this; }
+    virtual MakeExprAST *asMakeExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual bool isValidCompositeLiteralType() const { return false; }
 
@@ -1192,7 +1197,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class UnaryExprAST: public ExprAST
@@ -1202,14 +1207,14 @@ public:
     ExprAST *x;
 
 public:
-    UnaryExprAST(unsigned t_op_ = 0, ExprAST *x_ = 0)
+    UnaryExprAST(unsigned t_op_ = 0, ExprAST *x_ = nullptr)
         : t_op(t_op_), x(x_)
     { }
 
-    virtual UnaryExprAST *asUnaryExpr() { return this; }
+    virtual UnaryExprAST *asUnaryExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override
     { return x ? x->resolve(resolver) : ResolvedType(); }
@@ -1217,39 +1222,39 @@ public:
     { return x ? x->check(resolver) : ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class ArrowUnaryExprAST: public UnaryExprAST
 {
 public:
-    ArrowUnaryExprAST(unsigned t_op_ = 0, ExprAST *x_ = 0)
+    ArrowUnaryExprAST(unsigned t_op_ = 0, ExprAST *x_ = nullptr)
         : UnaryExprAST(t_op_, x_)
     { }
 
-    virtual ArrowUnaryExprAST *asArrowUnaryExpr() { return this; }
+    virtual ArrowUnaryExprAST *asArrowUnaryExpr() override { return this; }
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class RefUnaryExprAST: public UnaryExprAST
 {
 public:
-    RefUnaryExprAST(unsigned t_op_ = 0, ExprAST *x_ = 0)
+    RefUnaryExprAST(unsigned t_op_ = 0, ExprAST *x_ = nullptr)
         : UnaryExprAST(t_op_, x_)
     { }
 
-    virtual RefUnaryExprAST *asRefUnaryExpr() { return this; }
+    virtual RefUnaryExprAST *asRefUnaryExpr() override { return this; }
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class BinaryExprAST: public ExprAST
@@ -1260,26 +1265,26 @@ public:
     ExprAST *y;
 
 public:
-    BinaryExprAST(ExprAST *x_ = 0, unsigned t_op_ = 0, ExprAST *y_ = 0)
+    BinaryExprAST(ExprAST *x_ = nullptr, unsigned t_op_ = 0, ExprAST *y_ = nullptr)
         : x(x_), t_op(t_op_), y(y_)
     { }
 
-    virtual BinaryExprAST *asBinaryExpr() { return this; }
+    virtual BinaryExprAST *asBinaryExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class BinaryPlusExprAST: public BinaryExprAST
 {
 public:
-    BinaryPlusExprAST(ExprAST *x_ = 0, unsigned t_op_ = 0, ExprAST *y_ = 0)
+    BinaryPlusExprAST(ExprAST *x_ = nullptr, unsigned t_op_ = 0, ExprAST *y_ = nullptr)
         : BinaryExprAST(x_, t_op_, y_)
     { }
 
@@ -1287,7 +1292,7 @@ public:
     { return x ? x->resolve(resolver).applyPlusOperation(y, resolver) : ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class KeyValueExprAST: public ExprAST
@@ -1298,14 +1303,14 @@ public:
     ExprAST *value;
 
 public:
-    KeyValueExprAST(ExprAST *key_ = 0, unsigned t_colon_ = 0, ExprAST *value_ = 0)
+    KeyValueExprAST(ExprAST *key_ = nullptr, unsigned t_colon_ = 0, ExprAST *value_ = nullptr)
         : key(key_), t_colon(t_colon_), value(value_)
     { }
 
-    virtual KeyValueExprAST *asKeyValueExpr() { return this; }
+    virtual KeyValueExprAST *asKeyValueExpr() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *) const override
     { return ResolvedType(); }
@@ -1313,7 +1318,7 @@ public:
     { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class EllipsisTypeAST: public TypeAST
@@ -1327,12 +1332,12 @@ public:
         : t_ellipsis(t_ellipsis_), ellipsisElement(ellipsisElement_)
     { }
 
-    virtual EllipsisTypeAST *asEllipsisType() { return this; }
+    virtual EllipsisTypeAST *asEllipsisType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     virtual ResolvedType elementsType(ResolveContext *, int refLvl = 0) const override;
 
@@ -1343,7 +1348,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *) const override { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class ArrayTypeAST: public TypeAST
@@ -1355,16 +1360,16 @@ public:
     TypeAST *elementType;
 
 public:
-    ArrayTypeAST(unsigned t_lbracket_, ExprAST *len_ = 0, unsigned t_rbracket_ = 0, TypeAST *elementType_ = 0)
+    ArrayTypeAST(unsigned t_lbracket_, ExprAST *len_ = nullptr, unsigned t_rbracket_ = 0, TypeAST *elementType_ = nullptr)
         : t_lbracket(t_lbracket_), len(len_), t_rbracket(t_rbracket_), elementType(elementType_)
     { }
 
-    virtual ArrayTypeAST *asArrayType() { return this; }
+    virtual ArrayTypeAST *asArrayType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return true; }
+    virtual bool isValidCompositeLiteralType() const override { return true; }
 
     virtual ResolvedType elementsType(ResolveContext *, int refLvl = 0) const override;
 
@@ -1374,7 +1379,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class ChanTypeAST: public TypeAST
@@ -1397,15 +1402,15 @@ public:
         : t_chan(t_chan_), t_arrow(t_arrow_), value(value_)
     { }
 
-    virtual ChanTypeAST *asChanType() { return this; }
+    virtual ChanTypeAST *asChanType() override { return this; }
 
-    virtual unsigned firstToken() const { return t_chan; }
-    virtual unsigned lastToken() const { return value->lastToken(); }
+    virtual unsigned firstToken() const override { return t_chan; }
+    virtual unsigned lastToken() const override { return value->lastToken(); }
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     virtual ResolvedType chanValueType(ResolveContext *, int refLvl = 0) const override
-    { return !refLvl ? value : 0; }
+    { return !refLvl ? value : nullptr; }
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *, int = 0) const override { return Other; }
@@ -1414,7 +1419,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class FuncTypeAST: public TypeAST
@@ -1427,16 +1432,17 @@ public:
     TupleTypeAST *_callType;     // 0 is void type
 
 public:
-    FuncTypeAST(unsigned t_func_ = 0, FieldGroupAST *params_ = 0, FieldGroupAST *results_ = 0, TupleTypeAST *callType_ = 0)
+    FuncTypeAST(unsigned t_func_ = 0, FieldGroupAST *params_ = nullptr,
+                FieldGroupAST *results_ = nullptr, TupleTypeAST *callType_ = nullptr)
         : t_func(t_func_), params(params_), results(results_), _callType(callType_)
     { }
 
-    virtual FuncTypeAST *asFuncType() { return this; }
+    virtual FuncTypeAST *asFuncType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     virtual ResolvedType callType(ResolveContext *, int refLvl = 0) const override;
     virtual int countInTurple() const override;
@@ -1447,7 +1453,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class StructTypeAST: public TypeAST
@@ -1457,16 +1463,16 @@ public:
     FieldGroupAST *fields;
 
 public:
-    StructTypeAST(unsigned t_struct_ = 0, FieldGroupAST *fields_ = 0)
+    StructTypeAST(unsigned t_struct_ = 0, FieldGroupAST *fields_ = nullptr)
         : t_struct(t_struct_), fields(fields_)
     { }
 
-    virtual StructTypeAST *asStructType() { return this; }
+    virtual StructTypeAST *asStructType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return true; }
+    virtual bool isValidCompositeLiteralType() const override { return true; }
 
     // LookupContext implementation
     virtual Symbol *lookupMember(const IdentAST *ast,
@@ -1476,7 +1482,7 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate = 0) const override;
+                                       Predicate = nullptr) const override;
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *, int = 0) const override { return Other; }
@@ -1484,7 +1490,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class InterfaceTypeAST: public TypeAST
@@ -1497,16 +1503,16 @@ public:
     FieldGroupAST *methods;
 
 public:
-    InterfaceTypeAST(unsigned t_interface_ = 0, FieldGroupAST *methods_ = 0)
+    InterfaceTypeAST(unsigned t_interface_ = 0, FieldGroupAST *methods_ = nullptr)
         : incomplete(true) , t_interface(t_interface_), methods(methods_)
     { }
 
-    virtual InterfaceTypeAST *asInterfaceType() { return this; }
+    virtual InterfaceTypeAST *asInterfaceType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return false; }
+    virtual bool isValidCompositeLiteralType() const override { return false; }
 
     // LookupContext implementation
     virtual Symbol *lookupMember(const IdentAST *ast,
@@ -1516,7 +1522,7 @@ public:
     virtual void fillMemberCompletions(QList<TextEditor::AssistProposalItemInterface *> &completions,
                                        ResolveContext *resolver,
                                        int refLvl = 0,
-                                       Predicate = 0) const override;
+                                       Predicate = nullptr) const override;
 
     virtual QString describe() const override;
     virtual BuiltingKind builtinKind(ResolveContext *, int = 0) const override { return Other; }
@@ -1525,7 +1531,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class MapTypeAST: public TypeAST
@@ -1536,16 +1542,16 @@ public:
     TypeAST *value;
 
 public:
-    MapTypeAST(unsigned t_map_ = 0, TypeAST *key_ = 0, TypeAST *value_ = 0)
+    MapTypeAST(unsigned t_map_ = 0, TypeAST *key_ = nullptr, TypeAST *value_ = nullptr)
         : t_map(t_map_), key(key_), value(value_)
     { }
 
-    virtual MapTypeAST *asMapType() { return this; }
+    virtual MapTypeAST *asMapType() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
-    virtual bool isValidCompositeLiteralType() const { return true; }
+    virtual bool isValidCompositeLiteralType() const override { return true; }
 
     virtual ResolvedType elementsType(ResolveContext *, int refLvl = 0) const override;
     virtual ResolvedType indexType(ResolveContext *, int refLvl = 0) const override;
@@ -1556,7 +1562,7 @@ public:
     virtual ResolvedType check(GoCheckSymbols *) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class LitAST: public ExprAST {
@@ -1575,10 +1581,10 @@ public:
         : t_value(t_value_)
     { }
 
-    virtual BasicLitAST *asBasicLit() { return this; }
+    virtual BasicLitAST *asBasicLit() override { return this; }
 
-    virtual unsigned firstToken() const { return t_value; }
-    virtual unsigned lastToken() const { return t_value; }
+    virtual unsigned firstToken() const override { return t_value; }
+    virtual unsigned lastToken() const override { return t_value; }
 
     virtual ResolvedType resolve(ResolveContext *) const override
     { return ResolvedType(Control::integralBuiltinType()); }
@@ -1586,7 +1592,7 @@ public:
     { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class StringLitAST: public BasicLitAST
@@ -1596,7 +1602,7 @@ public:
         : BasicLitAST(t_value_)
     { }
 
-    virtual StringLitAST *asStringLit() { return this; }
+    virtual StringLitAST *asStringLit() override { return this; }
 
     virtual ResolvedType resolve(ResolveContext *) const override
     { return ResolvedType(Control::stringBuiltingType()); }
@@ -1604,7 +1610,7 @@ public:
     { return ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class FuncLitAST: public LitAST
@@ -1614,21 +1620,21 @@ public:
     BlockStmtAST *body;
 
 public:
-    FuncLitAST(FuncTypeAST *type_ = 0, BlockStmtAST *body_ = 0)
+    FuncLitAST(FuncTypeAST *type_ = nullptr, BlockStmtAST *body_ = nullptr)
         : type(type_), body(body_)
     { }
 
-    virtual FuncLitAST *asFuncLit() { return this; }
+    virtual FuncLitAST *asFuncLit() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *) const override { return ResolvedType(type); }
     virtual ResolvedType check(GoCheckSymbols *) const override
     { return type ? ResolvedType(type) : ResolvedType(); }
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class CompositeLitAST: public LitAST
@@ -1640,20 +1646,21 @@ public:
     unsigned t_rbrace;
 
 public:
-    CompositeLitAST(ExprAST *type_ = 0, unsigned t_lbrace_ = 0, ExprListAST *elements_ = 0, unsigned t_rbrace_ = 0)
+    CompositeLitAST(ExprAST *type_ = nullptr, unsigned t_lbrace_ = 0,
+                    ExprListAST *elements_ = nullptr, unsigned t_rbrace_ = 0)
         : type(type_), t_lbrace(t_lbrace_), elements(elements_), t_rbrace(t_rbrace_)
     { }
 
-    virtual CompositeLitAST *asCompositeLit() { return this; }
+    virtual CompositeLitAST *asCompositeLit() override { return this; }
 
-    virtual unsigned firstToken() const;
-    virtual unsigned lastToken() const;
+    virtual unsigned firstToken() const override;
+    virtual unsigned lastToken() const override;
 
     virtual ResolvedType resolve(ResolveContext *resolver) const override;
     virtual ResolvedType check(GoCheckSymbols *resolver) const override;
 
 protected:
-    virtual void accept0(ASTVisitor *visitor);
+    virtual void accept0(ASTVisitor *visitor) override;
 };
 
 class StmtAST: public AST
@@ -1708,7 +1715,7 @@ public:
     DeclAST *decl;
 
 public:
-    DeclStmtAST(DeclAST *decl_ = 0)
+    DeclStmtAST(DeclAST *decl_ = nullptr)
         : decl(decl_)
     { }
 
@@ -1729,7 +1736,7 @@ public:
     StmtAST *stmt;
 
 public:
-    LabeledStmtAST(IdentAST *label_ = 0, unsigned t_colon_ = 0, StmtAST *stmt_ = 0)
+    LabeledStmtAST(IdentAST *label_ = nullptr, unsigned t_colon_ = 0, StmtAST *stmt_ = nullptr)
         : label(label_), t_colon(t_colon_), stmt(stmt_)
     { }
 
@@ -1748,7 +1755,7 @@ public:
     ExprAST *x;
 
 public:
-    ExprStmtAST(ExprAST *x_ = 0)
+    ExprStmtAST(ExprAST *x_ = nullptr)
         : x(x_)
     { }
 
@@ -1769,7 +1776,7 @@ public:
     ExprAST *value;
 
 public:
-    SendStmtAST(ExprAST *chan_ = 0, unsigned t_arrow_ = 0, ExprAST *value_ = 0)
+    SendStmtAST(ExprAST *chan_ = nullptr, unsigned t_arrow_ = 0, ExprAST *value_ = nullptr)
         : chan(chan_), t_arrow(t_arrow_), value(value_)
     { }
 
@@ -1789,7 +1796,7 @@ public:
     unsigned t_pos;
 
 public:
-    IncDecStmtAST(ExprAST *x_ = 0, unsigned t_pos_ = 0)
+    IncDecStmtAST(ExprAST *x_ = nullptr, unsigned t_pos_ = 0)
         : x(x_), t_pos(t_pos_)
     { }
 
@@ -1805,7 +1812,7 @@ protected:
 class BlockStmtAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_lbrace;
@@ -1813,7 +1820,7 @@ public:
     unsigned t_rbrace;
 
 public:
-    BlockStmtAST(unsigned t_lbrace_ = 0, StmtListAST *list_ = 0, unsigned t_rbrace_ = 0)
+    BlockStmtAST(unsigned t_lbrace_ = 0, StmtListAST *list_ = nullptr, unsigned t_rbrace_ = 0)
         : t_lbrace(t_lbrace_), list(list_), t_rbrace(t_rbrace_)
     { }
 
@@ -1834,7 +1841,7 @@ public:
     ExprListAST *rhs;
 
 public:
-    AssignStmtAST(ExprListAST *lhs_ = 0, unsigned t_assign_ = 0, ExprListAST *rhs_ = 0)
+    AssignStmtAST(ExprListAST *lhs_ = nullptr, unsigned t_assign_ = 0, ExprListAST *rhs_ = nullptr)
         : lhs(lhs_), t_assign(t_assign_), rhs(rhs_)
     { }
 
@@ -1850,7 +1857,7 @@ protected:
 class DefineStmtAST: public AssignStmtAST
 {
 public:
-    DefineStmtAST(ExprListAST *lhs_ = 0, unsigned t_assign_ = 0, ExprListAST *rhs_ = 0)
+    DefineStmtAST(ExprListAST *lhs_ = nullptr, unsigned t_assign_ = 0, ExprListAST *rhs_ = nullptr)
         : AssignStmtAST(lhs_, t_assign_, rhs_)
     { }
 
@@ -1867,7 +1874,7 @@ public:
     CallExprAST *call;
 
 public:
-    GoStmtAST(unsigned t_go_ = 0, CallExprAST *call_ = 0)
+    GoStmtAST(unsigned t_go_ = 0, CallExprAST *call_ = nullptr)
         : t_go(t_go_), call(call_)
     { }
 
@@ -1887,7 +1894,7 @@ public:
     CallExprAST *call;
 
 public:
-    DeferStmtAST(unsigned t_defer_ = 0, CallExprAST *call_ = 0)
+    DeferStmtAST(unsigned t_defer_ = 0, CallExprAST *call_ = nullptr)
         : t_defer(t_defer_), call(call_)
     { }
 
@@ -1907,7 +1914,7 @@ public:
     ExprListAST *results;
 
 public:
-    ReturnStmtAST(unsigned t_return_ = 0, ExprListAST *results_ = 0)
+    ReturnStmtAST(unsigned t_return_ = 0, ExprListAST *results_ = nullptr)
         : t_return(t_return_), results(results_)
     { }
 
@@ -1927,7 +1934,7 @@ public:
     IdentAST *label;
 
 public:
-    BranchStmtAST(unsigned t_pos_ = 0, IdentAST *label_ = 0)
+    BranchStmtAST(unsigned t_pos_ = 0, IdentAST *label_ = nullptr)
         : t_pos(t_pos_), label(label_)
     { }
 
@@ -1943,7 +1950,7 @@ protected:
 class IfStmtAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_if;
@@ -1953,7 +1960,8 @@ public:
     StmtAST *elseStmt;
 
 public:
-    IfStmtAST(unsigned t_if_ = 0, StmtAST *init_ = 0, ExprAST *cond_ = 0, BlockStmtAST *body_ = 0, StmtAST *elseStmt_ = 0)
+    IfStmtAST(unsigned t_if_ = 0, StmtAST *init_ = nullptr, ExprAST *cond_ = nullptr,
+              BlockStmtAST *body_ = nullptr, StmtAST *elseStmt_ = nullptr)
         : t_if(t_if_), init(init_), cond(cond_), body(body_), elseStmt(elseStmt_)
     { }
 
@@ -1969,7 +1977,7 @@ protected:
 class CaseClauseAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_case;
@@ -1978,7 +1986,7 @@ public:
     StmtListAST *body;
 
 public:
-    CaseClauseAST(unsigned t_case_ = 0, ExprListAST *list_ = 0, unsigned t_colon_ = 0, StmtListAST *body_ = 0)
+    CaseClauseAST(unsigned t_case_ = 0, ExprListAST *list_ = nullptr, unsigned t_colon_ = 0, StmtListAST *body_ = nullptr)
         : t_case(t_case_), list(list_), t_colon(t_colon_), body(body_)
     { }
 
@@ -1994,7 +2002,7 @@ protected:
 class SwitchStmtAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_switch;
@@ -2003,7 +2011,7 @@ public:
     BlockStmtAST *body;
 
 public:
-    SwitchStmtAST(unsigned t_switch_ = 0, StmtAST *init_ = 0, ExprAST *tag_ = 0, BlockStmtAST *body_ = 0)
+    SwitchStmtAST(unsigned t_switch_ = 0, StmtAST *init_ = nullptr, ExprAST *tag_ = nullptr, BlockStmtAST *body_ = nullptr)
         : t_switch(t_switch_), init(init_), tag(tag_), body(body_)
     { }
 
@@ -2019,7 +2027,7 @@ protected:
 class TypeSwitchStmtAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_switch;
@@ -2028,7 +2036,7 @@ public:
     BlockStmtAST *body;
 
 public:
-    TypeSwitchStmtAST(unsigned t_switch_ = 0, StmtAST *init_ = 0, StmtAST *assign_ = 0, BlockStmtAST *body_ = 0)
+    TypeSwitchStmtAST(unsigned t_switch_ = 0, StmtAST *init_ = nullptr, StmtAST *assign_ = nullptr, BlockStmtAST *body_ = nullptr)
         : t_switch(t_switch_), init(init_), assign(assign_), body(body_)
     { }
 
@@ -2050,7 +2058,7 @@ public:
     StmtListAST *body;
 
 public:
-    CommClauseAST(unsigned t_case_ = 0, StmtAST *comm_ = 0, unsigned t_colon_ = 0, StmtListAST *body_ = 0)
+    CommClauseAST(unsigned t_case_ = 0, StmtAST *comm_ = nullptr, unsigned t_colon_ = 0, StmtListAST *body_ = nullptr)
         : t_case(t_case_), comm(comm_), t_colon(t_colon_), body(body_)
     { }
 
@@ -2070,7 +2078,7 @@ public:
     BlockStmtAST *body;
 
 public:
-    SelectStmtAST(unsigned t_select_ = 0, BlockStmtAST *body_ = 0)
+    SelectStmtAST(unsigned t_select_ = 0, BlockStmtAST *body_ = nullptr)
         : t_select(t_select_), body(body_)
     { }
 
@@ -2086,7 +2094,7 @@ protected:
 class ForStmtAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_for;
@@ -2096,7 +2104,8 @@ public:
     BlockStmtAST *body;
 
 public:
-    ForStmtAST(unsigned t_for_ = 0, StmtAST *init_ = 0, ExprAST *cond_ = 0, StmtAST *post_ = 0, BlockStmtAST *body_ = 0)
+    ForStmtAST(unsigned t_for_ = 0, StmtAST *init_ = nullptr, ExprAST *cond_ = nullptr,
+               StmtAST *post_ = nullptr, BlockStmtAST *body_ = nullptr)
         : t_for(t_for_), init(init_), cond(cond_), post(post_), body(body_)
     { }
 
@@ -2112,7 +2121,7 @@ protected:
 class RangeStmtAST: public StmtAST
 {
 public:
-    Scope *scope = 0;
+    Scope *scope = nullptr;
 
 public:
     unsigned t_for;
@@ -2123,7 +2132,8 @@ public:
     BlockStmtAST *body;
 
 public:
-    RangeStmtAST(unsigned t_for_ = 0, ExprAST *key_ = 0, ExprAST *value_ = 0, unsigned t_assign_ = 0, ExprAST *x_ = 0, BlockStmtAST *body_ = 0)
+    RangeStmtAST(unsigned t_for_ = 0, ExprAST *key_ = nullptr, ExprAST *value_ = nullptr,
+                 unsigned t_assign_ = 0, ExprAST *x_ = nullptr, BlockStmtAST *body_ = nullptr)
         : t_for(t_for_), key(key_), value(value_), t_assign(t_assign_), x(x_), body(body_)
     { }
 
