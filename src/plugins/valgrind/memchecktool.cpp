@@ -118,7 +118,6 @@ const char MEMCHECK_RUN_MODE[] = "MemcheckTool.MemcheckRunMode";
 const char MEMCHECK_WITH_GDB_RUN_MODE[] = "MemcheckTool.MemcheckWithGdbRunMode";
 
 const char MemcheckPerspectiveId[] = "Memcheck.Perspective";
-const char MemcheckErrorDockId[] = "Memcheck.Dock.Error";
 
 
 class MemcheckToolRunner : public ValgrindToolRunner
@@ -392,6 +391,7 @@ class MemcheckTool : public QObject
 
 public:
     MemcheckTool();
+    ~MemcheckTool();
 
     void setupRunner(MemcheckToolRunner *runTool);
     void loadShowXmlLogFile(const QString &filePath, const QString &exitMsg);
@@ -425,7 +425,7 @@ private:
 
     Valgrind::XmlProtocol::ErrorListModel m_errorModel;
     MemcheckErrorFilterProxyModel m_errorProxyModel;
-    MemcheckErrorView *m_errorView = 0;
+    QPointer<MemcheckErrorView> m_errorView;
 
     QList<QAction *> m_errorFilterActions;
     QAction *m_filterProjectAction;
@@ -556,9 +556,8 @@ MemcheckTool::MemcheckTool()
     m_errorView->setObjectName(QLatin1String("Valgrind.MemcheckTool.ErrorView"));
     m_errorView->setWindowTitle(tr("Memory Issues"));
 
-    Debugger::registerPerspective(MemcheckPerspectiveId, new Perspective (tr("Memcheck"), {
-        {MemcheckErrorDockId, m_errorView, {}, Perspective::SplitVertical}
-    }));
+    auto perspective = new Perspective(tr("Memcheck"));
+    perspective->addWindow(m_errorView, Perspective::SplitVertical, nullptr);
 
     connect(ProjectExplorerPlugin::instance(), &ProjectExplorerPlugin::updateRunActions,
             this, &MemcheckTool::maybeActiveRunConfigurationChanged);
@@ -684,18 +683,22 @@ MemcheckTool::MemcheckTool()
         ProjectExplorerPlugin::startRunControl(rc);
     });
 
-    ToolbarDescription toolbar;
-    toolbar.addAction(m_startAction);
+    perspective->addToolbarAction(m_startAction);
     //toolbar.addAction(m_startWithGdbAction);
-    toolbar.addAction(m_stopAction);
-    toolbar.addAction(m_loadExternalLogFile);
-    toolbar.addAction(m_goBack);
-    toolbar.addAction(m_goNext);
-    toolbar.addWidget(filterButton);
-    Debugger::registerToolbar(MemcheckPerspectiveId, toolbar);
+    perspective->addToolbarAction(m_stopAction);
+    perspective->addToolbarAction(m_loadExternalLogFile);
+    perspective->addToolbarAction(m_goBack);
+    perspective->addToolbarAction(m_goNext);
+    perspective->addToolbarWidget(filterButton);
+    Debugger::registerPerspective(MemcheckPerspectiveId, perspective);
 
     updateFromSettings();
     maybeActiveRunConfigurationChanged();
+}
+
+MemcheckTool::~MemcheckTool()
+{
+    delete m_errorView;
 }
 
 void MemcheckTool::heobAction()

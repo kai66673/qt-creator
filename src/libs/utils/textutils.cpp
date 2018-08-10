@@ -27,7 +27,6 @@
 
 #include <QTextDocument>
 #include <QTextBlock>
-#include <QTextCursor>
 
 namespace Utils {
 namespace Text {
@@ -46,9 +45,9 @@ bool convertPosition(const QTextDocument *document, int pos, int *line, int *col
     }
 }
 
-Utils::OptionalLineColumn convertPosition(const QTextDocument *document, int pos)
+OptionalLineColumn convertPosition(const QTextDocument *document, int pos)
 {
-    Utils::OptionalLineColumn optional;
+    OptionalLineColumn optional;
 
     QTextBlock block = document->findBlock(pos);
 
@@ -56,6 +55,13 @@ Utils::OptionalLineColumn convertPosition(const QTextDocument *document, int pos
         optional.emplace(block.blockNumber() + 1, pos - block.position());
 
     return optional;
+}
+
+int positionInText(QTextDocument *textDocument, int line, int column)
+{
+    // Deduct 1 from line and column since they are 1-based.
+    // Column should already be converted from UTF-8 byte offset to the TextEditor column.
+    return textDocument->findBlockByNumber(line - 1).position() + column - 1;
 }
 
 QString textAt(QTextCursor tc, int pos, int length)

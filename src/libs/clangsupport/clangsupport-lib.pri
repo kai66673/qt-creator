@@ -87,7 +87,10 @@ SOURCES += \
     $$PWD/writemessageblock.cpp \
     $$PWD/filepathcaching.cpp \
     $$PWD/filepathid.cpp \
-    $$PWD/baseserverproxy.cpp
+    $$PWD/baseserverproxy.cpp \
+    $$PWD/updategeneratedfilesmessage.cpp \
+    $$PWD/removegeneratedfilesmessage.cpp \
+    $$PWD/generatedfiles.cpp
 
 HEADERS += \
     $$PWD/cancelmessage.h \
@@ -202,6 +205,9 @@ HEADERS += \
     $$PWD/nativefilepath.h \
     $$PWD/filepathview.h \
     $$PWD/compilermacro.h \
-    $$PWD/projectpartpchproviderinterface.h
+    $$PWD/projectpartpchproviderinterface.h \
+    $$PWD/updategeneratedfilesmessage.h \
+    $$PWD/removegeneratedfilesmessage.h \
+    $$PWD/generatedfiles.h
 
 contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols

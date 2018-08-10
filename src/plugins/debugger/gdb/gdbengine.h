@@ -159,7 +159,7 @@ private: ////////// General Interface //////////
     int m_oldestAcceptableToken = -1;
     int m_nonDiscardableCount = 0;
 
-    typedef void (GdbEngine::*CommandsDoneCallback)();
+    using CommandsDoneCallback = void (GdbEngine::*)();
     // This function is called after all previous responses have been received.
     CommandsDoneCallback m_commandsDoneCallback = nullptr;
 
@@ -175,8 +175,6 @@ private: ////////// General Interface //////////
     void handleStop2(const GdbMi &data);
     void handleStop3();
     void resetCommandQueue();
-
-    bool isSynchronous() const final { return true; }
 
     // Gdb initialization sequence
     void handleShowVersion(const DebuggerResponse &response);
@@ -403,6 +401,7 @@ private: ////////// General Interface //////////
     void shutdownEngine() final;
 
     void interruptInferior2();
+    QChar mixedDisasmFlag() const;
 
     // Plain
     void handleExecRun(const DebuggerResponse &response);

@@ -30,10 +30,10 @@
 // **********************************************************************
 
 /*!
-    \contentspage {Qt Creator Manual}
+    \contentspage index.html
     \page creator-commercial-overview.html
 
-    \title Qt Creator Commercial Features
+    \title Commercial Features
 
     \commercial
 
@@ -41,8 +41,8 @@
     \l{http://qt.io/licensing/}{Qt license}:
 
     \list
-        \li \l{Analyzing CPU Usage}{CPU Usage Analyzer}
-        \li \l{Browsing ISO 7000 Icons} in \QMLD
+        \li \l{Analyzing CPU Usage}{Performance Analyzer}
+        \li \l{Browsing ISO 7000 Icons} in the Design mode
         \li \l{http://doc.qt.io/QtForDeviceCreation/index.html}{Developing for
             embedded devices}
         \li \l{http://doc.qt.io/qtcreator/creator-overview-qtasam.html}

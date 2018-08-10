@@ -30,6 +30,7 @@
 #include "androidtoolchain.h"
 #include "androidmanager.h"
 #include "adbcommandswidget.h"
+#include "androidrunenvironmentaspect.h"
 
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/project.h>
@@ -110,6 +111,9 @@ void BaseStringListAspect::setLabel(const QString &label)
 AndroidRunConfiguration::AndroidRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
+    addExtraAspect(new AndroidRunEnvironmentAspect(this));
+    addExtraAspect(new ArgumentsAspect(this));
+
     auto amStartArgsAspect = new BaseStringAspect(this);
     amStartArgsAspect->setId(Constants::ANDROID_AMSTARTARGS);
     amStartArgsAspect->setSettingsKey("Android.AmStartArgsKey");
@@ -141,6 +145,7 @@ QWidget *AndroidRunConfiguration::createConfigurationWidget()
     auto widget = new QWidget;
     auto layout = new QFormLayout(widget);
 
+    extraAspect<ArgumentsAspect>()->addToConfigurationLayout(layout);
     extraAspect(Constants::ANDROID_AMSTARTARGS)->addToConfigurationLayout(layout);
 
     auto warningIconLabel = new QLabel;
@@ -151,6 +156,7 @@ QWidget *AndroidRunConfiguration::createConfigurationWidget()
 
     extraAspect(Constants::ANDROID_PRESTARTSHELLCMDLIST)->addToConfigurationLayout(layout);
     extraAspect(Constants::ANDROID_POSTFINISHSHELLCMDLIST)->addToConfigurationLayout(layout);
+    extraAspect<AndroidRunEnvironmentAspect>()->addToConfigurationLayout(layout);
 
     auto wrapped = wrapWidget(widget);
     auto detailsWidget = qobject_cast<DetailsWidget *>(wrapped);

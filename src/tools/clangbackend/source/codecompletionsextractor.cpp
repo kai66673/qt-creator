@@ -25,15 +25,19 @@
 
 #include "codecompletionsextractor.h"
 
+#include "clangbackend_global.h"
 #include "clangstring.h"
 #include "codecompletionchunkconverter.h"
+#include "sourcerange.h"
 
 #include <QDebug>
 
 namespace ClangBackEnd {
 
-CodeCompletionsExtractor::CodeCompletionsExtractor(CXCodeCompleteResults *cxCodeCompleteResults)
-    : cxCodeCompleteResults(cxCodeCompleteResults)
+CodeCompletionsExtractor::CodeCompletionsExtractor(CXTranslationUnit cxTranslationUnit,
+                                                   CXCodeCompleteResults *cxCodeCompleteResults)
+    : cxTranslationUnit(cxTranslationUnit)
+    , cxCodeCompleteResults(cxCodeCompleteResults)
 {
 
 }
@@ -55,6 +59,7 @@ bool CodeCompletionsExtractor::next()
         extractBriefComment();
         extractCompletionChunks();
         adaptPriority();
+        extractRequiredFixIts();
 
         ++cxCodeCompleteResultIndex;
 
@@ -171,6 +176,9 @@ void CodeCompletionsExtractor::extractText()
 void CodeCompletionsExtractor::extractMethodCompletionKind()
 {
     CXCompletionString cxCompletionString = cxCodeCompleteResults->Results[cxCodeCompleteResultIndex].CompletionString;
+
+    const unsigned long long contexts = clang_codeCompleteGetContexts(cxCodeCompleteResults);
+
     const uint annotationCount = clang_getCompletionNumAnnotations(cxCompletionString);
 
     for (uint annotationIndex = 0; annotationIndex < annotationCount; ++annotationIndex) {
@@ -187,7 +195,11 @@ void CodeCompletionsExtractor::extractMethodCompletionKind()
         }
     }
 
-    currentCodeCompletion_.completionKind = CodeCompletion::FunctionCompletionKind;
+    currentCodeCompletion_.completionKind = CodeCompletion::FunctionDefinitionCompletionKind;
+    if ((contexts & CXCompletionContext_DotMemberAccess)
+            || (contexts & CXCompletionContext_ArrowMemberAccess)) {
+        currentCodeCompletion_.completionKind = CodeCompletion::FunctionCompletionKind;
+    }
 }
 
 void CodeCompletionsExtractor::extractMacroCompletionKind()
@@ -258,6 +270,27 @@ void CodeCompletionsExtractor::extractBriefComment()
 void CodeCompletionsExtractor::extractCompletionChunks()
 {
     currentCodeCompletion_.chunks = CodeCompletionChunkConverter::extract(currentCxCodeCompleteResult.CompletionString);
+}
+
+void CodeCompletionsExtractor::extractRequiredFixIts()
+{
+#ifdef IS_COMPLETION_FIXITS_BACKPORTED
+    unsigned fixItsNumber = clang_getCompletionNumFixIts(cxCodeCompleteResults,
+                                                         cxCodeCompleteResultIndex);
+
+    if (!fixItsNumber)
+        return;
+
+    CXSourceRange range;
+    for (unsigned i = 0; i < fixItsNumber; ++i) {
+        ClangString fixIt = clang_getCompletionFixIt(cxCodeCompleteResults,
+                                                     cxCodeCompleteResultIndex,
+                                                     i,
+                                                     &range);
+        currentCodeCompletion_.requiredFixIts.push_back(
+                    FixItContainer(Utf8String(fixIt), SourceRange(cxTranslationUnit, range)));
+    }
+#endif
 }
 
 void CodeCompletionsExtractor::adaptPriority()

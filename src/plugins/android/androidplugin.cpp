@@ -92,6 +92,7 @@ public:
     AndroidPackageInstallationFactory packackeInstallationFactory;
     AndroidManifestEditorFactory manifestEditorFactory;
     AndroidRunConfigurationFactory runConfigFactory;
+    AndroidBuildApkStepFactory buildApkStepFactory;
 };
 
 AndroidPlugin::~AndroidPlugin()
@@ -106,7 +107,7 @@ bool AndroidPlugin::initialize(const QStringList &arguments, QString *errorMessa
 
     RunControl::registerWorker(QML_PREVIEW_RUN_MODE, [](RunControl *runControl) -> RunWorker* {
         const Runnable runnable = runControl->runConfiguration()->runnable();
-        return new AndroidQmlToolingSupport(runControl, runnable.executable, runnable.commandLineArguments);
+        return new AndroidQmlToolingSupport(runControl, runnable.executable);
     }, [](RunConfiguration *runConfig) {
         return runConfig->isEnabled()
                 && runConfig->id().name().startsWith("QmlProjectManager.QmlRunConfiguration")
@@ -116,7 +117,7 @@ bool AndroidPlugin::initialize(const QStringList &arguments, QString *errorMessa
 
     d = new AndroidPluginPrivate;
 
-    KitManager::registerKitInformation(new Internal::AndroidGdbServerKitInformation);
+    KitManager::registerKitInformation<Internal::AndroidGdbServerKitInformation>();
 
     connect(KitManager::instance(), &KitManager::kitsLoaded,
             this, &AndroidPlugin::kitsRestored);

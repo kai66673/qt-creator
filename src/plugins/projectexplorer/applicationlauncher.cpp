@@ -69,7 +69,7 @@ class ApplicationLauncherPrivate : public QObject
 public:
     enum State { Inactive, Run };
     explicit ApplicationLauncherPrivate(ApplicationLauncher *parent);
-    ~ApplicationLauncherPrivate() { setFinished(); }
+    ~ApplicationLauncherPrivate() override { setFinished(); }
 
     void start(const Runnable &runnable, const IDevice::ConstPtr &device, bool local);
     void stop();
@@ -160,19 +160,15 @@ ApplicationLauncherPrivate::ApplicationLauncherPrivate(ApplicationLauncher *pare
     connect(WinDebugInterface::instance(), &WinDebugInterface::cannotRetrieveDebugOutput,
             this, &ApplicationLauncherPrivate::cannotRetrieveLocalDebugOutput);
     connect(WinDebugInterface::instance(), &WinDebugInterface::debugOutput,
-            this, &ApplicationLauncherPrivate::checkLocalDebugOutput, Qt::BlockingQueuedConnection);
+            this, &ApplicationLauncherPrivate::checkLocalDebugOutput);
 #endif
 }
 
 ApplicationLauncher::ApplicationLauncher(QObject *parent) : QObject(parent),
-    d(new ApplicationLauncherPrivate(this))
-{
-}
+    d(std::make_unique<ApplicationLauncherPrivate>(this))
+{ }
 
-ApplicationLauncher::~ApplicationLauncher()
-{
-    delete d;
-}
+ApplicationLauncher::~ApplicationLauncher() = default;
 
 void ApplicationLauncher::setProcessChannelMode(QProcess::ProcessChannelMode mode)
 {
@@ -324,7 +320,7 @@ void ApplicationLauncherPrivate::readLocalStandardError()
 void ApplicationLauncherPrivate::cannotRetrieveLocalDebugOutput()
 {
 #ifdef Q_OS_WIN
-    disconnect(WinDebugInterface::instance(), 0, this, 0);
+    disconnect(WinDebugInterface::instance(), nullptr, this, nullptr);
     emit q->appendMessage(ApplicationLauncher::msgWinCannotRetrieveDebuggingOutput(), ErrorMessageFormat);
 #endif
 }
@@ -446,7 +442,7 @@ void ApplicationLauncherPrivate::setFinished()
     if (m_deviceProcess) {
         m_deviceProcess->disconnect(this);
         m_deviceProcess->deleteLater();
-        m_deviceProcess = 0;
+        m_deviceProcess = nullptr;
     }
 
     m_state = Inactive;

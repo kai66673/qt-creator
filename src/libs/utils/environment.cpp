@@ -49,8 +49,10 @@ public:
             toReplace.append(':');
             toReplace.append(lib.path());
 
-            if (ldLibraryPath.startsWith(toReplace))
-                set("LD_LIBRARY_PATH", ldLibraryPath.remove(0, toReplace.length()));
+            if (ldLibraryPath.startsWith(toReplace + ':'))
+                set("LD_LIBRARY_PATH", ldLibraryPath.remove(0, toReplace.length() + 1));
+            else if (ldLibraryPath == toReplace)
+                unset("LD_LIBRARY_PATH");
         }
     }
 };
@@ -181,16 +183,16 @@ QDebug operator<<(QDebug debug, const EnvironmentItem &i)
     debug.nospace();
     debug << "EnvironmentItem(";
     switch (i.operation) {
-    case Utils::EnvironmentItem::Set:
+    case EnvironmentItem::Set:
         debug << "set \"" << i.name << "\" to \"" << i.value << '"';
         break;
-    case Utils::EnvironmentItem::Unset:
+    case EnvironmentItem::Unset:
         debug << "unset \"" << i.name << '"';
         break;
-    case Utils::EnvironmentItem::Prepend:
+    case EnvironmentItem::Prepend:
         debug << "prepend to \"" << i.name << "\":\"" << i.value << '"';
         break;
-    case Utils::EnvironmentItem::Append:
+    case EnvironmentItem::Append:
         debug << "append to \"" << i.name << "\":\"" << i.value << '"';
         break;
     }
@@ -447,7 +449,11 @@ bool Environment::isSameExecutable(const QString &exe1, const QString &exe2) con
     const QStringList exe2List = appendExeExtensions(exe2);
     for (const QString &i1 : exe1List) {
         for (const QString &i2 : exe2List) {
-            if (FileName::fromString(i1) == FileName::fromString(i2))
+            const FileName f1 = FileName::fromString(i1);
+            const FileName f2 = FileName::fromString(i2);
+            if (f1 == f2)
+                return true;
+            if (FileUtils::resolveSymlinks(f1) == FileUtils::resolveSymlinks(f2))
                 return true;
         }
     }

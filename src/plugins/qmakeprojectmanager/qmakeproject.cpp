@@ -624,7 +624,7 @@ static FolderNode *folderOf(FolderNode *in, const FileName &fileName)
 static FileNode *fileNodeOf(FolderNode *in, const FileName &fileName)
 {
     for (FolderNode *folder = folderOf(in, fileName); folder; folder = folder->parentFolderNode()) {
-        if (QmakeProFileNode *proFile = dynamic_cast<QmakeProFileNode *>(folder)) {
+        if (auto *proFile = dynamic_cast<QmakeProFileNode *>(folder)) {
             foreach (FileNode *fileNode, proFile->fileNodes()) {
                 if (fileNode->filePath() == fileName)
                     return fileNode;
@@ -1062,15 +1062,11 @@ void QmakeProject::updateBuildSystemData()
             else
                 workingDir = destDir;
         } else {
-            destDir = ti.buildDir.toString();
             workingDir = ti.buildDir.toString();
         }
 
-        if (HostOsInfo::isMacHost() && config.contains("app_bundle")) {
-            const QString infix = '/' + ti.target + ".app/Contents/MacOS";
-            workingDir += infix;
-            destDir += infix;
-        }
+        if (HostOsInfo::isMacHost() && config.contains("app_bundle"))
+            workingDir += '/' + ti.target + ".app/Contents/MacOS";
 
         BuildTargetInfo bti;
         bti.targetFilePath = FileName::fromString(executableFor(proFile));
@@ -1292,30 +1288,38 @@ void QmakeProject::testToolChain(ToolChain *tc, const Utils::FileName &path) con
     const Utils::FileName expected = tc->compilerCommand();
 
     Environment env = Environment::systemEnvironment();
+    Kit *k = nullptr;
     if (Target *t = activeTarget()) {
+        k = t->kit();
         if (BuildConfiguration *bc = t->activeBuildConfiguration())
             env = bc->environment();
         else
-            t->kit()->addToEnvironment(env);
+            k->addToEnvironment(env);
     }
+    QTC_ASSERT(k, return);
 
-    if (!env.isSameExecutable(path.toString(), expected.toString())) {
-        const QPair<Utils::FileName, Utils::FileName> pair = qMakePair(expected, path);
-        if (!m_toolChainWarnings.contains(pair)) {
-            // Suppress warnings on Apple machines where compilers in /usr/bin point into Xcode.
-            // This will suppress some valid warnings, but avoids annoying Apple users with
-            // spurious warnings all the time!
-            if (!pair.first.toString().startsWith("/usr/bin/")
-                    || !pair.second.toString().contains("/Contents/Developer/Toolchains/")) {
-                TaskHub::addTask(Task(Task::Warning,
-                                      QCoreApplication::translate("QmakeProjectManager", "\"%1\" is used by qmake, but \"%2\" is configured in the kit.\n"
-                                                                                         "Please update your kit or choose a mkspec for qmake that matches your target environment better.").
-                                      arg(path.toUserOutput()).arg(expected.toUserOutput()),
-                                      Utils::FileName(), -1, ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
-                m_toolChainWarnings.insert(pair);
-            }
-        }
+    if (env.isSameExecutable(path.toString(), expected.toString()))
+        return;
+    const QPair<Utils::FileName, Utils::FileName> pair = qMakePair(expected, path);
+    if (m_toolChainWarnings.contains(pair))
+        return;
+    // Suppress warnings on Apple machines where compilers in /usr/bin point into Xcode.
+    // This will suppress some valid warnings, but avoids annoying Apple users with
+    // spurious warnings all the time!
+    if (pair.first.toString().startsWith("/usr/bin/")
+            && pair.second.toString().contains("/Contents/Developer/Toolchains/")) {
+        return;
     }
+    TaskHub::addTask(
+                Task(Task::Warning,
+                     QCoreApplication::translate(
+                         "QmakeProjectManager",
+                         "\"%1\" is used by qmake, but \"%2\" is configured in the kit.\n"
+                         "Please update your kit (%3) or choose a mkspec for qmake that matches "
+                         "your target environment better.")
+                     .arg(path.toUserOutput()).arg(expected.toUserOutput()).arg(k->displayName()),
+                     Utils::FileName(), -1, ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
+    m_toolChainWarnings.insert(pair);
 }
 
 void QmakeProject::warnOnToolChainMismatch(const QmakeProFile *pro) const

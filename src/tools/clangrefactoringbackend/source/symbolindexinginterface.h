@@ -38,7 +38,7 @@ public:
     SymbolIndexingInterface &operator=(const SymbolIndexingInterface&) = delete;
 
     virtual void updateProjectParts(V2::ProjectPartContainers &&projectParts,
-                                    V2::FileContainers &&generatedFiles) = 0;
+                                    const V2::FileContainers &generatedFiles) = 0;
 
 protected:
     ~SymbolIndexingInterface() = default;

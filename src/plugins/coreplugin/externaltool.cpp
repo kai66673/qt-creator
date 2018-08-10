@@ -35,6 +35,7 @@
 
 #include <app/app_version.h>
 
+#include <utils/algorithm.h>
 #include <utils/fileutils.h>
 #include <utils/macroexpander.h>
 #include <utils/qtcassert.h>
@@ -80,11 +81,7 @@ const char kFalse[] = "false";
 // #pragma mark -- ExternalTool
 
 ExternalTool::ExternalTool() :
-    m_displayCategory(QLatin1String("")), // difference between isNull and isEmpty
-    m_order(-1),
-    m_outputHandling(ShowInPane),
-    m_errorHandling(ShowInPane),
-    m_modifiesCurrentDocument(false)
+    m_displayCategory(QLatin1String("")) // difference between isNull and isEmpty
 {
 }
 
@@ -128,9 +125,7 @@ ExternalTool &ExternalTool::operator=(const ExternalTool &other)
     return *this;
 }
 
-ExternalTool::~ExternalTool()
-{
-}
+ExternalTool::~ExternalTool() = default;
 
 QString ExternalTool::id() const
 {
@@ -353,7 +348,7 @@ ExternalTool * ExternalTool::createFromXml(const QByteArray &xml, QString *error
     int nameLocale = -1;
     int categoryLocale = -1;
     const QStringList &locales = splitLocale(locale);
-    ExternalTool *tool = new ExternalTool;
+    auto tool = new ExternalTool;
     QXmlStreamReader reader(xml);
 
     if (!reader.readNextStartElement() || reader.name() != QLatin1String(kExternalTool))
@@ -441,7 +436,7 @@ ExternalTool * ExternalTool::createFromXml(const QByteArray &xml, QString *error
         if (errorMessage)
             *errorMessage = reader.errorString();
         delete tool;
-        return 0;
+        return nullptr;
     }
     return tool;
 }
@@ -451,10 +446,10 @@ ExternalTool * ExternalTool::createFromFile(const QString &fileName, QString *er
     QString absFileName = QFileInfo(fileName).absoluteFilePath();
     FileReader reader;
     if (!reader.fetch(absFileName, errorMessage))
-        return 0;
+        return nullptr;
     ExternalTool *tool = ExternalTool::createFromXml(reader.data(), errorMessage, locale);
     if (!tool)
-        return 0;
+        return nullptr;
     tool->m_fileName = absFileName;
     return tool;
 }
@@ -540,7 +535,7 @@ bool ExternalTool::operator==(const ExternalTool &other) const
 
 ExternalToolRunner::ExternalToolRunner(const ExternalTool *tool)
     : m_tool(new ExternalTool(tool)),
-      m_process(0),
+      m_process(nullptr),
       m_outputCodec(QTextCodec::codecForLocale()),
       m_hasError(false)
 {
@@ -574,7 +569,11 @@ bool ExternalToolRunner::resolve()
 
 
     MacroExpander *expander = globalMacroExpander();
-    m_resolvedEnvironment.modify(m_tool->environment());
+    QList<EnvironmentItem> expandedEnvironment
+        = Utils::transform(m_tool->environment(), [expander](const EnvironmentItem &item) {
+              return EnvironmentItem(item.name, expander->expand(item.value), item.operation);
+          });
+    m_resolvedEnvironment.modify(expandedEnvironment);
 
     {
         // executable

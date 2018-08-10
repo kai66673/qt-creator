@@ -124,14 +124,14 @@ public:
     bool automaticKitCreation() const;
     void setAutomaticKitCreation(bool b);
 
-    QString deviceQmlsceneCommand() const;
-    void setDeviceQmlsceneCommand(const QString &qmlsceneCommand);
+    Utils::FileName qtLiveApkPath() const;
 
     Utils::FileName adbToolPath() const;
     Utils::FileName androidToolPath() const;
     Utils::FileName emulatorToolPath() const;
     Utils::FileName sdkManagerToolPath() const;
     Utils::FileName avdManagerToolPath() const;
+    Utils::FileName aaptToolPath() const;
 
     Utils::FileName gccPath(const ProjectExplorer::Abi &abi, Core::Id lang,
                             const QString &ndkToolChainVersion) const;
@@ -181,7 +181,6 @@ private:
     QStringList m_makeExtraSearchDirectories;
     unsigned m_partitionSize = 1024;
     bool m_automaticKitCreation = true;
-    QString m_deviceQmlsceneCommand;
 
     //caches
     mutable bool m_NdkInformationUpToDate = false;
@@ -229,6 +228,8 @@ private:
     QMap<ProjectExplorer::Project *, QMap<QString, QString> > m_defaultDeviceForAbi;
     bool m_force32bit;
 };
+
+QDebug &operator<<(QDebug &stream, const AndroidDeviceInfo &device);
 
 } // namespace Android
 

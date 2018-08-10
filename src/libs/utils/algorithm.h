@@ -229,7 +229,7 @@ protected:
   Container *container;
 
 public:
-  typedef Container container_type;
+  using container_type = Container;
   explicit SetInsertIterator (Container &x)
     : container(&x) {}
   SetInsertIterator<Container> &operator=(const typename Container::value_type &value)
@@ -253,7 +253,7 @@ template <class Container>
     Container *container;
 
   public:
-    typedef Container container_type;
+    using container_type = Container;
     explicit MapInsertIterator (Container &x)
       : container(&x) {}
     MapInsertIterator<Container> &operator=(const std::pair<const typename Container::key_type, typename Container::mapped_type> &value)
@@ -727,15 +727,15 @@ auto toConstReferences(const SourceContainer &sources)
 /////////////////
 
 template<class C, typename P>
-Q_REQUIRED_RESULT Utils::optional<typename C::value_type> take(C &container, P predicate)
+Q_REQUIRED_RESULT optional<typename C::value_type> take(C &container, P predicate)
 {
     const auto end = std::end(container);
 
     const auto it = std::find_if(std::begin(container), end, predicate);
     if (it == end)
-        return Utils::nullopt;
+        return nullopt;
 
-    Utils::optional<typename C::value_type> result = Utils::make_optional(std::move(*it));
+    optional<typename C::value_type> result = Utils::make_optional(std::move(*it));
     container.erase(it);
     return result;
 }

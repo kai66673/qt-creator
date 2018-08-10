@@ -132,14 +132,14 @@ public:
 // -------------------------------------------------------------------------
 
 Kit::Kit(Id id) :
-    d(new Internal::KitPrivate(id, this))
+    d(std::make_unique<Internal::KitPrivate>(id, this))
 {
     foreach (KitInformation *sti, KitManager::kitInformation())
         d->m_data.insert(sti->id(), sti->defaultValue(this));
 }
 
 Kit::Kit(const QVariantMap &data) :
-    d(new Internal::KitPrivate(Id(), this))
+    d(std::make_unique<Internal::KitPrivate>(Id(), this))
 {
     d->m_id = Id::fromSetting(data.value(QLatin1String(ID_KEY)));
 
@@ -162,27 +162,19 @@ Kit::Kit(const QVariantMap &data) :
     QVariantMap extra = data.value(QLatin1String(DATA_KEY)).toMap();
     d->m_data.clear(); // remove default values
     const QVariantMap::ConstIterator cend = extra.constEnd();
-    for (QVariantMap::ConstIterator it = extra.constBegin(); it != cend; ++it) {
-        const QString key = it.key();
-        if (!key.isEmpty())
-            d->m_data.insert(Id::fromString(key), it.value());
-    }
+    for (QVariantMap::ConstIterator it = extra.constBegin(); it != cend; ++it)
+        d->m_data.insert(Id::fromString(it.key()), it.value());
 
     QStringList mutableInfoList = data.value(QLatin1String(MUTABLE_INFO_KEY)).toStringList();
     foreach (const QString &mutableInfo, mutableInfoList)
-        if (!mutableInfo.isEmpty())
-            d->m_mutable.insert(Id::fromString(mutableInfo));
+        d->m_mutable.insert(Id::fromString(mutableInfo));
 
     QStringList stickyInfoList = data.value(QLatin1String(STICKY_INFO_KEY)).toStringList();
     foreach (const QString &stickyInfo, stickyInfoList)
-        if (!stickyInfo.isEmpty())
-            d->m_sticky.insert(Id::fromString(stickyInfo));
+        d->m_sticky.insert(Id::fromString(stickyInfo));
 }
 
-Kit::~Kit()
-{
-    delete d;
-}
+Kit::~Kit() = default;
 
 void Kit::blockNotification()
 {
@@ -477,7 +469,7 @@ bool Kit::isEqual(const Kit *other) const
 
 QVariantMap Kit::toMap() const
 {
-    typedef QHash<Id, QVariant>::ConstIterator IdVariantConstIt;
+    using IdVariantConstIt = QHash<Id, QVariant>::ConstIterator;
 
     QVariantMap data;
     data.insert(QLatin1String(ID_KEY), QString::fromLatin1(d->m_id.name()));

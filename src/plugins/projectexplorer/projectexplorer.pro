@@ -3,6 +3,10 @@ QT += qml
 include(../../qtcreatorplugin.pri)
 include(customwizard/customwizard.pri)
 include(jsonwizard/jsonwizard.pri)
+
+include(../../shared/clang/clang_installation.pri)
+include(../../shared/clang/clang_defines.pri)
+
 HEADERS += projectexplorer.h \
     abi.h \
     abiwidget.h \
@@ -12,6 +16,7 @@ HEADERS += projectexplorer.h \
     configtaskhandler.h \
     environmentaspect.h \
     environmentaspectwidget.h \
+    extraabi.h \
     gcctoolchain.h \
     importwidget.h \
     userfileaccessor.h \
@@ -161,6 +166,7 @@ SOURCES += projectexplorer.cpp \
     configtaskhandler.cpp \
     environmentaspect.cpp \
     environmentaspectwidget.cpp \
+    extraabi.cpp \
     gcctoolchain.cpp \
     importwidget.cpp \
     projectconfigurationmodel.cpp \

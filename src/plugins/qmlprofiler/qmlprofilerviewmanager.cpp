@@ -61,8 +61,8 @@ QmlProfilerViewManager::QmlProfilerViewManager(QObject *parent,
 
     new QmlProfilerStateWidget(m_profilerState, m_profilerModelManager, m_traceView);
 
-    auto perspective = new Utils::Perspective;
-    perspective->setName(tr("QML Profiler"));
+    m_perspective = new Utils::Perspective;
+    m_perspective->setName(tr("QML Profiler"));
 
     auto prepareEventsView = [this](QmlProfilerEventsView *view) {
         connect(view, &QmlProfilerEventsView::typeSelected,
@@ -83,22 +83,26 @@ QmlProfilerViewManager::QmlProfilerViewManager(QObject *parent,
     m_flameGraphView = new FlameGraphView(m_profilerModelManager);
     prepareEventsView(m_flameGraphView);
 
-    QByteArray anchorDockId;
+    QWidget *anchor = nullptr;
     if (m_traceView->isUsable()) {
-        anchorDockId = m_traceView->objectName().toLatin1();
-        perspective->addOperation({anchorDockId, m_traceView, {}, Perspective::SplitVertical});
-        perspective->addOperation({m_flameGraphView->objectName().toLatin1(), m_flameGraphView,
-                                   anchorDockId, Perspective::AddToTab});
+        anchor = m_traceView;
+        m_perspective->addWindow(m_traceView, Perspective::SplitVertical, nullptr);
+        m_perspective->addWindow(m_flameGraphView, Perspective::AddToTab, anchor);
     } else {
-        anchorDockId = m_flameGraphView->objectName().toLatin1();
-        perspective->addOperation({anchorDockId, m_flameGraphView, {},
-                                   Perspective::SplitVertical});
+        anchor = m_flameGraphView;
+        m_perspective->addWindow(m_flameGraphView, Perspective::SplitVertical, nullptr);
     }
-    perspective->addOperation({m_statisticsView->objectName().toLatin1(), m_statisticsView,
-                               anchorDockId, Perspective::AddToTab});
-    perspective->addOperation({anchorDockId, nullptr, {}, Perspective::Raise});
+    m_perspective->addWindow(m_statisticsView, Perspective::AddToTab, anchor);
+    m_perspective->addWindow(anchor, Perspective::Raise, nullptr);
 
-    Debugger::registerPerspective(Constants::QmlProfilerPerspectiveId, perspective);
+    Debugger::registerPerspective(Constants::QmlProfilerPerspectiveId, m_perspective);
+}
+
+QmlProfilerViewManager::~QmlProfilerViewManager()
+{
+    delete m_traceView;
+    delete m_flameGraphView;
+    delete m_statisticsView;
 }
 
 void QmlProfilerViewManager::clear()

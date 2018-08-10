@@ -93,7 +93,7 @@ QmlDesignerPlugin *QmlDesignerPlugin::m_instance = nullptr;
 
 static bool isInDesignerMode()
 {
-    return Core::ModeManager::currentMode() == Core::Constants::MODE_DESIGN;
+    return Core::ModeManager::currentModeId() == Core::Constants::MODE_DESIGN;
 }
 
 static bool checkIfEditorIsQtQuick(Core::IEditor *editor)
@@ -106,7 +106,7 @@ static bool checkIfEditorIsQtQuick(Core::IEditor *editor)
                     || document->language() == QmlJS::Dialect::QmlQtQuick2Ui
                     || document->language() == QmlJS::Dialect::Qml;
 
-        if (Core::ModeManager::currentMode() == Core::Constants::MODE_DESIGN) {
+        if (Core::ModeManager::currentModeId() == Core::Constants::MODE_DESIGN) {
             Core::AsynchronousMessageBox::warning(QmlDesignerPlugin::tr("Cannot Open Design Mode"),
                                                   QmlDesignerPlugin::tr("The QML file is not currently opened in a QML Editor."));
             Core::ModeManager::activateMode(Core::Constants::MODE_EDIT);
@@ -198,15 +198,16 @@ bool QmlDesignerPlugin::delayedInitialize()
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::TextTool);
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::PathTool);
 
-    connect(Core::DesignMode::instance(), &Core::DesignMode::actionsUpdated,
-        &d->shortCutManager, &ShortCutManager::updateActions);
-
     return true;
 }
 
 void QmlDesignerPlugin::extensionsInitialized()
 {
-    integrateIntoQtCreator(&d->mainWidget);
+    Core::DesignMode::setDesignModeIsRequired();
+    // delay after Core plugin's extensionsInitialized, so the DesignMode is availabe
+    connect(Core::ICore::instance(), &Core::ICore::coreAboutToOpen, this, [this] {
+        integrateIntoQtCreator(&d->mainWidget);
+    });
 }
 
 static QStringList allUiQmlFilesforCurrentProject(const Utils::FileName &fileName)
@@ -254,6 +255,9 @@ void QmlDesignerPlugin::integrateIntoQtCreator(QWidget *modeWidget)
                                     QmlJSTools::Constants::QMLUI_MIMETYPE };
 
     Core::DesignMode::registerDesignWidget(modeWidget, mimeTypes, d->context->context());
+
+    connect(Core::DesignMode::instance(), &Core::DesignMode::actionsUpdated,
+        &d->shortCutManager, &ShortCutManager::updateActions);
 
     connect(Core::EditorManager::instance(), &Core::EditorManager::currentEditorChanged, [this] (Core::IEditor *editor) {
         if (d && checkIfEditorIsQtQuick(editor) && isInDesignerMode())

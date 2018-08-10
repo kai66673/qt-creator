@@ -127,7 +127,7 @@ struct QmlV8ObjectData
     }
 };
 
-typedef std::function<void(const QVariantMap &)> QmlCallback;
+using QmlCallback = std::function<void(const QVariantMap &)>;
 
 struct LookupData
 {
@@ -136,7 +136,13 @@ struct LookupData
     QString exp;
 };
 
-typedef QHash<int, LookupData> LookupItems; // id -> (iname, exp)
+using LookupItems = QHash<int, LookupData>; // id -> (iname, exp)
+
+static void setWatchItemHasChildren(WatchItem *item, bool hasChildren)
+{
+    item->setHasChildren(hasChildren);
+    item->valueEditable = !hasChildren;
+}
 
 class QmlEnginePrivate : public QmlDebugClient
 {
@@ -164,6 +170,10 @@ public:
                        bool enabled = true,int line = 0, int column = 0,
                        const QString condition = QString(), int ignoreCount = -1);
     void clearBreakpoint(int breakpoint);
+
+    bool canChangeBreakpoint() const;
+    void changeBreakpoint(int breakpoint, bool enabled);
+
     void setExceptionBreak(Exceptions type, bool enabled = false);
 
     void flushSendBuffer();
@@ -219,6 +229,7 @@ public:
     bool automaticConnect = false;
     bool unpausedEvaluate = false;
     bool contextEvaluate = false;
+    bool supportChangeBreakpoint = false;
 
     QTimer connectionTimer;
     QmlDebug::QDebugMessageClient *msgClient = nullptr;
@@ -404,7 +415,7 @@ void QmlEngine::connectionStartupFailed()
         return;
     }
 
-    QMessageBox *infoBox = new QMessageBox(ICore::mainWindow());
+    auto infoBox = new QMessageBox(ICore::mainWindow());
     infoBox->setIcon(QMessageBox::Critical);
     infoBox->setWindowTitle(Core::Constants::IDE_DISPLAY_NAME);
     infoBox->setText(tr("Could not connect to the in-process QML debugger."
@@ -425,7 +436,7 @@ void QmlEngine::appStartupFailed(const QString &errorMessage)
     QString error = tr("Could not connect to the in-process QML debugger. %1").arg(errorMessage);
 
     if (isMasterEngine()) {
-        QMessageBox *infoBox = new QMessageBox(ICore::mainWindow());
+        auto infoBox = new QMessageBox(ICore::mainWindow());
         infoBox->setIcon(QMessageBox::Critical);
         infoBox->setWindowTitle(Core::Constants::IDE_DISPLAY_NAME);
         infoBox->setText(error);
@@ -747,20 +758,19 @@ void QmlEngine::changeBreakpoint(Breakpoint bp)
     BreakpointResponse br = bp.response();
     if (params.type == BreakpointAtJavaScriptThrow) {
         d->setExceptionBreak(AllExceptions, params.enabled);
-        br.enabled = params.enabled;
-        bp.setResponse(br);
     } else if (params.type == BreakpointOnQmlSignalEmit) {
         d->setBreakpoint(EVENT, params.functionName, params.enabled);
-        br.enabled = params.enabled;
-        bp.setResponse(br);
+    } else if (d->canChangeBreakpoint()) {
+        d->changeBreakpoint(d->breakpoints.value(bp.id()), params.enabled);
     } else {
-        //V8 supports only minimalistic changes in breakpoint
-        //Remove the breakpoint and add again
-        bp.notifyBreakpointChangeOk();
-        bp.removeBreakpoint();
-        BreakHandler *handler = d->engine->breakHandler();
-        handler->appendBreakpoint(params);
+        d->clearBreakpoint(d->breakpoints.take(bp.id()));
+        d->setBreakpoint(SCRIPTREGEXP, params.fileName,
+                         params.enabled, params.lineNumber, 0,
+                         params.condition, params.ignoreCount);
+        d->breakpointsSync.insert(d->sequence, bp.id());
     }
+    br.enabled = params.enabled;
+    bp.setResponse(br);
 
     if (bp.state() == BreakpointChangeProceeding)
         bp.notifyBreakpointChangeOk();
@@ -922,9 +932,9 @@ void QmlEngine::selectWatchData(const QString &iname)
 
 bool compareConsoleItems(const ConsoleItem *a, const ConsoleItem *b)
 {
-    if (a == 0)
+    if (a == nullptr)
         return true;
-    if (b == 0)
+    if (b == nullptr)
         return false;
     return a->text() < b->text();
 }
@@ -934,7 +944,7 @@ static ConsoleItem *constructLogItemTree(const QVariant &result,
 {
     bool sorted = boolSetting(SortStructMembers);
     if (!result.isValid())
-        return 0;
+        return nullptr;
 
     QString text;
     ConsoleItem *item = nullptr;
@@ -1311,7 +1321,7 @@ void QmlEnginePrivate::handleEvaluateExpression(const QVariantMap &response,
     if (success) {
         item->type = body.type;
         item->value = body.value.toString();
-        item->setHasChildren(body.hasChildren());
+        setWatchItemHasChildren(item, body.hasChildren());
     } else {
         //Do not set type since it is unknown
         item->setError(body.value.toString());
@@ -1493,6 +1503,19 @@ void QmlEnginePrivate::clearBreakpoint(int breakpoint)
 
     DebuggerCommand cmd(CLEARBREAKPOINT);
     cmd.arg(BREAKPOINT, breakpoint);
+    runCommand(cmd);
+}
+
+bool QmlEnginePrivate::canChangeBreakpoint() const
+{
+    return supportChangeBreakpoint;
+}
+
+void QmlEnginePrivate::changeBreakpoint(int breakpoint, bool enabled)
+{
+    DebuggerCommand cmd(CHANGEBREAKPOINT);
+    cmd.arg(BREAKPOINT, breakpoint);
+    cmd.arg(ENABLED, enabled);
     runCommand(cmd);
 }
 
@@ -2156,11 +2179,11 @@ void QmlEnginePrivate::handleFrame(const QVariantMap &response)
         item->id = objectData.handle;
         item->type = objectData.type;
         item->value = objectData.value.toString();
-        item->setHasChildren(objectData.hasChildren());
+        setWatchItemHasChildren(item, objectData.hasChildren());
         // In case of global object, we do not get children
         // Set children nevertheless and query later.
         if (item->value == "global") {
-            item->setHasChildren(true);
+            setWatchItemHasChildren(item, true);
             item->id = 0;
         }
         watchHandler->insertItem(item);
@@ -2244,10 +2267,13 @@ void QmlEnginePrivate::handleScope(const QVariantMap &response)
         item->id = localData.handle;
         item->type = localData.type;
         item->value = localData.value.toString();
-        item->setHasChildren(localData.hasChildren());
+        setWatchItemHasChildren(item.get(), localData.hasChildren());
 
         if (localData.value.isValid() || item->wantsChildren || localData.expectedProperties == 0) {
-            engine->watchHandler()->insertItem(item.release());
+            WatchHandler *watchHander = engine->watchHandler();
+            if (watchHander->isExpandedIName(item->iname))
+                itemsToLookup.insert(int(item->id), {item->iname, item->name, item->exp});
+            watchHander->insertItem(item.release());
         } else {
             itemsToLookup.insert(int(item->id), {item->iname, item->name, item->exp});
         }
@@ -2387,7 +2413,7 @@ void QmlEnginePrivate::insertSubItems(WatchItem *parent, const QVariantList &pro
         item->value = propertyData.value.toString();
         if (item->type.isEmpty() || expandedINames.contains(item->iname))
             itemsToLookup.insert(propertyData.handle, {item->iname, item->name, item->exp});
-        item->setHasChildren(propertyData.hasChildren());
+        setWatchItemHasChildren(item.get(), propertyData.hasChildren());
         parent->appendChild(item.release());
     }
 
@@ -2443,7 +2469,7 @@ void QmlEnginePrivate::handleLookup(const QVariantMap &response)
             item->type = bodyObjectData.type;
             item->value = bodyObjectData.value.toString();
 
-            item->setHasChildren(bodyObjectData.hasChildren());
+            setWatchItemHasChildren(item, bodyObjectData.hasChildren());
             insertSubItems(item, bodyObjectData.properties);
 
             engine->watchHandler()->insertItem(item);
@@ -2469,8 +2495,10 @@ void QmlEnginePrivate::stateChanged(State state)
 
 void QmlEnginePrivate::handleVersion(const QVariantMap &response)
 {
-    unpausedEvaluate = response.value(BODY).toMap().value("UnpausedEvaluate", false).toBool();
-    contextEvaluate = response.value(BODY).toMap().value("ContextEvaluate", false).toBool();
+    const QVariantMap body = response.value(BODY).toMap();
+    unpausedEvaluate = body.value("UnpausedEvaluate", false).toBool();
+    contextEvaluate = body.value("ContextEvaluate", false).toBool();
+    supportChangeBreakpoint = body.value("ChangeBreakpoint", false).toBool();
 }
 
 void QmlEnginePrivate::flushSendBuffer()

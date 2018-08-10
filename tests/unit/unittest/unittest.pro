@@ -92,7 +92,9 @@ SOURCES += \
     projectpartartefact-test.cpp \
     filestatuscache-test.cpp \
     highlightingresultreporter-test.cpp \
-    precompiledheaderstorage-test.cpp
+    precompiledheaderstorage-test.cpp \
+    projectpartqueue-test.cpp \
+    generatedfiles-test.cpp
 
 !isEmpty(LIBCLANG_LIBS) {
 SOURCES += \

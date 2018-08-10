@@ -75,9 +75,9 @@ public:
 // --------------------------------------------------------------------------
 
 AbiWidget::AbiWidget(QWidget *parent) : QWidget(parent),
-    d(new Internal::AbiWidgetPrivate)
+    d(std::make_unique<Internal::AbiWidgetPrivate>())
 {
-    QHBoxLayout *layout = new QHBoxLayout(this);
+    auto *layout = new QHBoxLayout(this);
     layout->setMargin(0);
     layout->setSpacing(2);
 
@@ -152,10 +152,7 @@ AbiWidget::AbiWidget(QWidget *parent) : QWidget(parent),
     setAbis(QList<Abi>(), Abi::hostAbi());
 }
 
-AbiWidget::~AbiWidget()
-{
-    delete d;
-}
+AbiWidget::~AbiWidget() = default;
 
 static Abi selectAbi(const Abi &current, const QList<Abi> &abiList)
 {

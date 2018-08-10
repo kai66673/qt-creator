@@ -213,8 +213,9 @@ void QmlProfilerDetailsRewriterTest::seedRewriter()
 
     QFutureInterface<void> result;
     QmlJS::PathsAndLanguages lPaths;
-    for (auto p : QLibraryInfo::location(QLibraryInfo::Qml2ImportsPath))
-        lPaths.maybeInsert(Utils::FileName::fromString(p), QmlJS::Dialect::Qml);
+    lPaths.maybeInsert(
+                Utils::FileName::fromString(QLibraryInfo::location(QLibraryInfo::Qml2ImportsPath)),
+                QmlJS::Dialect::Qml);
     QmlJS::ModelManagerInterface::importScan(result, QmlJS::ModelManagerInterface::workingCopy(),
                                              lPaths, m_modelManager, false);
 
@@ -228,9 +229,9 @@ void QmlProfilerDetailsRewriterTest::seedRewriter()
     doc->parse();
     QVERIFY(!doc->source().isEmpty());
 
-    ProjectExplorer::Kit *kit = new ProjectExplorer::Kit;
+    auto kit = std::make_unique<ProjectExplorer::Kit>();
     ProjectExplorer::SysRootKitInformation::setSysRoot(
-                kit, Utils::FileName::fromLatin1("/nowhere"));
+                kit.get(), Utils::FileName::fromLatin1("/nowhere"));
 
     DummyProject *project = new DummyProject(Utils::FileName::fromString(filename));
     ProjectExplorer::SessionManager::addProject(project);
@@ -239,12 +240,11 @@ void QmlProfilerDetailsRewriterTest::seedRewriter()
         // Make sure the uniqe_ptr gets deleted before the project.
         // Otherwise we'll get a double free because the target is also parented to the project
         // and unique_ptr doesn't know anything about QObject parent/child relationships.
-        std::unique_ptr<ProjectExplorer::Target> target = project->createTarget(kit);
+        std::unique_ptr<ProjectExplorer::Target> target = project->createTarget(kit.get());
         m_rewriter.populateFileFinder(target.get());
     }
 
     ProjectExplorer::SessionManager::removeProject(project);
-    ProjectExplorer::KitManager::deleteKit(kit);
 }
 
 } // namespace Internal

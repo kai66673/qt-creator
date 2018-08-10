@@ -87,13 +87,23 @@
             \list
                 \li \l {Creating Qt Quick Projects}
                 \li \l {Qt Quick UI Forms}
-                \li \l {Using Qt Quick Designer}
+                \li \l {Editing QML Files in Design Mode}
+                \li \l {Creating Components}
+                    \list
+                        \li \l {Creating Buttons}
+                        \li \l {Creating Scalable Buttons and Borders}
+                    \endlist
+                \li \l {Managing Item Hierarchy}
+                \li \l {Specifying Item Properties}
                 \li \l {Editing PathView Properties}
                 \li \l {Adding Connections}
-                \li \l {Creating Components}
-                \li \l {Creating Buttons}
-                \li \l {Creating Scalable Buttons and Borders}
-                \li \l {Creating Screens}
+                \list
+                    \li \l{Connecting Objects to Signals}
+                    \li \l{Specifying Dynamic Properties}
+                    \li \l{Adding Bindings Between Properties}
+                    \li \l{Managing C++ Backend Objects}
+                \endlist
+                \li \l {Adding States}
                 \li \l {Browsing ISO 7000 Icons}
                 \li \l {Exporting Designs from Graphics Software}
                 \li \l {Using QML Modules with Plugins}

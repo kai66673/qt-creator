@@ -70,9 +70,6 @@ using namespace Core::Internal;
 using namespace Utils;
 
 CorePlugin::CorePlugin()
-  : m_mainWindow(nullptr)
-  , m_editMode(nullptr)
-  , m_locator(nullptr)
 {
     qRegisterMetaType<Id>();
     qRegisterMetaType<Core::Search::TextPosition>();
@@ -247,7 +244,7 @@ QObject *CorePlugin::remoteCommand(const QStringList & /* options */,
         return nullptr;
     }
     IDocument *res = m_mainWindow->openFiles(
-                args, ICore::OpenFilesFlags(ICore::SwitchMode | ICore::CanContainLineAndColumnNumbers),
+                args, ICore::OpenFilesFlags(ICore::SwitchMode | ICore::CanContainLineAndColumnNumbers | ICore::SwitchSplitIfAlreadyVisible),
                 workingDirectory);
     m_mainWindow->raiseWindow();
     return res;

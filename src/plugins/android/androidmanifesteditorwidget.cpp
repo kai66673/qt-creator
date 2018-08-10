@@ -25,6 +25,7 @@
 
 #include "androidmanifesteditorwidget.h"
 #include "androidmanifesteditor.h"
+#include "androidconfigurations.h"
 #include "androidconstants.h"
 #include "androidmanifestdocument.h"
 #include "androidmanager.h"
@@ -34,6 +35,7 @@
 #include <coreplugin/infobar.h>
 #include <coreplugin/editormanager/ieditor.h>
 
+#include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectwindow.h>
 #include <projectexplorer/session.h>
@@ -93,7 +95,7 @@ Project *androidProject(const Utils::FileName &fileName)
                 && fileName.isChildOf(project->projectDirectory()))
             return project;
     }
-    return 0;
+    return nullptr;
 }
 
 } // anonymous namespace
@@ -127,15 +129,15 @@ void AndroidManifestEditorWidget::initializePage()
 {
     QWidget *mainWidget = new QWidget; // different name
 
-    QVBoxLayout *topLayout = new QVBoxLayout(mainWidget);
+    auto topLayout = new QVBoxLayout(mainWidget);
 
-    QGroupBox *packageGroupBox = new QGroupBox(mainWidget);
+    auto packageGroupBox = new QGroupBox(mainWidget);
     topLayout->addWidget(packageGroupBox);
 
     auto setDirtyFunc = [this] { setDirty(); };
     packageGroupBox->setTitle(tr("Package"));
     {
-        QFormLayout *formLayout = new QFormLayout();
+        auto formLayout = new QFormLayout();
 
         m_packageNameLineEdit = new QLineEdit(packageGroupBox);
         m_packageNameLineEdit->setToolTip(tr(
@@ -161,7 +163,7 @@ void AndroidManifestEditorWidget::initializePage()
         m_packageNameWarningIcon->setVisible(false);
         m_packageNameWarningIcon->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
-        QHBoxLayout *warningRow = new QHBoxLayout;
+        auto warningRow = new QHBoxLayout;
         warningRow->setMargin(0);
         warningRow->addWidget(m_packageNameWarningIcon);
         warningRow->addWidget(m_packageNameWarning);
@@ -213,12 +215,12 @@ void AndroidManifestEditorWidget::initializePage()
     }
 
     // Application
-    QGroupBox *applicationGroupBox = new QGroupBox(mainWidget);
+    auto applicationGroupBox = new QGroupBox(mainWidget);
     topLayout->addWidget(applicationGroupBox);
 
     applicationGroupBox->setTitle(tr("Application"));
     {
-        QFormLayout *formLayout = new QFormLayout();
+        auto formLayout = new QFormLayout();
 
         m_appNameLineEdit = new QLineEdit(applicationGroupBox);
         formLayout->addRow(tr("Application name:"), m_appNameLineEdit);
@@ -232,7 +234,7 @@ void AndroidManifestEditorWidget::initializePage()
         m_targetLineEdit->installEventFilter(this);
         formLayout->addRow(tr("Run:"), m_targetLineEdit);
 
-        QHBoxLayout *iconLayout = new QHBoxLayout();
+        auto iconLayout = new QHBoxLayout();
         m_lIconButton = new QToolButton(applicationGroupBox);
         m_lIconButton->setMinimumSize(QSize(48, 48));
         m_lIconButton->setMaximumSize(QSize(48, 48));
@@ -276,12 +278,12 @@ void AndroidManifestEditorWidget::initializePage()
 
 
     // Permissions
-    QGroupBox *permissionsGroupBox = new QGroupBox(mainWidget);
+    auto permissionsGroupBox = new QGroupBox(mainWidget);
     topLayout->addWidget(permissionsGroupBox);
 
     permissionsGroupBox->setTitle(tr("Permissions"));
     {
-        QGridLayout *layout = new QGridLayout(permissionsGroupBox);
+        auto layout = new QGridLayout(permissionsGroupBox);
 
         m_defaultPermissonsCheckBox = new QCheckBox(this);
         m_defaultPermissonsCheckBox->setText(tr("Include default permissions for Qt modules."));
@@ -459,7 +461,7 @@ void AndroidManifestEditorWidget::initializePage()
 
     topLayout->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::Fixed, QSizePolicy::MinimumExpanding));
 
-    QScrollArea *mainWidgetScrollArea = new QScrollArea;
+    auto mainWidgetScrollArea = new QScrollArea;
     mainWidgetScrollArea->setWidgetResizable(true);
     mainWidgetScrollArea->setWidget(mainWidget);
     mainWidgetScrollArea->setFocusProxy(m_packageNameLineEdit);
@@ -605,9 +607,15 @@ void AndroidManifestEditorWidget::postSave()
     ProjectExplorer::Project *project = androidProject(docPath);
     if (project) {
         if (Target *target = project->activeTarget()) {
-            AndroidQtSupport *androidQtSupport = AndroidManager::androidQtSupport(target);
-            if (androidQtSupport)
-                androidQtSupport->manifestSaved(target);
+            if (BuildConfiguration *bc = target->activeBuildConfiguration()) {
+                QString androidNdkPlatform = AndroidConfigurations::currentConfig()
+                        .bestNdkPlatformMatch(AndroidManager::minimumSDK(target));
+                if (m_androidNdkPlatform != androidNdkPlatform) {
+                    m_androidNdkPlatform = androidNdkPlatform;
+                    bc->updateCacheAndEmitEnvironmentChanged();
+                    bc->regenerateBuildFiles(nullptr);
+                }
+            }
         }
     }
 }

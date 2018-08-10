@@ -25,6 +25,7 @@
 
 #include "quicktesttreeitem.h"
 #include "quicktestconfiguration.h"
+#include "quicktestframework.h"
 #include "quicktestparser.h"
 #include "../testframeworkmanager.h"
 
@@ -415,7 +416,7 @@ QSet<QString> QuickTestTreeItem::internalTargets() const
     QSet<QString> result;
     const auto cppMM = CppTools::CppModelManager::instance();
     const auto projectInfo = cppMM->projectInfo(ProjectExplorer::SessionManager::startupProject());
-    for (const CppTools::ProjectPart::Ptr projectPart : projectInfo.projectParts()) {
+    for (const CppTools::ProjectPart::Ptr &projectPart : projectInfo.projectParts()) {
         if (projectPart->buildTargetType != CppTools::ProjectPart::Executable)
             continue;
         if (projectPart->projectFile == proFile()) {
@@ -424,6 +425,23 @@ QSet<QString> QuickTestTreeItem::internalTargets() const
         }
     }
     return result;
+}
+
+void QuickTestTreeItem::markForRemovalRecursively(const QString &filePath)
+{
+    static const Core::Id id = Core::Id(Constants::FRAMEWORK_PREFIX).withSuffix(
+                QuickTest::Constants::FRAMEWORK_NAME);
+    TestTreeItem::markForRemovalRecursively(filePath);
+    auto parser = dynamic_cast<QuickTestParser *>(TestFrameworkManager::instance()
+                                                   ->testParserForTestFramework(id));
+    const QString proFile = parser->projectFileForMainCppFile(filePath);
+    if (!proFile.isEmpty()) {
+        TestTreeItem *root = TestFrameworkManager::instance()->rootNodeForTestFramework(id);
+        root->forAllChildren([proFile](TestTreeItem *it) {
+            if (it->proFile() == proFile)
+                it->markForRemoval(true);
+        });
+    }
 }
 
 TestTreeItem *QuickTestTreeItem::unnamedQuickTests() const

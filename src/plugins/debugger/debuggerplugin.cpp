@@ -468,8 +468,8 @@ QAction *addCheckableAction(QMenu *menu, const QString &display, bool on, bool c
 class DummyEngine : public DebuggerEngine
 {
 public:
-    DummyEngine() {}
-    ~DummyEngine() override {}
+    DummyEngine() = default;
+    ~DummyEngine() override = default;
 
     void setupEngine() override {}
     void runEngine() override {}
@@ -486,7 +486,7 @@ bool DummyEngine::hasCapability(unsigned cap) const
     // This can only be a first approximation of what to expect when running.
     Project *project = ProjectTree::currentProject();
     if (!project)
-        return 0;
+        return false;
     Target *target = project->activeTarget();
     QTC_ASSERT(target, return 0);
     RunConfiguration *activeRc = target->activeRunConfiguration();
@@ -632,7 +632,7 @@ class DebuggerPluginPrivate : public QObject
 
 public:
     explicit DebuggerPluginPrivate(DebuggerPlugin *plugin);
-    ~DebuggerPluginPrivate();
+    ~DebuggerPluginPrivate() override;
 
     bool initialize(const QStringList &arguments, QString *errorMessage);
     void extensionsInitialized();
@@ -640,7 +640,7 @@ public:
     void doShutdown();
 
     void connectEngine(DebuggerRunTool *runTool);
-    void disconnectEngine() { connectEngine(0); }
+    void disconnectEngine() { connectEngine(nullptr); }
     DebuggerEngine *dummyEngine();
 
     void setThreadBoxContents(const QStringList &list, int index)
@@ -1022,20 +1022,21 @@ public:
     BaseTreeView *m_stackView = nullptr;
     BaseTreeView *m_threadsView = nullptr;
 
-    QWidget *m_breakWindow = nullptr;
     BreakHandler *m_breakHandler = nullptr;
-    QWidget *m_returnWindow = nullptr;
-    QWidget *m_localsWindow = nullptr;
-    QWidget *m_watchersWindow = nullptr;
-    QWidget *m_inspectorWindow = nullptr;
-    QWidget *m_registerWindow = nullptr;
-    QWidget *m_modulesWindow = nullptr;
-    QWidget *m_snapshotWindow = nullptr;
-    QWidget *m_sourceFilesWindow = nullptr;
-    QWidget *m_stackWindow = nullptr;
-    QWidget *m_threadsWindow = nullptr;
-    LogWindow *m_logWindow = nullptr;
-    LocalsAndInspectorWindow *m_localsAndInspectorWindow = nullptr;
+
+    QPointer<QWidget> m_returnWindow;
+    QPointer<QWidget> m_localsWindow;
+    QPointer<QWidget> m_watchersWindow;
+    QPointer<QWidget> m_inspectorWindow;
+    QPointer<LocalsAndInspectorWindow> m_localsAndInspectorWindow;
+    QPointer<QWidget> m_breakWindow;
+    QPointer<QWidget> m_registerWindow;
+    QPointer<QWidget> m_modulesWindow;
+    QPointer<QWidget> m_snapshotWindow;
+    QPointer<QWidget> m_sourceFilesWindow;
+    QPointer<QWidget> m_stackWindow;
+    QPointer<QWidget> m_threadsWindow;
+    QPointer<LogWindow> m_logWindow;
 
     bool m_busy = false;
     QString m_lastPermanentStatusMessage;
@@ -1088,6 +1089,20 @@ DebuggerPluginPrivate::~DebuggerPluginPrivate()
 
     delete m_breakHandler;
     m_breakHandler = nullptr;
+
+    delete m_returnWindow;
+    delete m_localsWindow;
+    delete m_watchersWindow;
+    delete m_inspectorWindow;
+    delete m_localsAndInspectorWindow;
+    delete m_breakWindow;
+    delete m_registerWindow;
+    delete m_modulesWindow;
+    delete m_snapshotWindow;
+    delete m_sourceFilesWindow;
+    delete m_stackWindow;
+    delete m_threadsWindow;
+    delete m_logWindow;
 }
 
 DebuggerEngine *DebuggerPluginPrivate::dummyEngine()
@@ -1341,8 +1356,8 @@ bool DebuggerPluginPrivate::initialize(const QStringList &arguments,
             this, [this](bool on) { m_breakView->setColumnHidden(BreakpointAddressColumn, !on); });
     m_breakView->setSettings(settings, "Debugger.BreakWindow");
     m_breakView->setModel(m_breakHandler->model());
-    m_breakWindow = addSearch(m_breakView, tr("&Breakpoints"), DOCKWIDGET_BREAK);
     m_breakView->setRootIsDecorated(true);
+    m_breakWindow = addSearch(m_breakView, tr("&Breakpoints"), DOCKWIDGET_BREAK);
 
     m_modulesView = new BaseTreeView;
     m_modulesView->setSortingEnabled(true);
@@ -1486,8 +1501,8 @@ bool DebuggerPluginPrivate::initialize(const QStringList &arguments,
 
     ActionContainer *debugMenu = ActionManager::actionContainer(PE::M_DEBUG);
 
-    m_localsAndInspectorWindow = new LocalsAndInspectorWindow(
-                m_localsWindow, m_inspectorWindow, m_returnWindow);
+    m_localsAndInspectorWindow = new LocalsAndInspectorWindow
+            (m_localsWindow, m_inspectorWindow, m_returnWindow);
     m_localsAndInspectorWindow->setObjectName(DOCKWIDGET_LOCALS_AND_INSPECTOR);
     m_localsAndInspectorWindow->setWindowTitle(m_localsWindow->windowTitle());
 
@@ -1794,34 +1809,17 @@ bool DebuggerPluginPrivate::initialize(const QStringList &arguments,
     connect(action(SettingsDialog), &QAction::triggered,
             [] { ICore::showOptionsDialog(DEBUGGER_COMMON_SETTINGS_ID); });
 
-    // Toolbar
-    ToolbarDescription toolbar;
-    toolbar.addAction(m_visibleStartAction);
-    toolbar.addAction(ActionManager::command(Constants::STOP)->action(), Icons::DEBUG_EXIT_SMALL_TOOLBAR.icon());
-    toolbar.addAction(ActionManager::command(Constants::NEXT)->action(), Icons::STEP_OVER_TOOLBAR.icon());
-    toolbar.addAction(ActionManager::command(Constants::STEP)->action(), Icons::STEP_INTO_TOOLBAR.icon());
-    toolbar.addAction(ActionManager::command(Constants::STEPOUT)->action(), Icons::STEP_OUT_TOOLBAR.icon());
-    toolbar.addAction(ActionManager::command(Constants::RESET)->action(), Icons::RESTART_TOOLBAR.icon());
-    toolbar.addAction(ActionManager::command(Constants::OPERATE_BY_INSTRUCTION)->action());
-
     if (isReverseDebuggingEnabled()) {
         m_reverseToolButton = new QToolButton;
         m_reverseToolButton->setDefaultAction(m_reverseDirectionAction);
-        toolbar.addWidget(m_reverseToolButton);
     }
 
-    toolbar.addWidget(new StyledSeparator);
-
     m_threadLabel = new QLabel(tr("Threads:"));
-    toolbar.addWidget(m_threadLabel);
 
     m_threadBox = new QComboBox;
     m_threadBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     connect(m_threadBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated),
             this, &DebuggerPluginPrivate::selectThread);
-
-    toolbar.addWidget(m_threadBox);
-//    toolbar.addSpacerItem(new QSpacerItem(4, 0));
 
 //    ToolbarDescription qmlToolbar
 //    qmlToolbar.addAction(qmlUpdateOnSaveDummyAction);
@@ -1830,27 +1828,44 @@ bool DebuggerPluginPrivate::initialize(const QStringList &arguments,
 //    qmlToolbar.addAction(qmlSelectDummyAction, Icons::SELECT_TOOLBAR.icon());
 //    qmlToolbar.addWidget(new StyledSeparator);
 
-    auto createBasePerspective = [this] { return new Perspective({}, {
-        {DOCKWIDGET_STACK, m_stackWindow, {}, Perspective::SplitVertical},
-        {DOCKWIDGET_BREAK, m_breakWindow, DOCKWIDGET_STACK, Perspective::SplitHorizontal},
-        {DOCKWIDGET_THREADS, m_threadsWindow, DOCKWIDGET_BREAK, Perspective::AddToTab, false},
-        {DOCKWIDGET_MODULES, m_modulesWindow, DOCKWIDGET_THREADS, Perspective::AddToTab, false},
-        {DOCKWIDGET_SOURCE_FILES, m_sourceFilesWindow, DOCKWIDGET_MODULES, Perspective::AddToTab, false},
-        {DOCKWIDGET_SNAPSHOTS, m_snapshotWindow, DOCKWIDGET_SOURCE_FILES, Perspective::AddToTab, false},
-        {DOCKWIDGET_LOCALS_AND_INSPECTOR, m_localsAndInspectorWindow, {}, Perspective::AddToTab, true,
-         Qt::RightDockWidgetArea},
-        {DOCKWIDGET_WATCHERS, m_watchersWindow, DOCKWIDGET_LOCALS_AND_INSPECTOR, Perspective::AddToTab, true,
-         Qt::RightDockWidgetArea},
-        {DOCKWIDGET_OUTPUT, m_logWindow, {}, Perspective::AddToTab, false, Qt::TopDockWidgetArea},
-        {DOCKWIDGET_BREAK, 0, {}, Perspective::Raise}
-    }); };
+    auto createBasePerspective = [this] {
+        auto perspective = new Perspective("Debugger");
+        perspective->addWindow(m_stackWindow, Perspective::SplitVertical, nullptr);
+        perspective->addWindow(m_breakWindow, Perspective::SplitHorizontal, m_stackWindow);
+        perspective->addWindow(m_threadsWindow, Perspective::AddToTab, m_breakWindow, false);
+        perspective->addWindow(m_modulesWindow, Perspective::AddToTab, m_threadsWindow, false);
+        perspective->addWindow(m_sourceFilesWindow, Perspective::AddToTab, m_modulesWindow, false);
+        perspective->addWindow(m_snapshotWindow, Perspective::AddToTab, m_sourceFilesWindow, false);
+        perspective->addWindow(m_localsAndInspectorWindow, Perspective::AddToTab, nullptr, true,
+                     Qt::RightDockWidgetArea);
+        perspective->addWindow(m_watchersWindow, Perspective::AddToTab, m_localsAndInspectorWindow, true,
+                     Qt::RightDockWidgetArea);
+        perspective->addWindow(m_logWindow, Perspective::AddToTab, nullptr, false, Qt::TopDockWidgetArea);
+        perspective->addWindow(m_breakWindow, Perspective::Raise, nullptr);
+
+
+        perspective->addToolbarAction(m_visibleStartAction);
+        perspective->addToolbarAction(ActionManager::command(Constants::STOP)->action(), Icons::DEBUG_EXIT_SMALL_TOOLBAR.icon());
+        perspective->addToolbarAction(ActionManager::command(Constants::NEXT)->action(), Icons::STEP_OVER_TOOLBAR.icon());
+        perspective->addToolbarAction(ActionManager::command(Constants::STEP)->action(), Icons::STEP_INTO_TOOLBAR.icon());
+        perspective->addToolbarAction(ActionManager::command(Constants::STEPOUT)->action(), Icons::STEP_OUT_TOOLBAR.icon());
+        perspective->addToolbarAction(ActionManager::command(Constants::RESET)->action(), Icons::RESTART_TOOLBAR.icon());
+        perspective->addToolbarAction(ActionManager::command(Constants::OPERATE_BY_INSTRUCTION)->action());
+
+        if (isReverseDebuggingEnabled())
+            perspective->addToolbarWidget(m_reverseToolButton);
+
+        perspective->addToolbarSeparator();
+        perspective->addToolbarWidget(m_threadLabel);
+        perspective->addToolbarWidget(m_threadBox);
+
+        return perspective;
+    };
 
     Perspective *cppPerspective = createBasePerspective();
     cppPerspective->setName(tr("Debugger"));
-    cppPerspective->addOperation({DOCKWIDGET_REGISTER, m_registerWindow, DOCKWIDGET_SNAPSHOTS,
-                                  Perspective::AddToTab, false});
+    cppPerspective->addWindow(m_registerWindow, Perspective::AddToTab, m_snapshotWindow, false);
 
-    Debugger::registerToolbar(CppPerspectiveId, toolbar);
     Debugger::registerPerspective(CppPerspectiveId, cppPerspective);
 
 //    Perspective *qmlPerspective = createBasePerspective();
@@ -1865,7 +1880,7 @@ bool DebuggerPluginPrivate::initialize(const QStringList &arguments,
             this, &DebuggerPluginPrivate::enableReverseDebuggingTriggered);
 
     setInitialState();
-    connectEngine(0);
+    connectEngine(nullptr);
 
     connect(SessionManager::instance(), &SessionManager::startupProjectChanged,
         this, &DebuggerPluginPrivate::onCurrentProjectChanged);
@@ -2066,12 +2081,12 @@ void DebuggerPluginPrivate::attachToUnstartedApplicationDialog()
 RunControl *DebuggerPluginPrivate::attachToRunningProcess(Kit *kit,
     DeviceProcessItem process, bool contAfterAttach)
 {
-    QTC_ASSERT(kit, return 0);
+    QTC_ASSERT(kit, return nullptr);
     IDevice::ConstPtr device = DeviceKitInformation::device(kit);
-    QTC_ASSERT(device, return 0);
+    QTC_ASSERT(device, return nullptr);
     if (process.pid == 0) {
         AsynchronousMessageBox::warning(tr("Warning"), tr("Cannot attach to process with PID 0"));
-        return 0;
+        return nullptr;
     }
 
     const Abi tcAbi = ToolChainKitInformation::targetAbi(kit);
@@ -2082,13 +2097,13 @@ RunControl *DebuggerPluginPrivate::attachToRunningProcess(Kit *kit,
                     tr("The process %1 is already under the control of a debugger.\n"
                        "%2 cannot attach to it.").arg(process.pid)
                     .arg(Core::Constants::IDE_DISPLAY_NAME));
-        return 0;
+        return nullptr;
     }
 
     if (device->type() != PE::DESKTOP_DEVICE_TYPE) {
         AsynchronousMessageBox::warning(tr("Not a Desktop Device Type"),
                              tr("It is only possible to attach to a locally running process."));
-        return 0;
+        return nullptr;
     }
 
     auto runControl = new RunControl(nullptr, ProjectExplorer::Constants::DEBUG_RUN_MODE);
@@ -2208,8 +2223,8 @@ void DebuggerPluginPrivate::editorOpened(IEditor *editor)
 
 void DebuggerPluginPrivate::updateBreakMenuItem(IEditor *editor)
 {
-    BaseTextEditor *textEditor = qobject_cast<BaseTextEditor *>(editor);
-    m_breakAction->setEnabled(textEditor != 0);
+    auto textEditor = qobject_cast<BaseTextEditor *>(editor);
+    m_breakAction->setEnabled(textEditor != nullptr);
 }
 
 void DebuggerPluginPrivate::requestContextMenu(TextEditorWidget *widget,
@@ -2743,7 +2758,7 @@ void DebuggerPluginPrivate::dumpLog()
 /*! Activates the previous mode when the current mode is the debug mode. */
 void DebuggerPluginPrivate::activatePreviousMode()
 {
-    if (ModeManager::currentMode() == MODE_DEBUG && m_previousMode.isValid()) {
+    if (ModeManager::currentModeId() == MODE_DEBUG && m_previousMode.isValid()) {
         // If stopping the application also makes Qt Creator active (as the
         // "previously active application"), doing the switch synchronously
         // leads to funny effects with floating dock widgets
@@ -2795,7 +2810,6 @@ void DebuggerPluginPrivate::aboutToShutdown()
 
     disconnect(SessionManager::instance(), &SessionManager::startupProjectChanged, this, nullptr);
 
-    m_mainWindow->saveCurrentPerspective();
     m_shutdownTimer.setInterval(0);
     m_shutdownTimer.setSingleShot(true);
     connect(&m_shutdownTimer, &QTimer::timeout, this, &DebuggerPluginPrivate::doShutdown);
@@ -2869,7 +2883,7 @@ static QString formatStartParameters(const DebuggerRunTool *debugger)
     str << "Start parameters: '" << sp.displayName << "' mode: " << sp.startMode
         << "\nABI: " << sp.toolChainAbi.toString() << '\n';
     str << "Languages: ";
-    if (sp.isCppDebugging)
+    if (sp.isCppDebugging())
         str << "c++ ";
     if (sp.isQmlDebugging)
         str << "qml";
@@ -3050,7 +3064,7 @@ BreakHandler *breakHandler()
 
 void showModuleSymbols(const QString &moduleName, const Symbols &symbols)
 {
-    QTreeWidget *w = new QTreeWidget;
+    auto w = new QTreeWidget;
     w->setUniformRowHeights(true);
     w->setColumnCount(5);
     w->setRootIsDecorated(false);
@@ -3066,7 +3080,7 @@ void showModuleSymbols(const QString &moduleName, const Symbols &symbols)
     w->setHeaderLabels(header);
     w->setWindowTitle(DebuggerPlugin::tr("Symbols in \"%1\"").arg(moduleName));
     for (const Symbol &s : symbols) {
-        QTreeWidgetItem *it = new QTreeWidgetItem;
+        auto it = new QTreeWidgetItem;
         it->setData(0, Qt::DisplayRole, s.name);
         it->setData(1, Qt::DisplayRole, s.address);
         it->setData(2, Qt::DisplayRole, s.state);
@@ -3079,7 +3093,7 @@ void showModuleSymbols(const QString &moduleName, const Symbols &symbols)
 
 void showModuleSections(const QString &moduleName, const Sections &sections)
 {
-    QTreeWidget *w = new QTreeWidget;
+    auto w = new QTreeWidget;
     w->setUniformRowHeights(true);
     w->setColumnCount(5);
     w->setRootIsDecorated(false);
@@ -3095,7 +3109,7 @@ void showModuleSections(const QString &moduleName, const Sections &sections)
     w->setHeaderLabels(header);
     w->setWindowTitle(DebuggerPlugin::tr("Sections in \"%1\"").arg(moduleName));
     for (const Section &s : sections) {
-        QTreeWidgetItem *it = new QTreeWidgetItem;
+        auto it = new QTreeWidgetItem;
         it->setData(0, Qt::DisplayRole, s.name);
         it->setData(1, Qt::DisplayRole, s.from);
         it->setData(2, Qt::DisplayRole, s.to);
@@ -3110,13 +3124,13 @@ void DebuggerPluginPrivate::doShutdown()
 {
     m_shutdownTimer.stop();
     delete m_mainWindow;
-    m_mainWindow = 0;
+    m_mainWindow = nullptr;
 
     delete m_modeWindow;
-    m_modeWindow = 0;
+    m_modeWindow = nullptr;
 
     delete m_mode;
-    m_mode = 0;
+    m_mode = nullptr;
     emit m_plugin->asynchronousShutdownFinished();
 }
 
@@ -3235,7 +3249,7 @@ QSharedPointer<Internal::GlobalDebuggerOptions> globalDebuggerOptions()
     is DebuggerCore, implemented in DebuggerPluginPrivate.
 */
 
-static DebuggerPlugin *m_instance = 0;
+static DebuggerPlugin *m_instance = nullptr;
 
 DebuggerPlugin::DebuggerPlugin()
 {
@@ -3246,8 +3260,8 @@ DebuggerPlugin::DebuggerPlugin()
 DebuggerPlugin::~DebuggerPlugin()
 {
     delete dd;
-    dd = 0;
-    m_instance = 0;
+    dd = nullptr;
+    m_instance = nullptr;
 }
 
 DebuggerPlugin *DebuggerPlugin::instance()
@@ -3272,7 +3286,7 @@ bool DebuggerPlugin::initialize(const QStringList &arguments, QString *errorMess
     mstart->addSeparator(Constants::G_GENERAL);
     mstart->addSeparator(Constants::G_SPECIAL);
 
-    KitManager::registerKitInformation(new DebuggerKitInformation);
+    KitManager::registerKitInformation<DebuggerKitInformation>();
 
     // Task integration.
     //: Category under which Analyzer tasks are listed in Issues view
@@ -3295,7 +3309,7 @@ QObject *DebuggerPlugin::remoteCommand(const QStringList &options,
     Q_UNUSED(workingDirectory);
     Q_UNUSED(list);
     dd->remoteCommand(options);
-    return 0;
+    return nullptr;
 }
 
 void DebuggerPlugin::extensionsInitialized()
@@ -3346,7 +3360,7 @@ void DebuggerPluginPrivate::updateActiveLanguages()
 //    Id perspective = (languages & QmlLanguage) && !(languages & CppLanguage)
 //            ? QmlPerspectiveId : CppPerspectiveId;
 //    m_mainWindow->restorePerspective(perspective);
-    if (rp.isCppDebugging)
+    if (rp.isCppDebugging())
         ICore::addAdditionalContext(Context(C_CPPDEBUGGER));
     else
         ICore::removeAdditionalContext(Context(C_CPPDEBUGGER));
@@ -3376,7 +3390,7 @@ void DebuggerPluginPrivate::onModeChanged(Id mode)
 
 void saveModeToRestore()
 {
-    dd->m_previousMode = ModeManager::currentMode();
+    dd->m_previousMode = ModeManager::currentModeId();
 }
 
 } // namespace Internal
@@ -3406,7 +3420,7 @@ static BuildConfiguration::BuildType startupBuildType()
 
 void showCannotStartDialog(const QString &text)
 {
-    QMessageBox *errorDialog = new QMessageBox(ICore::mainWindow());
+    auto errorDialog = new QMessageBox(ICore::mainWindow());
     errorDialog->setAttribute(Qt::WA_DeleteOnClose);
     errorDialog->setIcon(QMessageBox::Warning);
     errorDialog->setWindowTitle(text);
@@ -3480,21 +3494,6 @@ bool wantRunTool(ToolMode toolMode, const QString &toolName)
     return true;
 }
 
-void registerToolbar(const QByteArray &perspectiveId, const ToolbarDescription &desc)
-{
-    auto toolbar = new QWidget;
-    toolbar->setObjectName(QString::fromLatin1(perspectiveId + ".Toolbar"));
-    auto hbox = new QHBoxLayout(toolbar);
-    hbox->setMargin(0);
-    hbox->setSpacing(0);
-    for (QWidget *widget : desc.widgets())
-        hbox->addWidget(widget);
-    hbox->addStretch();
-    toolbar->setLayout(hbox);
-
-    dd->m_mainWindow->registerToolbar(perspectiveId, toolbar);
-}
-
 QAction *createStartAction()
 {
     auto action = new QAction(DebuggerMainWindow::tr("Start"), DebuggerPlugin::instance());
@@ -3511,7 +3510,7 @@ QAction *createStopAction()
     return action;
 }
 
-void registerPerspective(const QByteArray &perspectiveId, const Perspective *perspective)
+void registerPerspective(const QByteArray &perspectiveId, Perspective *perspective)
 {
     dd->m_mainWindow->registerPerspective(perspectiveId, perspective);
 }
@@ -3523,7 +3522,7 @@ void setPerspectiveEnabled(const QByteArray &perspectiveId, bool enabled)
 
 void selectPerspective(const QByteArray &perspectiveId)
 {
-    if (ModeManager::currentMode() == MODE_DEBUG
+    if (ModeManager::currentModeId() == MODE_DEBUG
             && dd->m_mainWindow->currentPerspective() == perspectiveId) {
         return;
     }
@@ -3532,7 +3531,7 @@ void selectPerspective(const QByteArray &perspectiveId)
     if (perspectiveId.isEmpty())
         return;
     ModeManager::activateMode(MODE_DEBUG);
-    dd->m_mainWindow->restorePerspective(perspectiveId);
+    dd->m_mainWindow->restorePerspective(dd->m_mainWindow->findPerspective(perspectiveId));
 }
 
 QByteArray currentPerspective()
@@ -3572,7 +3571,7 @@ class DebuggerUnitTests : public QObject
     Q_OBJECT
 
 public:
-    DebuggerUnitTests() {}
+    DebuggerUnitTests() = default;
 
 private slots:
     void initTestCase();
@@ -3585,7 +3584,7 @@ private slots:
     void testStateMachine();
 
 private:
-    CppTools::Tests::TemporaryCopiedDir *m_tmpDir = 0;
+    CppTools::Tests::TemporaryCopiedDir *m_tmpDir = nullptr;
 };
 
 void DebuggerUnitTests::initTestCase()
@@ -3750,7 +3749,7 @@ void DebuggerUnitTests::testDebuggerMatching()
     QFETCH(QString, target);
     QFETCH(int, result);
 
-    DebuggerItem::MatchLevel expectedLevel = static_cast<DebuggerItem::MatchLevel>(result);
+    auto expectedLevel = static_cast<DebuggerItem::MatchLevel>(result);
 
     QList<Abi> debuggerAbis;
     foreach (const QString &abi, debugger)

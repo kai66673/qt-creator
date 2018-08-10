@@ -337,8 +337,8 @@ ICore::ICore(MainWindow *mainwindow)
 
 ICore::~ICore()
 {
-    m_instance = 0;
-    m_mainwindow = 0;
+    m_instance = nullptr;
+    m_mainwindow = nullptr;
 }
 
 void ICore::showNewItemDialog(const QString &title,
@@ -459,6 +459,28 @@ QString ICore::libexecPath()
     return QDir::cleanPath(QApplication::applicationDirPath() + '/' + RELATIVE_LIBEXEC_PATH);
 }
 
+static QString clangIncludePath(const QString &clangVersion)
+{
+    return "/lib/clang/" + clangVersion + "/include";
+}
+
+QString ICore::clangIncludeDirectory(const QString &clangVersion, const QString &clangResourceDirectory)
+{
+    QDir dir(libexecPath() + "/clang" + clangIncludePath(clangVersion));
+    if (!dir.exists() || !QFileInfo(dir, "stdint.h").exists())
+        dir = QDir(clangResourceDirectory);
+    return QDir::toNativeSeparators(dir.canonicalPath());
+}
+
+QString ICore::clangExecutable(const QString &clangBinDirectory)
+{
+    const QString hostExeSuffix(QTC_HOST_EXE_SUFFIX);
+    QFileInfo executable(libexecPath() + "/clang/bin/clang" + hostExeSuffix);
+    if (!executable.exists())
+        executable = QFileInfo(clangBinDirectory + "/clang" + hostExeSuffix);
+    return QDir::toNativeSeparators(executable.canonicalFilePath());
+}
+
 static QString compilerString()
 {
 #if defined(Q_CC_CLANG) // must be before GNU, because clang claims to be GNU too
@@ -507,6 +529,11 @@ QWidget *ICore::currentContextWidget()
 {
     IContext *context = currentContextObject();
     return context ? context->widget() : nullptr;
+}
+
+IContext *ICore::contextObject(QWidget *widget)
+{
+    return m_mainwindow->contextObject(widget);
 }
 
 

@@ -26,7 +26,6 @@
 #include "clangassistproposalitem.h"
 
 #include "clangactivationsequenceprocessor.h"
-#include "clangassistproposal.h"
 #include "clangassistproposalmodel.h"
 #include "clangcompletionassistprocessor.h"
 #include "clangcompletioncontextanalyzer.h"
@@ -41,6 +40,7 @@
 
 #include <texteditor/codeassist/assistproposalitem.h>
 #include <texteditor/codeassist/functionhintproposal.h>
+#include <texteditor/codeassist/genericproposal.h>
 #include <texteditor/codeassist/ifunctionhintproposalmodel.h>
 
 #include <cplusplus/BackwardsScanner.h>
@@ -64,15 +64,58 @@ namespace Internal {
 using ClangBackEnd::CodeCompletion;
 using TextEditor::AssistProposalItemInterface;
 
-namespace {
-
-QList<AssistProposalItemInterface *> toAssistProposalItems(const CodeCompletions &completions)
+static void addAssistProposalItem(QList<AssistProposalItemInterface *> &items,
+                                  const CodeCompletion &codeCompletion,
+                                  const QString &name)
 {
+    ClangAssistProposalItem *item = new ClangAssistProposalItem;
+    items.push_back(item);
 
+    item->setText(name);
+    item->setOrder(int(codeCompletion.priority));
+    item->appendCodeCompletion(codeCompletion);
+}
+
+static void addFunctionOverloadAssistProposalItem(QList<AssistProposalItemInterface *> &items,
+                                                  AssistProposalItemInterface *sameItem,
+                                                  const ClangCompletionAssistInterface *interface,
+                                                  const CodeCompletion &codeCompletion,
+                                                  const QString &name)
+{
+    ClangBackEnd::CodeCompletionChunk resultType = codeCompletion.chunks.first();
+    auto *item = static_cast<ClangAssistProposalItem *>(sameItem);
+    item->setHasOverloadsWithParameters(true);
+    if (resultType.kind != ClangBackEnd::CodeCompletionChunk::ResultType) {
+        // It's the constructor.
+        // CLANG-UPGRADE-CHECK: Can we get here with constructor definition?
+        if (!item->firstCodeCompletion().hasParameters)
+            item->removeFirstCodeCompletion();
+        item->appendCodeCompletion(codeCompletion);
+        return;
+    }
+
+    QTextCursor cursor = interface->textEditorWidget()->textCursor();
+    cursor.setPosition(interface->position());
+    cursor.movePosition(QTextCursor::StartOfWord);
+
+    if (::Utils::Text::matchPreviousWord(*interface->textEditorWidget(),
+                                         cursor,
+                                         resultType.text.toString())) {
+        addAssistProposalItem(items, codeCompletion, name);
+    } else {
+        item->appendCodeCompletion(codeCompletion);
+    }
+}
+
+static QList<AssistProposalItemInterface *> toAssistProposalItems(
+        const CodeCompletions &completions,
+        const ClangCompletionAssistInterface *interface)
+{
     bool signalCompletion = false; // TODO
     bool slotCompletion = false; // TODO
 
-    QHash<QString, ClangAssistProposalItem *> items;
+    QList<AssistProposalItemInterface *> items;
+    items.reserve(completions.size());
     for (const CodeCompletion &codeCompletion : completions) {
         if (codeCompletion.text.isEmpty()) // TODO: Make isValid()?
             continue;
@@ -81,34 +124,41 @@ QList<AssistProposalItemInterface *> toAssistProposalItems(const CodeCompletions
         if (slotCompletion && codeCompletion.completionKind != CodeCompletion::SlotCompletionKind)
             continue;
 
-        QString name;
-        if (codeCompletion.completionKind == CodeCompletion::KeywordCompletionKind)
-            name = CompletionChunksToTextConverter::convertToName(codeCompletion.chunks);
-        else
-            name = codeCompletion.text.toString();
+        const QString name = codeCompletion.completionKind == CodeCompletion::KeywordCompletionKind
+                ? CompletionChunksToTextConverter::convertToName(codeCompletion.chunks)
+                : codeCompletion.text.toString();
 
-        ClangAssistProposalItem *item = items.value(name, 0);
-        if (item) {
-            if (codeCompletion.hasParameters)
-                item->setHasOverloadsWithParameters(true);
+        if (codeCompletion.completionKind == CodeCompletion::ConstructorCompletionKind
+                || codeCompletion.completionKind == CodeCompletion::ClassCompletionKind) {
+            auto samePreviousConstructor
+                    = std::find_if(items.begin(),
+                                   items.end(),
+                                   [&name](const AssistProposalItemInterface *item) {
+                return item->text() == name;
+            });
+            if (samePreviousConstructor == items.end()) {
+                addAssistProposalItem(items, codeCompletion, name);
+            } else {
+                addFunctionOverloadAssistProposalItem(items, *samePreviousConstructor, interface,
+                                                      codeCompletion, name);
+            }
+            continue;
+        }
+
+        if (!items.empty() && items.last()->text() == name) {
+            if ((codeCompletion.completionKind == CodeCompletion::FunctionCompletionKind
+                 || codeCompletion.completionKind == CodeCompletion::FunctionDefinitionCompletionKind)
+                    && codeCompletion.hasParameters) {
+                addFunctionOverloadAssistProposalItem(items, items.back(), interface,
+                                                      codeCompletion, name);
+            }
         } else {
-            item = new ClangAssistProposalItem;
-            items.insert(name, item);
-
-            item->setText(name);
-            item->setOrder(int(codeCompletion.priority));
-            item->setCodeCompletion(codeCompletion);
+            addAssistProposalItem(items, codeCompletion, name);
         }
     }
 
-    QList<AssistProposalItemInterface *> results;
-    results.reserve(items.size());
-    std::copy(items.cbegin(), items.cend(), std::back_inserter(results));
-
-    return results;
+    return items;
 }
-
-} // Anonymous
 
 using namespace CPlusPlus;
 using namespace TextEditor;
@@ -143,18 +193,17 @@ static CodeCompletions filterFunctionSignatures(const CodeCompletions &completio
 }
 
 void ClangCompletionAssistProcessor::handleAvailableCompletions(
-        const CodeCompletions &completions,
-        CompletionCorrection neededCorrection)
+        const CodeCompletions &completions)
 {
     QTC_CHECK(m_completions.isEmpty());
 
     if (m_sentRequestType == NormalCompletion) {
-        m_completions = toAssistProposalItems(completions);
+        m_completions = toAssistProposalItems(completions, m_interface.data());
 
         if (m_addSnippets && !m_completions.isEmpty())
             addSnippets();
 
-        setAsyncProposalAvailable(createProposal(neededCorrection));
+        setAsyncProposalAvailable(createProposal());
     } else {
         const CodeCompletions functionSignatures = filterFunctionSignatures(completions);
         if (!functionSignatures.isEmpty())
@@ -447,11 +496,11 @@ bool ClangCompletionAssistProcessor::completePreprocessorDirectives()
 {
     foreach (const QString &preprocessorCompletion, m_preprocessorCompletions)
         addCompletionItem(preprocessorCompletion,
-                          Icons::iconForType(Icons::MacroIconType));
+                          ::Utils::CodeModelIcon::iconForType(::Utils::CodeModelIcon::Macro));
 
     if (m_interface->objcEnabled())
         addCompletionItem(QLatin1String("import"),
-                          Icons::iconForType(Icons::MacroIconType));
+                          ::Utils::CodeModelIcon::iconForType(::Utils::CodeModelIcon::Macro));
 
     return !m_completions.isEmpty();
 }
@@ -591,13 +640,12 @@ bool ClangCompletionAssistProcessor::sendCompletionRequest(int position,
     return false;
 }
 
-TextEditor::IAssistProposal *ClangCompletionAssistProcessor::createProposal(
-        CompletionCorrection neededCorrection)
+TextEditor::IAssistProposal *ClangCompletionAssistProcessor::createProposal()
 {
     m_requestSent = false;
-    TextEditor::GenericProposalModelPtr model(new ClangAssistProposalModel(neededCorrection));
+    TextEditor::GenericProposalModelPtr model(new ClangAssistProposalModel());
     model->loadContent(m_completions);
-    return new ClangAssistProposal(m_positionForProposal, model);
+    return new GenericProposal(m_positionForProposal, model);
 }
 
 IAssistProposal *ClangCompletionAssistProcessor::createFunctionHintProposal(

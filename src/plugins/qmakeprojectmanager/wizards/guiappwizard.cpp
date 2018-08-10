@@ -132,7 +132,7 @@ static inline bool generateFormClass(const GuiAppParameters &params,
 Core::GeneratedFiles GuiAppWizard::generateFiles(const QWizard *w,
                                                  QString *errorMessage) const
 {
-    const GuiAppWizardDialog *dialog = qobject_cast<const GuiAppWizardDialog *>(w);
+    const auto *dialog = qobject_cast<const GuiAppWizardDialog *>(w);
     const QtProjectParameters projectParams = dialog->projectParameters();
     const QString projectPath = projectParams.projectPath();
     const GuiAppParameters params = dialog->parameters();
@@ -187,6 +187,7 @@ Core::GeneratedFiles GuiAppWizard::generateFiles(const QWizard *w,
         QTextStream proStr(&contents);
         QtProjectParameters::writeProFileHeader(proStr);
         projectParams.writeProFile(proStr);
+        proStr << "\nCONFIG += c++11"; // ensure all Qt5 versions can handle the source
         proStr << "\n\nSOURCES +="
                << " \\\n        " << Utils::FileName::fromString(mainSourceFileName).fileName()
                << " \\\n        " << Utils::FileName::fromString(formSource.path()).fileName()

@@ -84,7 +84,7 @@ public:
     void clearAbortedPosition();
     void updateFromCompletionSettings(const TextEditor::CompletionSettings &settings);
 
-    virtual bool eventFilter(QObject *o, QEvent *e);
+    bool eventFilter(QObject *o, QEvent *e) override;
 
 private:
     void processProposalItem(AssistProposalItemInterface *proposalItem);
@@ -512,7 +512,7 @@ bool CodeAssistantPrivate::isDestroyEvent(int key, const QString &keyText)
 {
     if (keyText.isEmpty())
         return key != Qt::LeftArrow && key != Qt::RightArrow && key != Qt::Key_Shift;
-    else if (auto *provider = dynamic_cast<CompletionAssistProvider *>(m_requestProvider))
+    if (auto *provider = qobject_cast<CompletionAssistProvider *>(m_requestProvider))
         return !provider->isContinuationChar(keyText.at(0));
     return false;
 }

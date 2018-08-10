@@ -84,16 +84,16 @@ namespace Utils {
 // A special QProcess derivative allowing for terminal control.
 class TerminalControllingProcess : public QProcess {
 public:
-    TerminalControllingProcess() : m_flags(0) {}
+    TerminalControllingProcess() = default;
 
     unsigned flags() const { return m_flags; }
     void setFlags(unsigned tc) { m_flags = tc; }
 
 protected:
-    virtual void setupChildProcess();
+    void setupChildProcess() override;
 
 private:
-    unsigned m_flags;
+    unsigned m_flags = 0;
 };
 
 void TerminalControllingProcess::setupChildProcess()
@@ -317,8 +317,8 @@ SynchronousProcess::SynchronousProcess() :
 
 SynchronousProcess::~SynchronousProcess()
 {
-    disconnect(&d->m_timer, 0, this, 0);
-    disconnect(&d->m_process, 0, this, 0);
+    disconnect(&d->m_timer, nullptr, this, nullptr);
+    disconnect(&d->m_process, nullptr, this, nullptr);
     delete d;
 }
 
@@ -488,7 +488,8 @@ SynchronousProcessResponse SynchronousProcess::runBlocking(const QString &binary
     // event loop in that case.
     d->m_binary = binary;
     d->m_process.start(binary, args, QIODevice::ReadOnly);
-    if (!d->m_process.waitForStarted(d->m_maxHangTimerCount * 1000)) {
+    if (!d->m_process.waitForStarted(d->m_maxHangTimerCount * 1000)
+            && d->m_process.state() == QProcess::NotRunning) {
         d->m_result.result = SynchronousProcessResponse::StartFailed;
         return d->m_result;
     }
@@ -539,10 +540,10 @@ static inline bool askToKill(const QString &binary = QString())
     msg += QLatin1Char(' ');
     msg += SynchronousProcess::tr("Would you like to terminate it?");
     // Restore the cursor that is set to wait while running.
-    const bool hasOverrideCursor = QApplication::overrideCursor() != 0;
+    const bool hasOverrideCursor = QApplication::overrideCursor() != nullptr;
     if (hasOverrideCursor)
         QApplication::restoreOverrideCursor();
-    QMessageBox::StandardButton answer = QMessageBox::question(0, title, msg, QMessageBox::Yes|QMessageBox::No);
+    QMessageBox::StandardButton answer = QMessageBox::question(nullptr, title, msg, QMessageBox::Yes|QMessageBox::No);
     if (hasOverrideCursor)
         QApplication::setOverrideCursor(Qt::WaitCursor);
     return answer == QMessageBox::Yes;
@@ -615,7 +616,7 @@ void SynchronousProcess::processStdErr(bool emitSignals)
 
 QSharedPointer<QProcess> SynchronousProcess::createProcess(unsigned flags)
 {
-    TerminalControllingProcess *process = new TerminalControllingProcess;
+    auto process = new TerminalControllingProcess;
     process->setFlags(flags);
     return QSharedPointer<QProcess>(process);
 }

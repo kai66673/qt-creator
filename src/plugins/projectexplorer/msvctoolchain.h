@@ -31,8 +31,12 @@
 
 #include <QFutureWatcher>
 
+#include <utils/optional.h>
+
 QT_FORWARD_DECLARE_CLASS(QLabel)
 QT_FORWARD_DECLARE_CLASS(QVersionNumber)
+
+namespace Utils { class PathChooser; }
 
 namespace ProjectExplorer {
 namespace Internal {
@@ -74,6 +78,7 @@ public:
     ToolChain *clone() const override;
 
     QString varsBatArg() const { return m_varsBatArg; }
+    void setVarsBatArg(const QString &varsBA) { m_varsBatArg = varsBA; }
 
     bool operator == (const ToolChain &) const override;
 
@@ -89,13 +94,18 @@ protected:
                                 const Utils::Environment &env) const override;
 
 private:
-    static void environmentModifications(QFutureInterface<QList<Utils::EnvironmentItem> > &future,
+    struct GenerateEnvResult
+    {
+        Utils::optional<QString> error;
+        QList<Utils::EnvironmentItem> environmentItems;
+    };
+    static void environmentModifications(QFutureInterface<GenerateEnvResult> &future,
                                          QString vcvarsBat, QString varsBatArg);
-    void initEnvModWatcher(const QFuture<QList<Utils::EnvironmentItem>> &future);
+    void initEnvModWatcher(const QFuture<GenerateEnvResult> &future);
     void updateEnvironmentModifications(QList<Utils::EnvironmentItem> modifications);
 
     mutable QList<Utils::EnvironmentItem> m_environmentModifications;
-    mutable QFutureWatcher<QList<Utils::EnvironmentItem>> m_envModWatcher;
+    mutable QFutureWatcher<GenerateEnvResult> m_envModWatcher;
 
     QString m_varsBatArg; // Argument
 };
@@ -103,11 +113,9 @@ private:
 class ClangClToolChain : public MsvcToolChain
 {
 public:
-    explicit ClangClToolChain(const QString &name, const QString &llvmDir,
-                              const Abi &abi,
-                              const QString &varsBat, const QString &varsBatArg,
-                              Core::Id language,
-                              Detection d = ManualDetection);
+    ClangClToolChain(const QString &name, const QString &llvmDir,
+                     Core::Id language,
+                     Detection d);
     ClangClToolChain();
 
     bool isValid() const override;
@@ -121,10 +129,15 @@ public:
     bool fromMap(const QVariantMap &data) override;
     ToolChainConfigWidget *configurationWidget() override;
 
-    QString llvmDir() const { return m_llvmDir; }
+    const QList<MsvcToolChain *> &msvcToolchains() const;
+    QString clangPath() const { return m_clangPath; }
+    void setClangPath(const QString &path) { m_clangPath = path; }
 
+    void resetMsvcToolChain(const MsvcToolChain *base = nullptr);
+
+    bool operator ==(const ToolChain &) const override;
 private:
-    QString m_llvmDir;
+    QString m_clangPath;
 };
 
 // --------------------------------------------------------------------------
@@ -144,10 +157,26 @@ public:
     bool canRestore(const QVariantMap &data) override;
     ToolChain *restore(const QVariantMap &data) override;
 
-    ToolChainConfigWidget *configurationWidget(ToolChain *);
     static QString vcVarsBatFor(const QString &basePath, MsvcToolChain::Platform platform,
                                 const QVersionNumber &v);
 };
+
+class ClangClToolChainFactory : public MsvcToolChainFactory
+{
+    Q_OBJECT
+
+public:
+    ClangClToolChainFactory();
+
+    QList<ToolChain *> autoDetect(const QList<ToolChain *> &alreadyKnown) override;
+
+    bool canRestore(const QVariantMap &data) override;
+    ToolChain *restore(const QVariantMap &data) override;
+
+    bool canCreate() override;
+    ToolChain *create(Core::Id l) override;
+};
+
 
 // --------------------------------------------------------------------------
 // MsvcBasedToolChainConfigWidget
@@ -197,12 +226,14 @@ public:
     explicit ClangClToolChainConfigWidget(ToolChain *);
 
 protected:
-    void discardImpl() override { setFromClangClToolChain(); }
+    void applyImpl() override;
+    void discardImpl() override;
 
 private:
     void setFromClangClToolChain();
 
-    QLabel *m_llvmDirLabel;
+    QLabel *m_llvmDirLabel = nullptr;
+    Utils::PathChooser *m_compilerCommand = nullptr;
 };
 
 } // namespace Internal

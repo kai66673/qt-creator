@@ -133,9 +133,9 @@ class PlainDumper:
 
     def __call__(self, d, value):
         try:
-            printer = self.printer.gen_printer(value)
+            printer = self.printer.gen_printer(value.nativeValue)
         except:
-            printer = self.printer.invoke(value)
+            printer = self.printer.invoke(value.nativeValue)
         lister = getattr(printer, 'children', None)
         children = [] if lister is None else list(lister())
         d.putType(self.printer.name)
@@ -990,7 +990,7 @@ class Dumper(DumperBase):
         if self.isWindowsTarget():
             qtCoreMatch = re.match('.*Qt5?Core[^/.]*d?\.dll', name)
         else:
-            qtCoreMatch = re.match('.*/libQt5?Core[^/.]\.so', name)
+            qtCoreMatch = re.match('.*/libQt5?Core[^/.]*\.so', name)
 
         if qtCoreMatch is not None:
             self.handleQtCoreLoaded(objfile)
@@ -1002,7 +1002,12 @@ class Dumper(DumperBase):
         try:
             symbols = gdb.execute(cmd, to_string = True)
         except:
-            pass
+            # command syntax depends on gdb version - below is gdb 8+
+            cmd = 'maint print msymbols -objfile "%s" -- %s' % (objfile.filename, tmppath)
+            try:
+                symbols = gdb.execute(cmd, to_string = True)
+            except:
+                pass
         ns = ''
         with open(tmppath) as f:
             for line in f:

@@ -104,7 +104,9 @@ enum class HighlightingType : quint8
     ObjectiveCInterface,
     ObjectiveCImplementation,
     ObjectiveCProperty,
-    ObjectiveCMethod
+    ObjectiveCMethod,
+    TemplateTypeParameter,
+    TemplateTemplateParameter
 };
 
 enum class StorageClass : quint8
@@ -175,7 +177,9 @@ enum class MessageType : quint8 {
     CancelMessage,
     UpdateProjectPartsMessage,
     RemoveProjectPartsMessage,
-    PrecompiledHeadersUpdatedMessage
+    PrecompiledHeadersUpdatedMessage,
+    UpdateGeneratedFilesMessage,
+    RemoveGeneratedFilesMessage
 };
 
 template<MessageType messageEnumeration>

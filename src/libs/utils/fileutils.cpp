@@ -305,7 +305,7 @@ QString FileUtils::normalizePathName(const QString &name)
 {
 #ifdef Q_OS_WIN
     const QString nativeSeparatorName(QDir::toNativeSeparators(name));
-    const LPCTSTR nameC = reinterpret_cast<LPCTSTR>(nativeSeparatorName.utf16()); // MinGW
+    const auto nameC = reinterpret_cast<LPCTSTR>(nativeSeparatorName.utf16()); // MinGW
     PIDLIST_ABSOLUTE file;
     HRESULT hr = SHParseDisplayName(nameC, NULL, &file, 0, NULL);
     if (FAILED(hr))
@@ -395,10 +395,7 @@ bool FileReader::fetch(const QString &fileName, QIODevice::OpenMode mode, QWidge
 }
 #endif // QT_GUI_LIB
 
-FileSaverBase::FileSaverBase()
-    : m_hasError(false)
-{
-}
+FileSaverBase::FileSaverBase() = default;
 
 FileSaverBase::~FileSaverBase() = default;
 
@@ -514,7 +511,7 @@ bool FileSaver::finalize()
     if (!m_isSafe)
         return FileSaverBase::finalize();
 
-    SaveFile *sf = static_cast<SaveFile *>(m_file.get());
+    auto sf = static_cast<SaveFile *>(m_file.get());
     if (m_hasError) {
         if (sf->isOpen())
             sf->rollback();
@@ -526,10 +523,9 @@ bool FileSaver::finalize()
 }
 
 TempFileSaver::TempFileSaver(const QString &templ)
-    : m_autoRemove(true)
 {
     m_file.reset(new QTemporaryFile{});
-    QTemporaryFile *tempFile = static_cast<QTemporaryFile *>(m_file.get());
+    auto tempFile = static_cast<QTemporaryFile *>(m_file.get());
     if (!templ.isEmpty())
         tempFile->setFileTemplate(templ);
     tempFile->setAutoRemove(false);

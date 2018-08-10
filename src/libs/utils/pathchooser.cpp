@@ -49,9 +49,11 @@
     This class has some validation logic for embedding into QWizardPage.
 */
 
+namespace Utils {
+
 static QString appBundleExpandedPath(const QString &path)
 {
-    if (Utils::HostOsInfo::hostOs() == Utils::OsTypeMac && path.endsWith(".app")) {
+    if (HostOsInfo::hostOs() == OsTypeMac && path.endsWith(".app")) {
         // possibly expand to Foo.app/Contents/MacOS/Foo
         QFileInfo info(path);
         if (info.isDir()) {
@@ -63,9 +65,7 @@ static QString appBundleExpandedPath(const QString &path)
     return path;
 }
 
-Utils::PathChooser::AboutToShowContextMenuHandler Utils::PathChooser::s_aboutToShowContextMenuHandler;
-
-namespace Utils {
+PathChooser::AboutToShowContextMenuHandler PathChooser::s_aboutToShowContextMenuHandler;
 
 // ------------------ BinaryVersionToolTipEventFilter
 // Event filter to be installed on a lineedit used for entering
@@ -78,7 +78,7 @@ class BinaryVersionToolTipEventFilter : public QObject
 public:
     explicit BinaryVersionToolTipEventFilter(QLineEdit *le);
 
-    virtual bool eventFilter(QObject *, QEvent *);
+    bool eventFilter(QObject *, QEvent *) override;
 
     QStringList arguments() const { return m_arguments; }
     void setArguments(const QStringList &arguments) { m_arguments = arguments; }
@@ -102,7 +102,7 @@ bool BinaryVersionToolTipEventFilter::eventFilter(QObject *o, QEvent *e)
 {
     if (e->type() != QEvent::ToolTip)
         return false;
-    QLineEdit *le = qobject_cast<QLineEdit *>(o);
+    auto le = qobject_cast<QLineEdit *>(o);
     QTC_ASSERT(le, return false);
 
     const QString binary = le->text();
@@ -147,7 +147,7 @@ public:
         BinaryVersionToolTipEventFilter(pe->lineEdit()), m_pathChooser(pe) {}
 
 private:
-    virtual QString defaultToolTip() const
+    QString defaultToolTip() const override
         { return m_pathChooser->errorMessage(); }
 
     const PathChooser *m_pathChooser = nullptr;
@@ -674,7 +674,7 @@ QString PathChooser::toolVersion(const QString &binary, const QStringList &argum
 
 void PathChooser::installLineEditVersionToolTip(QLineEdit *le, const QStringList &arguments)
 {
-    BinaryVersionToolTipEventFilter *ef = new BinaryVersionToolTipEventFilter(le);
+    auto ef = new BinaryVersionToolTipEventFilter(le);
     ef->setArguments(arguments);
 }
 

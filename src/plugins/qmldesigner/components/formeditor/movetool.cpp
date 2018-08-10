@@ -51,10 +51,7 @@ MoveTool::MoveTool(FormEditorView *editorView)
     m_selectionIndicator.setCursor(Qt::SizeAllCursor);
 }
 
-MoveTool::~MoveTool()
-{
-
-}
+MoveTool::~MoveTool() = default;
 
 void MoveTool::clear()
 {
@@ -107,6 +104,7 @@ void MoveTool::mouseMoveEvent(const QList<QGraphicsItem*> &itemList,
         FormEditorItem *containerItem = containerFormEditorItem(itemList, m_movingItems);
         if (containerItem && view()->currentState().isBaseState()) {
             if (containerItem != m_movingItems.constFirst()->parentItem()
+                    && event->modifiers().testFlag(Qt::ControlModifier)
                     && event->modifiers().testFlag(Qt::ShiftModifier)) {
 
                 const FormEditorItem *movingItem = m_movingItems.constFirst();
@@ -315,7 +313,7 @@ bool MoveTool::isAncestorOfAllItems(FormEditorItem* maybeAncestorItem,
 FormEditorItem* MoveTool::ancestorIfOtherItemsAreChild(const QList<FormEditorItem*> &itemList)
 {
     if (itemList.isEmpty())
-        return 0;
+        return nullptr;
 
 
     foreach (FormEditorItem* item, itemList)
@@ -324,7 +322,7 @@ FormEditorItem* MoveTool::ancestorIfOtherItemsAreChild(const QList<FormEditorIte
             return item;
     }
 
-    return 0;
+    return nullptr;
 }
 
 void MoveTool::updateMoveManipulator()
@@ -368,13 +366,13 @@ QList<FormEditorItem*> MoveTool::movingItems(const QList<FormEditorItem*> &selec
 
     FormEditorItem* ancestorItem = ancestorIfOtherItemsAreChild(filteredItemList);
 
-    if (ancestorItem != 0 && ancestorItem->qmlItemNode().isRootNode()) {
+    if (ancestorItem != nullptr && ancestorItem->qmlItemNode().isRootNode()) {
 //        view()->changeToSelectionTool();
         return QList<FormEditorItem*>();
     }
 
 
-    if (ancestorItem != 0 && ancestorItem->parentItem() != 0)  {
+    if (ancestorItem != nullptr && ancestorItem->parentItem() != nullptr)  {
         QList<FormEditorItem*> ancestorItemList;
         ancestorItemList.append(ancestorItem);
         return ancestorItemList;

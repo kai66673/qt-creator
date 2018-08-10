@@ -111,21 +111,11 @@ bool TranslationUnit::suspend() const
     return clang_suspendTranslationUnit(cxTranslationUnit());
 }
 
-TranslationUnit::CodeCompletionResult TranslationUnit::complete(
-        UnsavedFiles &unsavedFiles,
-        uint line,
-        uint column,
-        int funcNameStartLine,
-        int funcNameStartColumn) const
+CodeCompletions TranslationUnit::complete(UnsavedFiles &unsavedFiles, uint line, uint column,
+                                          int funcNameStartLine, int funcNameStartColumn) const
 {
-    CodeCompleter codeCompleter(*this, unsavedFiles);
-
-    const CodeCompletions completions = codeCompleter.complete(line, column,
-                                                               funcNameStartLine,
-                                                               funcNameStartColumn);
-    const CompletionCorrection correction = codeCompleter.neededCorrection();
-
-    return CodeCompletionResult{completions, correction};
+    return CodeCompleter(*this, unsavedFiles).complete(line, column, funcNameStartLine,
+                                                       funcNameStartColumn);
 }
 
 void TranslationUnit::extractAnnotations(
@@ -237,17 +227,6 @@ static bool isHeaderErrorDiagnostic(const Utf8String &mainFilePath, const Diagno
     return isCritical && diagnostic.location().filePath() != mainFilePath;
 }
 
-static bool isIgnoredHeaderErrorDiagnostic(const Diagnostic &diagnostic)
-{
-    // FIXME: This diagnostic can appear if e.g. a main file includes a -isystem header and then the
-    // header is opened in the editor - the provided unsaved file for the newly opened editor
-    // overrides the file from the preamble. In this case, clang uses the version from the preamble
-    // and changes in the header are not reflected in the main file. Typically that's not a problem
-    // because only non-project headers are opened as -isystem headers.
-    return diagnostic.text().endsWith(
-        Utf8StringLiteral("from the precompiled header has been overridden"));
-}
-
 void TranslationUnit::extractDiagnostics(DiagnosticContainer &firstHeaderErrorDiagnostic,
                                          QVector<DiagnosticContainer> &mainFileDiagnostics) const
 {
@@ -257,9 +236,7 @@ void TranslationUnit::extractDiagnostics(DiagnosticContainer &firstHeaderErrorDi
     bool hasFirstHeaderErrorDiagnostic = false;
 
     for (const Diagnostic &diagnostic : diagnostics()) {
-        if (!hasFirstHeaderErrorDiagnostic
-                && isHeaderErrorDiagnostic(m_filePath, diagnostic)
-                && !isIgnoredHeaderErrorDiagnostic(diagnostic)) {
+        if (!hasFirstHeaderErrorDiagnostic && isHeaderErrorDiagnostic(m_filePath, diagnostic)) {
             hasFirstHeaderErrorDiagnostic = true;
             firstHeaderErrorDiagnostic = diagnostic.toDiagnosticContainer();
         }

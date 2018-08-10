@@ -890,7 +890,7 @@ public:
         }
     }
 
-    ~RunControlPrivate()
+    ~RunControlPrivate() override
     {
         QTC_CHECK(state == RunControlState::Finished || state == RunControlState::Initialized);
         disconnect();
@@ -949,7 +949,7 @@ public:
 using namespace Internal;
 
 RunControl::RunControl(RunConfiguration *runConfiguration, Core::Id mode) :
-    d(new RunControlPrivate(this, runConfiguration, mode))
+    d(std::make_unique<RunControlPrivate>(this, runConfiguration, mode))
 {
 #ifdef WITH_JOURNALD
     JournaldWatcher::instance()->subscribe(this, [this](const JournaldWatcher::LogEntry &entry) {
@@ -981,8 +981,6 @@ RunControl::~RunControl()
 #ifdef WITH_JOURNALD
     JournaldWatcher::instance()->unsubscribe(this);
 #endif
-    delete d;
-    d = nullptr;
 }
 
 void RunControl::initiateStart()
@@ -1009,7 +1007,7 @@ void RunControl::forceStop()
 
 void RunControl::initiateFinish()
 {
-    QTimer::singleShot(0, d, &RunControlPrivate::initiateFinish);
+    QTimer::singleShot(0, d.get(), &RunControlPrivate::initiateFinish);
 }
 
 using WorkerCreators = QHash<Core::Id, RunControl::WorkerCreator>;
@@ -1048,7 +1046,7 @@ RunWorkerFactory::WorkerCreator RunControl::producer(RunConfiguration *runConfig
     if (candidates.empty())
         return {};
 
-    const auto higherPriority = std::bind(std::greater<int>(),
+    const auto higherPriority = std::bind(std::greater<>(),
                                           std::bind(&RunWorkerFactory::priority, std::placeholders::_1),
                                           std::bind(&RunWorkerFactory::priority, std::placeholders::_2));
     const auto bestFactory = std::max_element(candidates.begin(), candidates.end(), higherPriority);
@@ -1878,14 +1876,10 @@ void RunWorkerPrivate::timerEvent(QTimerEvent *ev)
 */
 
 RunWorker::RunWorker(RunControl *runControl)
-    : d(new RunWorkerPrivate(this, runControl))
-{
-}
+    : d(std::make_unique<RunWorkerPrivate>(this, runControl))
+{ }
 
-RunWorker::~RunWorker()
-{
-    delete d;
-}
+RunWorker::~RunWorker() = default;
 
 /*!
  * This function is called by the RunControl once all dependencies

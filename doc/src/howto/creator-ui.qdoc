@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2017 The Qt Company Ltd.
+** Copyright (C) 2018 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Creator documentation.
@@ -30,7 +30,7 @@
 // **********************************************************************
 
 /*!
-    \contentspage {Qt Creator Manual}
+    \contentspage index.html
     \previouspage creator-overview.html
     \page creator-quick-tour.html
     \nextpage creator-configuring.html
@@ -136,24 +136,16 @@
         \li \uicontrol{File System} shows all files in the currently selected
              directory.
 
-        \li \uicontrol {Class View} shows the class hierarchy of the currently
-            open projects.
-
-        \li \uicontrol Outline shows the symbol hierarchy of a C++ file and the type
-            hierarchy of a QML file.
-
-        \li \uicontrol Tests lists autotests and Qt Quick tests in the project.
-            For more information, see \l {Running Autotests}.
-
-        \li \uicontrol {Type Hierarchy} shows the base classes of a class.
-
-        \li \uicontrol {Include Hierarchy} shows which files are included in the current file
-            and which files include the current file.
+        \li \uicontrol Outline shows an overview of defined types and other
+            symbols, as well as their properties and hierarchy in a source file.
 
     \endlist
 
-    For more information about the sidebar views that are only available in
-    \QMLD, see \l{Using Qt Quick Designer}.
+    \include creator-sidebar-cpp-views.qdocinc cpp sidebar views
+
+    For more information about the sidebar views that are only
+    available when editing QML files in the Design mode, see
+    \l{Editing QML Files in Design Mode}.
 
     You can change the view of the sidebars in the following ways:
 
@@ -325,16 +317,6 @@
 
     \endlist
 
-    \section2 Viewing the Class Hierarchy
-
-    The \uicontrol {Class View} shows the class hierarchy of the currently
-    open projects. To organize the view by subprojects, click
-    \inlineimage qtcreator-show-subprojects.png
-    (\uicontrol {Show Subprojects}).
-
-    To visit all parts of a namespace, double-click on the namespace item
-    multiple times.
-
     \section2 Viewing QML Types
 
     The \uicontrol Outline view shows the type hierarchy in a QML file.
@@ -349,16 +331,9 @@
 
     \endlist
 
-    \section2 Viewing Type Hierarchy
-
-    To view the base classes of a class, right-click the class and select
-    \uicontrol {Open Type Hierarchy}  or press \key {Ctrl+Shift+T}.
-
-    \section2 Viewing Include Hierarchy
-
-    To view which files are included in the current file and which files include
-    the current file, right-click in the editor and select \uicontrol {Open Include Hierarchy}
-    or press \key {Ctrl+Shift+I}.
+    \include creator-sidebar-cpp-views.qdocinc class view
+    \include creator-sidebar-cpp-views.qdocinc type hierarchy view
+    \include creator-sidebar-cpp-views.qdocinc include hierarchy view
 
     \section1 Viewing Output
 
@@ -645,13 +620,13 @@
             \li Look In
         \row
             \li \uicontrol Tools > \uicontrol Options
-            \li \uicontrol {Qt Creator} > \uicontrol Preferences
+            \li \uicontrol {\QC} > \uicontrol Preferences
         \row
             \li \uicontrol Help > \uicontrol {About Plugins}
-            \li \uicontrol {Qt Creator} > \uicontrol {About Plugins}
+            \li \uicontrol {\QC} > \uicontrol {About Plugins}
         \row
             \li Keyboard shortcuts
-            \li \uicontrol {Qt Creator} > \uicontrol Preferences > \uicontrol Environment >
+            \li \uicontrol {\QC} > \uicontrol Preferences > \uicontrol Environment >
                 \uicontrol Keyboard
     \endtable
 

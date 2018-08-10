@@ -69,6 +69,12 @@ QbsRunConfiguration::QbsRunConfiguration(Target *target, Core::Id id)
     addExtraAspect(libAspect);
     connect(libAspect, &UseLibraryPathsAspect::changed,
             envAspect, &EnvironmentAspect::environmentChanged);
+    if (HostOsInfo::isMacHost()) {
+        auto dyldAspect = new UseDyldSuffixAspect(this, "Qbs.RunConfiguration.UseDyldImageSuffix");
+        addExtraAspect(dyldAspect);
+        connect(dyldAspect, &UseDyldSuffixAspect::changed,
+                envAspect, &EnvironmentAspect::environmentChanged);
+    }
 
     connect(project(), &Project::parsingFinished, this,
             [envAspect]() { envAspect->buildEnvironmentHasChanged(); });
@@ -81,7 +87,7 @@ QbsRunConfiguration::QbsRunConfiguration(Target *target, Core::Id id)
     connect(target, &Target::kitChanged,
             this, &QbsRunConfiguration::updateTargetInformation);
 
-    QbsProject *qbsProject = static_cast<QbsProject *>(target->project());
+    auto qbsProject = static_cast<QbsProject *>(target->project());
     connect(qbsProject, &QbsProject::dataChanged, this, [this] { m_envCache.clear(); });
     connect(qbsProject, &Project::parsingFinished,
             this, &QbsRunConfiguration::updateTargetInformation);
@@ -109,6 +115,10 @@ void QbsRunConfiguration::doAdditionalSetup(const RunConfigurationCreationInfo &
 
 void QbsRunConfiguration::addToBaseEnvironment(Utils::Environment &env) const
 {
+    if (auto dyldAspect = extraAspect<UseDyldSuffixAspect>()) {
+        if (dyldAspect->value())
+            env.set("DYLD_IMAGE_SUFFIX", "_debug");
+    }
     bool usingLibraryPaths = extraAspect<UseLibraryPathsAspect>()->value();
 
     const auto key = qMakePair(env.toStringList(), usingLibraryPaths);

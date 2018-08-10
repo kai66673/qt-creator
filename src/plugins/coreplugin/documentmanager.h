@@ -54,7 +54,7 @@ public:
         KeepLinks
     };
 
-    typedef QPair<QString, Id> RecentFile;
+    using RecentFile = QPair<QString, Id>;
 
     static DocumentManager *instance();
 
@@ -68,6 +68,8 @@ public:
 
     static void expectFileChange(const QString &fileName);
     static void unexpectFileChange(const QString &fileName);
+
+    static void setAutoReloadPostponed(bool enabled);
 
     // recent files
     static void addToRecentFiles(const QString &fileName, Id editorId = Id());

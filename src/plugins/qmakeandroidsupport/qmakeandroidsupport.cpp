@@ -23,10 +23,10 @@
 **
 ****************************************************************************/
 
-#include "qmakeandroidbuildapkstep.h"
 #include "qmakeandroidsupport.h"
 #include "androidqmakebuildconfigurationfactory.h"
 
+#include <android/androidbuildapkstep.h>
 #include <android/androidconstants.h>
 #include <android/androidglobal.h>
 
@@ -54,11 +54,11 @@ bool QmakeAndroidSupport::canHandle(const ProjectExplorer::Target *target) const
     return qobject_cast<QmakeProject*>(target->project());
 }
 
-QStringList QmakeAndroidSupport::targetData(Core::Id role, const Target *target) const
+QVariant QmakeAndroidSupport::targetData(Core::Id role, const Target *target) const
 {
     RunConfiguration *rc = target->activeRunConfiguration();
     if (!rc)
-        return QStringList();
+        return {};
 
     const FileName projectFilePath = FileName::fromString(rc->buildKey());
     const QmakeProject *pro = qobject_cast<QmakeProject *>(target->project());
@@ -67,23 +67,69 @@ QStringList QmakeAndroidSupport::targetData(Core::Id role, const Target *target)
     const QmakeProFileNode *profileNode = pro->rootProjectNode()->findProFileFor(projectFilePath);
     QTC_ASSERT(profileNode, return {});
 
-    Variable var = {};
     if (role == Android::Constants::AndroidPackageSourceDir)
-        var = Variable::AndroidPackageSourceDir;
-    else if (role == Android::Constants::AndroidDeploySettingsFile)
-        var = Variable::AndroidDeploySettingsFile;
-    else if (role == Android::Constants::AndroidExtraLibs)
-        var = Variable::AndroidExtraLibs;
-    else
-        QTC_CHECK(false);
+        return profileNode->singleVariableValue(Variable::AndroidPackageSourceDir);
+    if (role == Android::Constants::AndroidDeploySettingsFile)
+        return profileNode->singleVariableValue(Variable::AndroidDeploySettingsFile);
+    if (role == Android::Constants::AndroidExtraLibs)
+        return profileNode->variableValue(Variable::AndroidExtraLibs);
+    if (role == Android::Constants::AndroidArch)
+        return profileNode->singleVariableValue(Variable::AndroidArch);
 
-    return profileNode->variableValue(var);
+    QTC_CHECK(false);
+    return {};
 }
 
-QString QmakeAndroidSupport::targetDataItem(Core::Id role, const Target *target) const
+static QmakeProFile *applicationProFile(const Target *target)
 {
-    const QStringList data = targetData(role, target);
-    return data.isEmpty() ? QString() : data.first();
+    ProjectExplorer::RunConfiguration *rc = target->activeRunConfiguration();
+    if (!rc)
+        return nullptr;
+    auto project = static_cast<QmakeProject *>(target->project());
+    return project->rootProFile()->findProFile(FileName::fromString(rc->buildKey()));
+}
+
+bool QmakeAndroidSupport::parseInProgress(const Target *target) const
+{
+    QmakeProjectManager::QmakeProFile *pro = applicationProFile(target);
+    return !pro || pro->parseInProgress();
+}
+
+bool QmakeAndroidSupport::validParse(const Target *target) const
+{
+    QmakeProjectManager::QmakeProFile *pro = applicationProFile(target);
+    return pro->validParse() && pro->projectType() == ProjectType::ApplicationTemplate;
+}
+
+bool QmakeAndroidSupport::extraLibraryEnabled(const Target *target) const
+{
+    QmakeProFile *pro = applicationProFile(target);
+    return pro && !pro->parseInProgress();
+}
+
+FileName QmakeAndroidSupport::projectFilePath(const Target *target) const
+{
+    QmakeProFile *pro = applicationProFile(target);
+    return pro ? pro->filePath() : FileName();
+}
+
+bool QmakeAndroidSupport::setTargetData(Core::Id role, const QVariant &value, const Target *target) const
+{
+    QmakeProFile *pro = applicationProFile(target);
+    if (!pro)
+        return false;
+
+    const QString arch = pro->singleVariableValue(Variable::AndroidArch);
+    const QString scope = "contains(ANDROID_TARGET_ARCH," + arch + ')';
+    auto flags = QmakeProjectManager::Internal::ProWriter::ReplaceValues
+               | QmakeProjectManager::Internal::ProWriter::MultiLine;
+
+    if (role == Android::Constants::AndroidExtraLibs)
+        return pro->setProVariable("ANDROID_EXTRA_LIBS", value.toStringList(), scope, flags);
+    if (role == Android::Constants::AndroidPackageSourceDir)
+        return pro->setProVariable("ANDROID_PACKAGE_SOURCE_DIR", {value.toString()}, scope, flags);
+
+    return false;
 }
 
 QStringList QmakeAndroidSupport::soLibSearchPath(const ProjectExplorer::Target *target) const
@@ -105,7 +151,7 @@ QStringList QmakeAndroidSupport::soLibSearchPath(const ProjectExplorer::Target *
             res.insert(destDir.toString());
         }
 
-        const QString jsonFile = targetDataItem(Android::Constants::AndroidDeploySettingsFile, target);
+        const QString jsonFile = targetData(Android::Constants::AndroidDeploySettingsFile, target).toString();
         QFile deploymentSettings(jsonFile);
         if (deploymentSettings.open(QIODevice::ReadOnly)) {
             QJsonParseError error;
@@ -141,24 +187,14 @@ QStringList QmakeAndroidSupport::projectTargetApplications(const ProjectExplorer
     return apps;
 }
 
-Utils::FileName QmakeAndroidSupport::androiddeployqtPath(const ProjectExplorer::Target *target) const
+void QmakeAndroidSupport::addFiles(const ProjectExplorer::Target *target,
+                                   const QString &buildKey,
+                                   const QStringList &addedFiles) const
 {
-    QtSupport::BaseQtVersion *version = QtSupport::QtKitInformation::qtVersion(target->kit());
-    if (!version)
-        return Utils::FileName();
-
-    QString command = version->qmakeProperty("QT_HOST_BINS");
-    if (!command.endsWith(QLatin1Char('/')))
-        command += QLatin1Char('/');
-    command += Utils::HostOsInfo::withExecutableSuffix(QLatin1String("androiddeployqt"));
-    return Utils::FileName::fromString(command);
-}
-
-void QmakeAndroidSupport::manifestSaved(const ProjectExplorer::Target *target)
-{
-    ProjectExplorer::BuildConfiguration *bc = target->activeBuildConfiguration();
-    if (auto qbc = qobject_cast<AndroidQmakeBuildConfiguration *>(bc))
-        qbc->manifestSaved();
+    QmakeProject *project = static_cast<QmakeProject *>(target->project());
+    QmakeProFile *currentRunNode = project->rootProFile()->findProFile(FileName::fromString(buildKey));
+    QTC_ASSERT(currentRunNode, return);
+    currentRunNode->addFiles(addedFiles);
 }
 
 } // namespace Internal

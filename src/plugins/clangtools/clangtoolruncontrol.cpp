@@ -145,16 +145,17 @@ private:
         if (buildType == BuildConfiguration::Release) {
             const QString wrongMode = ClangToolRunControl::tr("Release");
             const QString toolName = m_parent->tool()->name();
-            const QString title = ClangToolRunControl::tr("Run %1 in %2 Mode?").arg(toolName)
-                    .arg(wrongMode);
-            const QString message = ClangToolRunControl::tr(
-                        "<html><head/><body>"
-                        "<p>You are trying to run the tool \"%1\" on an application in %2 mode. The tool is "
+            const QString title = ClangToolRunControl::tr("Run %1 in %2 Mode?").arg(toolName, wrongMode);
+            const QString problem = ClangToolRunControl::tr(
+                        "You are trying to run the tool \"%1\" on an application in %2 mode. The tool is "
                         "designed to be used in Debug mode since enabled assertions can reduce the number of "
-                        "false positives.</p>"
-                        "<p>Do you want to continue and run the tool in %2 mode?</p>"
-                        "</body></html>")
-                    .arg(toolName).arg(wrongMode);
+                        "false positives.").arg(toolName, wrongMode);
+            const QString question = ClangToolRunControl::tr(
+                        "Do you want to continue and run the tool in %1 mode?").arg(wrongMode);
+            const QString message = QString("<html><head/><body>"
+                                            "<p>%1</p>"
+                                            "<p>%2</p>"
+                                            "</body></html>").arg(problem, question);
             if (Utils::CheckableMessageBox::doNotAskAgainQuestion(Core::ICore::mainWindow(),
                                                                   title, message, Core::ICore::settings(),
                                                                   "ClangToolsCorrectModeWarning") != QDialogButtonBox::Yes)
@@ -185,16 +186,12 @@ private:
      bool m_success = false;
 };
 
-static AnalyzeUnits toAnalyzeUnits(const FileInfos &fileInfos,
-                                   const QString &clangVersion,
-                                   const QString &clangResourceDirectory)
+static AnalyzeUnits toAnalyzeUnits(const FileInfos &fileInfos)
 {
     AnalyzeUnits unitsToAnalyze;
     const CompilerOptionsBuilder::PchUsage pchUsage = CppTools::getPchUsage();
     for (const FileInfo &fileInfo : fileInfos) {
-        CompilerOptionsBuilder optionsBuilder(*fileInfo.projectPart,
-                                              clangVersion,
-                                              clangResourceDirectory);
+        CompilerOptionsBuilder optionsBuilder(*fileInfo.projectPart);
         QStringList arguments = extraClangToolsPrependOptions();
         arguments.append(optionsBuilder.build(fileInfo.kind, pchUsage));
         arguments.append(extraClangToolsAppendOptions());
@@ -204,12 +201,11 @@ static AnalyzeUnits toAnalyzeUnits(const FileInfos &fileInfos,
     return unitsToAnalyze;
 }
 
-AnalyzeUnits ClangToolRunControl::unitsToAnalyze(const QString &clangVersion)
+AnalyzeUnits ClangToolRunControl::unitsToAnalyze()
 {
     QTC_ASSERT(m_projectInfo.isValid(), return AnalyzeUnits());
 
-    const QString clangResourceDirectory = clangIncludeDirectory(m_clangExecutable, clangVersion);
-    return toAnalyzeUnits(m_fileInfos, clangVersion, clangResourceDirectory);
+    return toAnalyzeUnits(m_fileInfos);
 }
 
 static QDebug operator<<(QDebug debug, const Utils::Environment &environment)
@@ -231,7 +227,7 @@ ClangToolRunControl::ClangToolRunControl(RunControl *runControl,
                                          const FileInfos &fileInfos)
     : RunWorker(runControl)
     , m_projectBuilder(new ProjectBuilder(runControl, target->project(), this))
-    , m_clangExecutable(CppTools::clangExecutable(CLANG_BINDIR))
+    , m_clangExecutable(Core::ICore::clangExecutable(CLANG_BINDIR))
     , m_temporaryDir("clangtools-XXXXXX")
     , m_target(target)
     , m_fileInfos(fileInfos)
@@ -302,7 +298,7 @@ void ClangToolRunControl::start()
     // Create log dir
     if (!m_temporaryDir.isValid()) {
         const QString errorMessage
-                = toolName + tr(": Failed to create temporary dir, stop.");
+                = tr("%1: Failed to create temporary dir, stop.").arg(toolName);
         appendMessage(errorMessage, Utils::ErrorMessageFormat);
         TaskHub::addTask(Task::Error, errorMessage, Debugger::Constants::ANALYZERTASK_ID);
         TaskHub::requestPopup();
@@ -311,7 +307,7 @@ void ClangToolRunControl::start()
     }
 
     // Collect files
-    const AnalyzeUnits unitsToProcess = unitsToAnalyze(CLANG_VERSION);
+    const AnalyzeUnits unitsToProcess = unitsToAnalyze();
     qCDebug(LOG) << "Files to process:" << unitsToProcess;
     m_unitsToProcess = unitsToProcess;
     m_initialFilesToProcessSize = m_unitsToProcess.count();
@@ -451,13 +447,13 @@ void ClangToolRunControl::updateProgressValue()
 void ClangToolRunControl::finalize()
 {
     const QString toolName = tool()->name();
-    appendMessage(toolName + tr(" finished: "
-                     "Processed %1 files successfully, %2 failed.")
-                        .arg(m_filesAnalyzed).arg(m_filesNotAnalyzed),
+    appendMessage(tr("%1 finished: "
+                     "Processed %2 files successfully, %3 failed.")
+                        .arg(toolName, m_filesAnalyzed, m_filesNotAnalyzed),
                   Utils::NormalMessageFormat);
 
     if (m_filesNotAnalyzed != 0) {
-        QString msg = toolName + tr(": Not all files could be analyzed.");
+        QString msg = tr("%1: Not all files could be analyzed.").arg(toolName);
         TaskHub::addTask(Task::Error, msg, Debugger::Constants::ANALYZERTASK_ID);
         TaskHub::requestPopup();
     }

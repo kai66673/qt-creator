@@ -52,12 +52,11 @@ namespace Internal {
 class AUTOTESTSHARED_EXPORT TestRunner : public QObject
 {
     Q_OBJECT
-
 public:
-    enum CancelReason { UserCanceled, Timeout };
+    enum CancelReason { UserCanceled, Timeout, KitChanged };
 
     static TestRunner* instance();
-    ~TestRunner();
+    ~TestRunner() override;
 
     void setSelectedTests(const QList<TestConfiguration *> &selected);
     void runTest(TestRunMode mode, const TestTreeItem *item);
@@ -91,6 +90,7 @@ private:
     QFutureInterface<TestResultPtr> *m_fakeFutureInterface = nullptr;
     QQueue<TestConfiguration *> m_selectedTests;
     bool m_executingTests = false;
+    bool m_canceled = false;
     TestConfiguration *m_currentConfig = nullptr;
     QProcess *m_currentProcess = nullptr;
     TestOutputReader *m_currentOutputReader = nullptr;
@@ -98,13 +98,17 @@ private:
 
     // temporarily used if building before running is necessary
     QMetaObject::Connection m_buildConnect;
+    // temporarily used when debugging
+    QMetaObject::Connection m_stopDebugConnect;
+    // temporarily used for handling of switching the current target
+    QMetaObject::Connection m_targetConnect;
 };
 
 class RunConfigurationSelectionDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit RunConfigurationSelectionDialog(const QString &testsInfo, QWidget *parent = nullptr);
+    explicit RunConfigurationSelectionDialog(const QString &buildTargetKey, QWidget *parent = nullptr);
     QString displayName() const;
     QString executable() const;
 private:

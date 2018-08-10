@@ -36,6 +36,7 @@ namespace ProjectExplorer {
 class BuildInfo;
 class NamedWidget;
 class BuildStepList;
+class Node;
 class Kit;
 class Target;
 class IOutputParser;
@@ -79,6 +80,8 @@ public:
     virtual bool isEnabled() const;
     virtual QString disabledReason() const;
 
+    virtual bool regenerateBuildFiles(Node *node);
+
     enum BuildType {
         Unknown,
         Debug,
@@ -93,6 +96,7 @@ public:
 
     void prependCompilerPathToEnvironment(Utils::Environment &env) const;
     static void prependCompilerPathToEnvironment(Kit *k, Utils::Environment &env);
+    void updateCacheAndEmitEnvironmentChanged();
 
 signals:
     void environmentChanged();
@@ -102,10 +106,8 @@ signals:
 
 protected:
     virtual void initialize(const BuildInfo *info);
-    void updateCacheAndEmitEnvironmentChanged();
 
 private:
-    void handleKitUpdate();
     void emitBuildDirectoryChanged();
 
     bool m_clearSystemEnvironment = false;

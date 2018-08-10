@@ -29,6 +29,7 @@
 
 #include <QPair>
 #include <QObject>
+#include <QVersionNumber>
 
 namespace ProjectExplorer {
 class Kit;
@@ -48,7 +49,12 @@ class ANDROID_EXPORT AndroidManager : public QObject
 public:
     static QString packageName(ProjectExplorer::Target *target);
     static QString packageName(const Utils::FileName &manifestFile);
-
+    static bool packageInstalled(const QString &deviceSerial,
+                                 const QString &packageName);
+    static void apkInfo(const Utils::FileName &apkPath,
+                        QString *packageName = nullptr,
+                        QVersionNumber *version = nullptr,
+                        QString *activityPath = nullptr);
     static QString intentName(ProjectExplorer::Target *target);
     static QString activityName(ProjectExplorer::Target *target);
 
@@ -68,10 +74,11 @@ public:
 
     static QString targetArch(ProjectExplorer::Target *target);
 
-    static Utils::FileName dirPath(ProjectExplorer::Target *target);
+    static Utils::FileName dirPath(const ProjectExplorer::Target *target);
     static Utils::FileName manifestPath(ProjectExplorer::Target *target);
     static Utils::FileName manifestSourcePath(ProjectExplorer::Target *target);
     static Utils::FileName defaultPropertiesPath(ProjectExplorer::Target *target);
+    static Utils::FileName apkPath(const ProjectExplorer::Target *target);
 
     static QPair<int, int> apiLevelRange();
     static QString androidNameForApiLevel(int x);
@@ -86,6 +93,10 @@ public:
     static AndroidQtSupport *androidQtSupport(ProjectExplorer::Target *target);
     static bool updateGradleProperties(ProjectExplorer::Target *target);
     static int findApiLevel(const Utils::FileName &platformPath);
+
+    static void runAdbCommandDetached(const QStringList &args);
+    static bool runAdbCommand(const QStringList &args, QString *output = nullptr);
+    static bool runAaptCommand(const QStringList &args, QString *output = nullptr);
 };
 
 } // namespace Android

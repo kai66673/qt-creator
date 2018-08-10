@@ -76,7 +76,7 @@ namespace Internal {
 class QmakeProjectManagerPluginPrivate : public QObject
 {
 public:
-    ~QmakeProjectManagerPluginPrivate();
+    ~QmakeProjectManagerPluginPrivate() override;
 
     void projectChanged();
     void activeTargetChanged();
@@ -140,7 +140,7 @@ bool QmakeProjectManagerPlugin::initialize(const QStringList &arguments, QString
     //create and register objects
     ProjectManager::registerProjectType<QmakeProject>(QmakeProjectManager::Constants::PROFILE_MIMETYPE);
 
-    ProjectExplorer::KitManager::registerKitInformation(new QmakeKitInformation);
+    ProjectExplorer::KitManager::registerKitInformation<QmakeKitInformation>();
 
     IWizardFactory::registerFactoryCreator([] {
         return QList<IWizardFactory *> {
@@ -371,10 +371,10 @@ void QmakeProjectManagerPluginPrivate::updateContextActions()
     Project *project = ProjectTree::currentProject();
 
     const ContainerNode *containerNode = node ? node->asContainerNode() : nullptr;
-    const QmakeProFileNode *proFileNode = dynamic_cast<const QmakeProFileNode *>(containerNode ? containerNode->rootProjectNode() : node);
+    const auto *proFileNode = dynamic_cast<const QmakeProFileNode *>(containerNode ? containerNode->rootProjectNode() : node);
 
     m_addLibraryActionContextMenu->setEnabled(proFileNode);
-    QmakeProject *qmakeProject = qobject_cast<QmakeProject *>(QmakeManager::contextProject());
+    auto *qmakeProject = qobject_cast<QmakeProject *>(QmakeManager::contextProject());
     QmakeProFileNode *subProjectNode = nullptr;
     disableBuildFileMenus();
     if (node) {

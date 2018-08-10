@@ -49,6 +49,7 @@
 #include <qmljs/qmljsmodelmanagerinterface.h>
 #include <qmljs/qmljssimplereader.h>
 
+#include <utils/algorithm.h>
 #include <utils/changeset.h>
 #include <utils/qtcassert.h>
 
@@ -69,9 +70,7 @@ RewriterView::RewriterView(DifferenceHandling differenceHandling, QObject *paren
     connect(&m_amendTimer, &QTimer::timeout, this, &RewriterView::amendQmlText);
 }
 
-RewriterView::~RewriterView()
-{
-}
+RewriterView::~RewriterView() = default;
 
 Internal::ModelToTextMerger *RewriterView::modelToTextMerger() const
 {
@@ -469,7 +468,7 @@ QString RewriterView::auxiliaryDataAsQML() const
     QString str = "Designer {\n    ";
 
     int columnCount = 0;
-    for (const auto node : allModelNodes()) {
+    for (const auto &node : allModelNodes()) {
         QHash<PropertyName, QVariant> data = node.auxiliaryData();
         if (!data.isEmpty()) {
             hasAuxData = true;
@@ -483,14 +482,20 @@ QString RewriterView::auxiliaryDataAsQML() const
             str += QString::number(node.internalId());
             str += ";";
 
-            for (auto i = data.begin(); i != data.end(); ++i) {
-                const QVariant value = i.value();
+            QStringList keys = Utils::transform(data.keys(), [](const PropertyName &name) {
+                return QString::fromUtf8(name);
+            });
+
+            keys.sort();
+
+            for (const QString &key : keys) {
+                const QVariant value = data.value(key.toUtf8());
                 QString strValue = value.toString();
                 if (static_cast<QMetaType::Type>(value.type()) == QMetaType::QString)
                     strValue = "\"" + strValue + "\"";
 
                 if (!strValue.isEmpty()) {
-                    str += replaceIllegalPropertyNameChars(QString::fromUtf8(i.key())) + ":";
+                    str += replaceIllegalPropertyNameChars(key) + ":";
                     str += strValue;
                     str += ";";
                 }
@@ -913,13 +918,11 @@ QString RewriterView::getRawAuxiliaryData() const
 
     const QString oldText = m_textModifier->text();
 
-    QString newText = oldText;
-
-    int startIndex = newText.indexOf(annotationsStart());
-    int endIndex = newText.indexOf(annotationsEnd());
+    int startIndex = oldText.indexOf(annotationsStart());
+    int endIndex = oldText.indexOf(annotationsEnd());
 
     if (startIndex > 0 && endIndex > 0)
-        return newText.mid(startIndex, endIndex - startIndex + annotationsEnd().length());
+        return oldText.mid(startIndex, endIndex - startIndex + annotationsEnd().length());
 
     return {};
 }
@@ -952,14 +955,14 @@ void RewriterView::writeAuxiliaryData()
     changeSet.apply(&tc);
 }
 
-static void checkNode(QmlJS::SimpleReaderNode::Ptr node, RewriterView *view);
+static void checkNode(const QmlJS::SimpleReaderNode::Ptr &node, RewriterView *view);
 
-static void checkChildNodes(QmlJS::SimpleReaderNode::Ptr node, RewriterView *view)
+static void checkChildNodes(const QmlJS::SimpleReaderNode::Ptr &node, RewriterView *view)
 {
     if (!node)
         return;
 
-    for (auto child : node->children())
+    for (const auto &child : node->children())
         checkNode(child, view);
 }
 
@@ -970,7 +973,7 @@ static QString fixUpIllegalChars(const QString &str)
     return ret;
 }
 
-static void checkNode(QmlJS::SimpleReaderNode::Ptr node, RewriterView *view)
+static void checkNode(const QmlJS::SimpleReaderNode::Ptr &node, RewriterView *view)
 {
     if (!node)
         return;

@@ -157,6 +157,7 @@ public:
 
     QFileSystemWatcher *m_fileWatcher = nullptr; // Delayed creation.
     QFileSystemWatcher *m_linkWatcher = nullptr; // Delayed creation (only UNIX/if a link is seen).
+    bool m_postponeAutoReload = false;
     bool m_blockActivated = false;
     bool m_checkOnFocusChange = false;
     QString m_lastVisitedDirectory = QDir::currentPath();
@@ -435,7 +436,7 @@ void DocumentManager::renamedFile(const QString &from, const QString &to)
 
 void DocumentManager::filePathChanged(const FileName &oldName, const FileName &newName)
 {
-    IDocument *doc = qobject_cast<IDocument *>(sender());
+    auto doc = qobject_cast<IDocument *>(sender());
     QTC_ASSERT(doc, return);
     if (doc == d->m_blockedIDocument)
         return;
@@ -450,12 +451,12 @@ void DocumentManager::filePathChanged(const FileName &oldName, const FileName &n
 */
 void DocumentManager::addDocument(IDocument *document, bool addWatcher)
 {
-    addDocuments(QList<IDocument *>() << document, addWatcher);
+    addDocuments({document}, addWatcher);
 }
 
 void DocumentManager::documentDestroyed(QObject *obj)
 {
-    IDocument *document = static_cast<IDocument*>(obj);
+    auto document = static_cast<IDocument*>(obj);
     // Check the special unwatched first:
     if (!d->m_documentsWithoutWatch.removeOne(document))
         removeFileInfo(document);
@@ -486,7 +487,7 @@ bool DocumentManager::removeDocument(IDocument *document)
    because the file was saved under different name. */
 void DocumentManager::checkForNewFileName()
 {
-    IDocument *document = qobject_cast<IDocument *>(sender());
+    auto document = qobject_cast<IDocument *>(sender());
     // We modified the IDocument
     // Trust the other code to also update the m_states map
     if (document == d->m_blockedIDocument)
@@ -595,6 +596,13 @@ void DocumentManager::unexpectFileChange(const QString &fileName)
     const QString resolvedCleanAbsFilePath = cleanAbsoluteFilePath(fileName, ResolveLinks);
     if (cleanAbsFilePath != resolvedCleanAbsFilePath)
         updateExpectedState(filePathKey(fileName, ResolveLinks));
+}
+
+void DocumentManager::setAutoReloadPostponed(bool postponed)
+{
+    d->m_postponeAutoReload = postponed;
+    if (!postponed)
+        QTimer::singleShot(500, m_instance, &DocumentManager::checkForReload);
 }
 
 static bool saveModifiedFilesHelper(const QList<IDocument *> &documents,
@@ -712,7 +720,7 @@ bool DocumentManager::saveDocument(IDocument *document, const QString &fileName,
     return ret;
 }
 
-QString DocumentManager::allDocumentFactoryFiltersString(QString *allFilesFilter = 0)
+QString DocumentManager::allDocumentFactoryFiltersString(QString *allFilesFilter = nullptr)
 {
     QSet<QString> uniqueFilters;
 
@@ -990,7 +998,7 @@ void DocumentManager::changedFile(const QString &fileName)
 
 void DocumentManager::checkForReload()
 {
-    if (d->m_changedFiles.isEmpty())
+    if (d->m_postponeAutoReload || d->m_changedFiles.isEmpty())
         return;
     if (QApplication::applicationState() != Qt::ApplicationActive)
         return;

@@ -795,7 +795,8 @@ QString GitClient::findGitDirForRepository(const QString &repositoryDir) const
 
 bool GitClient::managesFile(const QString &workingDirectory, const QString &fileName) const
 {
-    return vcsFullySynchronousExec(workingDirectory, {"ls-files", "--error-unmatch", fileName}).result
+    return vcsFullySynchronousExec(workingDirectory, {"ls-files", "--error-unmatch", fileName},
+                                   Core::ShellCommand::NoOutput).result
             == SynchronousProcessResponse::Finished;
 }
 
@@ -3370,10 +3371,10 @@ GitRemote::GitRemote(const QString &url)
 
     // Check for local remotes (refer to the root or relative path)
     // On Windows, local paths typically starts with <drive>:
-    if (url.startsWith('/') || url.startsWith('.')
+    if (url.startsWith("file://") || url.startsWith('/') || url.startsWith('.')
             || (HostOsInfo::isWindowsHost() && url[1] == ':')) {
         protocol = "file";
-        path = QDir::fromNativeSeparators(url);
+        path = QDir::fromNativeSeparators(url.startsWith("file://") ? url.mid(7) : url);
         isValid = QDir(path).exists() || QDir(path + ".git").exists();
         return;
     }

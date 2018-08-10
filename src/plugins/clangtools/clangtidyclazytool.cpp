@@ -119,13 +119,14 @@ public:
 
             const Debugger::DiagnosticLocation start = step.ranges.first();
             const Debugger::DiagnosticLocation end = step.ranges.last();
-            const int startPos = file.position(start.line, start.column);
-            const int endPos = file.position(end.line, end.column);
+            const int startPos = file.position(start.filePath, start.line, start.column);
+            const int endPos = file.position(start.filePath, end.line, end.column);
 
             auto op = new ReplacementOperation;
             op->pos = startPos;
             op->length = endPos - startPos;
             op->text = step.message;
+            op->fileName = start.filePath;
             op->apply = apply;
 
             replacements += op;
@@ -251,7 +252,10 @@ ClangTidyClazyTool::ClangTidyClazyTool()
     m_applyFixitsButton->setEnabled(false);
     connect(m_diagnosticModel,
             &ClangToolsDiagnosticModel::fixItsToApplyCountChanged,
-            [this](int c) { m_applyFixitsButton->setEnabled(c); });
+            [this](int c) {
+        m_applyFixitsButton->setEnabled(c);
+        static_cast<DiagnosticView *>(m_diagnosticView.data())->setSelectedFixItsCount(c);
+    });
     connect(m_applyFixitsButton, &QToolButton::clicked, [this]() {
         QVector<DiagnosticItem *> diagnosticItems;
         m_diagnosticModel->rootItem()->forChildrenAtLevel(1, [&](TreeItem *item){
@@ -265,10 +269,8 @@ ClangTidyClazyTool::ClangTidyClazyTool()
     const QString toolTip = tr("Clang-Tidy and Clazy use a customized Clang executable from the "
                                "Clang project to search for errors and warnings.");
 
-    Debugger::registerPerspective(ClangTidyClazyPerspectiveId, new Perspective(
-        tr("Clang-Tidy and Clazy"),
-        {{ClangTidyClazyDockId, m_diagnosticView, {}, Perspective::SplitVertical}}
-    ));
+    auto perspective = new Perspective(tr("Clang-Tidy and Clazy"));
+    perspective->addWindow(m_diagnosticView, Perspective::SplitVertical, nullptr);
 
     action = new QAction(tr("Clang-Tidy and Clazy..."), this);
     action->setToolTip(toolTip);
@@ -280,14 +282,14 @@ ClangTidyClazyTool::ClangTidyClazyTool()
         action->setEnabled(m_startAction->isEnabled());
     });
 
-    ToolbarDescription tidyClazyToolbar;
-    tidyClazyToolbar.addAction(m_startAction);
-    tidyClazyToolbar.addAction(m_stopAction);
-    tidyClazyToolbar.addAction(m_goBack);
-    tidyClazyToolbar.addAction(m_goNext);
-    tidyClazyToolbar.addWidget(m_filterLineEdit);
-    tidyClazyToolbar.addWidget(m_applyFixitsButton);
-    Debugger::registerToolbar(ClangTidyClazyPerspectiveId, tidyClazyToolbar);
+    perspective->addToolbarAction(m_startAction);
+    perspective->addToolbarAction(m_stopAction);
+    perspective->addToolbarAction(m_goBack);
+    perspective->addToolbarAction(m_goNext);
+    perspective->addToolbarWidget(m_filterLineEdit);
+    perspective->addToolbarWidget(m_applyFixitsButton);
+
+    Debugger::registerPerspective(ClangTidyClazyPerspectiveId, perspective);
 
     updateRunActions();
 
@@ -329,7 +331,7 @@ void ClangTidyClazyTool::startTool(bool askUserForFileSelection)
     QTC_ASSERT(project, return);
 
     const FileInfos fileInfos = collectFileInfos(project, askUserForFileSelection);
-    if (fileInfos.isEmpty())
+    if (fileInfos.empty())
         return;
 
     auto clangTool = new ClangTidyClazyRunControl(runControl,

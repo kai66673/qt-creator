@@ -77,8 +77,7 @@ TestRunner *TestRunner::instance()
 }
 
 TestRunner::TestRunner(QObject *parent) :
-    QObject(parent),
-    m_executingTests(false)
+    QObject(parent)
 {
     connect(&m_futureWatcher, &QFutureWatcher<TestResultPtr>::resultReadyAt,
             this, [this](int index) { emit testResultReady(m_futureWatcher.resultAt(index)); });
@@ -154,6 +153,7 @@ void TestRunner::scheduleNext()
     QTC_ASSERT(!m_selectedTests.isEmpty(), onFinished(); return);
     QTC_ASSERT(!m_currentConfig && !m_currentProcess, resetInternalPointers());
     QTC_ASSERT(m_fakeFutureInterface, onFinished(); return);
+    QTC_ASSERT(!m_canceled, onFinished(); return);
 
     m_currentConfig = m_selectedTests.dequeue();
 
@@ -215,9 +215,16 @@ void TestRunner::scheduleNext()
 
 void TestRunner::cancelCurrent(TestRunner::CancelReason reason)
 {
+    m_canceled = true;
     if (reason == UserCanceled) {
-        if (!m_fakeFutureInterface->isCanceled()) // depends on using the button / progress bar
+        // when using the stop button we need to report, for progress bar this happens automatically
+        if (m_fakeFutureInterface && !m_fakeFutureInterface->isCanceled())
             m_fakeFutureInterface->reportCanceled();
+    } else if (reason == KitChanged) {
+        if (m_fakeFutureInterface)
+            m_fakeFutureInterface->reportCanceled();
+        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn,
+                tr("Current kit has changed. Canceling test run."))));
     }
     if (m_currentProcess && m_currentProcess->state() != QProcess::NotRunning) {
         m_currentProcess->kill();
@@ -231,24 +238,30 @@ void TestRunner::cancelCurrent(TestRunner::CancelReason reason)
 
 void TestRunner::onProcessFinished()
 {
-    m_fakeFutureInterface->setProgressValue(m_fakeFutureInterface->progressValue()
-                                            + m_currentConfig->testCaseCount());
-    if (!m_fakeFutureInterface->isCanceled()) {
-        if (m_currentProcess->exitStatus() == QProcess::CrashExit) {
-            m_currentOutputReader->reportCrash();
-            emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageFatal,
-                tr("Test for project \"%1\" crashed.").arg(m_currentConfig->displayName())
-                    + processInformation(m_currentProcess) + rcInfo(m_currentConfig))));
-        } else if (!m_currentOutputReader->hadValidOutput()) {
-            emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageFatal,
-                tr("Test for project \"%1\" did not produce any expected output.")
+    if (m_executingTests && QTC_GUARD(m_currentConfig)) {
+        QTC_CHECK(m_fakeFutureInterface);
+        m_fakeFutureInterface->setProgressValue(m_fakeFutureInterface->progressValue()
+                                                + m_currentConfig->testCaseCount());
+        if (!m_fakeFutureInterface->isCanceled()) {
+            if (m_currentProcess->exitStatus() == QProcess::CrashExit) {
+                m_currentOutputReader->reportCrash();
+                emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageFatal,
+                        tr("Test for project \"%1\" crashed.").arg(m_currentConfig->displayName())
+                        + processInformation(m_currentProcess) + rcInfo(m_currentConfig))));
+            } else if (!m_currentOutputReader->hadValidOutput()) {
+                emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageFatal,
+                    tr("Test for project \"%1\" did not produce any expected output.")
                     .arg(m_currentConfig->displayName()) + processInformation(m_currentProcess)
-                                                         + rcInfo(m_currentConfig))));
+                    + rcInfo(m_currentConfig))));
+            }
         }
     }
-
     resetInternalPointers();
 
+    if (!m_fakeFutureInterface) {
+        QTC_ASSERT(!m_executingTests, m_executingTests = false);
+        return;
+    }
     if (!m_selectedTests.isEmpty() && !m_fakeFutureInterface->isCanceled())
         scheduleNext();
     else
@@ -277,6 +290,7 @@ void TestRunner::prepareToRunTests(TestRunMode mode)
     }
 
     m_executingTests = true;
+    m_canceled = false;
     emit testRunStarted();
 
     // clear old log and output pane
@@ -299,6 +313,9 @@ void TestRunner::prepareToRunTests(TestRunMode mode)
         return;
     }
 
+    m_targetConnect = connect(project, &ProjectExplorer::Project::activeTargetChanged,
+                              [this]() { cancelCurrent(KitChanged); });
+
     if (!projectExplorerSettings.buildBeforeDeploy || mode == TestRunMode::DebugWithoutDeploy
             || mode == TestRunMode::RunWithoutDeploy) {
         runOrDebugTests();
@@ -311,17 +328,14 @@ void TestRunner::prepareToRunTests(TestRunMode mode)
     }
 }
 
-static QString firstTestCaseTarget(const TestConfiguration *config)
+static QString firstNonEmptyTestCaseTarget(const TestConfiguration *config)
 {
-    for (const QString &internalTarget : config->internalTargets()) {
-        const QString buildTarget = internalTarget.split('|').first();
-        if (!buildTarget.isEmpty())
-            return buildTarget;
-    }
-    return QString();
+    return Utils::findOrDefault(config->internalTargets(), [](const QString &internalTarget) {
+        return !internalTarget.isEmpty();
+    });
 }
 
-static ProjectExplorer::RunConfiguration *getRunConfiguration(const QString &dialogDetail)
+static ProjectExplorer::RunConfiguration *getRunConfiguration(const QString &buildTargetKey)
 {
     using namespace ProjectExplorer;
     const Project *project = SessionManager::startupProject();
@@ -339,7 +353,7 @@ static ProjectExplorer::RunConfiguration *getRunConfiguration(const QString &dia
     if (runConfigurations.size() == 1)
         return runConfigurations.first();
 
-    RunConfigurationSelectionDialog dialog(dialogDetail, Core::ICore::dialogParent());
+    RunConfigurationSelectionDialog dialog(buildTargetKey, Core::ICore::dialogParent());
     if (dialog.exec() == QDialog::Accepted) {
         const QString dName = dialog.displayName();
         if (dName.isEmpty())
@@ -384,10 +398,14 @@ int TestRunner::precheckTestConfigurations()
 void TestRunner::runTests()
 {
     QList<TestConfiguration *> toBeRemoved;
+    bool projectChanged = false;
     for (TestConfiguration *config : m_selectedTests) {
         config->completeTestInformation(TestRunMode::Run);
-        if (!config->hasExecutable()) {
-            if (auto rc = getRunConfiguration(firstTestCaseTarget(config)))
+        if (!config->project()) {
+            projectChanged = true;
+            toBeRemoved.append(config);
+        } else if (!config->hasExecutable()) {
+            if (auto rc = getRunConfiguration(firstNonEmptyTestCaseTarget(config)))
                 config->setOriginalRunConfiguration(rc);
             else
                 toBeRemoved.append(config);
@@ -398,8 +416,10 @@ void TestRunner::runTests()
     qDeleteAll(toBeRemoved);
     toBeRemoved.clear();
     if (m_selectedTests.isEmpty()) {
-        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn,
-                tr("No test cases left for execution. Canceling test run."))));
+        QString mssg = projectChanged ? tr("Startup project has changed. Canceling test run.")
+                                      : tr("No test cases left for execution. Canceling test run.");
+
+        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn, mssg)));
         onFinished();
         return;
     }
@@ -452,8 +472,14 @@ void TestRunner::debugTests()
 
     TestConfiguration *config = m_selectedTests.first();
     config->completeTestInformation(TestRunMode::Debug);
+    if (!config->project()) {
+        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn,
+            TestRunner::tr("Startup project has changed. Canceling test run."))));
+        onFinished();
+        return;
+    }
     if (!config->hasExecutable()) {
-        if (auto *rc = getRunConfiguration(firstTestCaseTarget(config)))
+        if (auto *rc = getRunConfiguration(firstNonEmptyTestCaseTarget(config)))
             config->completeTestInformation(rc, TestRunMode::Debug);
     }
 
@@ -528,8 +554,9 @@ void TestRunner::debugTests()
                 outputreader, &QObject::deleteLater);
     }
 
-    connect(this, &TestRunner::requestStopTestRun, runControl,
-            &ProjectExplorer::RunControl::initiateStop);
+    m_stopDebugConnect = connect(this, &TestRunner::requestStopTestRun,
+                                 runControl, &ProjectExplorer::RunControl::initiateStop);
+
     connect(runControl, &ProjectExplorer::RunControl::stopped, this, &TestRunner::onFinished);
     ProjectExplorer::ProjectExplorerPlugin::startRunControl(runControl);
 }
@@ -540,15 +567,14 @@ void TestRunner::runOrDebugTests()
     case TestRunMode::Run:
     case TestRunMode::RunWithoutDeploy:
         runTests();
-        break;
+        return;
     case TestRunMode::Debug:
     case TestRunMode::DebugWithoutDeploy:
         debugTests();
-        break;
-    default:
-        onFinished();
-        QTC_ASSERT(false, return);  // unexpected run mode
+        return;
     }
+    onFinished();
+    QTC_ASSERT(false, return);  // unexpected run mode
 }
 
 void TestRunner::buildProject(ProjectExplorer::Project *project)
@@ -571,7 +597,10 @@ void TestRunner::buildFinished(bool success)
                this, &TestRunner::buildFinished);
 
     if (success) {
-        runOrDebugTests();
+        if (!m_canceled)
+            runOrDebugTests();
+        else if (m_executingTests)
+            onFinished();
     } else {
         emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageFatal,
                                                   tr("Build failed. Canceling test run."))));
@@ -585,6 +614,8 @@ void TestRunner::onFinished()
     qDeleteAll(m_selectedTests);
     m_selectedTests.clear();
 
+    disconnect(m_stopDebugConnect);
+    disconnect(m_targetConnect);
     m_fakeFutureInterface = nullptr;
     m_executingTests = false;
     emit testRunFinished();
@@ -592,7 +623,15 @@ void TestRunner::onFinished()
 
 /*************************************************************************************************/
 
-RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &testsInfo,
+static QFrame *createLine(QWidget *parent)
+{
+    QFrame *line = new QFrame(parent);
+    line->setFrameShape(QFrame::HLine);
+    line->setFrameShadow(QFrame::Sunken);
+    return line;
+}
+
+RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &buildTargetKey,
                                                                  QWidget *parent)
     : QDialog(parent)
 {
@@ -600,8 +639,8 @@ RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &
     setWindowTitle(tr("Select Run Configuration"));
 
     QString details = tr("Could not determine which run configuration to choose for running tests");
-    if (!testsInfo.isEmpty())
-        details.append(QString(" (%1)").arg(testsInfo));
+    if (!buildTargetKey.isEmpty())
+        details.append(QString(" (%1)").arg(buildTargetKey));
     m_details = new QLabel(details, this);
     m_rcCombo = new QComboBox(this);
     m_executable = new QLabel(this);
@@ -611,15 +650,11 @@ RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &
     m_buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
     m_buttonBox->button(QDialogButtonBox::Ok)->setDefault(true);
 
-    auto line = new QFrame(this);
-    line->setFrameShape(QFrame::HLine);
-    line->setFrameShadow(QFrame::Sunken);
-
     auto formLayout = new QFormLayout;
     formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     formLayout->addRow(m_details);
     formLayout->addRow(tr("Run Configuration:"), m_rcCombo);
-    formLayout->addRow(line);
+    formLayout->addRow(createLine(this));
     formLayout->addRow(tr("Executable:"), m_executable);
     formLayout->addRow(tr("Arguments:"), m_arguments);
     formLayout->addRow(tr("Working Directory:"), m_workingDir);
@@ -627,7 +662,7 @@ RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &
     auto vboxLayout = new QVBoxLayout(this);
     vboxLayout->addLayout(formLayout);
     vboxLayout->addStretch();
-    vboxLayout->addWidget(line);
+    vboxLayout->addWidget(createLine(this));
     vboxLayout->addWidget(m_buttonBox);
 
     connect(m_rcCombo, &QComboBox::currentTextChanged,

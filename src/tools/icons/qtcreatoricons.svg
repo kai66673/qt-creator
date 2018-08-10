@@ -3376,12 +3376,6 @@
          width="16"
          id="rect3817-2-9-1-9-6-2"
          style="fill:#ffffff" />
-      <path
-         sodipodi:nodetypes="cccc"
-         inkscape:connector-curvature="0"
-         id="path4784"
-         d="m 210,595 -2.5,2.5 -2.5,-2.5 z"
-         style="fill:#000000;fill-opacity:1;stroke:none" />
       <polygon
          transform="translate(93.999999,334)"
          id="polygon4959-9"
@@ -6012,6 +6006,26 @@
          inkscape:connector-curvature="0"
          sodipodi:nodetypes="cccccccccccccccccccc" />
     </g>
+    <g
+       id="src/libs/utils/images/toolbuttonexpandarrow"
+       style="display:inline"
+       clip-path="url(#clipPath4845-7)"
+       transform="translate(-131,-32)">
+      <use
+         x="0"
+         y="0"
+         xlink:href="#backgroundRect"
+         id="use5933-0-9"
+         width="100%"
+         height="100%"
+         transform="translate(211,148)" />
+      <path
+         sodipodi:nodetypes="cccc"
+         inkscape:connector-curvature="0"
+         id="path4784-17"
+         d="m 210,595 -2.5,2.5 -2.5,-2.5 z"
+         style="fill:#000000;fill-opacity:1;stroke:none" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -6261,7 +6275,7 @@
          style="display:inline" />
     </g>
     <g
-       id="src/libs/cplusplus/images/member"
+       id="src/libs/utils/images/member"
        transform="translate(-28,0)">
       <rect
          style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-opacity:1"
@@ -6278,7 +6292,7 @@
          style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
     </g>
     <g
-       id="src/libs/cplusplus/images/signal">
+       id="src/libs/utils/images/signal">
       <rect
          style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-opacity:1"
          id="rect4853-8-7"
@@ -6341,7 +6355,7 @@
     </g>
     <g
        transform="translate(4,0)"
-       id="src/libs/cplusplus/images/slot">
+       id="src/libs/utils/images/slot">
       <rect
          style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-opacity:1"
          id="rect4853-8-0"
@@ -6371,7 +6385,7 @@
          height="100%" />
     </g>
     <g
-       id="src/libs/cplusplus/images/protected"
+       id="src/libs/utils/images/protected"
        transform="translate(36,0)">
       <rect
          y="552"
@@ -6404,7 +6418,7 @@
       </g>
     </g>
     <g
-       id="src/libs/cplusplus/images/protectedbackground"
+       id="src/libs/utils/images/protectedbackground"
        transform="translate(52,0)">
       <rect
          y="552"
@@ -6437,7 +6451,7 @@
       </g>
     </g>
     <g
-       id="src/libs/cplusplus/images/private"
+       id="src/libs/utils/images/private"
        transform="translate(36,0)">
       <rect
          y="552"
@@ -6483,7 +6497,7 @@
          sodipodi:nodetypes="zzzzz" />
     </g>
     <g
-       id="src/libs/cplusplus/images/privatebackground"
+       id="src/libs/utils/images/privatebackground"
        transform="translate(52,0)">
       <rect
          y="552"
@@ -6523,7 +6537,7 @@
          inkscape:connector-curvature="0" />
     </g>
     <g
-       id="src/libs/cplusplus/images/static"
+       id="src/libs/utils/images/static"
        transform="translate(68,0)">
       <rect
          y="552"
@@ -6540,7 +6554,7 @@
          sodipodi:nodetypes="cczczcc" />
     </g>
     <g
-       id="src/libs/cplusplus/images/staticbackground"
+       id="src/libs/utils/images/staticbackground"
        transform="translate(84,0)">
       <rect
          y="552"
@@ -6557,7 +6571,7 @@
          sodipodi:nodetypes="cczczcc" />
     </g>
     <g
-       id="src/libs/cplusplus/images/classparent"
+       id="src/libs/utils/images/classparent"
        transform="translate(84,0)">
       <rect
          y="552"
@@ -6574,7 +6588,7 @@
          sodipodi:nodetypes="ccccc" />
     </g>
     <g
-       id="src/libs/cplusplus/images/classmemberfunction"
+       id="src/libs/utils/images/classmemberfunction"
        transform="translate(100,0)">
       <rect
          y="552"
@@ -6592,7 +6606,7 @@
          inkscape:label="#path4895-4" />
     </g>
     <g
-       id="src/libs/cplusplus/images/classmembervariable"
+       id="src/libs/utils/images/classmembervariable"
        transform="translate(116,0)">
       <rect
          y="552"
@@ -6611,7 +6625,7 @@
          height="100%" />
     </g>
     <g
-       id="src/libs/cplusplus/images/classrelation"
+       id="src/libs/utils/images/classrelation"
        transform="translate(148,0)">
       <rect
          y="552"
@@ -6634,7 +6648,7 @@
          sodipodi:nodetypes="cc" />
     </g>
     <g
-       id="src/libs/cplusplus/images/classrelationbackground"
+       id="src/libs/utils/images/classrelationbackground"
        transform="translate(164,0)">
       <rect
          y="552"
@@ -6657,7 +6671,7 @@
          sodipodi:nodetypes="cc" />
     </g>
     <g
-       id="src/libs/cplusplus/images/keyword">
+       id="src/libs/utils/images/keyword">
       <rect
          style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-opacity:1"
          id="rect4853-8-9-8-3-7-5-1-9"
@@ -6715,7 +6729,7 @@
          x="0" />
     </g>
     <g
-       id="src/libs/cplusplus/images/macro">
+       id="src/libs/utils/images/macro">
       <rect
          style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-opacity:1"
          id="rect4853-8-9-8-3-7-5-1-9-9-5"
@@ -6772,7 +6786,7 @@
       </g>
     </g>
     <g
-       id="src/libs/cplusplus/images/enum"
+       id="src/libs/utils/images/enum"
        transform="translate(16,0)">
       <rect
          y="552"
@@ -6809,7 +6823,7 @@
       </g>
     </g>
     <g
-       id="src/libs/cplusplus/images/enumerator"
+       id="src/libs/utils/images/enumerator"
        transform="translate(32,0)">
       <rect
          y="552"
@@ -6842,7 +6856,7 @@
          style="opacity:1;fill:#b3b3b3;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
     </g>
     <g
-       id="src/libs/cplusplus/images/property"
+       id="src/libs/utils/images/property"
        transform="translate(292)">
       <rect
          y="552"
@@ -6867,7 +6881,7 @@
          rx="1" />
     </g>
     <g
-       id="src/libs/cplusplus/images/propertybackground">
+       id="src/libs/utils/images/propertybackground">
       <rect
          y="552"
          x="441"

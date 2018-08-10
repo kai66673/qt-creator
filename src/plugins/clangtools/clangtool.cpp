@@ -78,13 +78,13 @@ static FileInfos sortedFileInfos(const QVector<CppTools::ProjectPart::Ptr> &proj
                 continue;
 
             if (CppTools::ProjectFile::isSource(file.kind)) {
-                const FileInfo info{Utils::FileName::fromString(file.path), file.kind, projectPart};
-                fileInfos.append(info);
+                fileInfos.emplace_back(Utils::FileName::fromString(file.path), file.kind, projectPart);
             }
         }
     }
 
     Utils::sort(fileInfos, &FileInfo::file);
+    fileInfos.erase(std::unique(fileInfos.begin(), fileInfos.end()), fileInfos.end());
 
     return fileInfos;
 }
@@ -96,6 +96,11 @@ ClangTool::ClangTool(const QString &name)
 
     m_startAction = Debugger::createStartAction();
     m_stopAction = Debugger::createStopAction();
+}
+
+ClangTool::~ClangTool()
+{
+    delete m_diagnosticView;
 }
 
 FileInfos ClangTool::collectFileInfos(Project *project, bool askUserForFileSelection) const

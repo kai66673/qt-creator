@@ -63,7 +63,7 @@ private:
     void setFuture(QFutureInterface<void> *future);
 
     QFutureInterface<void> *m_future;
-    QMutex *m_futureMutex;
+    QMutex *m_futureMutex = nullptr;
     friend class ShellCommand;
 };
 
@@ -154,6 +154,7 @@ public:
 signals:
     void stdOutText(const QString &);
     void stdErrText(const QString &);
+    void started();
     void finished(bool ok, int exitCode, const QVariant &cookie);
     void success(const QVariant &cookie);
 

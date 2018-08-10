@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2017 The Qt Company Ltd.
+** Copyright (C) 2018 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Creator documentation.
@@ -24,7 +24,7 @@
 ****************************************************************************/
 
 /*!
-    \contentspage {Qt Creator Manual}
+    \contentspage index.html
     \previouspage creator-cpu-usage-analyzer.html
     \page creator-autotest.html
     \nextpage creator-advanced.html
@@ -132,7 +132,7 @@
 
     \QC creates the test in the specified project directory.
     For more information about creating Google tests, see the
-    \l{https://github.com/google/googletest/blob/master/googletest/docs/Primer.md}
+    \l{https://github.com/google/googletest/blob/master/googletest/docs/primer.md}
     {Google Test Primer}.
 
     \section1 Setting Up the Google C++ Testing Framework
@@ -235,7 +235,7 @@
     select \uicontrol {GTest Filter} and specify the filter to use in the
     \uicontrol {Active filter} field. For more information about GTest
     filters, see
-    \l{https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#running-a-subset-of-the-tests}
+    \l{https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#running-a-subset-of-the-tests}
     {Running a Subset of the Tests}.
 
     \image qtcreator-autotests-options.png

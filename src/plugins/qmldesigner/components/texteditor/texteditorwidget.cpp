@@ -186,7 +186,7 @@ bool TextEditorWidget::eventFilter( QObject *, QEvent *event)
                                                            QKeySequence(Qt::Key_Down + Qt::CTRL)
                                                          };
     if (event->type() == QEvent::ShortcutOverride) {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+        auto keyEvent = static_cast<QKeyEvent *>(event);
 
         if (std::find(overrideKeys.begin(), overrideKeys.end(), keyEvent->key()) != overrideKeys.end()) {
             keyEvent->accept();
@@ -199,7 +199,7 @@ bool TextEditorWidget::eventFilter( QObject *, QEvent *event)
                 | Qt::MetaModifier;
 
         QKeySequence keySqeuence(keyEvent->key() | (keyEvent->modifiers() & relevantModifiers));
-        for (QKeySequence overrideSequence : overrideSequences)
+        for (const QKeySequence &overrideSequence : overrideSequences)
             if (keySqeuence.matches(overrideSequence)) {
                 keyEvent->accept();
                 return true;

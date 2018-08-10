@@ -129,7 +129,6 @@ public:
 
     DebuggerEngineType cppEngineType = NoEngineType;
 
-    bool isCppDebugging = true;
     bool isQmlDebugging = false;
     bool breakOnMain = false;
     bool multiProcess = false; // Whether to set detach-on-fork off.
@@ -156,6 +155,7 @@ public:
 
     bool nativeMixedEnabled = false;
 
+    bool isCppDebugging() const;
     bool isNativeMixedDebugging() const;
     void validateExecutable();
 
@@ -187,7 +187,7 @@ public:
 class Location
 {
 public:
-    Location() {}
+    Location() = default;
     Location(quint64 address) { m_address = address; }
     Location(const QString &file) { m_fileName = file; }
     Location(const QString &file, int line, bool marker = true)
@@ -301,7 +301,6 @@ public:
     virtual bool hasCapability(unsigned cap) const = 0;
     virtual void debugLastCommand() {}
 
-    virtual bool isSynchronous() const;
     virtual QString qtNamespace() const;
     void setQtNamespace(const QString &ns);
 
@@ -367,7 +366,7 @@ public:
     bool isMasterEngine() const;
     DebuggerEngine *masterEngine();
     virtual DebuggerEngine *activeEngine() { return this; }
-    virtual DebuggerEngine *cppEngine() { return 0; }
+    virtual DebuggerEngine *cppEngine() { return nullptr; }
 
     virtual bool canDisplayTooltip() const;
 
