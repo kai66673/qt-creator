@@ -91,7 +91,9 @@ void GoConfigurations::updateAutomaticKitList()
     const DebuggerItem *possibleDebugger = DebuggerItemManager::findByEngineType(GdbEngineType);
     const QVariant debuggerId = (possibleDebugger ? possibleDebugger->id() : QVariant());
 
-    Kit *kit = new Kit;
+    auto newKit = std::make_unique<Kit>();
+
+    Kit *kit = newKit.get();
     kit->blockNotification();
 
     kit->setAutoDetected(true);
@@ -108,7 +110,7 @@ void GoConfigurations::updateAutomaticKitList()
     kit->setSticky(DebuggerKitInformation::id(), true);
 
     kit->unblockNotification();
-    KitManager::registerKit(kit);
+    KitManager::registerKit(std::move(newKit));
 }
 
 GoConfigurations::GoConfigurations(QObject *parent)
