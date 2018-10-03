@@ -131,7 +131,7 @@ private:
     QStringList projectsInDirectory(const QModelIndex &index) const;
     void openProjectsInDirectory(const QModelIndex &index);
     void createNewFolder(const QModelIndex &parent);
-    void setCrumblePath(const QModelIndex &index, const QModelIndex &);
+    void setCrumblePath(const QModelIndex &index);
 
     Core::IContext *m_context = nullptr;
     Utils::NavigationTreeView *m_listView = nullptr;
@@ -145,6 +145,7 @@ private:
     QToolButton *m_toggleSync = nullptr;
     QToolButton *m_toggleRootSync = nullptr;
     QComboBox *m_rootSelector = nullptr;
+    QWidget *m_crumbContainer = nullptr;
     DelayedFileCrumbLabel *m_crumbLabel = nullptr;
 
     // FolderNavigationWidgetFactory needs private members to build a menu

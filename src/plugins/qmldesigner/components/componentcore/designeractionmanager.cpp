@@ -196,7 +196,7 @@ public:
                              SelectionContextOperation action,
                              SelectionContextPredicate enabled = &SelectionContextFunctors::always,
                              SelectionContextPredicate visibility = &SelectionContextFunctors::always) :
-        ModelNodeContextMenuAction(id, description, category, key, priority, action, enabled, visibility)
+        ModelNodeContextMenuAction(id, description, {}, category, key, priority, action, enabled, visibility)
     {}
 
     void updateContext() override
@@ -223,7 +223,7 @@ public:
                               SelectionContextOperation action,
                               SelectionContextPredicate enabled = &SelectionContextFunctors::always,
                               SelectionContextPredicate visibility = &SelectionContextFunctors::always) :
-        ModelNodeContextMenuAction(id, description, category, key, priority, action, enabled, visibility)
+        ModelNodeContextMenuAction(id, description, {}, category, key, priority, action, enabled, visibility)
     {}
     void updateContext() override
     {
@@ -598,6 +598,9 @@ bool lowerAvailable(const SelectionContext &selectionState)
     if (modelNode.isRootNode())
         return false;
 
+    if (!modelNode.hasParentProperty())
+        return false;
+
     if (!modelNode.parentProperty().isNodeListProperty())
         return false;
 
@@ -654,6 +657,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           toFrontCommandId,
                           toFrontDisplayName,
+                          {},
                           stackCategory,
                           QKeySequence(),
                           200,
@@ -663,27 +667,26 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           toBackCommandId,
                           toBackDisplayName,
+                          {},
                           stackCategory,
                           QKeySequence(),
                           180,
                           &toBack,
                           &singleSelection));
 
-    addDesignerAction(new ModelNodeAction(
+    addDesignerAction(new ModelNodeContextMenuAction(
                           raiseCommandId, raiseDisplayName,
                           Utils::Icon({{":/qmldesigner/icon/designeractions/images/raise.png", Utils::Theme::IconsBaseColor}}).icon(),
-                          raiseToolTip,
                           stackCategory,
                           QKeySequence(),
                           160,
                           &raise,
                           &raiseAvailable));
 
-    addDesignerAction(new ModelNodeAction(
+    addDesignerAction(new ModelNodeContextMenuAction(
                           lowerCommandId,
                           lowerDisplayName,
                           Utils::Icon({{":/qmldesigner/icon/designeractions/images/lower.png", Utils::Theme::IconsBaseColor}}).icon(),
-                          lowerToolTip,
                           stackCategory,
                           QKeySequence(),
                           140,
@@ -695,6 +698,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           resetZCommandId,
                           resetZDisplayName,
+                          {},
                           stackCategory,
                           QKeySequence(),
                           100,
@@ -790,6 +794,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           removePositionerCommandId,
                           removePositionerDisplayName,
+                          {},
                           positionCategory,
                           QKeySequence("Ctrl+Shift+p"),
                           210,
@@ -800,6 +805,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           layoutRowPositionerCommandId,
                           layoutRowPositionerDisplayName,
+                          {},
                           positionCategory,
                           QKeySequence(),
                           200,
@@ -810,6 +816,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           layoutColumnPositionerCommandId,
                           layoutColumnPositionerDisplayName,
+                          {},
                           positionCategory,
                           QKeySequence(),
                           180,
@@ -820,6 +827,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           layoutGridPositionerCommandId,
                           layoutGridPositionerDisplayName,
+                          {},
                           positionCategory,
                           QKeySequence(),
                           160,
@@ -830,6 +838,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           layoutFlowPositionerCommandId,
                           layoutFlowPositionerDisplayName,
+                          {},
                           positionCategory,
                           QKeySequence("Ctrl+m"),
                           140,
@@ -842,6 +851,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           removeLayoutCommandId,
                           removeLayoutDisplayName,
+                          {},
                           layoutCategory,
                           QKeySequence(),
                           110,
@@ -864,6 +874,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           addTabBarToStackedContainerCommandId,
                           addTabBarToStackedContainerDisplayName,
+                          {},
                           stackedContainerCategory,
                           QKeySequence("Ctrl+Shift+t"),
                           100,
@@ -955,6 +966,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           goIntoComponentCommandId,
                           goIntoComponentDisplayName,
+                          {},
                           rootCategory,
                           QKeySequence(Qt::Key_F2),
                           priorityGoIntoComponent,
@@ -964,6 +976,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           goToImplementationCommandId,
                           goToImplementationDisplayName,
+                          {},
                           rootCategory,
                           QKeySequence(),
                           42,
@@ -974,6 +987,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           addSignalHandlerCommandId,
                           addSignalHandlerDisplayName,
+                          {},
                           rootCategory, QKeySequence(),
                           42, &addNewSignalHandler,
                           &singleSelectedAndUiFile,
@@ -982,6 +996,7 @@ void DesignerActionManager::createDefaultDesignerActions()
     addDesignerAction(new ModelNodeContextMenuAction(
                           moveToComponentCommandId,
                           moveToComponentDisplayName,
+                          {},
                           rootCategory,
                           QKeySequence(),
                           44,

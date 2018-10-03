@@ -106,8 +106,8 @@ static QString getArch(const QString &triple)
 // Paths added here are those that were used by qmake. They were taken from
 // *qtsource*/qtbase/mkspecs/common/android-base-head.conf
 // Adding them here allows us to use them for all build systems.
-static void addSystemHeaderPaths(QList<ProjectExplorer::HeaderPath> &paths,
-                                 const QString &triple, const QString &version)
+static void addBuiltInHeaderPaths(ProjectExplorer::HeaderPaths &paths,
+                                  const QString &triple, const QString &version)
 {
     const Utils::FileName ndkPath = AndroidConfigurations::currentConfig().ndkLocation();
 
@@ -120,24 +120,24 @@ static void addSystemHeaderPaths(QList<ProjectExplorer::HeaderPath> &paths,
     Utils::FileName includePath = stdcppPath;
     Utils::FileName cppLibsPath = stdcppPath;
     cppLibsPath.appendPath("libs/" + getArch(triple) + "/include/");
-    paths.prepend({cppLibsPath.toString(), ProjectExplorer::HeaderPath::GlobalHeaderPath});
+    paths.prepend({cppLibsPath.toString(), ProjectExplorer::HeaderPathType::BuiltIn});
     includePath.appendPath("include/");
-    paths.prepend({includePath.toString(), ProjectExplorer::HeaderPath::GlobalHeaderPath});
+    paths.prepend({includePath.toString(), ProjectExplorer::HeaderPathType::BuiltIn});
 
     paths.prepend({ndkPath.toString() + "/sysroot/usr/include/" + triple,
-                  ProjectExplorer::HeaderPath::GlobalHeaderPath});
+                   ProjectExplorer::HeaderPathType::BuiltIn});
     paths.prepend({ndkPath.toString() + "/sysroot/usr/include",
-                  ProjectExplorer::HeaderPath::GlobalHeaderPath});
+                   ProjectExplorer::HeaderPathType::BuiltIn});
 }
 
-AndroidToolChain::SystemHeaderPathsRunner AndroidToolChain::createSystemHeaderPathsRunner() const
+AndroidToolChain::BuiltInHeaderPathsRunner AndroidToolChain::createBuiltInHeaderPathsRunner() const
 {
     const QString triple = originalTargetTriple();
     const QString version = this->version();
-    initExtraHeaderPathsFunction([triple, version] (QList<HeaderPath> &paths) {
-        addSystemHeaderPaths(paths, triple, version);
+    initExtraHeaderPathsFunction([triple, version] (HeaderPaths &paths) {
+        addBuiltInHeaderPaths(paths, triple, version);
     });
-    return GccToolChain::createSystemHeaderPathsRunner();
+    return GccToolChain::createBuiltInHeaderPathsRunner();
 }
 
 QString AndroidToolChain::typeDisplayName() const
@@ -181,9 +181,9 @@ bool AndroidToolChain::operator ==(const ToolChain &tc) const
     return m_ndkToolChainVersion == static_cast<const AndroidToolChain &>(tc).m_ndkToolChainVersion;
 }
 
-ToolChainConfigWidget *AndroidToolChain::configurationWidget()
+std::unique_ptr<ToolChainConfigWidget> AndroidToolChain::createConfigurationWidget()
 {
-    return new AndroidToolChainConfigWidget(this);
+    return std::make_unique<AndroidToolChainConfigWidget>(this);
 }
 
 FileName AndroidToolChain::suggestedDebugger() const

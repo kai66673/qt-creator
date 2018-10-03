@@ -108,7 +108,7 @@ ProgressBarColorNormal=b4ffffff
 ProgressBarTitleColor=ffffffff
 ProgressBarBackgroundColor=18ffffff
 SplitterColor=splitterColor
-TextColorDisabled=ff000000
+TextColorDisabled=55000000
 TextColorError=ffff0000
 TextColorHighlight=ffa0a0a4
 TextColorHighlightBackground=ffef0b
@@ -216,6 +216,7 @@ FlatProjectsMode=false
 FlatMenuBar=false
 ToolBarIconShadow=true
 WindowColorAsBase=false
+DarkUserInterface=false
 
 [Gradients]
 DetailsWidgetHeaderGradient\1\color=ffffffff

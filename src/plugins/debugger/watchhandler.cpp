@@ -31,6 +31,7 @@
 #include "debuggerdialogs.h"
 #include "debuggerengine.h"
 #include "debuggerinternalconstants.h"
+#include "debuggermainwindow.h"
 #include "debuggerprotocol.h"
 #include "debuggertooltipmanager.h"
 #include "imageviewer.h"
@@ -43,6 +44,8 @@
 #include <coreplugin/icore.h>
 #include <coreplugin/helpmanager.h>
 #include <coreplugin/messagebox.h>
+
+#include <projectexplorer/session.h>
 
 #include <texteditor/syntaxhighlighter.h>
 
@@ -80,6 +83,7 @@
 #include <ctype.h>
 
 using namespace Core;
+using namespace ProjectExplorer;
 using namespace Utils;
 
 namespace Debugger {
@@ -211,12 +215,12 @@ static QString stripForFormat(const QString &ba)
 
 static void saveWatchers()
 {
-    setSessionValue("Watchers", WatchHandler::watchedExpressions());
+    SessionManager::setValue("Watchers", WatchHandler::watchedExpressions());
 }
 
 static void loadFormats()
 {
-    QVariant value = sessionValue("DefaultFormats");
+    QVariant value = SessionManager::value("DefaultFormats");
     QMapIterator<QString, QVariant> it(value.toMap());
     while (it.hasNext()) {
         it.next();
@@ -224,7 +228,7 @@ static void loadFormats()
             theTypeFormats.insert(it.key(), it.value().toInt());
     }
 
-    value = sessionValue("IndividualFormats");
+    value = SessionManager::value("IndividualFormats");
     it = QMapIterator<QString, QVariant>(value.toMap());
     while (it.hasNext()) {
         it.next();
@@ -246,7 +250,7 @@ static void saveFormats()
                 formats.insert(key, format);
         }
     }
-    setSessionValue("DefaultFormats", formats);
+    SessionManager::setValue("DefaultFormats", formats);
 
     formats.clear();
     it = QHashIterator<QString, int>(theIndividualFormats);
@@ -257,7 +261,18 @@ static void saveFormats()
         if (!key.isEmpty())
             formats.insert(key, format);
     }
-    setSessionValue("IndividualFormats", formats);
+    SessionManager::setValue("IndividualFormats", formats);
+}
+
+static void saveSessionData()
+{
+    saveWatchers();
+    saveFormats();
+}
+
+static void loadSessionData()
+{
+    // Handled by loadSesseionDataForEngine.
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -269,14 +284,14 @@ static void saveFormats()
 class SeparatedView : public QTabWidget
 {
 public:
-    SeparatedView() : QTabWidget(Internal::mainWindow())
+    SeparatedView() : QTabWidget(DebuggerMainWindow::instance())
     {
         setTabsClosable(true);
         connect(this, &QTabWidget::tabCloseRequested, this, &SeparatedView::closeTab);
         setWindowFlags(windowFlags() | Qt::Window);
         setWindowTitle(WatchHandler::tr("Debugger - %1").arg(Core::Constants::IDE_DISPLAY_NAME));
 
-        QVariant geometry = sessionValue("DebuggerSeparateWidgetGeometry");
+        QVariant geometry = SessionManager::value("DebuggerSeparateWidgetGeometry");
         if (geometry.isValid()) {
             QRect rc = geometry.toRect();
             if (rc.width() < 400)
@@ -289,7 +304,7 @@ public:
 
     void saveGeometry()
     {
-        setSessionValue("DebuggerSeparateWidgetGeometry", geometry());
+        SessionManager::setValue("DebuggerSeparateWidgetGeometry", geometry());
     }
 
     ~SeparatedView() override
@@ -505,6 +520,11 @@ WatchModel::WatchModel(WatchHandler *handler, DebuggerEngine *engine)
         m_engine, &DebuggerEngine::updateAll);
     connect(action(ShowQObjectNames), &SavedAction::valueChanged,
         m_engine, &DebuggerEngine::updateAll);
+
+    connect(SessionManager::instance(), &SessionManager::sessionLoaded,
+            this, &loadSessionData);
+    connect(SessionManager::instance(), &SessionManager::aboutToSaveSession,
+            this, &saveSessionData);
 }
 
 void WatchModel::reinitialize(bool includeInspectData)
@@ -1298,7 +1318,7 @@ void WatchModel::timerEvent(QTimerEvent *event)
             }
             ungrabWidget();
         }
-        showMessage(msg, StatusBar);
+        m_engine->showMessage(msg, StatusBar);
     } else {
         WatchModelBase::timerEvent(event);
     }
@@ -1682,8 +1702,8 @@ bool WatchModel::contextMenuEvent(const ItemViewEvent &ev)
               });
 
     addAction(menu, tr("Close Editor Tooltips"),
-              DebuggerToolTipManager::hasToolTips(),
-              [] { DebuggerToolTipManager::closeAllToolTips(); });
+              m_engine->toolTipManager()->hasToolTips(),
+              [this] { m_engine->toolTipManager()->closeAllToolTips(); });
 
     addAction(menu, tr("Copy View Contents to Clipboard"),
               true,
@@ -1951,6 +1971,7 @@ QString WatchModel::nameForFormat(int format)
 ///////////////////////////////////////////////////////////////////////
 
 WatchHandler::WatchHandler(DebuggerEngine *engine)
+    : m_engine(engine)
 {
     m_model = new WatchModel(this, engine);
 }
@@ -1973,8 +1994,7 @@ void WatchHandler::cleanup()
     saveWatchers();
     m_model->reinitialize();
     emit m_model->updateFinished();
-    if (Internal::mainWindow())
-        m_model->m_separatedView->hide();
+    m_model->m_separatedView->hide();
 }
 
 static bool sortByName(const WatchItem *a, const WatchItem *b)
@@ -1987,7 +2007,7 @@ void WatchHandler::insertItems(const GdbMi &data)
     QSet<WatchItem *> itemsToSort;
 
     const bool sortStructMembers = boolSetting(SortStructMembers);
-    for (const GdbMi &child : data.children()) {
+    for (const GdbMi &child : data) {
         auto item = new WatchItem;
         item->parse(child, sortStructMembers);
         const TypeInfo ti = m_model->m_reportedTypeInfo.value(item->type);
@@ -2072,7 +2092,13 @@ void WatchHandler::resetValueCache()
 
 void WatchHandler::resetWatchers()
 {
-    loadSessionData();
+    loadFormats();
+    theWatcherNames.clear();
+    theWatcherCount = 0;
+    const QStringList watchers = SessionManager::value("Watchers").toStringList();
+    m_model->m_watchRoot->removeChildren();
+    for (const QString &exp : watchers)
+        watchExpression(exp.trimmed());
 }
 
 void WatchHandler::notifyUpdateStarted(const UpdateParameters &updateParameters)
@@ -2173,7 +2199,7 @@ void WatchHandler::watchExpression(const QString &exp, const QString &name, bool
         m_model->m_engine->updateWatchData(item->iname);
     }
     updateLocalsWindow();
-    Internal::raiseWatchersWindow();
+    m_engine->raiseWatchersWindow();
 }
 
 void WatchHandler::updateWatchExpression(WatchItem *item, const QString &newExp)
@@ -2358,7 +2384,7 @@ void WatchHandler::updateLocalsWindow()
 {
     // Force show/hide of return view.
     bool showReturn = m_model->m_returnRoot->childCount() != 0;
-    Internal::updateLocalsWindow(showReturn);
+    m_engine->updateLocalsWindow(showReturn);
 }
 
 QStringList WatchHandler::watchedExpressions()
@@ -2375,18 +2401,12 @@ QStringList WatchHandler::watchedExpressions()
     return watcherNames;
 }
 
-void WatchHandler::saveSessionData()
-{
-    saveWatchers();
-    saveFormats();
-}
-
-void WatchHandler::loadSessionData()
+void WatchHandler::loadSessionDataForEngine()
 {
     loadFormats();
     theWatcherNames.clear();
     theWatcherCount = 0;
-    QVariant value = sessionValue("Watchers");
+    QVariant value = SessionManager::value("Watchers");
     m_model->m_watchRoot->removeChildren();
     foreach (const QString &exp, value.toStringList())
         watchExpression(exp.trimmed());
@@ -2565,8 +2585,8 @@ static inline QJsonObject watcher(const QString &iname, const QString &exp)
 void WatchHandler::appendWatchersAndTooltipRequests(DebuggerCommand *cmd)
 {
     QJsonArray watchers;
-    DebuggerToolTipContexts toolTips = DebuggerToolTipManager::pendingTooltips(m_model->m_engine);
-    foreach (const DebuggerToolTipContext &p, toolTips)
+    const DebuggerToolTipContexts toolTips = m_engine->toolTipManager()->pendingTooltips();
+    for (const DebuggerToolTipContext &p : toolTips)
         watchers.append(watcher(p.iname, p.expression));
 
     QMapIterator<QString, int> it(WatchHandler::watcherNames());
@@ -2579,7 +2599,7 @@ void WatchHandler::appendWatchersAndTooltipRequests(DebuggerCommand *cmd)
 
 void WatchHandler::addDumpers(const GdbMi &dumpers)
 {
-    for (const GdbMi &dumper : dumpers.children()) {
+    for (const GdbMi &dumper : dumpers) {
         DisplayFormats formats;
         formats.append(RawFormat);
         QString reportedFormats = dumper["formats"].data();
@@ -2646,7 +2666,7 @@ QSet<QString> WatchHandler::expandedINames() const
 void WatchHandler::recordTypeInfo(const GdbMi &typeInfo)
 {
     if (typeInfo.type() == GdbMi::List) {
-        for (const GdbMi &s : typeInfo.children()) {
+        for (const GdbMi &s : typeInfo) {
             QString typeName = fromHex(s["name"].data());
             TypeInfo ti(s["size"].data().toUInt());
             m_model->m_reportedTypeInfo.insert(typeName, ti);

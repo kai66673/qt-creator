@@ -83,7 +83,7 @@ struct CompleteFunctionDeclaration
 class CppAssistProposalItem final : public AssistProposalItem
 {
 public:
-    ~CppAssistProposalItem() Q_DECL_NOEXCEPT {}
+    ~CppAssistProposalItem() noexcept {}
     bool prematurelyApplies(const QChar &c) const override;
     void applyContextualContent(TextDocumentManipulatorInterface &manipulator, int basePosition) const override;
 
@@ -1258,20 +1258,20 @@ bool InternalCppCompletionAssistProcessor::completeInclude(const QTextCursor &cu
     }
 
     // Make completion for all relevant includes
-    ProjectPartHeaderPaths headerPaths = m_interface->headerPaths();
-    const ProjectPartHeaderPath currentFilePath(QFileInfo(m_interface->fileName()).path(),
-                                                ProjectPartHeaderPath::IncludePath);
+    ProjectExplorer::HeaderPaths headerPaths = m_interface->headerPaths();
+    const ProjectExplorer::HeaderPath currentFilePath(QFileInfo(m_interface->fileName()).path(),
+                                                      ProjectExplorer::HeaderPathType::User);
     if (!headerPaths.contains(currentFilePath))
         headerPaths.append(currentFilePath);
 
     const QStringList suffixes = Utils::mimeTypeForName(QLatin1String("text/x-c++hdr")).suffixes();
 
-    foreach (const ProjectPartHeaderPath &headerPath, headerPaths) {
+    foreach (const ProjectExplorer::HeaderPath &headerPath, headerPaths) {
         QString realPath = headerPath.path;
         if (!directoryPrefix.isEmpty()) {
             realPath += QLatin1Char('/');
             realPath += directoryPrefix;
-            if (headerPath.isFrameworkPath())
+            if (headerPath.type == ProjectExplorer::HeaderPathType::Framework)
                 realPath += QLatin1String(".framework/Headers");
         }
         completeInclude(realPath, suffixes);

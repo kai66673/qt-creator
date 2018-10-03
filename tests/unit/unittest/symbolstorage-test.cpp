@@ -58,7 +58,6 @@ using Storage = ClangBackEnd::SymbolStorage<StatementFactory>;
 class SymbolStorage : public testing::Test
 {
 protected:
-    MockFilePathCaching filePathCache;
     NiceMock<MockSqliteDatabase> mockDatabase;
     StatementFactory statementFactory{mockDatabase};
     MockSqliteWriteStatement &insertSymbolsToNewSymbolsStatement = statementFactory.insertSymbolsToNewSymbolsStatement;
@@ -95,7 +94,7 @@ protected:
     SourceLocationEntries sourceLocations{{1, {1, 3}, {42, 23}, SourceLocationKind::Declaration},
                                           {2, {1, 4}, {7, 11}, SourceLocationKind::Definition}};
     ClangBackEnd::ProjectPartArtefact artefact{"[\"-DFOO\"]", "{\"FOO\":\"1\"}", "[\"/includes\"]", 74};
-    Storage storage{statementFactory, filePathCache};
+    Storage storage{statementFactory};
 };
 
 TEST_F(SymbolStorage, CreateAndFillTemporaryLocationsTable)
@@ -195,7 +194,7 @@ TEST_F(SymbolStorage, InsertProjectPart)
                       TypedEq<Utils::SmallStringView>("[\"foo\"]"),
                       TypedEq<Utils::SmallStringView>("{\"FOO\":\"1\"}"),
                       TypedEq<Utils::SmallStringView>("[\"/includes\"]")));
-    EXPECT_CALL(mockDatabase, lastInsertedRowId());
+    EXPECT_CALL(mockDatabase, lastInsertedRowId()).Times(2);
 
     storage.insertOrUpdateProjectPart("project",  {"foo"}, {{"FOO", "1"}}, {"/includes"});
 }
@@ -217,6 +216,7 @@ TEST_F(SymbolStorage, UpdateProjectPart)
                       TypedEq<Utils::SmallStringView>("{\"FOO\":\"1\"}"),
                       TypedEq<Utils::SmallStringView>("[\"/includes\"]"),
                       TypedEq<Utils::SmallStringView>("project")));
+    EXPECT_CALL(mockDatabase, lastInsertedRowId());
 
     storage.insertOrUpdateProjectPart("project",  {"foo"}, {{"FOO", "1"}}, {"/includes"});
 }
@@ -225,12 +225,11 @@ TEST_F(SymbolStorage, UpdateProjectPartSources)
 {
     InSequence sequence;
 
-    EXPECT_CALL(getProjectPartIdStatement, valueReturnInt32(TypedEq<Utils::SmallStringView>("project"))).WillRepeatedly(Return(42));
     EXPECT_CALL(deleteAllProjectPartsSourcesWithProjectPartIdStatement, write(TypedEq<int>(42)));
     EXPECT_CALL(insertProjectPartSourcesStatement, write(TypedEq<int>(42), TypedEq<int>(1)));
     EXPECT_CALL(insertProjectPartSourcesStatement, write(TypedEq<int>(42), TypedEq<int>(2)));
 
-    storage.updateProjectPartSources("project", {{1, 1}, {1, 2}});
+    storage.updateProjectPartSources(42, {{1, 1}, {1, 2}});
 }
 
 TEST_F(SymbolStorage, InsertOrUpdateUsedMacros)

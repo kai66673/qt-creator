@@ -40,9 +40,11 @@
 namespace ClangBackEnd {
 
 RefactoringServer::RefactoringServer(SymbolIndexingInterface &symbolIndexing,
-                                     FilePathCachingInterface &filePathCache)
+                                     FilePathCachingInterface &filePathCache,
+                                     GeneratedFiles &generatedFiles)
     : m_symbolIndexing(symbolIndexing),
-      m_filePathCache(filePathCache)
+      m_filePathCache(filePathCache),
+      m_generatedFiles(generatedFiles)
 {
     m_pollTimer.setInterval(100);
 
@@ -97,12 +99,12 @@ void RefactoringServer::requestSourceRangesForQueryMessage(RequestSourceRangesFo
 
 void RefactoringServer::updateProjectParts(UpdateProjectPartsMessage &&message)
 {
-    m_symbolIndexing.updateProjectParts(message.takeProjectsParts(), m_generatedFiles);
+    m_symbolIndexing.updateProjectParts(message.takeProjectsParts());
 }
 
 void RefactoringServer::updateGeneratedFiles(UpdateGeneratedFilesMessage &&message)
 {
-    m_generatedFiles = message.takeGeneratedFiles();
+    m_generatedFiles.update(message.takeGeneratedFiles());
 }
 
 void RefactoringServer::removeProjectParts(RemoveProjectPartsMessage &&)
@@ -112,7 +114,7 @@ void RefactoringServer::removeProjectParts(RemoveProjectPartsMessage &&)
 
 void RefactoringServer::removeGeneratedFiles(RemoveGeneratedFilesMessage &&message)
 {
-    // TODO
+    m_generatedFiles.remove(message.generatedFiles);
 }
 
 void RefactoringServer::cancel()

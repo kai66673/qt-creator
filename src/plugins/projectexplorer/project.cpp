@@ -642,6 +642,15 @@ Utils::FileName Project::projectDirectory(const Utils::FileName &top)
     return Utils::FileName::fromString(top.toFileInfo().absoluteDir().path());
 }
 
+/*!
+    Returns the common root directory that contains all files which belongs to a project.
+*/
+
+Utils::FileName Project::rootProjectDirectory() const
+{
+    return projectDirectory(); // TODO parse all files and find the common path
+}
+
 ProjectNode *Project::rootProjectNode() const
 {
     return d->m_rootProjectNode.get();
@@ -844,6 +853,13 @@ void Project::setup(const QList<const BuildInfo *> &infoList)
 Utils::MacroExpander *Project::macroExpander() const
 {
     return &d->m_macroExpander;
+}
+
+QVariant Project::additionalData(Core::Id id, const Target *target) const
+{
+    Q_UNUSED(id);
+    Q_UNUSED(target);
+    return QVariant();
 }
 
 bool Project::isParsing() const

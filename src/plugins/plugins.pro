@@ -4,6 +4,7 @@ TEMPLATE  = subdirs
 
 SUBDIRS   = \
     autotest \
+    clangformat \
     clangtools \
     coreplugin \
     texteditor \
@@ -56,7 +57,10 @@ SUBDIRS   = \
     scxmleditor \
     welcome \
     silversearcher \
-    go
+    go \
+    languageclient \
+    cppcheck \
+    compilationdatabaseprojectmanager
 
 qtHaveModule(serialport) {
     SUBDIRS += serialterminal

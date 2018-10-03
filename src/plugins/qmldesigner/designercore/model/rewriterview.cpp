@@ -489,6 +489,10 @@ QString RewriterView::auxiliaryDataAsQML() const
             keys.sort();
 
             for (const QString &key : keys) {
+
+                if (key.endsWith("@NodeInstance"))
+                    continue;
+
                 const QVariant value = data.value(key.toUtf8());
                 QString strValue = value.toString();
                 if (static_cast<QMetaType::Type>(value.type()) == QMetaType::QString)
@@ -902,13 +906,13 @@ void RewriterView::delayedSetup()
 
 static QString annotationsEnd()
 {
-    const static QString end = QString(" %1*/\n").arg(annotationsEscapeSequence);
+    const static QString end = QString(" %1*/").arg(annotationsEscapeSequence);
     return end;
 }
 
 static QString annotationsStart()
 {
-    const static QString start = QString("\n/*%1 ").arg(annotationsEscapeSequence);
+    const static QString start = QString("/*%1 ").arg(annotationsEscapeSequence);
     return start;
 }
 
@@ -944,8 +948,8 @@ void RewriterView::writeAuxiliaryData()
     QString auxData = auxiliaryDataAsQML();
 
     if (!auxData.isEmpty()) {
-        auxData.prepend(annotationsStart());
-        auxData.append(annotationsEnd());
+        auxData.prepend("\n" + annotationsStart());
+        auxData.append(annotationsEnd() + "\n");
         newText.append(auxData);
     }
 

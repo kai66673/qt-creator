@@ -40,15 +40,15 @@ using namespace Utils;
 
 namespace GoLang {
 
-GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *parent, Core::Id id)
-    : RunConfiguration(parent, id)
+GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *target, Core::Id id)
+    : RunConfiguration(target, id)
     , m_buildConfiguration(nullptr)
 {
-    addExtraAspect(new ExecutableAspect(this));
-    addExtraAspect(new ArgumentsAspect(this, Constants::C_GORUNCONFIGURATION_ARGUMENTASPECT_ID));
-    addExtraAspect(new WorkingDirectoryAspect(this, Constants::C_GORUNCONFIGURATION_WORKINGDIRECTORYASPECT_ID));
-    addExtraAspect(new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier()));
-    addExtraAspect(new TerminalAspect(this, Constants::C_GORUNCONFIGURATION_TERMINALASPECT_ID));
+    addAspect<ExecutableAspect>();
+    addAspect<ArgumentsAspect>();
+    auto envAspect = addAspect<LocalEnvironmentAspect>(target, LocalEnvironmentAspect::BaseEnvironmentModifier());
+    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<TerminalAspect>();
 
     // Connect target signals
     connect(this->target(), &Target::activeBuildConfigurationChanged,

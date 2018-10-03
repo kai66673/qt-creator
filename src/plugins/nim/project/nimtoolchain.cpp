@@ -97,14 +97,14 @@ WarningFlags NimToolChain::warningFlags(const QStringList &) const
     return WarningFlags::NoWarnings;
 }
 
-ToolChain::SystemHeaderPathsRunner NimToolChain::createSystemHeaderPathsRunner() const
+ToolChain::BuiltInHeaderPathsRunner NimToolChain::createBuiltInHeaderPathsRunner() const
 {
-    return ToolChain::SystemHeaderPathsRunner();
+    return ToolChain::BuiltInHeaderPathsRunner();
 }
 
-QList<HeaderPath> NimToolChain::systemHeaderPaths(const QStringList &, const FileName &) const
+HeaderPaths NimToolChain::builtInHeaderPaths(const QStringList &, const FileName &) const
 {
-    return QList<HeaderPath>();
+    return {};
 }
 
 void NimToolChain::addToEnvironment(Environment &env) const
@@ -136,9 +136,9 @@ IOutputParser *NimToolChain::outputParser() const
     return nullptr;
 }
 
-ToolChainConfigWidget *NimToolChain::configurationWidget()
+std::unique_ptr<ProjectExplorer::ToolChainConfigWidget> NimToolChain::createConfigurationWidget()
 {
-    return new NimToolChainConfigWidget(this);
+    return std::make_unique<NimToolChainConfigWidget>(this);
 }
 
 ToolChain *NimToolChain::clone() const

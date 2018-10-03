@@ -25,6 +25,11 @@
 
 #include "googletest.h"
 
+#include "mocktaskscheduler.h"
+#include "mockpchcreator.h"
+#include "mockprecompiledheaderstorage.h"
+#include "mocksqlitetransactionbackend.h"
+
 #include <projectpartqueue.h>
 
 namespace {
@@ -32,7 +37,10 @@ namespace {
 class ProjectPartQueue : public testing::Test
 {
 protected:
-    ClangBackEnd::ProjectPartQueue queue;
+    MockTaskScheduler<ClangBackEnd::ProjectPartQueue::Task> mockTaskScheduler;
+    MockPrecompiledHeaderStorage mockPrecompiledHeaderStorage;
+    MockSqliteTransactionBackend mockSqliteTransactionBackend;
+    ClangBackEnd::ProjectPartQueue queue{mockTaskScheduler, mockPrecompiledHeaderStorage, mockSqliteTransactionBackend};
     ClangBackEnd::V2::ProjectPartContainer projectPart1{"ProjectPart1",
                                                         {"--yi"},
                                                         {{"YI","1"}},
@@ -57,12 +65,6 @@ protected:
                                                         {"/SAN"},
                                                         {{3, 1}},
                                                         {{3, 2}}};
-    ClangBackEnd::V2::ProjectPartContainer projectPartMerged{"ProjectPart2",
-                                                             {"--liang"},
-                                                             {{"LIANG","3"}},
-                                                             {"/liang"},
-                                                             {{2, 1}, {2, 3}},
-                                                             {{2, 2}, {2, 4}}};
 };
 
 TEST_F(ProjectPartQueue, AddProjectPart)
@@ -83,13 +85,13 @@ TEST_F(ProjectPartQueue, IgnoreIdenticalProjectPart)
     ASSERT_THAT(queue.projectParts(), ElementsAre(projectPart1, projectPart2));
 }
 
-TEST_F(ProjectPartQueue, MergeSameProjectPartWithSameId)
+TEST_F(ProjectPartQueue, ReplaceProjectPartWithSameId)
 {
     queue.addProjectParts({projectPart1, projectPart2});
 
     queue.addProjectParts({projectPart1, projectPart2b, projectPart3});
 
-    ASSERT_THAT(queue.projectParts(), ElementsAre(projectPart1, projectPartMerged, projectPart3));
+    ASSERT_THAT(queue.projectParts(), ElementsAre(projectPart1, projectPart2b, projectPart3));
 }
 
 TEST_F(ProjectPartQueue, RemoveProjectPart)
@@ -100,5 +102,68 @@ TEST_F(ProjectPartQueue, RemoveProjectPart)
 
     ASSERT_THAT(queue.projectParts(), ElementsAre(projectPart1, projectPart3));
 }
+
+TEST_F(ProjectPartQueue, ProcessTasksCallsFreeSlotsAndAddTasksInScheduler)
+{
+    InSequence s;
+    queue.addProjectParts({projectPart1, projectPart2});
+
+    EXPECT_CALL(mockTaskScheduler, freeSlots()).WillRepeatedly(Return(2));
+    EXPECT_CALL(mockTaskScheduler, addTasks(SizeIs(2)));
+
+    queue.processEntries();
+}
+
+TEST_F(ProjectPartQueue, CreateTasksSizeEqualsInputSize)
+{
+    auto tasks = queue.createPchTasks({projectPart1, projectPart2});
+
+    ASSERT_THAT(tasks, SizeIs(2));
+}
+
+TEST_F(ProjectPartQueue, CreateTaskFromProjectPart)
+{
+    InSequence s;
+    MockPchCreator mockPchCreator;
+    ClangBackEnd::ProjectPartPch projectPartPch{"project1", "/path/to/pch", 99};
+    auto tasks = queue.createPchTasks({projectPart1});
+
+    EXPECT_CALL(mockPchCreator, generatePch(Eq(projectPart1)));
+    EXPECT_CALL(mockPchCreator, projectPartPch()).WillOnce(ReturnRef(projectPartPch));
+    EXPECT_CALL(mockSqliteTransactionBackend, lock());
+    EXPECT_CALL(mockSqliteTransactionBackend, immediateBegin());
+    EXPECT_CALL(mockPrecompiledHeaderStorage, insertPrecompiledHeader(Eq("project1"), Eq("/path/to/pch"), 99));
+    EXPECT_CALL(mockSqliteTransactionBackend, commit());
+    EXPECT_CALL(mockSqliteTransactionBackend, unlock());
+
+    tasks.front()(mockPchCreator);
+}
+
+TEST_F(ProjectPartQueue, DeletePchEntryInDatabaseIfNoPchIsGenerated)
+{
+    InSequence s;
+    MockPchCreator mockPchCreator;
+    ClangBackEnd::ProjectPartPch projectPartPch{"project1", "", 0};
+    auto tasks = queue.createPchTasks({projectPart1});
+
+    EXPECT_CALL(mockPchCreator, generatePch(Eq(projectPart1)));
+    EXPECT_CALL(mockPchCreator, projectPartPch()).WillOnce(ReturnRef(projectPartPch));
+    EXPECT_CALL(mockSqliteTransactionBackend, lock());
+    EXPECT_CALL(mockSqliteTransactionBackend, immediateBegin());
+    EXPECT_CALL(mockPrecompiledHeaderStorage, deletePrecompiledHeader(Eq("project1")));
+    EXPECT_CALL(mockSqliteTransactionBackend, commit());
+    EXPECT_CALL(mockSqliteTransactionBackend, unlock());
+
+    tasks.front()(mockPchCreator);
+}
+
+
+//TEST_F(PchManagerClient, ProjectPartPchRemovedFromDatabase)
+//{
+//    EXPECT_CALL(mockPrecompiledHeaderStorage, deletePrecompiledHeader(TypedEq<Utils::SmallStringView>(projectPartId)));
+
+//    projectUpdater.removeProjectParts({QString(projectPartId)});
+//}
+
 
 }

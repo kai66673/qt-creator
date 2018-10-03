@@ -64,6 +64,7 @@ const char M_SUBPROJECTCONTEXT[]  = "Project.Menu.SubProject";
 const char M_FOLDERCONTEXT[]      = "Project.Menu.Folder";
 const char M_FILECONTEXT[]        = "Project.Menu.File";
 const char M_OPENFILEWITHCONTEXT[] = "Project.Menu.File.OpenWith";
+const char M_OPENTERMINALCONTEXT[] = "Project.Menu.File.OpenTerminal";
 
 // Context menu groups
 const char G_SESSION_BUILD[]      = "Session.Group.Build";
@@ -162,6 +163,7 @@ const char MINGW_TOOLCHAIN_TYPEID[] = "ProjectExplorer.ToolChain.Mingw";
 const char MSVC_TOOLCHAIN_TYPEID[] = "ProjectExplorer.ToolChain.Msvc";
 const char CLANG_CL_TOOLCHAIN_TYPEID[] = "ProjectExplorer.ToolChain.ClangCl";
 const char CUSTOM_TOOLCHAIN_TYPEID[] = "ProjectExplorer.ToolChain.Custom";
+const char COMPILATION_DATABASE_TOOLCHAIN_TYPEID[] = "ProjectExplorer.ToolChain.Empty";
 
 // Default directory to run custom (build) commands in.
 const char DEFAULT_WORKING_DIR[] = "%{buildDir}";

@@ -102,7 +102,7 @@ static QString toNdkArch(const QString &arch)
 AndroidDebugSupport::AndroidDebugSupport(RunControl *runControl, const QString &intentName)
     : Debugger::DebuggerRunTool(runControl)
 {
-    setDisplayName("AndroidDebugger");
+    setId("AndroidDebugger");
     m_runner = new AndroidRunner(runControl, intentName);
     addStartDependency(m_runner);
 }
@@ -147,9 +147,10 @@ void AndroidDebugSupport::start()
         gdbServer.setPort(m_runner->gdbServerPort().number());
         setRemoteChannel(gdbServer);
 
-        QString sysRoot = AndroidConfigurations::currentConfig().ndkLocation().appendPath("platforms")
+        Utils::FileName sysRoot = AndroidConfigurations::currentConfig().ndkLocation()
+                .appendPath("platforms")
                 .appendPath(QString("android-%1").arg(AndroidManager::minimumSDK(target)))
-                .appendPath(toNdkArch(AndroidManager::targetArch(target))).toString();
+                .appendPath(toNdkArch(AndroidManager::targetArch(target)));
         setSysRoot(sysRoot);
         qCDebug(androidDebugSupportLog) << "Sysroot: " << sysRoot;
     }
@@ -159,7 +160,7 @@ void AndroidDebugSupport::start()
         setQmlServer(m_runner->qmlServer());
         //TODO: Not sure if these are the right paths.
         if (qtVersion)
-            addSearchDirectory(qtVersion->qmlPath().toString());
+            addSearchDirectory(qtVersion->qmlPath());
     }
 
     DebuggerRunTool::start();

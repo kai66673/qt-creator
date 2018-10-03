@@ -28,13 +28,16 @@
 #include "gtest-qt-printing.h"
 
 #include <gtest/gtest-printers.h>
+#include <gmock/gmock-matchers.h>
 
 #include <sourcelocations.h>
 
 #include <clangcodemodelclientmessages.h>
 #include <clangcodemodelservermessages.h>
+#include <clangdocumentsuspenderresumer.h>
 #include <clangpathwatcher.h>
 #include <clangrefactoringmessages.h>
+#include <clangreferencescollector.h>
 #include <filestatus.h>
 #include <filepath.h>
 #include <fulltokeninfo.h>
@@ -47,6 +50,7 @@
 #include <tokenprocessor.h>
 #include <filepathview.h>
 #include <symbolentry.h>
+#include <symbolindexertaskqueue.h>
 #include <symbol.h>
 #include <tooltipinfo.h>
 #include <projectpartentry.h>
@@ -143,14 +147,19 @@ std::ostream &operator<<(std::ostream &out, const LineColumn &lineColumn)
     return out << "(" << lineColumn.line << ", " << lineColumn.column << ")";
 }
 
+void PrintTo(Utils::SmallStringView text, ::std::ostream *os)
+{
+    *os << "\"" << text << "\"";
+}
+
 void PrintTo(const Utils::SmallString &text, ::std::ostream *os)
 {
-    *os << text;
+    *os << "\"" << text << "\"";
 }
 
 void PrintTo(const Utils::PathString &text, ::std::ostream *os)
 {
-    *os << text;
+    *os << "\"" << text << "\"";
 }
 
 } // namespace Utils
@@ -223,15 +232,6 @@ std::ostream &operator<<(std::ostream &os, const SourceLocationsContainer &conta
 {
     os << "("
        << container.sourceLocationContainers()
-       << ")";
-
-    return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const ProjectPartsUpdatedMessage &message)
-{
-    os << "("
-       << message.projectContainers
        << ")";
 
     return os;
@@ -351,15 +351,6 @@ std::ostream &operator<<(std::ostream &os, const EchoMessage &/*message*/)
      return os << "()";
 }
 
-std::ostream &operator<<(std::ostream &os, const ProjectPartsRemovedMessage &message)
-{
-    os << "("
-       << message.projectPartIds
-       << ")";
-
-    return os;
-}
-
 std::ostream &operator<<(std::ostream &os, const DocumentsClosedMessage &message)
 {
     os << "("
@@ -460,8 +451,7 @@ std::ostream &operator<<(std::ostream &os, const FileContainer &container)
 {
     os << "("
         << container.filePath << ", "
-        << container.projectPartId << ", "
-        << container.fileArguments << ", "
+        << container.compilationArguments << ", "
         << container.documentRevision << ", "
         << container.textCodecName;
 
@@ -509,6 +499,7 @@ static const char *highlightingTypeToCStringLiteral(HighlightingType type)
         RETURN_TEXT_FOR_CASE(PreprocessorDefinition);
         RETURN_TEXT_FOR_CASE(PreprocessorExpansion);
         RETURN_TEXT_FOR_CASE(PrimitiveType);
+        RETURN_TEXT_FOR_CASE(Punctuation);
         RETURN_TEXT_FOR_CASE(Declaration);
         RETURN_TEXT_FOR_CASE(Namespace);
         RETURN_TEXT_FOR_CASE(Class);
@@ -596,22 +587,12 @@ std::ostream &operator<<(std::ostream &out, const PrecompiledHeadersUpdatedMessa
     return out;
 }
 
-std::ostream &operator<<(std::ostream &os, const ProjectPartContainer &container)
-{
-    os << "("
-        << container.projectPartId
-        << ","
-        << container.arguments
-        << ")";
-
-    return os;
-}
-
 std::ostream &operator<<(std::ostream &out, const ProjectPartPch &projectPartPch)
 {
     out << "("
         << projectPartPch.projectPartId << ", "
-        << projectPartPch.pchPath << ")";
+        << projectPartPch.pchPath << ", "
+        << projectPartPch.lastModified << ")";
 
     return out;
 }
@@ -629,7 +610,6 @@ std::ostream &operator<<(std::ostream &os, const RequestAnnotationsMessage &mess
 {
     os << "("
        << message.fileContainer.filePath << ","
-       << message.fileContainer.projectPartId
        << ")";
 
     return os;
@@ -981,6 +961,45 @@ std::ostream &operator<<(std::ostream &out, SymbolTags symbolTags)
     return out;
 }
 
+std::ostream &operator<<(std::ostream &out, const UpdateGeneratedFilesMessage &message)
+{
+    return out << "(" << message.generatedFiles << ")";
+}
+
+std::ostream &operator<<(std::ostream &out, const RemoveGeneratedFilesMessage &message)
+{
+    return out << "(" << message.generatedFiles << ")";
+}
+
+std::ostream &operator<<(std::ostream &out, const SuspendResumeJobsEntry &entry)
+{
+    return out << "("
+               << entry.document.filePath() << ", "
+               << entry.jobRequestType << ", "
+               << entry.preferredTranslationUnit
+               << ")";
+}
+
+std::ostream &operator<<(std::ostream &os, const ReferencesResult &value)
+{
+    os << "ReferencesResult(";
+    os << value.isLocalVariable << ", {";
+    for (const SourceRangeContainer &r : value.references) {
+        os << r.start.line << ",";
+        os << r.start.column << ",";
+        EXPECT_THAT(r.start.line, testing::Eq(r.end.line));
+        os << r.end.column - r.start.column << ",";
+    }
+    os << "})";
+
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &out, const SymbolIndexerTask &task)
+{
+    return out << "(" << task.filePathId << ", " << task.projectPartId << ")";
+}
+
 void PrintTo(const FilePath &filePath, ::std::ostream *os)
 {
     *os << filePath;
@@ -1020,6 +1039,7 @@ std::ostream &operator<<(std::ostream &out, const ProjectPartContainer &containe
         << container.projectPartId << ", "
         << container.arguments << ", "
         << container.headerPathIds << ", "
+        << container.sourcePathIds << ", "
         << container.compilerMacros << ", "
         << container.includeSearchPaths << ")";
 

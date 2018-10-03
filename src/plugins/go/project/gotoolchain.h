@@ -38,7 +38,7 @@ public:
     GoToolChain(Detection d);
 
     QString version() const;
-    QList<ProjectExplorer::Abi> supportedAbis () const;
+    QList<ProjectExplorer::Abi> supportedAbis () const override;
     void setSupportedAbis(const QList<ProjectExplorer::Abi> &abis);
     void setTargetAbi(const ProjectExplorer::Abi &abi);
     void setOriginalTargetTriple(const QString &targetTriple);
@@ -56,13 +56,14 @@ public:
     ProjectExplorer::Macros predefinedMacros(const QStringList &) const override;
     CompilerFlags compilerFlags(const QStringList &) const override;
     ProjectExplorer::WarningFlags warningFlags(const QStringList &) const override;
-    SystemHeaderPathsRunner createSystemHeaderPathsRunner() const override;
-    QList<ProjectExplorer::HeaderPath> systemHeaderPaths(const QStringList &, const Utils::FileName &) const override;
+    BuiltInHeaderPathsRunner createBuiltInHeaderPathsRunner() const override;
+    ProjectExplorer::HeaderPaths builtInHeaderPaths(const QStringList &flags,
+                                                    const Utils::FileName &sysRoot) const final;
     void addToEnvironment(Utils::Environment &env) const override;
     QString makeCommand(const Utils::Environment &) const override;
     virtual Utils::FileName compilerCommand() const override;
     ProjectExplorer::IOutputParser *outputParser() const override;
-    ProjectExplorer::ToolChainConfigWidget *configurationWidget() override;
+    std::unique_ptr<ProjectExplorer::ToolChainConfigWidget> createConfigurationWidget() final;
     bool canClone() const override;
     ToolChain *clone() const override final;
     QVariantMap toMap() const override;

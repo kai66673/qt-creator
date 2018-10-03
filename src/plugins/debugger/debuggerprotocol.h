@@ -131,11 +131,12 @@ public:
 
     QString m_name;
     QString m_data;
-    QVector<GdbMi> m_children;
 
+    using Children = QVector<GdbMi>;
     enum Type { Invalid, Const, Tuple, List };
-
     Type m_type = Invalid;
+
+    void addChild(const GdbMi &child) { m_children.push_back(child); }
 
     Type type() const { return m_type; }
     const QString &name() const { return m_name; }
@@ -145,7 +146,8 @@ public:
     bool isList() const { return m_type == List; }
 
     const QString &data() const { return m_data; }
-    const QVector<GdbMi> &children() const { return m_children; }
+    Children::const_iterator begin() const { return m_children.begin(); }
+    Children::const_iterator end() const { return m_children.end(); }
     int childCount() const { return int(m_children.size()); }
 
     const GdbMi &childAt(int index) const { return m_children[index]; }
@@ -169,6 +171,7 @@ public:
 
 private:
     void dumpChildren(QString *str, bool multiline, int indent) const;
+    Children m_children;
 };
 
 QString fromHex(const QString &str);
@@ -300,6 +303,20 @@ const char DisplayImageData[]    = "imagedata:separate";
 const char DisplayImageFile[]    = "imagefile:separate";
 const char DisplayPlotData[]     = "plotdata:separate";
 const char DisplayArrayData[]    = "arraydata:separate";
+
+enum LocationType { UnknownLocation, LocationByFile, LocationByAddress };
+
+class ContextData
+{
+public:
+    bool isValid() const { return type != UnknownLocation; }
+
+public:
+    LocationType type = UnknownLocation;
+    QString fileName;
+    int lineNumber = 0;
+    quint64 address = 0;
+};
 
 } // namespace Internal
 } // namespace Debugger

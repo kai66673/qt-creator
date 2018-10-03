@@ -119,7 +119,7 @@ public:
     ProjectBuilder(RunControl *runControl, Project *project, ClangToolRunControl *parent)
         : RunWorker(runControl), m_project(project), m_parent(parent)
     {
-        setDisplayName("ProjectBuilder");
+        setId("ProjectBuilder");
     }
 
     void setEnabled(bool enabled) { m_enabled = enabled; }
@@ -191,7 +191,11 @@ static AnalyzeUnits toAnalyzeUnits(const FileInfos &fileInfos)
     AnalyzeUnits unitsToAnalyze;
     const CompilerOptionsBuilder::PchUsage pchUsage = CppTools::getPchUsage();
     for (const FileInfo &fileInfo : fileInfos) {
-        CompilerOptionsBuilder optionsBuilder(*fileInfo.projectPart);
+        CompilerOptionsBuilder optionsBuilder(*fileInfo.projectPart,
+                                              CppTools::UseSystemHeader::No,
+                                              CppTools::SkipBuiltIn::No,
+                                              QString(CLANG_VERSION),
+                                              QString(CLANG_RESOURCE_DIR));
         QStringList arguments = extraClangToolsPrependOptions();
         arguments.append(optionsBuilder.build(fileInfo.kind, pchUsage));
         arguments.append(extraClangToolsAppendOptions());
@@ -406,22 +410,25 @@ void ClangToolRunControl::onRunnerFinishedWithSuccess(const QString &filePath)
 }
 
 void ClangToolRunControl::onRunnerFinishedWithFailure(const QString &errorMessage,
-                                                            const QString &errorDetails)
+                                                      const QString &errorDetails)
 {
     qCDebug(LOG).noquote() << "onRunnerFinishedWithFailure:"
                            << errorMessage << '\n' << errorDetails;
 
+    auto *toolRunner = qobject_cast<ClangToolRunner *>(sender());
+    const QString filePath = toolRunner->filePath();
+    const QString logFilePath = toolRunner->logFilePath();
+
     // Even in the error case the log file was created, so clean it up here, too.
-    QFile::remove(qobject_cast<ClangToolRunner *>(sender())->logFilePath());
+    QFile::remove(logFilePath);
+
+    const QString message = tr("Failed to analyze \"%1\": %2").arg(filePath, errorMessage);
 
     ++m_filesNotAnalyzed;
     m_success = false;
-    const QString filePath = qobject_cast<ClangToolRunner *>(sender())->filePath();
-    appendMessage(tr("Failed to analyze \"%1\": %2").arg(filePath, errorMessage),
-                  Utils::StdErrFormat);
+    appendMessage(message, Utils::StdErrFormat);
     appendMessage(errorDetails, Utils::StdErrFormat);
-    TaskHub::addTask(Task::Warning, errorMessage, Debugger::Constants::ANALYZERTASK_ID);
-    TaskHub::addTask(Task::Warning, errorDetails, Debugger::Constants::ANALYZERTASK_ID);
+    TaskHub::addTask(Task::Warning, message, Debugger::Constants::ANALYZERTASK_ID);
     handleFinished();
 }
 
@@ -449,7 +456,7 @@ void ClangToolRunControl::finalize()
     const QString toolName = tool()->name();
     appendMessage(tr("%1 finished: "
                      "Processed %2 files successfully, %3 failed.")
-                        .arg(toolName, m_filesAnalyzed, m_filesNotAnalyzed),
+                        .arg(toolName).arg(m_filesAnalyzed).arg(m_filesNotAnalyzed),
                   Utils::NormalMessageFormat);
 
     if (m_filesNotAnalyzed != 0) {

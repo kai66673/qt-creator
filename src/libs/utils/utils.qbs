@@ -75,6 +75,8 @@ Project {
             "detailsbutton.h",
             "detailswidget.cpp",
             "detailswidget.h",
+            "differ.cpp",
+            "differ.h",
             "dropsupport.cpp",
             "dropsupport.h",
             "elfreader.cpp",
@@ -307,10 +309,19 @@ Project {
         }
 
         Group {
-            name: "FileUtils_osx"
+            name: "FileUtils_macos"
             condition: qbs.targetOS.contains("macos")
             files: [
                 "fileutils_mac.h", "fileutils_mac.mm",
+            ]
+        }
+
+        Group {
+            name: "Theme_macos"
+            condition: qbs.targetOS.contains("macos")
+            prefix: "theme/"
+            files: [
+                "theme_mac.h", "theme_mac.mm",
             ]
         }
 

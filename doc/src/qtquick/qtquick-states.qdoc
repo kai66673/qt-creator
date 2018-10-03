@@ -25,9 +25,14 @@
 
 /*!
     \contentspage {Qt Creator Manual}
-    \previouspage quick-connections-backend.html
     \page quick-states.html
+    \if defined(qtdesignstudio)
+    \previouspage quick-property-bindings.html
+    \nextpage studio-fonts.html
+    \else
+    \previouspage quick-connections-backend.html
     \nextpage qtquick-iso-icon-browser.html
+    \endif
 
     \title Adding States
 
@@ -138,7 +143,9 @@
             \endqml
         \endlist
 
+    \if defined(qtcreator)
     \include qtquick-states-scxml.qdocinc scxml state machines
+    \endif
 
     \section1 Animating Transitions Between States
 

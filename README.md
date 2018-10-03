@@ -28,7 +28,7 @@ The standalone binary packages support the following platforms:
 
 * Windows 7 or later
 * (K)Ubuntu Linux 16.04 (64-bit) or later
-* macOS 10.10 or later
+* macOS 10.11 or later
 
 ## Compiling Qt Creator
 
@@ -46,6 +46,7 @@ Prerequisites:
 * LLVM/Clang 6.0.0 or later (optional, needed for the Clang Code Model, see the
   section "Get LLVM/Clang for the Clang Code Model")
     * CMake (only for manual builds of LLVM/Clang)
+* Python 2.6 or later (needed for building the bundled Botan library)
 * Qbs 1.7.x (optional, sources also contain Qbs itself)
 
 The installed toolchains have to match the one Qt was compiled with.
@@ -157,7 +158,7 @@ For detailed information on the supported compilers, see
          the location of libclang.dll/.so that you want to be used.
          See more info in the section "Prebuilt LLVM/Clang packages".
        * When you launch Qt Creator, activate the Clang Code Model plugin as
-         described in doc/src/editors/creator-clang-codemodel.qdoc.
+         described in doc/src/editors/creator-only/creator-clang-codemodel.qdoc.
 
    11. You are now ready to configure and build Qt and Qt Creator.
        Please see <https://wiki.qt.io/Building_Qt_5_from_Git> for

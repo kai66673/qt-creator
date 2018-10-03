@@ -25,6 +25,7 @@
 
 #include "gitplugin.h"
 
+#include "branchview.h"
 #include "changeselectiondialog.h"
 #include "commitdata.h"
 #include "gitclient.h"
@@ -32,7 +33,6 @@
 #include "giteditor.h"
 #include "gitsubmiteditor.h"
 #include "gitversioncontrol.h"
-#include "branchdialog.h"
 #include "remotedialog.h"
 #include "stashdialog.h"
 #include "settingspage.h"
@@ -55,6 +55,8 @@
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/editormanager/ieditor.h>
 #include <coreplugin/locator/commandlocator.h>
+#include <coreplugin/modemanager.h>
+#include <coreplugin/navigationwidget.h>
 #include <coreplugin/vcsmanager.h>
 
 #include <coreplugin/messagebox.h>
@@ -126,7 +128,7 @@ const VcsBaseEditorParameters editorParameters[] = {
 
 // GitPlugin
 
-static GitPlugin *m_instance = 0;
+static GitPlugin *m_instance = nullptr;
 
 GitPlugin::GitPlugin()
 {
@@ -140,7 +142,7 @@ GitPlugin::~GitPlugin()
 {
     cleanCommitMessageFile();
     delete m_gitClient;
-    m_instance = 0;
+    m_instance = nullptr;
 }
 
 void GitPlugin::cleanCommitMessageFile()
@@ -303,6 +305,7 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
             this, &GitPlugin::updateRepositoryBrowserAction);
 
     new GitGrep(this);
+    m_branchViewFactory = new BranchViewFactory;
 
     const auto describeFunc = [this](const QString &source, const QString &id) {
         m_gitClient->show(source, id);
@@ -570,7 +573,7 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     remoteRepositoryMenu->addSeparator(context);
 
     createRepositoryAction(remoteRepositoryMenu, tr("Manage Remotes..."), "Git.RemoteList",
-                           context, false, std::bind(&GitPlugin::remoteList, this));
+                           context, false, std::bind(&GitPlugin::manageRemotes, this));
 
     /* \"Remote Repository" menu */
 
@@ -639,22 +642,6 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
                 createRepositoryAction, "Git.CreateRepository");
     connect(createRepositoryAction, &QAction::triggered, this, &GitPlugin::createRepository);
     gitContainer->addAction(createRepositoryCommand);
-
-    // Submit editor
-    Context submitContext(Constants::GITSUBMITEDITOR_ID);
-    m_submitCurrentAction = new QAction(VcsBaseSubmitEditor::submitIcon(), tr("Commit"), this);
-    Command *command = ActionManager::registerAction(m_submitCurrentAction, Constants::SUBMIT_CURRENT, submitContext);
-    command->setAttribute(Command::CA_UpdateText);
-    connect(m_submitCurrentAction, &QAction::triggered, this, &GitPlugin::submitCurrentLog);
-
-    m_diffSelectedFilesAction = new QAction(VcsBaseSubmitEditor::diffIcon(), tr("Diff &Selected Files"), this);
-    ActionManager::registerAction(m_diffSelectedFilesAction, Constants::DIFF_SELECTED, submitContext);
-
-    m_undoAction = new QAction(tr("&Undo"), this);
-    ActionManager::registerAction(m_undoAction, Core::Constants::UNDO, submitContext);
-
-    m_redoAction = new QAction(tr("&Redo"), this);
-    ActionManager::registerAction(m_redoAction, Core::Constants::REDO, submitContext);
 
     connect(VcsManager::instance(), &VcsManager::repositoryChanged,
             this, &GitPlugin::updateContinueAndAbortCommands);
@@ -999,12 +986,9 @@ void GitPlugin::updateVersionWarning()
 IEditor *GitPlugin::openSubmitEditor(const QString &fileName, const CommitData &cd)
 {
     IEditor *editor = EditorManager::openEditor(fileName, Constants::GITSUBMITEDITOR_ID);
-    GitSubmitEditor *submitEditor = qobject_cast<GitSubmitEditor*>(editor);
-    QTC_ASSERT(submitEditor, return 0);
+    auto submitEditor = qobject_cast<GitSubmitEditor*>(editor);
+    QTC_ASSERT(submitEditor, return nullptr);
     setSubmitEditor(submitEditor);
-    // The actions are for some reason enabled by the context switching
-    // mechanism. Disable them correctly.
-    submitEditor->registerActions(m_undoAction, m_redoAction, m_submitCurrentAction, m_diffSelectedFilesAction);
     submitEditor->setCommitData(cd);
     submitEditor->setCheckScriptWorkingDirectory(m_submitRepository);
     QString title;
@@ -1024,7 +1008,7 @@ IEditor *GitPlugin::openSubmitEditor(const QString &fileName, const CommitData &
     return editor;
 }
 
-void GitPlugin::submitCurrentLog()
+void GitPlugin::commitFromEditor()
 {
     // Close the submit editor
     m_submitActionTriggered = true;
@@ -1036,7 +1020,7 @@ bool GitPlugin::submitEditorAboutToClose()
 {
     if (!isCommitEditorOpen())
         return true;
-    GitSubmitEditor *editor = qobject_cast<GitSubmitEditor *>(submitEditor());
+    auto editor = qobject_cast<GitSubmitEditor *>(submitEditor());
     QTC_ASSERT(editor, return true);
     IDocument *editorDocument = editor->document();
     QTC_ASSERT(editorDocument, return true);
@@ -1068,7 +1052,7 @@ bool GitPlugin::submitEditorAboutToClose()
 
 
     // Go ahead!
-    SubmitFileModel *model = qobject_cast<SubmitFileModel *>(editor->fileModel());
+    auto model = qobject_cast<SubmitFileModel *>(editor->fileModel());
     CommitType commitType = editor->commitType();
     QString amendSHA1 = editor->amendSHA1();
     if (model->hasCheckedFiles() || !amendSHA1.isEmpty()) {
@@ -1127,7 +1111,7 @@ void GitPlugin::pull()
 
     if (!m_gitClient->beginStashScope(topLevel, "Pull", rebase ? Default : AllowUnstashed))
         return;
-    m_gitClient->synchronousPull(topLevel, rebase);
+    m_gitClient->pull(topLevel, rebase);
 }
 
 void GitPlugin::push()
@@ -1326,12 +1310,18 @@ template <class NonModalDialog>
 
 void GitPlugin::branchList()
 {
-    showNonModalDialog(currentState().topLevel(), m_branchDialog);
+    ModeManager::activateMode(Core::Constants::MODE_EDIT);
+    NavigationWidget::activateSubWidget(Constants::GIT_BRANCH_VIEW_ID, Side::Right);
 }
 
-void GitPlugin::remoteList()
+void GitPlugin::manageRemotes()
 {
     showNonModalDialog(currentState().topLevel(), m_remoteDialog);
+}
+
+void GitPlugin::initRepository()
+{
+    createRepository();
 }
 
 void GitPlugin::stashList()
@@ -1345,8 +1335,8 @@ void GitPlugin::updateActions(VcsBasePlugin::ActionState as)
     const bool repositoryEnabled = state.hasTopLevel();
     if (m_stashDialog)
         m_stashDialog->refresh(state.topLevel(), false);
-    if (m_branchDialog)
-        m_branchDialog->refresh(state.topLevel(), false);
+    if (m_branchViewFactory && m_branchViewFactory->view())
+        m_branchViewFactory->view()->refresh(state.topLevel(), false);
     if (m_remoteDialog)
         m_remoteDialog->refresh(state.topLevel(), false);
 
@@ -1418,8 +1408,8 @@ void GitPlugin::delayedPushToGerrit()
 
 void GitPlugin::updateBranches(const QString &repository)
 {
-    if (m_branchDialog && m_branchDialog->isVisible())
-        m_branchDialog->refreshIfSame(repository);
+    if (m_branchViewFactory && m_branchViewFactory->view())
+        m_branchViewFactory->view()->refreshIfSame(repository);
 }
 
 QObject *GitPlugin::remoteCommand(const QStringList &options, const QString &workingDirectory,

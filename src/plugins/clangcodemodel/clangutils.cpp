@@ -39,13 +39,19 @@
 #include <cpptools/projectpart.h>
 #include <cpptools/cppcodemodelsettings.h>
 #include <cpptools/cpptoolsreuse.h>
+#include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/projectexplorerconstants.h>
+#include <projectexplorer/target.h>
 
 #include <utils/algorithm.h>
+#include <utils/fileutils.h>
 #include <utils/qtcassert.h>
 
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QStringList>
 #include <QTextBlock>
 
@@ -57,62 +63,16 @@ using namespace CppTools;
 namespace ClangCodeModel {
 namespace Utils {
 
-/**
- * @brief Creates list of message-line arguments required for correct parsing
- * @param pPart Null if file isn't part of any project
- * @param fileName Path to file, non-empty
- */
-QStringList createClangOptions(const ProjectPart::Ptr &pPart, const QString &fileName)
-{
-    ProjectFile::Kind fileKind = ProjectFile::Unclassified;
-    if (!pPart.isNull())
-        foreach (const ProjectFile &file, pPart->files)
-            if (file.path == fileName) {
-                fileKind = file.kind;
-                break;
-            }
-    if (fileKind == ProjectFile::Unclassified)
-        fileKind = ProjectFile::classify(fileName);
-
-    return createClangOptions(pPart, fileKind);
-}
-
-static QString creatorResourcePath()
-{
-#ifndef UNIT_TESTS
-    return Core::ICore::resourcePath();
-#else
-    return QString();
-#endif
-}
-
-static QString clangIncludeDirectory(const QString &clangVersion,
-                                     const QString &clangResourceDirectory)
-{
-#ifndef UNIT_TESTS
-    return Core::ICore::clangIncludeDirectory(clangVersion, clangResourceDirectory);
-#else
-    return QString();
-#endif
-}
-
 class LibClangOptionsBuilder final : public CompilerOptionsBuilder
 {
 public:
     LibClangOptionsBuilder(const ProjectPart &projectPart)
-        : CompilerOptionsBuilder(projectPart)
-        , m_clangVersion(CLANG_VERSION)
-        , m_clangResourceDirectory(CLANG_RESOURCE_DIR)
+        : CompilerOptionsBuilder(projectPart,
+                                 UseSystemHeader::No,
+                                 CppTools::SkipBuiltIn::No,
+                                 QString(CLANG_VERSION),
+                                 QString(CLANG_RESOURCE_DIR))
     {
-    }
-
-    void addPredefinedHeaderPathsOptions() final
-    {
-        CompilerOptionsBuilder::addPredefinedHeaderPathsOptions();
-        add("-nostdinc");
-        add("-nostdlibinc");
-        addClangIncludeFolder();
-        addWrappedQtHeadersIncludePath();
     }
 
     void addToolchainAndProjectMacros() final
@@ -132,51 +92,20 @@ public:
     }
 
 private:
-    void addClangIncludeFolder()
-    {
-        QTC_CHECK(!m_clangVersion.isEmpty());
-        add("-I");
-        add(clangIncludeDirectory(m_clangVersion, m_clangResourceDirectory));
-    }
-
-    void addWrappedQtHeadersIncludePath()
-    {
-        static const QString resourcePath = creatorResourcePath();
-        static QString wrappedQtHeadersPath = resourcePath + "/cplusplus/wrappedQtHeaders";
-        QTC_ASSERT(QDir(wrappedQtHeadersPath).exists(), return;);
-
-        if (m_projectPart.qtVersion != CppTools::ProjectPart::NoQt) {
-            const QString wrappedQtCoreHeaderPath = wrappedQtHeadersPath + "/QtCore";
-            add(includeDirOption());
-            add(QDir::toNativeSeparators(wrappedQtHeadersPath));
-            add(includeDirOption());
-            add(QDir::toNativeSeparators(wrappedQtCoreHeaderPath));
-        }
-    }
-
     void addDummyUiHeaderOnDiskIncludePath()
     {
         const QString path = ModelManagerSupportClang::instance()->dummyUiHeaderOnDiskDirPath();
         if (!path.isEmpty()) {
-            add(includeDirOption());
+            add("-I");
             add(QDir::toNativeSeparators(path));
         }
     }
-
-    QString m_clangVersion;
-    QString m_clangResourceDirectory;
 };
 
-/**
- * @brief Creates list of message-line arguments required for correct parsing
- * @param pPart Null if file isn't part of any project
- * @param fileKind Determines language and source/header state
- */
-QStringList createClangOptions(const ProjectPart::Ptr &pPart, ProjectFile::Kind fileKind)
+QStringList createClangOptions(const ProjectPart &projectPart, ProjectFile::Kind fileKind)
 {
-    if (!pPart)
-        return QStringList();
-    return LibClangOptionsBuilder(*pPart).build(fileKind, CompilerOptionsBuilder::PchUsage::None);
+    return LibClangOptionsBuilder(projectPart)
+        .build(fileKind, CompilerOptionsBuilder::PchUsage::None);
 }
 
 ProjectPart::Ptr projectPartForFile(const QString &filePath)
@@ -281,7 +210,8 @@ int clangColumn(const QTextBlock &line, int cppEditorColumn)
     ClangBackEnd::StorageClass storageClass = extraInfo.storageClass;
     if (mainType == ClangBackEnd::HighlightingType::VirtualFunction
             || mainType == ClangBackEnd::HighlightingType::Function
-            || mainType == ClangBackEnd::HighlightingType::Operator) {
+            || token.types.mixinHighlightingTypes.contains(
+                ClangBackEnd::HighlightingType::Operator)) {
         if (storageClass != ClangBackEnd::StorageClass::Static) {
             switch (access) {
             case ClangBackEnd::AccessSpecifier::Public:
@@ -355,6 +285,63 @@ QString diagnosticCategoryPrefixRemoved(const QString &text)
     }
 
     return text;
+}
+
+static ::Utils::FileName buildDirectory(const CppTools::ProjectPart &projectPart)
+{
+    ProjectExplorer::Target *target = projectPart.project->activeTarget();
+    if (!target)
+        return ::Utils::FileName();
+
+    ProjectExplorer::BuildConfiguration *buildConfig = target->activeBuildConfiguration();
+    if (!buildConfig)
+        return ::Utils::FileName();
+
+    return buildConfig->buildDirectory();
+}
+
+static QJsonObject createFileObject(CompilerOptionsBuilder &optionsBuilder,
+                                    const ProjectFile &projFile,
+                                    const ::Utils::FileName &buildDir)
+{
+    const ProjectFile::Kind kind = ProjectFile::classify(projFile.path);
+    optionsBuilder.updateLanguageOption(kind);
+
+    QJsonObject fileObject;
+    fileObject["file"] = projFile.path;
+    QJsonArray args = QJsonArray::fromStringList(optionsBuilder.options());
+    args.prepend(kind == ProjectFile::CXXSource ? "clang++" : "clang");
+    args.append(QDir::toNativeSeparators(projFile.path));
+    fileObject["arguments"] = args;
+    fileObject["directory"] = buildDir.toString();
+    return fileObject;
+}
+
+void generateCompilationDB(::Utils::FileName projectDir, CppTools::ProjectInfo projectInfo)
+{
+    QFile compileCommandsFile(projectDir.toString() + "/compile_commands.json");
+
+    compileCommandsFile.open(QIODevice::WriteOnly | QIODevice::Truncate);
+    compileCommandsFile.write("[");
+    for (ProjectPart::Ptr projectPart : projectInfo.projectParts()) {
+        const ::Utils::FileName buildDir = buildDirectory(*projectPart);
+
+        CompilerOptionsBuilder optionsBuilder(*projectPart,
+                                              CppTools::UseSystemHeader::No,
+                                              CppTools::SkipBuiltIn::Yes);
+        optionsBuilder.build(CppTools::ProjectFile::Unclassified,
+                             CppTools::CompilerOptionsBuilder::PchUsage::None);
+
+        for (const ProjectFile &projFile : projectPart->files) {
+            const QJsonObject json = createFileObject(optionsBuilder, projFile, buildDir);
+            if (compileCommandsFile.size() > 1)
+                compileCommandsFile.write(",");
+            compileCommandsFile.write('\n' + QJsonDocument(json).toJson().trimmed());
+        }
+    }
+
+    compileCommandsFile.write("\n]");
+    compileCommandsFile.close();
 }
 
 } // namespace Utils

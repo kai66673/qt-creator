@@ -4,10 +4,12 @@ Project {
     name: "Libs"
     references: [
         "aggregation/aggregation.qbs",
+        "botan/botan.qbs",
         "clangsupport/clangsupport.qbs",
         "cplusplus/cplusplus.qbs",
         "extensionsystem/extensionsystem.qbs",
         "glsl/glsl.qbs",
+        "languageserverprotocol/languageserverprotocol.qbs",
         "languageutils/languageutils.qbs",
         "modelinglib/modelinglib.qbs",
         "qmleditorwidgets/qmleditorwidgets.qbs",

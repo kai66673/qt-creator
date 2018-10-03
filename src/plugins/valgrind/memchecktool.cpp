@@ -117,9 +117,6 @@ namespace Internal {
 const char MEMCHECK_RUN_MODE[] = "MemcheckTool.MemcheckRunMode";
 const char MEMCHECK_WITH_GDB_RUN_MODE[] = "MemcheckTool.MemcheckWithGdbRunMode";
 
-const char MemcheckPerspectiveId[] = "Memcheck.Perspective";
-
-
 class MemcheckToolRunner : public ValgrindToolRunner
 {
     Q_OBJECT
@@ -440,6 +437,7 @@ private:
     bool m_toolBusy = false;
 
     QString m_exitMsg;
+    Perspective m_perspective{"Memcheck.Perspective", tr("Memcheck")};
 };
 
 #ifdef Q_OS_WIN
@@ -556,8 +554,7 @@ MemcheckTool::MemcheckTool()
     m_errorView->setObjectName(QLatin1String("Valgrind.MemcheckTool.ErrorView"));
     m_errorView->setWindowTitle(tr("Memory Issues"));
 
-    auto perspective = new Perspective(tr("Memcheck"));
-    perspective->addWindow(m_errorView, Perspective::SplitVertical, nullptr);
+    m_perspective.addWindow(m_errorView, Perspective::SplitVertical, nullptr);
 
     connect(ProjectExplorerPlugin::instance(), &ProjectExplorerPlugin::updateRunActions,
             this, &MemcheckTool::maybeActiveRunConfigurationChanged);
@@ -617,11 +614,11 @@ MemcheckTool::MemcheckTool()
         action->setToolTip(toolTip);
         menu->addAction(ActionManager::registerAction(action, "Memcheck.Local"),
                         Debugger::Constants::G_ANALYZER_TOOLS);
-        QObject::connect(action, &QAction::triggered, this, [action] {
+        QObject::connect(action, &QAction::triggered, this, [this, action] {
             if (!Debugger::wantRunTool(DebugMode, action->text()))
                 return;
             TaskHub::clearTasks(Debugger::Constants::ANALYZERTASK_ID);
-            Debugger::selectPerspective(MemcheckPerspectiveId);
+            m_perspective.select();
             ProjectExplorerPlugin::runStartupProject(MEMCHECK_RUN_MODE);
         });
         QObject::connect(m_startAction, &QAction::triggered, action, &QAction::triggered);
@@ -636,11 +633,11 @@ MemcheckTool::MemcheckTool()
             "the application is interrupted and can be debugged."));
         menu->addAction(ActionManager::registerAction(action, "MemcheckWithGdb.Local"),
                         Debugger::Constants::G_ANALYZER_TOOLS);
-        QObject::connect(action, &QAction::triggered, this, [action] {
+        QObject::connect(action, &QAction::triggered, this, [this, action] {
             if (!Debugger::wantRunTool(DebugMode, action->text()))
                 return;
             TaskHub::clearTasks(Debugger::Constants::ANALYZERTASK_ID);
-            Debugger::selectPerspective(MemcheckPerspectiveId);
+            m_perspective.select();
             ProjectExplorerPlugin::runStartupProject(MEMCHECK_WITH_GDB_RUN_MODE);
         });
         QObject::connect(m_startWithGdbAction, &QAction::triggered, action, &QAction::triggered);
@@ -663,7 +660,7 @@ MemcheckTool::MemcheckTool()
     action->setToolTip(toolTip);
     menu->addAction(ActionManager::registerAction(action, "Memcheck.Remote"),
                     Debugger::Constants::G_ANALYZER_REMOTE_TOOLS);
-    QObject::connect(action, &QAction::triggered, this, [action] {
+    QObject::connect(action, &QAction::triggered, this, [this, action] {
         auto runConfig = RunConfiguration::startupRunConfiguration();
         if (!runConfig) {
             showCannotStartDialog(action->text());
@@ -673,7 +670,7 @@ MemcheckTool::MemcheckTool()
         if (dlg.exec() != QDialog::Accepted)
             return;
         TaskHub::clearTasks(Debugger::Constants::ANALYZERTASK_ID);
-        Debugger::selectPerspective(MemcheckPerspectiveId);
+        m_perspective.select();
         RunControl *rc = new RunControl(runConfig, MEMCHECK_RUN_MODE);
         if (auto creator = RunControl::producer(runConfig, MEMCHECK_RUN_MODE))
             creator(rc);
@@ -683,14 +680,13 @@ MemcheckTool::MemcheckTool()
         ProjectExplorerPlugin::startRunControl(rc);
     });
 
-    perspective->addToolbarAction(m_startAction);
+    m_perspective.addToolBarAction(m_startAction);
     //toolbar.addAction(m_startWithGdbAction);
-    perspective->addToolbarAction(m_stopAction);
-    perspective->addToolbarAction(m_loadExternalLogFile);
-    perspective->addToolbarAction(m_goBack);
-    perspective->addToolbarAction(m_goNext);
-    perspective->addToolbarWidget(filterButton);
-    Debugger::registerPerspective(MemcheckPerspectiveId, perspective);
+    m_perspective.addToolBarAction(m_stopAction);
+    m_perspective.addToolBarAction(m_loadExternalLogFile);
+    m_perspective.addToolBarAction(m_goBack);
+    m_perspective.addToolBarAction(m_goNext);
+    m_perspective.addToolBarWidget(filterButton);
 
     updateFromSettings();
     maybeActiveRunConfigurationChanged();
@@ -753,6 +749,8 @@ void MemcheckTool::heobAction()
         TaskHub::requestPopup();
         return;
     }
+    if (!QFile::exists(executable))
+        executable = Utils::HostOsInfo::withExecutableSuffix(executable);
     if (!QFile::exists(executable)) {
         const QString msg = tr("Heob: Cannot find %1.").arg(executable);
         TaskHub::addTask(Task::Error, msg, Debugger::Constants::ANALYZERTASK_ID);
@@ -917,8 +915,7 @@ void MemcheckTool::maybeActiveRunConfigurationChanged()
     if (Project *project = SessionManager::startupProject())
         if (Target *target = project->activeTarget())
             if (RunConfiguration *rc = target->activeRunConfiguration())
-                if (IRunConfigurationAspect *aspect = rc->extraAspect(ANALYZER_VALGRIND_SETTINGS))
-                    settings = qobject_cast<ValgrindBaseSettings *>(aspect->currentSettings());
+                settings = rc->currentSettings<ValgrindBaseSettings>(ANALYZER_VALGRIND_SETTINGS);
 
     if (!settings) // fallback to global settings
         settings = ValgrindPlugin::globalSettings();
@@ -980,7 +977,7 @@ void MemcheckTool::loadShowXmlLogFile(const QString &filePath, const QString &ex
     clearErrorView();
     m_settings->setFilterExternalIssues(false);
     m_filterProjectAction->setChecked(true);
-    Debugger::selectPerspective(MemcheckPerspectiveId);
+    m_perspective.select();
     Core::ModeManager::activateMode(Debugger::Constants::MODE_DEBUG);
 
     m_exitMsg = exitMsg;
@@ -1119,7 +1116,7 @@ MemcheckToolRunner::MemcheckToolRunner(RunControl *runControl)
       m_withGdb(runControl->runMode() == MEMCHECK_WITH_GDB_RUN_MODE),
       m_localServerAddress(QHostAddress::LocalHost)
 {
-    setDisplayName("MemcheckToolRunner");
+    setId("MemcheckToolRunner");
     connect(m_runner.parser(), &XmlProtocol::ThreadedParser::error,
             this, &MemcheckToolRunner::parserError);
     connect(m_runner.parser(), &XmlProtocol::ThreadedParser::suppressionCount,

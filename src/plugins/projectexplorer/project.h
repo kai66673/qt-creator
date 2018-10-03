@@ -102,6 +102,7 @@ public:
     Core::IDocument *document() const;
     Utils::FileName projectFilePath() const;
     Utils::FileName projectDirectory() const;
+    Utils::FileName rootProjectDirectory() const;
     static Utils::FileName projectDirectory(const Utils::FileName &top);
 
     virtual ProjectNode *rootProjectNode() const;
@@ -164,6 +165,8 @@ public:
 
     void setup(const QList<const BuildInfo *> &infoList);
     Utils::MacroExpander *macroExpander() const;
+
+    virtual QVariant additionalData(Core::Id id, const Target *target) const;
 
     bool isParsing() const;
     bool hasParsingData() const;

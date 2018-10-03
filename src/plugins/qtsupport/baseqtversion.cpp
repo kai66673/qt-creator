@@ -33,6 +33,8 @@
 #include <coreplugin/icore.h>
 #include <coreplugin/progressmanager/progressmanager.h>
 #include <proparser/qmakevfs.h>
+#include <projectexplorer/deployablefile.h>
+#include <projectexplorer/deploymentdata.h>
 #include <projectexplorer/toolchainmanager.h>
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/projectexplorer.h>
@@ -51,6 +53,8 @@
 #include <utils/synchronousprocess.h>
 #include <utils/winutils.h>
 #include <utils/fileinprojectfinder.h>
+
+#include <resourceeditor/resourcenode.h>
 
 #include <QDir>
 #include <QUrl>
@@ -328,6 +332,12 @@ QSet<Id> BaseQtVersion::availableFeatures() const
     features.unite(versionedIds(Constants::FEATURE_QT_QUICK_CONTROLS_2_PREFIX, 2, 4));
 
     if (qtVersion().matches(5, 11))
+        return features;
+
+    features.unite(versionedIds(Constants::FEATURE_QT_QUICK_PREFIX, 2, 12));
+    features.unite(versionedIds(Constants::FEATURE_QT_QUICK_CONTROLS_2_PREFIX, 2, 5));
+
+    if (qtVersion().matches(5, 12))
         return features;
 
     return features;
@@ -1330,12 +1340,12 @@ void BaseQtVersion::populateQmlFileFinder(FileInProjectFinder *finder, const Tar
     const QList<ProjectExplorer::Project *> projects = ProjectExplorer::SessionManager::projects();
     QTC_CHECK(projects.isEmpty() || startupProject);
 
-    QString projectDirectory;
+    Utils::FileName projectDirectory;
     Utils::FileNameList sourceFiles;
 
     // Sort files from startupProject to the front of the list ...
     if (startupProject) {
-        projectDirectory = startupProject->projectDirectory().toString();
+        projectDirectory = startupProject->projectDirectory();
         sourceFiles.append(startupProject->files(ProjectExplorer::Project::SourceFiles));
     }
 
@@ -1352,11 +1362,28 @@ void BaseQtVersion::populateQmlFileFinder(FileInProjectFinder *finder, const Tar
 
     // ... and find the sysroot and qml directory if we have any target at all.
     const ProjectExplorer::Kit *kit = target ? target->kit() : nullptr;
-    QString activeSysroot = ProjectExplorer::SysRootKitInformation::sysRoot(kit).toString();
+    const Utils::FileName activeSysroot = ProjectExplorer::SysRootKitInformation::sysRoot(kit);
     const QtSupport::BaseQtVersion *qtVersion = QtVersionManager::isLoaded()
             ? QtSupport::QtKitInformation::qtVersion(kit) : nullptr;
-    QStringList additionalSearchDirectories = qtVersion
-            ? QStringList(qtVersion->qmlPath().toString()) : QStringList();
+    Utils::FileNameList additionalSearchDirectories = qtVersion
+            ? Utils::FileNameList({qtVersion->qmlPath()}) : Utils::FileNameList();
+
+    if (target) {
+        for (const ProjectExplorer::DeployableFile &file : target->deploymentData().allFiles())
+            finder->addMappedPath(file.localFilePath(), file.remoteFilePath());
+    }
+
+    // Add resource paths to the mapping
+    if (startupProject) {
+        if (ProjectExplorer::ProjectNode *rootNode = startupProject->rootProjectNode()) {
+            rootNode->forEachNode([&](ProjectExplorer::FileNode *node) {
+                if (auto resourceNode = dynamic_cast<ResourceEditor::ResourceFileNode *>(node))
+                    finder->addMappedPath(node->filePath(), ":" + resourceNode->qrcPath());
+            });
+        } else {
+            // Can there be projects without root node?
+        }
+    }
 
     // Finally, do populate m_projectFinder
     finder->setProjectDirectory(projectDirectory);

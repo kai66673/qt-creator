@@ -85,10 +85,10 @@ static int includePathStartIndex(const QVector<ClangBackEnd::TokenInfoContainer>
 }
 
 static int includePathEndIndex(const QVector<ClangBackEnd::TokenInfoContainer> &marks,
-                                 int currentIndex)
+                               int currentIndex)
 {
     int endIndex = currentIndex + 1;
-    while (isValidIncludePathToken(marks[endIndex]))
+    while (endIndex < marks.size() && isValidIncludePathToken(marks[endIndex]))
         ++endIndex;
     return endIndex - 1;
 }
@@ -135,8 +135,10 @@ static Utils::Link linkAtCursor(const QTextCursor &cursor,
         return token;
     }
 
-    if (mark.extraInfo.identifier || mark.extraInfo.token == "operator")
+    if (mark.extraInfo.identifier || mark.extraInfo.token == "operator"
+            || mark.extraInfo.token == "auto") {
         return token;
+    }
     return Link();
 }
 

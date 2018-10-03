@@ -133,12 +133,14 @@ static QList<AssistProposalItemInterface *> toAssistProposalItems(
             auto samePreviousConstructor
                     = std::find_if(items.begin(),
                                    items.end(),
-                                   [&name](const AssistProposalItemInterface *item) {
-                return item->text() == name;
+                                   [&](const AssistProposalItemInterface *item) {
+                return item->text() == name
+                        && static_cast<const ClangAssistProposalItem *>(item)->firstCodeCompletion()
+                        .completionKind == codeCompletion.completionKind;
             });
             if (samePreviousConstructor == items.end()) {
                 addAssistProposalItem(items, codeCompletion, name);
-            } else {
+            } else if (codeCompletion.completionKind == CodeCompletion::ConstructorCompletionKind){
                 addFunctionOverloadAssistProposalItem(items, *samePreviousConstructor, interface,
                                                       codeCompletion, name);
             }
@@ -192,24 +194,55 @@ static CodeCompletions filterFunctionSignatures(const CodeCompletions &completio
     });
 }
 
+static CodeCompletions filterConstructorSignatures(Utf8String textBefore,
+                                                   const CodeCompletions &completions)
+{
+    const int prevStatementEnd = textBefore.lastIndexOf(";");
+    if (prevStatementEnd != -1)
+        textBefore = textBefore.mid(prevStatementEnd + 1);
+
+    return ::Utils::filtered(completions, [&textBefore](const CodeCompletion &completion) {
+        if (completion.completionKind != CodeCompletion::ConstructorCompletionKind)
+            return false;
+        const Utf8String type = completion.chunks.at(0).text;
+        return textBefore.indexOf(type) != -1;
+    });
+}
+
 void ClangCompletionAssistProcessor::handleAvailableCompletions(
         const CodeCompletions &completions)
 {
     QTC_CHECK(m_completions.isEmpty());
 
-    if (m_sentRequestType == NormalCompletion) {
-        m_completions = toAssistProposalItems(completions, m_interface.data());
+    if (m_sentRequestType == FunctionHintCompletion){
+        CodeCompletions functionSignatures;
+        if (m_completionOperator == T_LPAREN) {
+            functionSignatures = filterFunctionSignatures(completions);
+        } else {
+            const QTextBlock block = m_interface->textDocument()->findBlock(
+                        m_interface->position());
+            const QString textBefore = block.text().left(
+                        m_interface->position() - block.position());
 
-        if (m_addSnippets && !m_completions.isEmpty())
-            addSnippets();
+            functionSignatures = filterConstructorSignatures(textBefore, completions);
+        }
 
-        setAsyncProposalAvailable(createProposal());
-    } else {
-        const CodeCompletions functionSignatures = filterFunctionSignatures(completions);
-        if (!functionSignatures.isEmpty())
+        if (!functionSignatures.isEmpty()) {
             setAsyncProposalAvailable(createFunctionHintProposal(functionSignatures));
-        // else: Not a function call, but e.g. a function declaration like "void f("
+            return;
+        }
+        // else: Proceed with a normal completion in case:
+        // 1) it was not a function call, but e.g. a function declaration like "void f("
+        // 2) '{' meant not a constructor call.
     }
+
+    //m_sentRequestType == NormalCompletion or function signatures were empty
+    m_completions = toAssistProposalItems(completions, m_interface.data());
+
+    if (m_addSnippets && !m_completions.isEmpty())
+        addSnippets();
+
+    setAsyncProposalAvailable(createProposal());
 }
 
 const TextEditorWidget *ClangCompletionAssistProcessor::textEditorWidget() const
@@ -432,21 +465,21 @@ bool ClangCompletionAssistProcessor::completeInclude(const QTextCursor &cursor)
     }
 
     // Make completion for all relevant includes
-    CppTools::ProjectPartHeaderPaths headerPaths = m_interface->headerPaths();
-    const CppTools::ProjectPartHeaderPath currentFilePath(QFileInfo(m_interface->fileName()).path(),
-                                                          CppTools::ProjectPartHeaderPath::IncludePath);
+    ProjectExplorer::HeaderPaths headerPaths = m_interface->headerPaths();
+    const ProjectExplorer::HeaderPath currentFilePath(QFileInfo(m_interface->fileName()).path(),
+                                                          ProjectExplorer::HeaderPathType::User);
     if (!headerPaths.contains(currentFilePath))
         headerPaths.append(currentFilePath);
 
     const ::Utils::MimeType mimeType = ::Utils::mimeTypeForName("text/x-c++hdr");
     const QStringList suffixes = mimeType.suffixes();
 
-    foreach (const CppTools::ProjectPartHeaderPath &headerPath, headerPaths) {
+    foreach (const ProjectExplorer::HeaderPath &headerPath, headerPaths) {
         QString realPath = headerPath.path;
         if (!directoryPrefix.isEmpty()) {
             realPath += QLatin1Char('/');
             realPath += directoryPrefix;
-            if (headerPath.isFrameworkPath())
+            if (headerPath.type == ProjectExplorer::HeaderPathType::Framework)
                 realPath += QLatin1String(".framework/Headers");
         }
         completeIncludePath(realPath, suffixes);
@@ -544,7 +577,6 @@ void ClangCompletionAssistProcessor::sendFileContent(const QByteArray &customFil
 
     BackendCommunicator &communicator = m_interface->communicator();
     communicator.documentsChanged({{m_interface->fileName(),
-                                    Utf8String(),
                                     Utf8String::fromByteArray(info.unsavedContent),
                                     info.isDocumentModified,
                                     uint(m_interface->textDocument()->revision())}});
@@ -625,12 +657,10 @@ bool ClangCompletionAssistProcessor::sendCompletionRequest(int position,
 
         const Position cursorPosition = extractLineColumn(position);
         const Position functionNameStart = extractLineColumn(functionNameStartPosition);
-        const QString projectPartId = CppTools::CppToolsBridge::projectPartIdForFile(filePath);
         communicator.requestCompletions(this,
                                         filePath,
                                         uint(cursorPosition.line),
                                         uint(cursorPosition.column),
-                                        projectPartId,
                                         functionNameStart.line,
                                         functionNameStart.column);
         setLastCompletionPosition(filePath, position);

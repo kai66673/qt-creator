@@ -31,8 +31,12 @@
 
 /*!
     \contentspage index.html
-    \previouspage creator-usability.html
     \page creator-coding.html
+    \if defined(qtdesignstudio)
+    \previouspage creator-keyboard-shortcuts.html
+    \else
+    \previouspage creator-usability.html
+    \endif
     \nextpage creator-editor-functions.html
 
     \title Coding
@@ -62,20 +66,25 @@
             can easily find and rename symbols and apply predefined actions to
             refactor code.
 
+        \if defined(qtcreator)
         \li \l{Beautifying Source Code}
 
             Beautifying code means applying indentation and style to source
             code files. You can use the Artistic Style, ClangFormat, or
             Uncrustify tool to format source files.
+       \endif
 
         \li \l{Configuring the Editor}
 
             You can change the fonts, colors, highlighting, and indentation.
+            \if defined(qtcreator)
             If you are used to the Vim editor, you can even run the main
             editor in a manner similar to it in the \uicontrol{FakeVim} mode.
+            \endif
 
     \endlist
 
+    \if defined(qtcreator)
     \section1 Related Topics
 
     \list
@@ -102,5 +111,5 @@
             in Qt applications.
 
     \endlist
-
+    \endif
 */

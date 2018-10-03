@@ -207,6 +207,7 @@ void CodeAssistantPrivate::requestProposal(AssistReason reason,
         return;
 
     m_assistKind = kind;
+    m_requestProvider = provider;
     IAssistProcessor *processor = provider->createProcessor();
 
     switch (provider->runType()) {
@@ -220,7 +221,6 @@ void CodeAssistantPrivate::requestProposal(AssistReason reason,
         if (IAssistProposal *newProposal = processor->immediateProposal(assistInterface))
             displayProposal(newProposal, reason);
 
-        m_requestProvider = provider;
         m_requestRunner = new ProcessorRunner;
         m_runnerConnection = connect(m_requestRunner, &ProcessorRunner::finished,
                                      this, [this, reason](){
@@ -350,6 +350,7 @@ void CodeAssistantPrivate::processProposalItem(AssistProposalItemInterface *prop
     destroyContext();
     if (!proposalItem->isSnippet())
         process();
+    m_editorWidget->encourageApply();
 }
 
 void CodeAssistantPrivate::handlePrefixExpansion(const QString &newPrefix)
@@ -432,10 +433,13 @@ void CodeAssistantPrivate::notifyChange()
         QTC_ASSERT(m_proposal, return);
         if (m_editorWidget->position() < m_proposal->basePosition()) {
             destroyContext();
-        } else {
+        } else if (!m_proposal->isFragile()) {
             m_proposalWidget->updateProposal(
                 m_editorWidget->textAt(m_proposal->basePosition(),
                                      m_editorWidget->position() - m_proposal->basePosition()));
+        } else {
+            destroyContext();
+            requestProposal(ExplicitlyInvoked, m_assistKind, m_requestProvider);
         }
     }
 }
@@ -512,7 +516,7 @@ bool CodeAssistantPrivate::isDestroyEvent(int key, const QString &keyText)
 {
     if (keyText.isEmpty())
         return key != Qt::LeftArrow && key != Qt::RightArrow && key != Qt::Key_Shift;
-    if (auto *provider = qobject_cast<CompletionAssistProvider *>(m_requestProvider))
+    if (auto provider = qobject_cast<CompletionAssistProvider *>(m_requestProvider))
         return !provider->isContinuationChar(keyText.at(0));
     return false;
 }
@@ -526,7 +530,7 @@ bool CodeAssistantPrivate::eventFilter(QObject *o, QEvent *e)
         if (type == QEvent::FocusOut) {
             destroyContext();
         } else if (type == QEvent::KeyPress) {
-            QKeyEvent *keyEvent = static_cast<QKeyEvent *>(e);
+            auto keyEvent = static_cast<QKeyEvent *>(e);
             const QString &keyText = keyEvent->text();
 
             if (isDestroyEvent(keyEvent->key(), keyText))

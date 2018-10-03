@@ -59,6 +59,13 @@ const char CUSTOM_EXECUTABLE_ID[] = "ProjectExplorer.CustomExecutableRunConfigur
 
 // Dialog prompting the user to complete the configuration.
 
+static void copyAspect(ProjectConfigurationAspect *source, ProjectConfigurationAspect *target)
+{
+    QVariantMap data;
+    source->toMap(data);
+    target->fromMap(data);
+}
+
 class CustomExecutableDialog : public QDialog
 {
 public:
@@ -87,9 +94,7 @@ private:
 CustomExecutableDialog::CustomExecutableDialog(RunConfiguration *rc)
     : QDialog(Core::ICore::dialogParent()),
       m_rc(rc),
-      m_arguments(rc, rc->extraAspect<ArgumentsAspect>()->settingsKey()),
-      m_workingDirectory(rc, rc->extraAspect<WorkingDirectoryAspect>()->settingsKey()),
-      m_terminal(rc, rc->extraAspect<TerminalAspect>()->settingsKey())
+      m_workingDirectory(rc->extraAspect<EnvironmentAspect>())
 {
     auto vbox = new QVBoxLayout(this);
     vbox->addWidget(new QLabel(tr("Could not find the executable, please specify one.")));
@@ -121,13 +126,13 @@ CustomExecutableDialog::CustomExecutableDialog(RunConfiguration *rc)
     connect(m_executableChooser, &PathChooser::rawPathChanged,
             this, &CustomExecutableDialog::changed);
 
-    m_arguments.copyFrom(rc->extraAspect<ArgumentsAspect>());
+    copyAspect(rc->extraAspect<ArgumentsAspect>(), &m_arguments);
     m_arguments.addToConfigurationLayout(layout);
 
-    m_workingDirectory.copyFrom(rc->extraAspect<WorkingDirectoryAspect>());
+    copyAspect(rc->extraAspect<WorkingDirectoryAspect>(), &m_workingDirectory);
     m_workingDirectory.addToConfigurationLayout(layout);
 
-    m_terminal.copyFrom(rc->extraAspect<TerminalAspect>());
+    copyAspect(rc->extraAspect<TerminalAspect>(), &m_terminal);
     m_terminal.addToConfigurationLayout(layout);
 
     auto enviromentAspect = rc->extraAspect<EnvironmentAspect>();
@@ -142,9 +147,9 @@ void CustomExecutableDialog::accept()
 {
     auto executable = FileName::fromString(m_executableChooser->path());
     m_rc->extraAspect<ExecutableAspect>()->setExecutable(executable);
-    m_rc->extraAspect<WorkingDirectoryAspect>()->copyFrom(&m_workingDirectory);
-    m_rc->extraAspect<ArgumentsAspect>()->copyFrom(&m_arguments);
-    m_rc->extraAspect<TerminalAspect>()->copyFrom(&m_terminal);
+    copyAspect(&m_arguments, m_rc->extraAspect<ArgumentsAspect>());
+    copyAspect(&m_workingDirectory, m_rc->extraAspect<WorkingDirectoryAspect>());
+    copyAspect(&m_terminal, m_rc->extraAspect<TerminalAspect>());
 
     QDialog::accept();
 }
@@ -178,20 +183,19 @@ CustomExecutableRunConfiguration::CustomExecutableRunConfiguration(Target *targe
 CustomExecutableRunConfiguration::CustomExecutableRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto envAspect = new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier());
-    addExtraAspect(envAspect);
+    auto envAspect = addAspect<LocalEnvironmentAspect>
+            (target, LocalEnvironmentAspect::BaseEnvironmentModifier());
 
-    auto exeAspect = new ExecutableAspect(this);
+    auto exeAspect = addAspect<ExecutableAspect>();
     exeAspect->setSettingsKey("ProjectExplorer.CustomExecutableRunConfiguration.Executable");
     exeAspect->setDisplayStyle(BaseStringAspect::PathChooserDisplay);
     exeAspect->setHistoryCompleter("Qt.CustomExecutable.History");
     exeAspect->setExpectedKind(PathChooser::ExistingCommand);
     exeAspect->setEnvironment(envAspect->environment());
-    addExtraAspect(exeAspect);
 
-    addExtraAspect(new ArgumentsAspect(this, "ProjectExplorer.CustomExecutableRunConfiguration.Arguments"));
-    addExtraAspect(new TerminalAspect(this, "ProjectExplorer.CustomExecutableRunConfiguration.UseTerminal"));
-    addExtraAspect(new WorkingDirectoryAspect(this, "ProjectExplorer.CustomExecutableRunConfiguration.WorkingDirectory"));
+    addAspect<ArgumentsAspect>();
+    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<TerminalAspect>();
 
     connect(envAspect, &EnvironmentAspect::environmentChanged,
             this, [exeAspect, envAspect] { exeAspect->setEnvironment(envAspect->environment()); });
@@ -248,11 +252,12 @@ bool CustomExecutableRunConfiguration::isConfigured() const
 
 Runnable CustomExecutableRunConfiguration::runnable() const
 {
-    FileName workingDirectory = extraAspect<WorkingDirectoryAspect>()->workingDirectory();
+    FileName workingDirectory =
+            extraAspect<WorkingDirectoryAspect>()->workingDirectory(macroExpander());
 
     Runnable r;
     r.executable = extraAspect<ExecutableAspect>()->executable().toString();
-    r.commandLineArguments = extraAspect<ArgumentsAspect>()->arguments();
+    r.commandLineArguments = extraAspect<ArgumentsAspect>()->arguments(macroExpander());
     r.environment = extraAspect<EnvironmentAspect>()->environment();
     r.workingDirectory = workingDirectory.toString();
     r.device = DeviceManager::instance()->defaultDevice(Constants::DESKTOP_DEVICE_TYPE);

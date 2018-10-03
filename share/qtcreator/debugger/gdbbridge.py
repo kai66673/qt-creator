@@ -138,20 +138,21 @@ class PlainDumper:
             printer = self.printer.invoke(value.nativeValue)
         lister = getattr(printer, 'children', None)
         children = [] if lister is None else list(lister())
-        d.putType(self.printer.name)
+        d.putType(value.nativeValue.type.name)
         val = printer.to_string()
         if isinstance(val, str):
             d.putValue(val)
         elif sys.version_info[0] <= 2 and isinstance(val, unicode):
             d.putValue(val)
         else: # Assuming LazyString
-            d.putCharArrayHelper(val.address, val.length, val.type)
+            d.putCharArrayValue(val.address, val.length,
+                                val.type.target().sizeof)
 
         d.putNumChild(len(children))
         if d.isExpanded():
             with Children(d):
                 for child in children:
-                    d.putSubItem(child[0], child[1])
+                    d.putSubItem(child[0], d.fromNativeValue(child[1]))
 
 def importPlainDumpers(args):
     if args == 'off':
@@ -407,7 +408,7 @@ class Dumper(DumperBase):
                     found = True
             if not found or v != 0:
                 # Leftover value
-                flags.append('unknown:%d' % v)
+                flags.append('unknown: %d' % v)
             return " | ".join(flags) + ' (' + (form % intval) + ')'
         except:
             pass
@@ -993,7 +994,20 @@ class Dumper(DumperBase):
             qtCoreMatch = re.match('.*/libQt5?Core[^/.]*\.so', name)
 
         if qtCoreMatch is not None:
+            self.addDebugLibs(objfile)
             self.handleQtCoreLoaded(objfile)
+
+    def addDebugLibs(self, objfile):
+        # The directory where separate debug symbols are searched for
+        # is "/usr/lib/debug".
+        try:
+            cooked = gdb.execute('show debug-file-directory', to_string=True)
+            clean = cooked.split('"')[1]
+            newdir = '/'.join(objfile.filename.split('/')[:-1])
+            gdb.execute('set debug-file-directory %s:%s' % (clean, newdir))
+        except:
+            pass
+
 
     def handleQtCoreLoaded(self, objfile):
         fd, tmppath = tempfile.mkstemp()

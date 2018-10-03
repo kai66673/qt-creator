@@ -209,7 +209,7 @@ class InterpreterAspect : public BaseStringAspect
     Q_OBJECT
 
 public:
-    explicit InterpreterAspect(RunConfiguration *rc) : BaseStringAspect(rc) {}
+    InterpreterAspect() = default;
 };
 
 class MainScriptAspect : public BaseStringAspect
@@ -217,7 +217,7 @@ class MainScriptAspect : public BaseStringAspect
     Q_OBJECT
 
 public:
-    explicit MainScriptAspect(RunConfiguration *rc) : BaseStringAspect(rc) {}
+    MainScriptAspect() = default;
 };
 
 class PythonRunConfiguration : public RunConfiguration
@@ -234,12 +234,11 @@ public:
 
 private:
     void doAdditionalSetup(const RunConfigurationCreationInfo &) final { updateTargetInformation(); }
-    void fillConfigurationLayout(QFormLayout *layout) const final;
     Runnable runnable() const final;
 
     bool supportsDebugger() const { return true; }
     QString mainScript() const { return extraAspect<MainScriptAspect>()->value(); }
-    QString arguments() const { return extraAspect<ArgumentsAspect>()->arguments(); }
+    QString arguments() const { return extraAspect<ArgumentsAspect>()->arguments(macroExpander()); }
     QString interpreter() const { return extraAspect<InterpreterAspect>()->value(); }
 
     void updateTargetInformation();
@@ -251,23 +250,21 @@ PythonRunConfiguration::PythonRunConfiguration(Target *target, Core::Id id)
     const Environment sysEnv = Environment::systemEnvironment();
     const QString exec = sysEnv.searchInPath("python").toString();
 
-    auto interpreterAspect = new InterpreterAspect(this);
+    auto interpreterAspect = addAspect<InterpreterAspect>();
     interpreterAspect->setSettingsKey("PythonEditor.RunConfiguation.Interpreter");
     interpreterAspect->setLabelText(tr("Interpreter:"));
     interpreterAspect->setDisplayStyle(BaseStringAspect::PathChooserDisplay);
     interpreterAspect->setHistoryCompleter("PythonEditor.Interpreter.History");
     interpreterAspect->setValue(exec.isEmpty() ? "python" : exec);
-    addExtraAspect(interpreterAspect);
 
-    auto scriptAspect = new MainScriptAspect(this);
+    auto scriptAspect = addAspect<MainScriptAspect>();
     scriptAspect->setSettingsKey("PythonEditor.RunConfiguation.Script");
     scriptAspect->setLabelText(tr("Script:"));
     scriptAspect->setDisplayStyle(BaseStringAspect::LabelDisplay);
-    addExtraAspect(scriptAspect);
 
-    addExtraAspect(new LocalEnvironmentAspect(this, LocalEnvironmentAspect::BaseEnvironmentModifier()));
-    addExtraAspect(new ArgumentsAspect(this, "PythonEditor.RunConfiguration.Arguments"));
-    addExtraAspect(new TerminalAspect(this, "PythonEditor.RunConfiguration.UseTerminal"));
+    addAspect<LocalEnvironmentAspect>(target, LocalEnvironmentAspect::BaseEnvironmentModifier());
+    addAspect<ArgumentsAspect>();
+    addAspect<TerminalAspect>();
 
     setOutputFormatter<PythonOutputFormatter>();
 
@@ -285,19 +282,12 @@ void PythonRunConfiguration::updateTargetInformation()
     extraAspect<MainScriptAspect>()->setValue(script);
 }
 
-void PythonRunConfiguration::fillConfigurationLayout(QFormLayout *layout) const
-{
-    extraAspect<InterpreterAspect>()->addToConfigurationLayout(layout);
-    extraAspect<MainScriptAspect>()->addToConfigurationLayout(layout);
-    extraAspect<ArgumentsAspect>()->addToConfigurationLayout(layout);
-    extraAspect<TerminalAspect>()->addToConfigurationLayout(layout);
-}
-
 Runnable PythonRunConfiguration::runnable() const
 {
     Runnable r;
     QtcProcess::addArg(&r.commandLineArguments, mainScript());
-    QtcProcess::addArgs(&r.commandLineArguments, extraAspect<ArgumentsAspect>()->arguments());
+    QtcProcess::addArgs(&r.commandLineArguments,
+                        extraAspect<ArgumentsAspect>()->arguments(macroExpander()));
     r.executable = extraAspect<InterpreterAspect>()->value();
     r.environment = extraAspect<EnvironmentAspect>()->environment();
     return r;

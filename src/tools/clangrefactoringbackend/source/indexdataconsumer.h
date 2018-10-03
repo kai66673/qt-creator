@@ -42,8 +42,9 @@ class IndexDataConsumer : public clang::index::IndexDataConsumer,
 public:
     IndexDataConsumer(SymbolEntries &symbolEntries,
                       SourceLocationEntries &sourceLocationEntries,
-                      FilePathCachingInterface &filePathCache)
-        : SymbolsVisitorBase(filePathCache, nullptr),
+                      FilePathCachingInterface &filePathCache,
+                      SourcesManager &sourcesManager)
+        : SymbolsVisitorBase(filePathCache, nullptr, sourcesManager),
           m_symbolEntries(symbolEntries),
           m_sourceLocationEntries(sourceLocationEntries)
     {}
@@ -57,6 +58,9 @@ public:
                              clang::FileID fileId,
                              unsigned offset,
                              ASTNodeInfo astNodeInfo) override;
+
+private:
+    bool skipSymbol(clang::FileID fileId, clang::index::SymbolRoleSet symbolRoles);
 
 private:
     SymbolEntries &m_symbolEntries;

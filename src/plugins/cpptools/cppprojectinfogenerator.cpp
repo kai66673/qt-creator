@@ -28,6 +28,7 @@
 #include "cppprojectfilecategorizer.h"
 
 #include <projectexplorer/headerpath.h>
+#include <projectexplorer/projectexplorerconstants.h>
 
 namespace CppTools {
 namespace Internal {
@@ -55,6 +56,10 @@ public:
         m_projectPart.extraCodeModelFlags = m_tcInfo.extraCodeModelFlags;
 
         m_projectPart.warningFlags = m_flags.warningFlags;
+
+        // For compilation database pass the command line flags directly.
+        if (m_projectPart.toolchainType == ProjectExplorer::Constants::COMPILATION_DATABASE_TOOLCHAIN_TYPEID)
+            m_projectPart.extraCodeModelFlags = m_flags.commandLineFlags;
 
         mapLanguageVersion();
         mapLanguageExtensions();
@@ -111,29 +116,18 @@ private:
             languageExtensions |= ProjectPart::ObjectiveCExtensions;
     }
 
-    static ProjectPartHeaderPath toProjectPartHeaderPath(
-            const ProjectExplorer::HeaderPath &headerPath)
-    {
-        const ProjectPartHeaderPath::Type headerPathType =
-            headerPath.kind() == ProjectExplorer::HeaderPath::FrameworkHeaderPath
-                ? ProjectPartHeaderPath::FrameworkPath
-                : ProjectPartHeaderPath::IncludePath;
-
-        return ProjectPartHeaderPath(headerPath.path(), headerPathType);
-    }
-
     void addHeaderPaths()
     {
         if (!m_tcInfo.headerPathsRunner)
             return; // No compiler set in kit.
 
-        const QList<ProjectExplorer::HeaderPath> systemHeaderPaths
+        const ProjectExplorer::HeaderPaths builtInHeaderPaths
                 = m_tcInfo.headerPathsRunner(m_flags.commandLineFlags,
                                              m_tcInfo.sysRootPath);
 
-        ProjectPartHeaderPaths &headerPaths = m_projectPart.headerPaths;
-        for (const ProjectExplorer::HeaderPath &header : systemHeaderPaths) {
-            const ProjectPartHeaderPath headerPath = toProjectPartHeaderPath(header);
+        ProjectExplorer::HeaderPaths &headerPaths = m_projectPart.headerPaths;
+        for (const ProjectExplorer::HeaderPath &header : builtInHeaderPaths) {
+            const ProjectExplorer::HeaderPath headerPath{header.path, header.type};
             if (!headerPaths.contains(headerPath))
                 headerPaths.push_back(headerPath);
         }

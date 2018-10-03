@@ -102,7 +102,6 @@ using namespace Utils;
 namespace Valgrind {
 namespace Internal {
 
-const char CallgrindPerspectiveId[]       = "Callgrind.Perspective";
 const char CallgrindLocalActionId[]       = "Callgrind.Local.Action";
 const char CallgrindRemoteActionId[]      = "Callgrind.Remote.Action";
 const char CALLGRIND_RUN_MODE[]           = "CallgrindTool.CallgrindRunMode";
@@ -215,6 +214,8 @@ public:
 
     QString m_toggleCollectFunction;
     bool m_toolBusy = false;
+
+    Perspective m_perspective{"Callgrind.Perspective", tr("Callgrind")};
 };
 
 CallgrindTool::CallgrindTool()
@@ -250,10 +251,10 @@ CallgrindTool::CallgrindTool()
         action->setToolTip(toolTip);
         menu->addAction(ActionManager::registerAction(action, CallgrindLocalActionId),
                         Debugger::Constants::G_ANALYZER_TOOLS);
-        QObject::connect(action, &QAction::triggered, this, [action] {
+        QObject::connect(action, &QAction::triggered, this, [this, action] {
             if (!Debugger::wantRunTool(OptimizedMode, action->text()))
                 return;
-            Debugger::selectPerspective(CallgrindPerspectiveId);
+            m_perspective.select();
             ProjectExplorerPlugin::runStartupProject(CALLGRIND_RUN_MODE);
         });
         QObject::connect(m_startAction, &QAction::triggered, action, &QAction::triggered);
@@ -266,7 +267,7 @@ CallgrindTool::CallgrindTool()
     action->setToolTip(toolTip);
     menu->addAction(ActionManager::registerAction(action, CallgrindRemoteActionId),
                     Debugger::Constants::G_ANALYZER_REMOTE_TOOLS);
-    QObject::connect(action, &QAction::triggered, this, [action] {
+    QObject::connect(action, &QAction::triggered, this, [this, action] {
         auto runConfig = RunConfiguration::startupRunConfiguration();
         if (!runConfig) {
             showCannotStartDialog(action->text());
@@ -275,7 +276,7 @@ CallgrindTool::CallgrindTool()
         StartRemoteDialog dlg;
         if (dlg.exec() != QDialog::Accepted)
             return;
-        Debugger::selectPerspective(CallgrindPerspectiveId);
+        m_perspective.select();
         auto runControl = new RunControl(runConfig, CALLGRIND_RUN_MODE);
         if (auto creator = RunControl::producer(runConfig, CALLGRIND_RUN_MODE))
             creator(runControl);
@@ -419,18 +420,17 @@ CallgrindTool::CallgrindTool()
             this, &CallgrindTool::setCostEvent);
     updateEventCombo();
 
-    auto perspective = new Perspective(tr("Callgrind"));
-    perspective->addToolbarAction(m_startAction);
-    perspective->addToolbarAction(m_stopAction);
-    perspective->addToolbarAction(m_loadExternalLogFile);
-    perspective->addToolbarAction(m_dumpAction);
-    perspective->addToolbarAction(m_resetAction);
-    perspective->addToolbarAction(m_pauseAction);
-    perspective->addToolbarAction(m_discardAction);
-    perspective->addToolbarAction(m_goBack);
-    perspective->addToolbarAction(m_goNext);
-    perspective->addToolbarSeparator();
-    perspective->addToolbarWidget(m_eventCombo);
+    m_perspective.addToolBarAction(m_startAction);
+    m_perspective.addToolBarAction(m_stopAction);
+    m_perspective.addToolBarAction(m_loadExternalLogFile);
+    m_perspective.addToolBarAction(m_dumpAction);
+    m_perspective.addToolBarAction(m_resetAction);
+    m_perspective.addToolBarAction(m_pauseAction);
+    m_perspective.addToolBarAction(m_discardAction);
+    m_perspective.addToolBarAction(m_goBack);
+    m_perspective.addToolBarAction(m_goNext);
+    m_perspective.addToolbarSeparator();
+    m_perspective.addToolBarWidget(m_eventCombo);
 
     // Cost formatting
     {
@@ -463,7 +463,7 @@ CallgrindTool::CallgrindTool()
     button->setPopupMode(QToolButton::InstantPopup);
     button->setText(QLatin1String("$"));
     button->setToolTip(tr("Cost Format"));
-    perspective->addToolbarWidget(button);
+    m_perspective.addToolBarWidget(button);
     }
 
     ValgrindGlobalSettings *settings = ValgrindPlugin::globalSettings();
@@ -500,17 +500,16 @@ CallgrindTool::CallgrindTool()
     setCostFormat(settings->costFormat());
     enableCycleDetection(settings->detectCycles());
 
-    perspective->addToolbarAction(m_cycleDetection);
-    perspective->addToolbarAction(m_shortenTemplates);
-    perspective->addToolbarAction(m_filterProjectCosts);
-    perspective->addToolbarWidget(m_searchFilter);
+    m_perspective.addToolBarAction(m_cycleDetection);
+    m_perspective.addToolBarAction(m_shortenTemplates);
+    m_perspective.addToolBarAction(m_filterProjectCosts);
+    m_perspective.addToolBarWidget(m_searchFilter);
 
-    perspective->addWindow(m_flatView, Perspective::SplitVertical, nullptr);
-    perspective->addWindow(m_calleesView, Perspective::SplitVertical, nullptr);
-    perspective->addWindow(m_callersView, Perspective::SplitHorizontal, m_calleesView);
-    perspective->addWindow(m_visualization, Perspective::SplitVertical, nullptr,
+    m_perspective.addWindow(m_flatView, Perspective::SplitVertical, nullptr);
+    m_perspective.addWindow(m_calleesView, Perspective::SplitVertical, nullptr);
+    m_perspective.addWindow(m_callersView, Perspective::SplitHorizontal, m_calleesView);
+    m_perspective.addWindow(m_visualization, Perspective::SplitVertical, nullptr,
                            false, Qt::RightDockWidgetArea);
-    Debugger::registerPerspective(CallgrindPerspectiveId, perspective);
 
     connect(ProjectExplorerPlugin::instance(), &ProjectExplorerPlugin::updateRunActions,
             this, &CallgrindTool::updateRunActions);
@@ -767,12 +766,11 @@ void CallgrindTool::setupRunner(CallgrindToolRunner *toolRunner)
     QTC_ASSERT(m_visualization, return);
 
     // apply project settings
-    if (IRunConfigurationAspect *analyzerAspect = runControl->runConfiguration()->extraAspect(ANALYZER_VALGRIND_SETTINGS)) {
-        if (const ValgrindBaseSettings *settings = qobject_cast<ValgrindBaseSettings *>(analyzerAspect->currentSettings())) {
-            m_visualization->setMinimumInclusiveCostRatio(settings->visualisationMinimumInclusiveCostRatio() / 100.0);
-            m_proxyModel.setMinimumInclusiveCostRatio(settings->minimumInclusiveCostRatio() / 100.0);
-            m_dataModel.setVerboseToolTipsEnabled(settings->enableEventToolTips());
-        }
+    if (auto settings = runControl->runConfiguration()
+            ->currentSettings<ValgrindBaseSettings>(ANALYZER_VALGRIND_SETTINGS)) {
+        m_visualization->setMinimumInclusiveCostRatio(settings->visualisationMinimumInclusiveCostRatio() / 100.0);
+        m_proxyModel.setMinimumInclusiveCostRatio(settings->minimumInclusiveCostRatio() / 100.0);
+        m_dataModel.setVerboseToolTipsEnabled(settings->enableEventToolTips());
     }
 
     m_toolBusy = true;

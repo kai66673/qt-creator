@@ -35,6 +35,11 @@ QT_END_NAMESPACE
 
 namespace CppTools {
 class CppEditorDocumentHandle;
+class ProjectInfo;
+}
+
+namespace Utils {
+class FileName;
 }
 
 namespace ClangBackEnd { class TokenInfoContainer; }
@@ -45,10 +50,8 @@ namespace Utils {
 CppTools::CppEditorDocumentHandle *cppDocument(const QString &filePath);
 void setLastSentDocumentRevision(const QString &filePath, uint revision);
 
-QStringList createClangOptions(const CppTools::ProjectPart::Ptr &pPart,
+QStringList createClangOptions(const CppTools::ProjectPart &projectPart,
                                CppTools::ProjectFile::Kind fileKind);
-QStringList createClangOptions(const CppTools::ProjectPart::Ptr &pPart,
-                               const QString &fileName = QString());
 
 CppTools::ProjectPart::Ptr projectPartForFile(const QString &filePath);
 CppTools::ProjectPart::Ptr projectPartForFileBasedOnProcessor(const QString &filePath);
@@ -59,6 +62,8 @@ int clangColumn(const QTextBlock &lineText, int cppEditorColumn);
 QString diagnosticCategoryPrefixRemoved(const QString &text);
 
 ::Utils::CodeModelIcon::Type iconTypeForToken(const ClangBackEnd::TokenInfoContainer &token);
+
+void generateCompilationDB(::Utils::FileName projectDir, CppTools::ProjectInfo projectInfo);
 
 } // namespace Utils
 } // namespace Clang

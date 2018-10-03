@@ -65,14 +65,19 @@
 #include <QMenu>
 #include <QUuid>
 
+#include <cstdlib>
+
 using namespace Core;
 using namespace Core::Internal;
 using namespace Utils;
+
+static CorePlugin *m_instance = nullptr;
 
 CorePlugin::CorePlugin()
 {
     qRegisterMetaType<Id>();
     qRegisterMetaType<Core::Search::TextPosition>();
+    m_instance = this;
 }
 
 CorePlugin::~CorePlugin()
@@ -87,6 +92,11 @@ CorePlugin::~CorePlugin()
 
     delete m_mainWindow;
     setCreatorTheme(nullptr);
+}
+
+CorePlugin *CorePlugin::instance()
+{
+    return m_instance;
 }
 
 struct CoreArguments {
@@ -142,7 +152,7 @@ bool CorePlugin::initialize(const QStringList &arguments, QString *errorMessage)
     if (args.overrideColor.isValid())
         m_mainWindow->setOverrideColor(args.overrideColor);
     m_locator = new Locator;
-    qsrand(QDateTime::currentDateTime().toTime_t());
+    std::srand(unsigned(QDateTime::currentDateTime().toSecsSinceEpoch()));
     m_mainWindow->init();
     m_editMode = new EditMode;
     ModeManager::activateMode(m_editMode->id());
@@ -226,7 +236,6 @@ void CorePlugin::extensionsInitialized()
 
 bool CorePlugin::delayedInitialize()
 {
-    HelpManager::setupHelpManager();
     m_locator->delayedInitialize();
     IWizardFactory::allWizardFactories(); // scan for all wizard factories
     return true;
@@ -290,6 +299,5 @@ ExtensionSystem::IPlugin::ShutdownFlag CorePlugin::aboutToShutdown()
 {
     Find::aboutToShutdown();
     m_mainWindow->aboutToShutdown();
-    HelpManager::aboutToShutdown();
     return SynchronousShutdown;
 }

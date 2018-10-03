@@ -45,10 +45,8 @@ class SymbolStorage final : public SymbolStorageInterface
     using Database = typename StatementFactory::Database;
 
 public:
-    SymbolStorage(StatementFactory &statementFactory,
-                  FilePathCachingInterface &filePathCache)
-        : m_statementFactory(statementFactory),
-          m_filePathCache(filePathCache)
+    SymbolStorage(StatementFactory &statementFactory)
+        : m_statementFactory(statementFactory)
     {
     }
 
@@ -66,7 +64,7 @@ public:
         deleteNewLocationsTable();
     }
 
-    void insertOrUpdateProjectPart(Utils::SmallStringView projectPartName,
+    int insertOrUpdateProjectPart(Utils::SmallStringView projectPartName,
                                    const Utils::SmallStringVector &commandLineArguments,
                                    const CompilerMacros &compilerMacros,
                                    const Utils::SmallStringVector &includeSearchPaths) override
@@ -90,6 +88,8 @@ public:
                                   includeSearchPathsAsJason,
                                   projectPartName);
         }
+
+        return int(m_statementFactory.database.lastInsertedRowId());
     }
 
     Utils::optional<ProjectPartArtefact> fetchProjectPartArtefact(FilePathId sourceId) const override
@@ -134,15 +134,6 @@ public:
         m_statementFactory.syncNewSourceDependenciesStatement.execute();
         m_statementFactory.deleteOutdatedSourceDependenciesStatement.execute();
         m_statementFactory.deleteNewSourceDependenciesStatement.execute();
-    }
-
-    void updateProjectPartSources(Utils::SmallStringView projectPartName,
-                                  const FilePathIds &sourceFilePathIds) override
-    {
-        ReadStatement &getProjectPartIdStatement = m_statementFactory.getProjectPartIdStatement;
-        int projectPartId = getProjectPartIdStatement.template value<int>(projectPartName).value();
-
-        updateProjectPartSources(projectPartId, sourceFilePathIds);
     }
 
     void updateProjectPartSources(int projectPartId,
@@ -266,7 +257,6 @@ public:
 
 private:
     StatementFactory &m_statementFactory;
-    FilePathCachingInterface &m_filePathCache;
 };
 
 } // namespace ClangBackEnd

@@ -38,7 +38,7 @@ def main():
     examplePath = os.path.join(templateDir, proFile)
     for useClang in [False, True]:
         with TestSection(getCodeModelString(useClang)):
-            if not startCreator(useClang):
+            if not startCreatorVerifyingClang(useClang):
                 continue
             # open example project
             openQmakeProject(examplePath)
@@ -94,3 +94,4 @@ def main():
             invokeMenuItem("File", "Close All")
             clickButton(waitForObject(":Save Changes.Do not Save_QPushButton"))
             invokeMenuItem("File", "Exit")
+            waitForCleanShutdown()

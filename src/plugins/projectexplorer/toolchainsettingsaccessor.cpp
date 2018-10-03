@@ -281,6 +281,7 @@ QList<ToolChain *> ToolChainSettingsAccessor::toolChains(const QVariantMap &data
 #include "headerpath.h"
 
 #include "abi.h"
+#include "toolchainconfigwidget.h"
 
 #include <QSet>
 #include <QTest>
@@ -311,14 +312,14 @@ public:
     Macros predefinedMacros(const QStringList &cxxflags) const override { Q_UNUSED(cxxflags); return Macros(); }
     CompilerFlags compilerFlags(const QStringList &cxxflags) const override { Q_UNUSED(cxxflags); return NoFlags; }
     WarningFlags warningFlags(const QStringList &cflags) const override { Q_UNUSED(cflags); return WarningFlags::NoWarnings; }
-    SystemHeaderPathsRunner createSystemHeaderPathsRunner() const override { return SystemHeaderPathsRunner(); }
-    QList<HeaderPath> systemHeaderPaths(const QStringList &cxxflags, const FileName &sysRoot) const override
-    { Q_UNUSED(cxxflags); Q_UNUSED(sysRoot); return QList<HeaderPath>(); }
+    BuiltInHeaderPathsRunner createBuiltInHeaderPathsRunner() const override { return BuiltInHeaderPathsRunner(); }
+    HeaderPaths builtInHeaderPaths(const QStringList &cxxflags, const FileName &sysRoot) const override
+    { Q_UNUSED(cxxflags); Q_UNUSED(sysRoot); return {}; }
     void addToEnvironment(Environment &env) const override { Q_UNUSED(env); }
     QString makeCommand(const Environment &env) const override { Q_UNUSED(env); return QString("make"); }
     FileName compilerCommand() const override { return Utils::FileName::fromString("/tmp/test/gcc"); }
     IOutputParser *outputParser() const override { return nullptr; }
-    ToolChainConfigWidget *configurationWidget() override { return nullptr; }
+    std::unique_ptr<ToolChainConfigWidget> createConfigurationWidget() override { return nullptr; }
     TTC *clone() const override { return new TTC(*this); }
     bool operator ==(const ToolChain &other) const override {
         if (!ToolChain::operator==(other))

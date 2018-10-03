@@ -49,6 +49,7 @@
 #include <utils/outputformat.h>
 #include <utils/qtcprocess.h>
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -137,8 +138,8 @@ static QString processInformation(const QProcess *proc)
 static QString rcInfo(const TestConfiguration * const config)
 {
     QString info = '\n' + TestRunner::tr("Run configuration:") + ' ';
-    if (config->isGuessed())
-        info += TestRunner::tr("guessed from");
+    if (config->isDeduced())
+        info += TestRunner::tr("deduced from");
     return info + " \"" + config->runConfigDisplayName() + '"';
 }
 
@@ -146,6 +147,15 @@ static QString constructOmittedDetailsString(const QStringList &omitted)
 {
     return TestRunner::tr("Omitted the following arguments specified on the run "
                           "configuration page for \"%1\":") + '\n' + omitted.join('\n');
+}
+
+static QString constructOmittedVariablesDetailsString(const QList<Utils::EnvironmentItem> &diff)
+{
+    auto removedVars = Utils::transform<QStringList>(diff, [](const Utils::EnvironmentItem &it) {
+        return it.name;
+    });
+    return TestRunner::tr("Omitted the following environment variables for \"%1\":")
+            + '\n' + removedVars.join('\n');
 }
 
 void TestRunner::scheduleNext()
@@ -192,17 +202,23 @@ void TestRunner::scheduleNext()
             details.arg(m_currentConfig->displayName()))));
     }
     m_currentProcess->setWorkingDirectory(m_currentConfig->workingDirectory());
-    QProcessEnvironment environment = m_currentConfig->environment().toProcessEnvironment();
-    if (Utils::HostOsInfo::isWindowsHost())
-        environment.insert("QT_LOGGING_TO_CONSOLE", "1");
-    const int timeout = AutotestPlugin::settings()->timeout;
-    if (timeout > 5 * 60 * 1000) // Qt5.5 introduced hard limit, Qt5.6.1 added env var to raise this
-        environment.insert("QTEST_FUNCTION_TIMEOUT", QString::number(timeout));
-    m_currentProcess->setProcessEnvironment(environment);
+    const Utils::Environment &original = m_currentConfig->environment();
+    Utils::Environment environment =  m_currentConfig->filteredEnvironment(original);
+    const QList<Utils::EnvironmentItem> removedVariables
+            = Utils::filtered(original.diff(environment), [](const Utils::EnvironmentItem &it) {
+        return it.operation == Utils::EnvironmentItem::Unset;
+    });
+    if (!removedVariables.isEmpty()) {
+        const QString &details = constructOmittedVariablesDetailsString(removedVariables)
+                .arg(m_currentConfig->displayName());
+        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn, details)));
+    }
+    m_currentProcess->setProcessEnvironment(environment.toProcessEnvironment());
 
     connect(m_currentProcess,
             static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
             this, &TestRunner::onProcessFinished);
+    const int timeout = AutotestPlugin::settings()->timeout;
     QTimer::singleShot(timeout, m_currentProcess, [this]() { cancelCurrent(Timeout); });
 
     m_currentProcess->start();
@@ -216,23 +232,23 @@ void TestRunner::scheduleNext()
 void TestRunner::cancelCurrent(TestRunner::CancelReason reason)
 {
     m_canceled = true;
-    if (reason == UserCanceled) {
-        // when using the stop button we need to report, for progress bar this happens automatically
-        if (m_fakeFutureInterface && !m_fakeFutureInterface->isCanceled())
-            m_fakeFutureInterface->reportCanceled();
-    } else if (reason == KitChanged) {
-        if (m_fakeFutureInterface)
-            m_fakeFutureInterface->reportCanceled();
-        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn,
-                tr("Current kit has changed. Canceling test run."))));
-    }
+
+    if (m_fakeFutureInterface)
+        m_fakeFutureInterface->reportCanceled();
+
+    auto reportResult = [this](Result::Type type, const QString &detail){
+        emit testResultReady(TestResultPtr(new FaultyTestResult(type, detail)));
+    };
+
+    if (reason == KitChanged)
+        reportResult(Result::MessageWarn, tr("Current kit has changed. Canceling test run."));
+    else if (reason == Timeout)
+        reportResult(Result::MessageFatal, tr("Test case canceled due to timeout.\nMaybe raise the timeout?"));
+
+    // if user or timeout cancels the current run ensure to kill the running process
     if (m_currentProcess && m_currentProcess->state() != QProcess::NotRunning) {
         m_currentProcess->kill();
         m_currentProcess->waitForFinished();
-    }
-    if (reason == Timeout) {
-        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageFatal,
-                tr("Test case canceled due to timeout.\nMaybe raise the timeout?"))));
     }
 }
 
@@ -350,6 +366,17 @@ static ProjectExplorer::RunConfiguration *getRunConfiguration(const QString &bui
             = Utils::filtered(target->runConfigurations(), [] (const RunConfiguration *rc) {
         return !rc->runnable().executable.isEmpty();
     });
+
+    const ChoicePair oldChoice = AutotestPlugin::cachedChoiceFor(buildTargetKey);
+    if (!oldChoice.executable.isEmpty()) {
+        runConfig = Utils::findOrDefault(runConfigurations,
+                                  [&oldChoice] (const RunConfiguration *rc) {
+            return oldChoice.matches(rc);
+        });
+        if (runConfig)
+            return runConfig;
+    }
+
     if (runConfigurations.size() == 1)
         return runConfigurations.first();
 
@@ -365,6 +392,8 @@ static ProjectExplorer::RunConfiguration *getRunConfiguration(const QString &bui
                 return false;
             return rc->runnable().executable == exe;
         });
+        if (runConfig && dialog.rememberChoice())
+            AutotestPlugin::cacheRunConfigChoice(buildTargetKey, ChoicePair(dName, exe));
     }
     return runConfig;
 }
@@ -377,11 +406,11 @@ int TestRunner::precheckTestConfigurations()
         config->completeTestInformation(TestRunMode::Run);
         if (config->project()) {
             testCaseCount += config->testCaseCount();
-            if (!omitWarnings && config->isGuessed()) {
+            if (!omitWarnings && config->isDeduced()) {
                 QString message = tr(
-                            "Project's run configuration was guessed for \"%1\".\n"
+                            "Project's run configuration was deduced for \"%1\".\n"
                             "This might cause trouble during execution.\n"
-                            "(guessed from \"%2\")");
+                            "(deduced from \"%2\")");
                 message = message.arg(config->displayName()).arg(config->runConfigDisplayName());
                 emit testResultReady(
                             TestResultPtr(new FaultyTestResult(Result::MessageWarn, message)));
@@ -521,6 +550,17 @@ void TestRunner::debugTests()
         emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn,
             details.arg(config->displayName()))));
     }
+    Utils::Environment original(inferior.environment);
+    inferior.environment = config->filteredEnvironment(original);
+    const QList<Utils::EnvironmentItem> removedVariables
+            = Utils::filtered(original.diff(inferior.environment), [](const Utils::EnvironmentItem &it) {
+        return it.operation == Utils::EnvironmentItem::Unset;
+    });
+    if (!removedVariables.isEmpty()) {
+        const QString &details = constructOmittedVariablesDetailsString(removedVariables)
+                .arg(config->displayName());
+        emit testResultReady(TestResultPtr(new FaultyTestResult(Result::MessageWarn, details)));
+    }
     auto debugger = new Debugger::DebuggerRunTool(runControl);
     debugger->setInferior(inferior);
     debugger->setRunControlName(config->displayName());
@@ -643,6 +683,8 @@ RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &
         details.append(QString(" (%1)").arg(buildTargetKey));
     m_details = new QLabel(details, this);
     m_rcCombo = new QComboBox(this);
+    m_rememberCB = new QCheckBox(tr("Remember choice. Cached choices can be reset by switching "
+                                    "projects or using the option to clear the cache."), this);
     m_executable = new QLabel(this);
     m_arguments = new QLabel(this);
     m_workingDir = new QLabel(this);
@@ -654,6 +696,7 @@ RunConfigurationSelectionDialog::RunConfigurationSelectionDialog(const QString &
     formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     formLayout->addRow(m_details);
     formLayout->addRow(tr("Run Configuration:"), m_rcCombo);
+    formLayout->addRow(m_rememberCB);
     formLayout->addRow(createLine(this));
     formLayout->addRow(tr("Executable:"), m_executable);
     formLayout->addRow(tr("Arguments:"), m_arguments);
@@ -681,6 +724,11 @@ QString RunConfigurationSelectionDialog::displayName() const
 QString RunConfigurationSelectionDialog::executable() const
 {
     return m_executable ? m_executable->text() : QString();
+}
+
+bool RunConfigurationSelectionDialog::rememberChoice() const
+{
+    return m_rememberCB ? m_rememberCB->isChecked() : false;
 }
 
 void RunConfigurationSelectionDialog::populate()

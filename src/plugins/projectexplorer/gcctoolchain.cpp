@@ -136,10 +136,10 @@ static ProjectExplorer::Macros gccPredefinedMacros(const FileName &gcc,
     return predefinedMacros;
 }
 
-QList<HeaderPath> GccToolChain::gccHeaderPaths(const FileName &gcc, const QStringList &arguments,
-                                               const QStringList &env)
+HeaderPaths GccToolChain::gccHeaderPaths(const FileName &gcc, const QStringList &arguments,
+                                         const QStringList &env)
 {
-    QList<HeaderPath> systemHeaderPaths;
+    HeaderPaths builtInHeaderPaths;
     QByteArray line;
     QByteArray data = runGcc(gcc, arguments, env);
     QBuffer cpp(&data);
@@ -151,24 +151,24 @@ QList<HeaderPath> GccToolChain::gccHeaderPaths(const FileName &gcc, const QStrin
     }
 
     if (!line.isEmpty() && line.startsWith("#include")) {
-        HeaderPath::Kind kind = HeaderPath::UserHeaderPath;
+        auto kind = HeaderPathType::User;
         while (cpp.canReadLine()) {
             line = cpp.readLine();
             if (line.startsWith("#include")) {
-                kind = HeaderPath::GlobalHeaderPath;
+                kind = HeaderPathType::BuiltIn;
             } else if (! line.isEmpty() && QChar(line.at(0)).isSpace()) {
-                HeaderPath::Kind thisHeaderKind = kind;
+                HeaderPathType thisHeaderKind = kind;
 
                 line = line.trimmed();
 
                 const int index = line.indexOf(" (framework directory)");
                 if (index != -1) {
                     line.truncate(index);
-                    thisHeaderKind = HeaderPath::FrameworkHeaderPath;
+                    thisHeaderKind = HeaderPathType::Framework;
                 }
 
                 const QString headerPath = QFileInfo(QFile::decodeName(line)).canonicalFilePath();
-                systemHeaderPaths.append(HeaderPath(headerPath, thisHeaderKind));
+                builtInHeaderPaths.append({headerPath, thisHeaderKind});
             } else if (line.startsWith("End of search list.")) {
                 break;
             } else {
@@ -176,7 +176,7 @@ QList<HeaderPath> GccToolChain::gccHeaderPaths(const FileName &gcc, const QStrin
             }
         }
     }
-    return systemHeaderPaths;
+    return builtInHeaderPaths;
 }
 
 void GccToolChain::toolChainUpdated()
@@ -255,7 +255,7 @@ GccToolChain::GccToolChain(Detection d) :
 GccToolChain::GccToolChain(Core::Id typeId, Detection d) :
     ToolChain(typeId, d),
     m_predefinedMacrosCache(std::make_shared<Cache<QVector<Macro>, 64>>()),
-    m_headerPathsCache(std::make_shared<Cache<QList<HeaderPath>>>())
+    m_headerPathsCache(std::make_shared<Cache<HeaderPaths>>())
 { }
 
 void GccToolChain::setCompilerCommand(const FileName &path)
@@ -385,6 +385,8 @@ static Utils::FileName findLocalCompiler(const Utils::FileName &compilerPath,
     return path.isEmpty() ? compilerPath : path;
 }
 
+Q_GLOBAL_STATIC_WITH_ARGS(const QVector<QByteArray>, unwantedMacros, ({"__cplusplus"}))
+
 ToolChain::PredefinedMacrosRunner GccToolChain::createPredefinedMacrosRunner() const
 {
     // Using a clean environment breaks ccache/distcc/etc.
@@ -442,17 +444,20 @@ ToolChain::PredefinedMacrosRunner GccToolChain::createPredefinedMacrosRunner() c
                 = gccPredefinedMacros(findLocalCompiler(compilerCommand, env),
                                       arguments,
                                       env.toStringList());
-        macroCache->insert(arguments, macros);
+        const QVector<Macro> filteredMacros = Utils::filtered(macros, [](const Macro &m) {
+            return !unwantedMacros->contains(m.key);
+        });
+        macroCache->insert(arguments, filteredMacros);
 
         qCDebug(gccLog) << "Reporting macros to code model:";
-        for (const Macro &m : macros) {
+        for (const Macro &m : filteredMacros) {
             qCDebug(gccLog) << compilerCommand.toUserOutput()
                             << (lang == Constants::CXX_LANGUAGE_ID ? ": C++ [" : ": C [")
                             << arguments.join(", ") << "]"
                             << QString::fromUtf8(m.toByteArray());
         }
 
-        return macros;
+        return filteredMacros;
     };
 }
 
@@ -621,7 +626,7 @@ void GccToolChain::initExtraHeaderPathsFunction(ExtraHeaderPathsFunction &&extra
     m_extraHeaderPathsFunction = std::move(extraHeaderPathsFunction);
 }
 
-ToolChain::SystemHeaderPathsRunner GccToolChain::createSystemHeaderPathsRunner() const
+ToolChain::BuiltInHeaderPathsRunner GccToolChain::createBuiltInHeaderPathsRunner() const
 {
     // Using a clean environment breaks ccache/distcc/etc.
     Environment env = Environment::systemEnvironment();
@@ -631,7 +636,7 @@ ToolChain::SystemHeaderPathsRunner GccToolChain::createSystemHeaderPathsRunner()
     const QStringList platformCodeGenFlags = m_platformCodeGenFlags;
     OptionsReinterpreter reinterpretOptions = m_optionsReinterpreter;
     QTC_CHECK(reinterpretOptions);
-    std::shared_ptr<Cache<QList<HeaderPath>>> headerCache = m_headerPathsCache;
+    std::shared_ptr<Cache<HeaderPaths>> headerCache = m_headerPathsCache;
     Core::Id languageId = language();
 
     // This runner must be thread-safe!
@@ -642,13 +647,12 @@ ToolChain::SystemHeaderPathsRunner GccToolChain::createSystemHeaderPathsRunner()
         QStringList arguments = gccPrepareArguments(flags, sysRoot, platformCodeGenFlags,
                                                     languageId, reinterpretOptions);
 
-        const Utils::optional<QList<HeaderPath>> cachedPaths = headerCache->check(arguments);
+        const Utils::optional<HeaderPaths> cachedPaths = headerCache->check(arguments);
         if (cachedPaths)
             return cachedPaths.value();
 
-        QList<HeaderPath> paths = gccHeaderPaths(findLocalCompiler(compilerCommand, env),
-                                                 arguments,
-                                                 env.toStringList());
+        HeaderPaths paths = gccHeaderPaths(findLocalCompiler(compilerCommand, env),
+                                           arguments, env.toStringList());
         extraHeaderPathsFunction(paths);
         headerCache->insert(arguments, paths);
 
@@ -657,17 +661,17 @@ ToolChain::SystemHeaderPathsRunner GccToolChain::createSystemHeaderPathsRunner()
             qCDebug(gccLog) << compilerCommand.toUserOutput()
                             << (languageId == Constants::CXX_LANGUAGE_ID ? ": C++ [" : ": C [")
                             << arguments.join(", ") << "]"
-                            << hp.path();
+                            << hp.path;
         }
 
         return paths;
     };
 }
 
-QList<HeaderPath> GccToolChain::systemHeaderPaths(const QStringList &flags,
-                                                  const FileName &sysRoot) const
+HeaderPaths GccToolChain::builtInHeaderPaths(const QStringList &flags,
+                                             const FileName &sysRoot) const
 {
-    return createSystemHeaderPathsRunner()(flags, sysRoot.toString());
+    return createBuiltInHeaderPathsRunner()(flags, sysRoot.toString());
 }
 
 void GccToolChain::addCommandPathToEnvironment(const FileName &command, Environment &env)
@@ -861,9 +865,9 @@ bool GccToolChain::operator ==(const ToolChain &other) const
             && m_platformLinkerFlags == gccTc->m_platformLinkerFlags;
 }
 
-ToolChainConfigWidget *GccToolChain::configurationWidget()
+std::unique_ptr<ToolChainConfigWidget> GccToolChain::createConfigurationWidget()
 {
-    return new GccToolChainConfigWidget(this);
+    return std::make_unique<GccToolChainConfigWidget>(this);
 }
 
 void GccToolChain::updateSupportedAbis() const
@@ -1554,22 +1558,28 @@ LinuxIccToolChainFactory::LinuxIccToolChainFactory()
 
 QSet<Core::Id> LinuxIccToolChainFactory::supportedLanguages() const
 {
-    return {Constants::CXX_LANGUAGE_ID};
+    return {Constants::CXX_LANGUAGE_ID, Constants::C_LANGUAGE_ID};
 }
 
 QList<ToolChain *> LinuxIccToolChainFactory::autoDetect(const QList<ToolChain *> &alreadyKnown)
 {
-    return autoDetectToolchains(compilerPathFromEnvironment("icpc"), Abi::hostAbi(),
-                                Constants::CXX_LANGUAGE_ID, Constants::LINUXICC_TOOLCHAIN_TYPEID,
-                                alreadyKnown);
+    QList<ToolChain *> result
+            = autoDetectToolchains(compilerPathFromEnvironment("icpc"),
+                                   Abi::hostAbi(), Constants::CXX_LANGUAGE_ID,
+                                   Constants::LINUXICC_TOOLCHAIN_TYPEID, alreadyKnown);
+    result += autoDetectToolchains(compilerPathFromEnvironment("icc"),
+                                   Abi::hostAbi(), Constants::C_LANGUAGE_ID,
+                                   Constants::LINUXICC_TOOLCHAIN_TYPEID, alreadyKnown);
+    return result;
 }
 
 QList<ToolChain *> LinuxIccToolChainFactory::autoDetect(const FileName &compilerPath, const Core::Id &language)
 {
     const QString fileName = compilerPath.fileName();
-    if (language == Constants::CXX_LANGUAGE_ID && fileName.startsWith("icpc"))
+    if ((language == Constants::CXX_LANGUAGE_ID && fileName.startsWith("icpc")) ||
+        (language == Constants::C_LANGUAGE_ID && fileName.startsWith("icc")))
         return autoDetectToolChain(compilerPath, language);
-    return QList<ToolChain *>();
+    return {};
 }
 
 bool LinuxIccToolChainFactory::canRestore(const QVariantMap &data)

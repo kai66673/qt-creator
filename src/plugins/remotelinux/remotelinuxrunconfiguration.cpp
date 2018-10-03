@@ -45,29 +45,21 @@ namespace RemoteLinux {
 RemoteLinuxRunConfiguration::RemoteLinuxRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto exeAspect = new ExecutableAspect(this);
+    auto exeAspect = addAspect<ExecutableAspect>();
     exeAspect->setLabelText(tr("Executable on device:"));
     exeAspect->setExecutablePathStyle(OsTypeLinux);
     exeAspect->setPlaceHolderText(tr("Remote path not set"));
     exeAspect->makeOverridable("RemoteLinux.RunConfig.AlternateRemoteExecutable",
                                "RemoteLinux.RunConfig.UseAlternateRemoteExecutable");
     exeAspect->setHistoryCompleter("RemoteLinux.AlternateExecutable.History");
-    addExtraAspect(exeAspect);
 
-    auto symbolsAspect = new SymbolFileAspect(this);
+    auto symbolsAspect = addAspect<SymbolFileAspect>();
     symbolsAspect->setLabelText(tr("Executable on host:"));
     symbolsAspect->setDisplayStyle(SymbolFileAspect::LabelDisplay);
-    addExtraAspect(symbolsAspect);
 
-    auto argsAspect = new ArgumentsAspect(this);
-    argsAspect->setSettingsKey("Qt4ProjectManager.MaemoRunConfiguration.Arguments");
-    addExtraAspect(argsAspect);
-
-    auto wdAspect = new WorkingDirectoryAspect(this);
-    wdAspect->setSettingsKey("RemoteLinux.RunConfig.WorkingDirectory");
-    addExtraAspect(wdAspect);
-
-    addExtraAspect(new RemoteLinuxEnvironmentAspect(this));
+    addAspect<ArgumentsAspect>();
+    addAspect<WorkingDirectoryAspect>();
+    addAspect<RemoteLinuxEnvironmentAspect>(target);
 
     setOutputFormatter<QtSupport::QtOutputFormatter>();
 

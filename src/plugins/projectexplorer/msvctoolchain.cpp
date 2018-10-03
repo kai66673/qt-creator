@@ -26,6 +26,7 @@
 #include "msvctoolchain.h"
 
 #include "msvcparser.h"
+#include "projectexplorer.h"
 #include "projectexplorerconstants.h"
 #include "taskhub.h"
 #include "toolchainmanager.h"
@@ -67,6 +68,16 @@ namespace Internal {
 // --------------------------------------------------------------------------
 // Helpers:
 // --------------------------------------------------------------------------
+
+static QThreadPool *envModThreadPool()
+{
+    static QThreadPool *pool = nullptr;
+    if (!pool) {
+        pool = new QThreadPool(ProjectExplorerPlugin::instance());
+        pool->setMaxThreadCount(1);
+    }
+    return pool;
+}
 
 struct MsvcPlatform {
     MsvcToolChain::Platform platform;
@@ -323,26 +334,17 @@ static QByteArray msvcCompilationFile()
         "__CLR_VER",
         "_CMMN_INTRIN_FUNC",
         "_CONTROL_FLOW_GUARD",
-        "__COUNTER__",
-        "__cplusplus",
         "__cplusplus_cli",
         "__cplusplus_winrt",
         "_CPPLIB_VER",
         "_CPPRTTI",
         "_CPPUNWIND",
-        "__DATE__",
         "_DEBUG",
         "_DLL",
-        "__FILE__",
-        "__func__",
-        "__FUNCDNAME__",
-        "__FUNCSIG__",
-        "__FUNCTION__",
         "_INTEGRAL_MAX_BITS",
         "__INTELLISENSE__",
         "_ISO_VOLATILE",
         "_KERNEL_MODE",
-        "__LINE__",
         "_M_AAMD64",
         "_M_ALPHA",
         "_M_AMD64",
@@ -382,8 +384,6 @@ static QByteArray msvcCompilationFile()
         "__STDC__",
         "__STDC_HOSTED__",
         "__STDCPP_THREADS__",
-        "__TIME__",
-        "__TIMESTAMP__",
         "_VC_NODEFAULTLIB",
         "_WCHAR_T_DEFINED",
         "_WIN32",
@@ -652,7 +652,8 @@ MsvcToolChain::MsvcToolChain(Core::Id typeId, const QString &name, const Abi &ab
     : AbstractMsvcToolChain(typeId, l, d, abi, varsBat)
     , m_varsBatArg(varsBatArg)
 {
-    initEnvModWatcher(Utils::runAsync(&MsvcToolChain::environmentModifications,
+    initEnvModWatcher(Utils::runAsync(envModThreadPool(),
+                                      &MsvcToolChain::environmentModifications,
                                       varsBat, varsBatArg));
 
     Q_ASSERT(!name.isEmpty());
@@ -744,16 +745,17 @@ bool MsvcToolChain::fromMap(const QVariantMap &data)
     m_environmentModifications = Utils::EnvironmentItem::itemsFromVariantList(
                 data.value(QLatin1String(environModsKeyC)).toList());
 
-    initEnvModWatcher(Utils::runAsync(&MsvcToolChain::environmentModifications,
+    initEnvModWatcher(Utils::runAsync(envModThreadPool(),
+                                      &MsvcToolChain::environmentModifications,
                                       m_vcvarsBat, m_varsBatArg));
 
     return !m_vcvarsBat.isEmpty() && m_abi.isValid();
 }
 
 
-ToolChainConfigWidget *MsvcToolChain::configurationWidget()
+std::unique_ptr<ToolChainConfigWidget> MsvcToolChain::createConfigurationWidget()
 {
-    return new MsvcToolChainConfigWidget(this);
+    return std::make_unique<MsvcToolChainConfigWidget>(this);
 }
 
 ToolChain *MsvcToolChain::clone() const
@@ -1035,9 +1037,9 @@ bool ClangClToolChain::fromMap(const QVariantMap &data)
     return true;
 }
 
-ToolChainConfigWidget *ClangClToolChain::configurationWidget()
+std::unique_ptr<ToolChainConfigWidget> ClangClToolChain::createConfigurationWidget()
 {
-    return new ClangClToolChainConfigWidget(this);
+    return std::make_unique<ClangClToolChainConfigWidget>(this);
 }
 
 void ClangClToolChain::resetMsvcToolChain(const MsvcToolChain *base)

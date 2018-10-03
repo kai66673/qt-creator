@@ -31,6 +31,18 @@
 
 namespace CppTools {
 
+enum class UseSystemHeader
+{
+    Yes,
+    No
+};
+
+enum class SkipBuiltIn
+{
+    Yes,
+    No
+};
+
 class CPPTOOLS_EXPORT CompilerOptionsBuilder
 {
 public:
@@ -39,15 +51,19 @@ public:
         Use
     };
 
-    CompilerOptionsBuilder(const ProjectPart &projectPart);
+    CompilerOptionsBuilder(const ProjectPart &projectPart,
+                           UseSystemHeader useSystemHeader = UseSystemHeader::No,
+                           SkipBuiltIn skipBuiltInHeaderPathsAndDefines = SkipBuiltIn::No,
+                           QString clangVersion = QString(),
+                           QString clangResourceDirectory = QString());
     virtual ~CompilerOptionsBuilder() {}
 
     virtual void addTargetTriple();
     virtual void addExtraCodeModelFlags();
     virtual void enableExceptions();
-    virtual void addPredefinedHeaderPathsOptions();
-    virtual void addLanguageOption(ProjectFile::Kind fileKind);
+    virtual void insertWrappedQtHeaders();
     virtual void addOptionsForLanguage(bool checkForBorlandExtensions = true);
+    virtual void updateLanguageOption(ProjectFile::Kind fileKind);
 
     virtual void addExtraOptions() {}
 
@@ -61,6 +77,7 @@ public:
 
     // Add options based on project part
     void addWordWidth();
+    void addToolchainFlags();
     void addHeaderPathOptions();
     void addPrecompiledHeaderOptions(PchUsage pchUsage);
     virtual void addToolchainAndProjectMacros();
@@ -80,8 +97,7 @@ protected:
     virtual QString defineOption() const;
     virtual QString undefineOption() const;
     virtual QString includeOption() const;
-    virtual QString includeDirOption() const;
-
+    QString includeDirOptionForPath(const QString &path) const;
     const ProjectPart m_projectPart;
 
 private:
@@ -89,7 +105,15 @@ private:
     QByteArray toDefineOption(const ProjectExplorer::Macro &macro) const;
     QString defineDirectiveToDefineOption(const ProjectExplorer::Macro &marco) const;
 
+    void addWrappedQtHeadersIncludePath(QStringList &list);
+
     QStringList m_options;
+    UseSystemHeader m_useSystemHeader;
+
+    QString m_clangVersion;
+    QString m_clangResourceDirectory;
+
+    SkipBuiltIn m_skipBuiltInHeaderPathsAndDefines;
 };
 
 } // namespace CppTools

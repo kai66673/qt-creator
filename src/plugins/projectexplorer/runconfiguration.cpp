@@ -77,14 +77,14 @@ namespace ProjectExplorer {
 //
 ///////////////////////////////////////////////////////////////////////
 
-ISettingsAspect::ISettingsAspect(RunConfiguration *runConfiguration) :
-    m_runConfiguration(runConfiguration)
-{
-}
+ISettingsAspect::ISettingsAspect(const ConfigWidgetCreator &creator)
+    : m_configWidgetCreator(creator)
+{}
 
-RunConfiguration *ISettingsAspect::runConfiguration() const
+QWidget *ISettingsAspect::createConfigWidget() const
 {
-    return m_runConfiguration;
+    QTC_ASSERT(m_configWidgetCreator, return nullptr);
+    return m_configWidgetCreator();
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -93,78 +93,48 @@ RunConfiguration *ISettingsAspect::runConfiguration() const
 //
 ///////////////////////////////////////////////////////////////////////
 
-IRunConfigurationAspect::IRunConfigurationAspect(RunConfiguration *runConfig) :
-    m_runConfiguration(runConfig)
-{ }
+GlobalOrProjectAspect::GlobalOrProjectAspect() = default;
 
-IRunConfigurationAspect::~IRunConfigurationAspect()
+GlobalOrProjectAspect::~GlobalOrProjectAspect()
 {
     delete m_projectSettings;
 }
 
-/*!
-    Returns the widget used to configure this run configuration. Ownership is
-    transferred to the caller.
-*/
-
-RunConfigWidget *IRunConfigurationAspect::createConfigurationWidget() const
-{
-    return m_runConfigWidgetCreator ? m_runConfigWidgetCreator() : nullptr;
-}
-
-void IRunConfigurationAspect::copyFrom(IRunConfigurationAspect *source)
-{
-    QTC_ASSERT(source, return);
-    QVariantMap data;
-    source->toMap(data);
-    fromMap(data);
-}
-
-void IRunConfigurationAspect::setProjectSettings(ISettingsAspect *settings)
+void GlobalOrProjectAspect::setProjectSettings(ISettingsAspect *settings)
 {
     m_projectSettings = settings;
 }
 
-void IRunConfigurationAspect::setGlobalSettings(ISettingsAspect *settings)
+void GlobalOrProjectAspect::setGlobalSettings(ISettingsAspect *settings)
 {
     m_globalSettings = settings;
 }
 
-void IRunConfigurationAspect::setUsingGlobalSettings(bool value)
+void GlobalOrProjectAspect::setUsingGlobalSettings(bool value)
 {
     m_useGlobalSettings = value;
 }
 
-ISettingsAspect *IRunConfigurationAspect::currentSettings() const
+ISettingsAspect *GlobalOrProjectAspect::currentSettings() const
 {
    return m_useGlobalSettings ? m_globalSettings : m_projectSettings;
 }
 
-void IRunConfigurationAspect::fromMap(const QVariantMap &map)
+void GlobalOrProjectAspect::fromMap(const QVariantMap &map)
 {
     if (m_projectSettings)
         m_projectSettings->fromMap(map);
     m_useGlobalSettings = map.value(m_id.toString() + QLatin1String(".UseGlobalSettings"), true).toBool();
 }
 
-void IRunConfigurationAspect::toMap(QVariantMap &map) const
+void GlobalOrProjectAspect::toMap(QVariantMap &map) const
 {
     if (m_projectSettings)
         m_projectSettings->toMap(map);
     map.insert(m_id.toString() + QLatin1String(".UseGlobalSettings"), m_useGlobalSettings);
 }
 
-void IRunConfigurationAspect::addToConfigurationLayout(QFormLayout *layout)
-{
-    Q_UNUSED(layout);
-}
-
-void IRunConfigurationAspect::setRunConfigWidgetCreator(const RunConfigWidgetCreator &runConfigWidgetCreator)
-{
-    m_runConfigWidgetCreator = runConfigWidgetCreator;
-}
-
-void IRunConfigurationAspect::resetProjectToGlobalSettings()
+void GlobalOrProjectAspect::resetProjectToGlobalSettings()
 {
     QTC_ASSERT(m_globalSettings, return);
     QVariantMap map;
@@ -231,13 +201,10 @@ RunConfiguration::RunConfiguration(Target *target, Core::Id id)
             [this] { return displayName(); }, false);
 
     for (const AspectFactory &factory : theAspectFactories)
-        addExtraAspect(factory(this));
+        m_aspects.append(factory(target));
 }
 
-RunConfiguration::~RunConfiguration()
-{
-    qDeleteAll(m_aspects);
-}
+RunConfiguration::~RunConfiguration() = default;
 
 bool RunConfiguration::isActive() const
 {
@@ -258,29 +225,14 @@ QWidget *RunConfiguration::createConfigurationWidget()
     auto widget = new QWidget;
     auto formLayout = new QFormLayout(widget);
 
-    fillConfigurationLayout(formLayout);
+    for (ProjectConfigurationAspect *aspect : m_aspects) {
+        if (aspect->isVisible())
+            aspect->addToConfigurationLayout(formLayout);
+    }
 
     Core::VariableChooser::addSupportForChildWidgets(widget, macroExpander());
 
     return wrapWidget(widget);
-}
-
-void RunConfiguration::fillConfigurationLayout(QFormLayout *layout) const
-{
-    if (auto aspect = extraAspect<ExecutableAspect>())
-        aspect->addToConfigurationLayout(layout);
-    if (auto aspect = extraAspect<SymbolFileAspect>())
-        aspect->addToConfigurationLayout(layout);
-    if (auto aspect = extraAspect<ArgumentsAspect>())
-        aspect->addToConfigurationLayout(layout);
-    if (auto aspect = extraAspect<WorkingDirectoryAspect>())
-        aspect->addToConfigurationLayout(layout);
-    if (auto aspect = extraAspect<TerminalAspect>())
-        aspect->addToConfigurationLayout(layout);
-    if (auto aspect = extraAspect<UseLibraryPathsAspect>())
-        aspect->addToConfigurationLayout(layout);
-    if (auto aspect = extraAspect<UseDyldSuffixAspect>())
-        aspect->addToConfigurationLayout(layout);
 }
 
 void RunConfiguration::updateEnabledState()
@@ -293,12 +245,6 @@ void RunConfiguration::updateEnabledState()
 void RunConfiguration::addAspectFactory(const AspectFactory &aspectFactory)
 {
     theAspectFactories.push_back(aspectFactory);
-}
-
-void RunConfiguration::addExtraAspect(IRunConfigurationAspect *aspect)
-{
-    if (aspect)
-        m_aspects += aspect;
 }
 
 /*!
@@ -367,8 +313,6 @@ QVariantMap RunConfiguration::toMap() const
         const Core::Id mangled = id().withSuffix(m_buildKey);
         map.insert(settingsIdKey(), mangled.toSetting());
     }
-    foreach (IRunConfigurationAspect *aspect, m_aspects)
-        aspect->toMap(map);
 
     return map;
 }
@@ -398,9 +342,6 @@ bool RunConfiguration::fromMap(const QVariantMap &map)
     const Core::Id mangledId = Core::Id::fromSetting(map.value(settingsIdKey()));
     m_buildKey = mangledId.suffixAfter(id());
 
-    foreach (IRunConfigurationAspect *aspect, m_aspects)
-        aspect->fromMap(map);
-
     return  true;
 }
 
@@ -415,22 +356,6 @@ bool RunConfiguration::fromMap(const QVariantMap &map)
     This prevents a combinatorial explosion of subclasses and eliminates
     the need to add all options to the base class.
 */
-
-/*!
-    Returns extra aspects.
-
-    \sa ProjectExplorer::IRunConfigurationAspect
-*/
-
-QList<IRunConfigurationAspect *> RunConfiguration::extraAspects() const
-{
-    return m_aspects;
-}
-
-IRunConfigurationAspect *RunConfiguration::extraAspect(Core::Id id) const
-{
-    return Utils::findOrDefault(m_aspects, Utils::equal(&IRunConfigurationAspect::id, id));
-}
 
 /*!
     \internal
@@ -461,9 +386,9 @@ Runnable RunConfiguration::runnable() const
     if (auto aspect = extraAspect<ExecutableAspect>())
         r.executable = aspect->executable().toString();
     if (auto aspect = extraAspect<ArgumentsAspect>())
-        r.commandLineArguments = aspect->arguments();
+        r.commandLineArguments = aspect->arguments(macroExpander());
     if (auto aspect = extraAspect<WorkingDirectoryAspect>())
-        r.workingDirectory = aspect->workingDirectory().toString();
+        r.workingDirectory = aspect->workingDirectory(macroExpander()).toString();
     if (auto aspect = extraAspect<EnvironmentAspect>())
         r.environment = aspect->environment();
     return r;
@@ -717,11 +642,6 @@ bool RunWorkerFactory::canRun(RunConfiguration *runConfiguration, Core::Id runMo
     return true;
 }
 
-void RunWorkerFactory::setPriority(int priority)
-{
-    m_priority = priority;
-}
-
 void RunWorkerFactory::setProducer(const WorkerCreator &producer)
 {
     m_producer = producer;
@@ -952,21 +872,24 @@ RunControl::RunControl(RunConfiguration *runConfiguration, Core::Id mode) :
     d(std::make_unique<RunControlPrivate>(this, runConfiguration, mode))
 {
 #ifdef WITH_JOURNALD
-    JournaldWatcher::instance()->subscribe(this, [this](const JournaldWatcher::LogEntry &entry) {
-        if (entry.value("_MACHINE_ID") != JournaldWatcher::instance()->machineId())
-            return;
+    if (!device().isNull() && device()->type() == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE) {
+        JournaldWatcher::instance()->subscribe(this, [this](const JournaldWatcher::LogEntry &entry) {
 
-        const QByteArray pid = entry.value("_PID");
-        if (pid.isEmpty())
-            return;
+            if (entry.value("_MACHINE_ID") != JournaldWatcher::instance()->machineId())
+                return;
 
-        const qint64 pidNum = static_cast<qint64>(QString::fromLatin1(pid).toInt());
-        if (pidNum != d->applicationProcessHandle.pid())
-            return;
+            const QByteArray pid = entry.value("_PID");
+            if (pid.isEmpty())
+                return;
 
-        const QString message = QString::fromUtf8(entry.value("MESSAGE")) + "\n";
-        appendMessageRequested(this, message, Utils::OutputFormat::LogMessageFormat);
-    });
+            const qint64 pidNum = static_cast<qint64>(QString::fromLatin1(pid).toInt());
+            if (pidNum != d->applicationProcessHandle.pid())
+                return;
+
+            const QString message = QString::fromUtf8(entry.value("MESSAGE")) + "\n";
+            appendMessageRequested(this, message, Utils::OutputFormat::LogMessageFormat);
+        });
+    }
 #endif
 }
 
@@ -1043,15 +966,14 @@ RunWorkerFactory::WorkerCreator RunControl::producer(RunConfiguration *runConfig
     const auto canRun = std::bind(&RunWorkerFactory::canRun, std::placeholders::_1, runConfig, runMode);
     const QList<RunWorkerFactory *> candidates = Utils::filtered(g_runWorkerFactories, canRun);
 
+    // This is legit, there might be combinations that cannot run.
     if (candidates.empty())
         return {};
 
-    const auto higherPriority = std::bind(std::greater<>(),
-                                          std::bind(&RunWorkerFactory::priority, std::placeholders::_1),
-                                          std::bind(&RunWorkerFactory::priority, std::placeholders::_2));
-    const auto bestFactory = std::max_element(candidates.begin(), candidates.end(), higherPriority);
-
-    return (*bestFactory)->producer();
+    // There should be at most one top-level producer feeling responsible per combination.
+    // Breaking a tie should be done by tightening the restrictions on one of them.
+    QTC_CHECK(candidates.size() == 1);
+    return candidates.front()->producer();
 }
 
 void RunControlPrivate::initiateStart()
@@ -1637,7 +1559,7 @@ void RunControl::appendMessage(const QString &msg, Utils::OutputFormat format)
 SimpleTargetRunner::SimpleTargetRunner(RunControl *runControl)
     : RunWorker(runControl)
 {
-    setDisplayName("SimpleTargetRunner");
+    setId("SimpleTargetRunner");
     m_runnable = runControl->runnable(); // Default value. Can be overridden using setRunnable.
     m_device = runControl->device(); // Default value. Can be overridden using setDevice.
     if (auto runConfig = runControl->runConfiguration()) {
@@ -1688,12 +1610,12 @@ void SimpleTargetRunner::start()
 
         connect(&m_launcher, &ApplicationLauncher::remoteStderr,
                 this, [this](const QString &output) {
-                    appendMessage(output, Utils::StdErrFormatSameLine);
+                    appendMessage(output, Utils::StdErrFormatSameLine, false);
                 });
 
         connect(&m_launcher, &ApplicationLauncher::remoteStdout,
                 this, [this](const QString &output) {
-                    appendMessage(output, Utils::StdOutFormatSameLine);
+                    appendMessage(output, Utils::StdOutFormatSameLine, false);
                 });
 
         connect(&m_launcher, &ApplicationLauncher::finished,

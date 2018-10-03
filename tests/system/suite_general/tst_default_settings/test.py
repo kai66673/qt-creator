@@ -25,16 +25,13 @@
 
 source("../../shared/qtcreator.py")
 
-import re
-
 currentSelectedTreeItem = None
 warningOrError = re.compile('<p><b>((Error|Warning).*?)</p>')
 
 def main():
     emptySettings = tempDir()
     __createMinimumIni__(emptySettings)
-    SettingsPath = ' -settingspath "%s"' % emptySettings
-    startApplication("qtcreator" + SettingsPath)
+    startQC(['-settingspath', '"%s"' % emptySettings], False)
     if not startedWithoutPluginError():
         return
     invokeMenuItem("Tools", "Options...")

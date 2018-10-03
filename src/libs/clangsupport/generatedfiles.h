@@ -25,17 +25,19 @@
 
 #pragma once
 
-#include <filecontainerv2.h>
+#include "generatedfilesinterface.h"
 
 namespace ClangBackEnd {
 
-class GeneratedFiles
+class CLANGSUPPORT_EXPORT GeneratedFiles final : public GeneratedFilesInterface
 {
 public:
     void update(V2::FileContainers &&fileContainers);
+    void update(const V2::FileContainers &fileContainers);
     void remove(const FilePaths &filePaths);
 
     const V2::FileContainers &fileContainers() const;
+
 private:
     V2::FileContainers m_fileContainers;
 };

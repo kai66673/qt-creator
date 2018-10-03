@@ -14,7 +14,10 @@ OBJECTS_DIR = $$OUT_PWD/obj # workaround for qmake bug in object_parallel_to_sou
 !msvc:force_debug_info:QMAKE_CXXFLAGS += -fno-omit-frame-pointer
 
 DEFINES += \
+    QT_NO_CAST_TO_ASCII \
     QT_RESTRICTED_CAST_FROM_ASCII \
+    QT_USE_FAST_OPERATOR_PLUS \
+    QT_USE_FAST_CONCATENATION \
     UNIT_TESTS \
     DONT_CHECK_MESSAGE_COUNTER \
     TESTDATA_DIR=\"R\\\"xxx($$PWD/data)xxx\\\"\"
@@ -56,7 +59,6 @@ SOURCES += \
     locatorfilter-test.cpp \
     matchingtext-test.cpp \
     mimedatabase-utilities.cpp \
-    pchgenerator-test.cpp \
     pchmanagerclientserverinprocess-test.cpp \
     pchmanagerclient-test.cpp \
     pchmanagerserver-test.cpp \
@@ -93,8 +95,13 @@ SOURCES += \
     filestatuscache-test.cpp \
     highlightingresultreporter-test.cpp \
     precompiledheaderstorage-test.cpp \
+    generatedfiles-test.cpp \
+    sourcesmanager-test.cpp \
+    symbolindexertaskqueue-test.cpp \
+    refactoringprojectupdater-test.cpp \
     projectpartqueue-test.cpp \
-    generatedfiles-test.cpp
+    processormanager-test.cpp \
+    taskscheduler-test.cpp \
 
 !isEmpty(LIBCLANG_LIBS) {
 SOURCES += \
@@ -137,7 +144,6 @@ SOURCES += \
     diagnosticset-test.cpp \
     diagnostic-test.cpp \
     fixit-test.cpp \
-    projectpart-test.cpp \
     senddocumenttracker-test.cpp \
     skippedsourceranges-test.cpp \
     sourcelocation-test.cpp \
@@ -148,6 +154,7 @@ SOURCES += \
     sqlitestatement-test.cpp \
     sqlitetable-test.cpp \
     sqlstatementbuilder-test.cpp \
+    token-test.cpp \
     translationunitupdater-test.cpp \
     unsavedfiles-test.cpp \
     unsavedfile-test.cpp \
@@ -171,7 +178,7 @@ SOURCES += \
     symbolindexing-test.cpp \
     symbolscollector-test.cpp \
     symbolfinder-test.cpp \
-    testclangtool.cpp \
+    testclangtool.cpp
 }
 
 exists($$GOOGLEBENCHMARK_DIR) {
@@ -196,7 +203,6 @@ HEADERS += \
     mockclangpathwatcher.h \
     mockclangpathwatchernotifier.h \
     mockpchcreator.h \
-    mockpchgeneratornotifier.h \
     mockpchmanagerclient.h \
     mockpchmanagernotifier.h \
     mockpchmanagerserver.h \
@@ -224,13 +230,21 @@ HEADERS += \
     mocksqlitestatement.h \
     unittest-utility-functions.h \
     mocksymbolquery.h \
-    runprojectcreateorupdate-utility.h \
     rundocumentparse-utility.h \
     mocktimer.h \
     mocksqlitetransactionbackend.h \
     mockprojectpartprovider.h \
     mockprecompiledheaderstorage.h \
-    mockeditormanager.h
+    mockeditormanager.h \
+    mocksymbolindexertaskqueue.h \
+    mockcppmodelmanager.h \
+    mockgeneratedfiles.h \
+    mockqueue.h \
+    mockprojectpartqueue.h \
+    mockprocessor.h \
+    mockprocessormanager.h \
+    mocktaskscheduler.h
+
 !isEmpty(LIBCLANG_LIBS) {
 HEADERS += \
     chunksreportedmonitor.h \
@@ -247,4 +261,4 @@ HEADERS += \
     testclangtool.h \
 }
 
-OTHER_FILES += $$files(data/*)
+OTHER_FILES += $$files(data/*) $$files(data/include/*)

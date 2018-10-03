@@ -26,9 +26,13 @@
     /*!
 
     \contentspage index.html
-    \previouspage creator-connecting-mobile.html
     \page creator-developing-android.html
+    \previouspage creator-connecting-mobile.html
+    \if defined(qtdesignstudio)
+    \nextpage creator-developing-generic-linux.html
+    \else
     \nextpage creator-developing-baremetal.html
+    \endif
 
     \title Connecting Android Devices
 
@@ -172,7 +176,11 @@
         \li Select \uicontrol File > \uicontrol {New File or Project} > \uicontrol Application >
             \uicontrol {Qt Quick Application} > \uicontrol Choose, and
             follow the instructions of the wizard. For more information, see
+            \if defined(qtcreator)
             \l{Creating Qt Quick Projects}.
+            \else
+            \l{Creating UI Prototype Projects}.
+            \endif
 
         \li To specify settings for deploying applications to Android, select
             \uicontrol Projects > \uicontrol Run for the \uicontrol Android kit, and then select
@@ -292,5 +300,9 @@
     \note Select a \l{glossary-build-config}{debug build configuration} to build
     the application for debugging.
 
-*/
+    \note \QC cannot debug applications on Android devices if Android Studio is
+    running. If the following message is displayed in the \uicontrol Output
+    pane, close Android Studio and try again: \e {Ignoring second debugger -
+    accepting and dropping.}
 
+*/

@@ -31,6 +31,7 @@
 
 #include <ipcclientprovider.h>
 #include <filepathcachinginterface.h>
+#include <generatedfiles.h>
 
 #include <utils/smallstring.h>
 
@@ -55,7 +56,8 @@ class RefactoringServer : public RefactoringServerInterface,
     using Future = std::future<SourceRangesForQueryMessage>;
 public:
     RefactoringServer(SymbolIndexingInterface &symbolIndexing,
-                      FilePathCachingInterface &filePathCache);
+                      FilePathCachingInterface &filePathCache,
+                      GeneratedFiles &generatedFiles);
 
     void end() override;
     void requestSourceLocationsForRenamingMessage(RequestSourceLocationsForRenamingMessage &&message) override;
@@ -84,10 +86,10 @@ private:
 
 private:
     ClangQueryGatherer m_gatherer;
-    V2::FileContainers m_generatedFiles;
     QTimer m_pollTimer;
     SymbolIndexingInterface &m_symbolIndexing;
     FilePathCachingInterface &m_filePathCache;
+    GeneratedFiles &m_generatedFiles;
 };
 
 } // namespace ClangBackEnd

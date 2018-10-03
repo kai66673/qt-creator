@@ -90,7 +90,6 @@ HEADERS += \
     cpptoolsbridgeinterface.h \
     cpptoolsbridgeqtcreatorimplementation.h \
     projectpart.h \
-    projectpartheaderpath.h \
     projectinfo.h \
     cppprojectinfogenerator.h \
     compileroptionsbuilder.h \
@@ -101,7 +100,8 @@ HEADERS += \
     cursorineditor.h \
     wrappablelineedit.h \
     usages.h \
-    cpptools_clangtidychecks.h
+    cpptools_clangtidychecks.h \
+    cppmodelmanagerinterface.h
 
 SOURCES += \
     abstracteditorsupport.cpp \

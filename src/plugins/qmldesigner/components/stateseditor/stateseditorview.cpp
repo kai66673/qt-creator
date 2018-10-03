@@ -152,6 +152,7 @@ void StatesEditorView::addState()
     }
 
     try {
+        rootModelNode().validId();
         if ((rootStateGroup().allStates().count() < 1) && //QtQuick import might be missing
                 (!model()->hasImport(Import::createLibraryImport("QtQuick", "1.0"), true, true))) {
             model()->changeImports({Import::createLibraryImport("QtQuick", "1.0")}, {});
@@ -273,7 +274,7 @@ void StatesEditorView::setWhenCondition(int internalNodeId, const QString &condi
             if (state.isValid())
                 state.modelNode().bindingProperty("when").setExpression(condition);
 
-        } catch (const RewritingException &e) {
+        } catch (const Exception &e) {
             e.showException();
         }
     }

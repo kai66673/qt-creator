@@ -41,7 +41,7 @@
 #include <coreplugin/progressmanager/progressmanager.h>
 #include <cpptools/cpprawprojectpart.h>
 #include <cpptools/projectinfo.h>
-#include <cpptools/projectpartheaderpath.h>
+#include <projectexplorer/headerpath.h>
 #include <cpptools/cppprojectupdater.h>
 #include <cpptools/cppmodelmanager.h>
 #include <qmljs/qmljsmodelmanagerinterface.h>
@@ -313,17 +313,15 @@ void QmakeProject::updateCppCodeModel()
             rpp.setQtVersion(ProjectPart::NoQt);
 
         // Header paths
-        CppTools::ProjectPartHeaderPaths headerPaths;
-        using CppToolsHeaderPath = CppTools::ProjectPartHeaderPath;
+        ProjectExplorer::HeaderPaths headerPaths;
         foreach (const QString &inc, pro->variableValue(Variable::IncludePath)) {
-            const auto headerPath = CppToolsHeaderPath(inc, CppToolsHeaderPath::IncludePath);
+            const ProjectExplorer::HeaderPath headerPath{inc, HeaderPathType::User};
             if (!headerPaths.contains(headerPath))
                 headerPaths += headerPath;
         }
 
         if (qtVersion && !qtVersion->frameworkInstallPath().isEmpty()) {
-            headerPaths += CppToolsHeaderPath(qtVersion->frameworkInstallPath(),
-                                              CppToolsHeaderPath::FrameworkPath);
+            headerPaths += {qtVersion->frameworkInstallPath(), HeaderPathType::Framework};
         }
         rpp.setHeaderPaths(headerPaths);
 
@@ -1349,8 +1347,11 @@ QString QmakeProject::executableFor(const QmakeProFile *file)
             && file->variableValue(Variable::Config).contains("app_bundle")) {
         target = ti.target + ".app/Contents/MacOS/" + ti.target;
     } else {
-        QString extension = file->singleVariableValue(Variable::TargetExt);
-        target = ti.target + extension;
+        const QString extension = file->singleVariableValue(Variable::TargetExt);
+        if (extension.isEmpty())
+            target = HostOsInfo::withExecutableSuffix(ti.target);
+        else
+            target = ti.target + extension;
     }
     return QDir(destDirFor(ti).toString()).absoluteFilePath(target);
 }
@@ -1376,6 +1377,13 @@ QString QmakeProject::mapProFilePathToTarget(const FileName &proFilePath)
 {
     const QmakeProFile *pro = rootProFile()->findProFile(proFilePath);
     return pro ? pro->targetInformation().target : QString();
+}
+
+QVariant QmakeProject::additionalData(Core::Id id, const Target *target) const
+{
+    if (id == "QmlDesignerImportPath")
+        return rootProjectNode()->variableValue(Variable::QmlDesignerImportPath);
+    return Project::additionalData(id, target);
 }
 
 } // namespace QmakeProjectManager

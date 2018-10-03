@@ -341,11 +341,11 @@ ToolChain::CompilerFlags GoToolChain::compilerFlags(const QStringList &) const
 WarningFlags GoToolChain::warningFlags(const QStringList &) const
 { return WarningFlags::NoWarnings; }
 
-ToolChain::SystemHeaderPathsRunner GoToolChain::createSystemHeaderPathsRunner() const
-{ return ToolChain::SystemHeaderPathsRunner(); }
+ToolChain::BuiltInHeaderPathsRunner GoToolChain::createBuiltInHeaderPathsRunner() const
+{ return ToolChain::BuiltInHeaderPathsRunner(); }
 
-QList<HeaderPath> GoToolChain::systemHeaderPaths(const QStringList &, const FileName &) const
-{ return QList<HeaderPath>(); }
+HeaderPaths GoToolChain::builtInHeaderPaths(const QStringList &, const FileName &) const
+{ return {}; }
 
 void GoToolChain::addToEnvironment(Environment &env) const
 {
@@ -364,8 +364,8 @@ FileName GoToolChain::compilerCommand() const
 IOutputParser *GoToolChain::outputParser() const
 { return nullptr; }
 
-ToolChainConfigWidget *GoToolChain::configurationWidget()
-{ return new GoToolChainConfigWidget(this); }
+std::unique_ptr<ProjectExplorer::ToolChainConfigWidget> GoToolChain::createConfigurationWidget()
+{ return std::make_unique<GoToolChainConfigWidget>(this); }
 
 bool GoToolChain::canClone() const
 { return true; }

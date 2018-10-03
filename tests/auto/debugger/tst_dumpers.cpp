@@ -584,6 +584,12 @@ struct Check
     mutable bool optionallyPresent = false;
 };
 
+struct CheckSet : public Check
+{
+    CheckSet(std::initializer_list<Check> checks) : checks(checks) {}
+    QList<Check> checks;
+};
+
 struct CheckType : public Check
 {
     CheckType(const QByteArray &iname, const Name &name,
@@ -703,6 +709,12 @@ public:
     const Data &operator+(const Check &check) const
     {
         checks.append(check);
+        return *this;
+    }
+
+    const Data &operator+(const CheckSet &checkset) const
+    {
+        checksets.append(checkset);
         return *this;
     }
 
@@ -959,6 +971,7 @@ public:
     mutable QString code;
 
     mutable QList<Check> checks;
+    mutable QList<CheckSet> checksets;
     mutable QList<RequiredMessage> requiredMessages;
 };
 
@@ -1339,6 +1352,7 @@ void tst_Dumpers::dumper()
             "\n\n" + data.includes +
             "\n\n" + (data.useQHash ?
                 "\n#include <QByteArray>"
+                "\n#include <QtGlobal>"
                 "\n#if QT_VERSION >= 0x050900"
                 "\n#include <QHash>"
                 "\nvoid initHashSeed() { qSetGlobalQHashSeed(0); }"
@@ -1448,15 +1462,20 @@ void tst_Dumpers::dumper()
 
     QSet<QString> expandedINames;
     expandedINames.insert("local");
-    for (const Check &check : qAsConst(data.checks)) {
-        QString parent = check.iname;
-        while (true) {
-            parent = parentIName(parent);
-            if (parent.isEmpty())
-                break;
-            expandedINames.insert(parent);
+    auto collectExpandedINames = [&](const QList<Check> &checks) {
+        for (const Check &check : checks) {
+            QString parent = check.iname;
+            while (true) {
+                parent = parentIName(parent);
+                if (parent.isEmpty())
+                    break;
+                expandedINames.insert(parent);
+            }
         }
-    }
+    };
+    collectExpandedINames(data.checks);
+    for (const auto checkset : qAsConst(data.checksets))
+        collectExpandedINames(checkset.checks);
 
     QString expanded;
     QString expandedq;
@@ -1639,7 +1658,7 @@ void tst_Dumpers::dumper()
     WatchItem local;
     local.iname = "local";
 
-    for (const GdbMi &child : qAsConst(actual.children())) {
+    for (const GdbMi &child : actual) {
         const QString iname = child["iname"].data();
         if (iname == "local.qtversion")
             context.qtVersion = child["value"].toInt();
@@ -1667,43 +1686,75 @@ void tst_Dumpers::dumper()
     QSet<QString> seenINames;
     bool ok = true;
 
-    for (int i = data.checks.size(); --i >= 0; ) {
-        Check check = data.checks.at(i);
+    auto test = [&](const Check &check, bool *removeIt, bool single) {
+        if (!check.matches(m_debuggerEngine, m_debuggerVersion, context)) {
+            if (single)
+                qDebug() << "SKIPPING NON-MATCHING TEST FOR " << check.iname;
+            return true; // we have not failed
+        }
+
         const QString iname = check.iname;
         WatchItem *item = static_cast<WatchItem *>(local.findAnyChild([iname](Utils::TreeItem *item) {
             return static_cast<WatchItem *>(item)->internalName() == iname;
         }));
-        if (item) {
-            seenINames.insert(iname);
-            //qDebug() << "CHECKS" << i << check.iname;
-            data.checks.removeAt(i);
-            if (check.matches(m_debuggerEngine, m_debuggerVersion, context)) {
-                //qDebug() << "USING MATCHING TEST FOR " << iname;
-                QString name = item->realName();
-                QString type = item->type;
-                if (!check.expectedName.matches(name, context)) {
-                    qDebug() << "INAME        : " << iname;
-                    qDebug() << "NAME ACTUAL  : " << name;
-                    qDebug() << "NAME EXPECTED: " << check.expectedName.name;
-                    ok = false;
-                }
-                if (!check.expectedValue.matches(item->value, context)) {
-                    qDebug() << "INAME         : " << iname;
-                    qDebug() << "VALUE ACTUAL  : " << item->value << toHex(item->value);
-                    qDebug() << "VALUE EXPECTED: " << check.expectedValue.value << toHex(check.expectedValue.value);
-                    ok = false;
-                }
-                if (!check.expectedType.matches(type, context)) {
-                    qDebug() << "INAME        : " << iname;
-                    qDebug() << "TYPE ACTUAL  : " << type;
-                    qDebug() << "TYPE EXPECTED: " << check.expectedType.type;
-                    ok = false;
-                }
-            } else {
-                qDebug() << "SKIPPING NON-MATCHING TEST FOR " << iname;
-            }
-        } else {
+        if (!item) {
             qDebug() << "NOT SEEN: " << check.iname;
+            return false;
+        }
+        seenINames.insert(iname);
+        //qDebug() << "CHECKS" << i << check.iname;
+
+        *removeIt = true;
+
+        //qDebug() << "USING MATCHING TEST FOR " << iname;
+        QString name = item->realName();
+        QString type = item->type;
+        if (!check.expectedName.matches(name, context)) {
+            if (single) {
+                qDebug() << "INAME        : " << iname;
+                qDebug() << "NAME ACTUAL  : " << name;
+                qDebug() << "NAME EXPECTED: " << check.expectedName.name;
+            }
+            return false;
+        }
+        if (!check.expectedValue.matches(item->value, context)) {
+            if (single) {
+                qDebug() << "INAME         : " << iname;
+                qDebug() << "VALUE ACTUAL  : " << item->value << toHex(item->value);
+                qDebug() << "VALUE EXPECTED: " << check.expectedValue.value << toHex(check.expectedValue.value);
+            }
+            return false;
+        }
+        if (!check.expectedType.matches(type, context)) {
+            if (single) {
+                qDebug() << "INAME        : " << iname;
+                qDebug() << "TYPE ACTUAL  : " << type;
+                qDebug() << "TYPE EXPECTED: " << check.expectedType.type;
+            }
+            return false;
+        }
+        return true;
+    };
+
+    for (int i = data.checks.size(); --i >= 0; ) {
+        bool removeIt = false;
+        if (!test(data.checks.at(i), &removeIt, true))
+            ok = false;
+        if (removeIt)
+            data.checks.removeAt(i);
+    }
+
+    for (const CheckSet &checkset : data.checksets) {
+        bool setok = false;
+        bool removeItDummy = false;
+        for (const Check &check : checkset.checks) {
+            if (test(check, &removeItDummy, false)) {
+                setok = true;
+            }
+        }
+        if (!setok) {
+            qDebug() << "NO CHECK IN SET PASSED";
+            ok = false;
         }
     }
 
@@ -3107,6 +3158,20 @@ void tst_Dumpers::dumper_data()
                 + Check("p.@1.e", "<2 items>", "@QList<@QString>")
                 + Check("pp.@1.a", "1", "int")
                 + Check("ppp.a", "1", "int");
+
+
+    QTest::newRow("QPointer")
+            << Data("#include <QPointer>\n"
+                    "#include <QTimer>\n",
+
+                    "QTimer timer; unused(&timer);\n"
+                    "QPointer<QTimer> ptr0; unused(&ptr0);\n"
+                    "QPointer<QTimer> ptr1(&timer); unused(&ptr1);\n\n")
+
+               + CoreProfile()
+
+               + Check("ptr0", "(null)", "@QPointer<QTimer>")
+               + Check("ptr1", "", "@QPointer<QTimer>");
 
 
     QTest::newRow("QScopedPointer")
@@ -5030,11 +5095,18 @@ void tst_Dumpers::dumper_data()
                + Cxx11Profile()
 
                + Check("set1", "<3 items>", "std::unordered_set<int>")
-               + Check("set1.0", "[0]", "33", "int") % NoCdbEngine
-               + Check("set1.0", "[0]", "11", "int") % CdbEngine
-               + Check("set1.1", "[1]", "22", "int")
-               + Check("set1.2", "[2]", "11", "int") % NoCdbEngine
-               + Check("set1.2", "[2]", "33", "int") % CdbEngine
+
+               + CheckSet({{"set1.0", "[0]", "11", "int"},
+                           {"set1.1", "[1]", "11", "int"},
+                           {"set1.2", "[2]", "11", "int"}})
+
+               + CheckSet({{"set1.0", "[0]", "22", "int"},
+                           {"set1.1", "[1]", "22", "int"},
+                           {"set1.2", "[2]", "22", "int"}})
+
+               + CheckSet({{"set1.0", "[0]", "33", "int"},
+                           {"set1.1", "[1]", "33", "int"},
+                           {"set1.2", "[2]", "33", "int"}})
 
                + Check("set2", "<2 items>", "std::unordered_multiset<int>")
                + Check("set2.0", "[0]", "42", "int")
@@ -5193,16 +5265,12 @@ void tst_Dumpers::dumper_data()
 
                + Check("a.d", FloatValue("9.1245819032257467e-313"), "double")
 
-               //+ Check("a.b", "43", "int") % GdbVersion(0, 70699)
-               //+ Check("a.i", "42", "int") % GdbVersion(0, 70699)
-               //+ Check("a.f", ff, "float") % GdbVersion(0, 70699)
-
-               + Check("a.#1.b", "43", "int") % NoCdbEngine
-               + Check("a.#1.i", "42", "int") % NoCdbEngine
-               + Check("a.#2.f", ff, "float") % NoCdbEngine
-               + Check("a.b", "43", "int") % CdbEngine
-               + Check("a.i", "42", "int") % CdbEngine
-               + Check("a.f", ff, "float") % CdbEngine;
+               + CheckSet({{"a.#1.b", "43", "int"}, // LLDB, new GDB
+                           {"a.b", "43", "int"}})   // CDB, old GDB
+               + CheckSet({{"a.#1.i", "42", "int"},
+                           {"a.i", "42", "int"}})
+               + CheckSet({{"a.#2.f", ff, "float"},
+                           {"a.f", ff, "float"}});
 
 
     QTest::newRow("Chars")
@@ -5348,8 +5416,8 @@ void tst_Dumpers::dumper_data()
                + GdbEngine
                + Check("fone", "one (1)", "Flags")
                + Check("fthree", "(one | two) (3)", "Flags")
-               + Check("fmixed", "(two | unknown:8) (10)", "Flags")
-               + Check("fbad", "(unknown:24) (24)", "Flags");
+               + Check("fmixed", "(two | unknown: 8) (10)", "Flags")
+               + Check("fbad", "(unknown: 24) (24)", "Flags");
 
 
     QTest::newRow("EnumInClass")
@@ -5363,9 +5431,9 @@ void tst_Dumpers::dumper_data()
                     "};\n",
                     "E e;\n")
                 + GdbEngine
-                + Check("e.e1", "E::b1 | E::c1 (0x0003)", "E::Enum1")
-                + Check("e.e2", "E::b2 | E::c2 (0x0003)", "E::Enum2")
-                + Check("e.e3", "E::b3 | E::c3 (0x0003)", "E::Enum3");
+                + Check("e.e1", "(E::b1 | E::c1) (3)", "E::Enum1")
+                + Check("e.e2", "(E::b2 | E::c2) (3)", "E::Enum2")
+                + Check("e.e3", "(E::b3 | E::c3) (3)", "E::Enum3");
 
 
     QTest::newRow("Array")
@@ -6439,10 +6507,10 @@ void tst_Dumpers::dumper_data()
                                     "std::_Tree_simple_types<std::pair<"
                                     "std::string const ,std::list<std::string>>>>>",
                                     "std::map<std::string, std::list<std::string> >::const_iterator"))
-         + Check("it.first", "\"one\"", "std::string") % NoCdbEngine
-         + Check("it.second", "<3 items>", "std::list<std::string>") % NoCdbEngine
-         + Check("it.0.first", "\"one\"", "std::string") % CdbEngine
-         + Check("it.0.second", "<3 items>", "std::list<std::string>") % CdbEngine;
+         + CheckSet({{"it.first", "\"one\"", "std::string"},    // NoCdbEngine
+                     {"it.0.first", "\"one\"", "std::string"}}) // CdbEngine
+         + CheckSet({{"it.second", "<3 items>", "std::list<std::string>"},
+                     {"it.0.second", "<3 items>", "std::list<std::string>"}});
 
     QTest::newRow("Varargs")
             << Data("#include <stdarg.h>\n"
@@ -6502,19 +6570,19 @@ void tst_Dumpers::dumper_data()
                     "D &dr = dd; unused(&dr);\n")
                 + Cxx11Profile()
                 + Check("c.c", "1", "int")
-                + Check("c.@1.@2.a", "42", "int") % NoLldbEngine
-                + Check("c.@1.@4.v", "45", "int") % NoLldbEngine
-                + Check("c.@2.@2.a", "43", "int") % NoLldbEngine
-                + Check("c.@2.@4.v", "45", "int") % NoLldbEngine
-                + Check("c.@1.@1.a", "42", "int") % LldbEngine
-                + Check("c.@1.@2.v", "45", "int") % LldbEngine
-                + Check("c.@2.@1.a", "43", "int") % LldbEngine
-                + Check("c.@2.@2.v", "45", "int") % LldbEngine
+                + CheckSet({{"c.@1.@2.a", "42", "int"},  // LLDB vs GDB vs ..
+                            {"c.@1.@1.a", "42", "int"}})
+                + CheckSet({{"c.@2.@2.a", "43", "int"},
+                            {"c.@2.@1.a", "43", "int"}})
+                + CheckSet({{"c.@1.@4.v", "45", "int"},
+                            {"c.@1.@2.v", "45", "int"},
+                            {"c.@2.@4.v", "45", "int"},
+                            {"c.@2.@2.v", "45", "int"}})
                 + Check("tt.c", "1", "int")
-                + Check("tt.@1.@2.v", "45", "int") % NoLldbEngine
-                + Check("tt.@2.@2.v", "45", "int") % NoLldbEngine
-                + Check("tt.@1.@1.v", "45", "int") % LldbEngine
-                + Check("tt.@2.@1.v", "45", "int") % LldbEngine
+                + CheckSet({{"tt.@1.@2.v", "45", "int"},
+                            {"tt.@1.@1.v", "45", "int"},
+                            {"tt.@2.@2.v", "45", "int"},
+                            {"tt.@2.@1.v", "45", "int"}})
 
                 + Check("dd.@1.@1.a", "1", "int") // B::a
                 // C::a - fails with command line LLDB 3.8/360.x
@@ -6617,8 +6685,8 @@ void tst_Dumpers::dumper_data()
                + Check("v", "", TypePattern("main::.*::Test")) % CdbEngine
                //+ Check("v.a", "1", "int") % GdbVersion(0, 70699)
                //+ Check("v.0.a", "1", "int") % GdbVersion(70700)
-               + Check("v.#1.a", "1", "int") % NoCdbEngine
-               + Check("v.a", "1", "int") % CdbEngine;
+               + CheckSet({{"v.#1.a", "1", "int"},
+                           {"v.a", "1", "int"}});
 
 
     QTest::newRow("Gdb10586eclipse")
@@ -6635,12 +6703,12 @@ void tst_Dumpers::dumper_data()
                + Check("n", "", TypePattern("main::.*::S")) % CdbEngine
                //+ Check("v.a", "2", "int") % GdbVersion(0, 70699)
                //+ Check("v.0.a", "2", "int") % GdbVersion(70700)
-               + Check("v.#1.a", "2", "int") % NoCdbEngine
-               + Check("v.a", "2", "int") % CdbEngine
+               + CheckSet({{"v.#1.a", "2", "int"},
+                           {"v.a", "2", "int"}})
                //+ Check("v.b", "3", "int") % GdbVersion(0, 70699)
                //+ Check("v.1.b", "3", "int") % GdbVersion(70700)
-               + Check("v.#2.b", "3", "int") % NoCdbEngine
-               + Check("v.b", "3", "int") % CdbEngine
+               + CheckSet({{"v.#2.b", "3", "int"},
+                           {"v.b", "3", "int"}})
                + Check("v.x", "1", "int")
                + Check("n.x", "10", "int")
                + Check("n.y", "20", "int");
@@ -6836,12 +6904,14 @@ void tst_Dumpers::dumper_data()
 
 
     QTest::newRow("Internal2")
-            << Data("struct Foo { int bar = 15; }; \n"
+            << Data("enum E { V1, V2 };\n"
+                    "struct Foo { int bar = 15; E e = V1; };\n"
                     "struct QtcDumperTest_PointerArray {\n"
                     "   Foo *foos = new Foo[10];\n"
                     "};\n\n",
                     "QtcDumperTest_PointerArray tc; unused(&tc);\n")
             + Check("tc.0.bar", "15", "int")
+            + Check("tc.0.e", "V1 (0)", "E")
             + Check("tc.1.bar", "15", "int")
             + Check("tc.2.bar", "15", "int")
             + Check("tc.3.bar", "15", "int");

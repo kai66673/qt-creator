@@ -22,7 +22,10 @@ HEADERS += \
     $$PWD/projectpartartefact.h \
     $$PWD/filestatuscache.h \
     $$PWD/indexdataconsumer.h \
-    $$PWD/projectpartqueue.h
+    $$PWD/sourcesmanager.h \
+    $$PWD/symbolindexertaskqueue.h \
+    $$PWD/symbolindexertaskqueueinterface.h \
+    $$PWD/symbolindexertask.h
 
 !isEmpty(LIBTOOLING_LIBS) {
 SOURCES += \
@@ -67,5 +70,4 @@ SOURCES += \
     $$PWD/sourcerangefilter.cpp \
     $$PWD/symbolindexer.cpp \
     $$PWD/projectpartartefact.cpp \
-    $$PWD/filestatuscache.cpp \
-    $$PWD/projectpartqueue.cpp
+    $$PWD/filestatuscache.cpp

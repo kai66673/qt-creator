@@ -228,8 +228,7 @@ public:
 
     ReloadBehavior reloadBehavior(ChangeTrigger state, ChangeType type) const override
     {
-        Q_UNUSED(state)
-        return type == TypeRemoved ? BehaviorSilent : BehaviorAsk;
+        return type == TypeRemoved ? BehaviorSilent : IDocument::reloadBehavior(state, type);
     }
 
     bool save(QString *errorString, const QString &fn, bool autoSave) override
@@ -395,7 +394,7 @@ public:
         delete m_widget;
     }
 
-    IDocument *document() override { return m_file; }
+    IDocument *document() const override { return m_file; }
 
     QWidget *toolBar() override { return m_toolBar; }
 

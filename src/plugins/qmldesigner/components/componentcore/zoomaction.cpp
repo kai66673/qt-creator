@@ -39,7 +39,7 @@ ZoomAction::ZoomAction(QObject *parent)
 
 }
 
-double ZoomAction::zoomLevel() const
+float ZoomAction::zoomLevel() const
 {
     return m_zoomLevel;
 }
@@ -63,9 +63,9 @@ void ZoomAction::resetZoomLevel()
     emit reseted();
 }
 
-void ZoomAction::setZoomLevel(double zoomLevel)
+void ZoomAction::setZoomLevel(float zoomLevel)
 {
-    m_zoomLevel = qBound(0.1, zoomLevel, 16.0);
+    m_zoomLevel = qBound(0.1f, zoomLevel, 16.0f);
     emit zoomLevelChanged(m_zoomLevel);
 }
 
@@ -120,8 +120,8 @@ void ZoomAction::emitZoomLevelChanged(int index)
     if (index == -1)
         return;
 
-    QModelIndex modelIndex(m_comboBoxModel.data()->index(index, 0));
-    setZoomLevel(m_comboBoxModel.data()->data(modelIndex, Qt::UserRole).toDouble());
+    const QModelIndex modelIndex(m_comboBoxModel.data()->index(index, 0));
+    setZoomLevel(m_comboBoxModel.data()->data(modelIndex, Qt::UserRole).toFloat());
 }
 
 } // namespace QmlDesigner

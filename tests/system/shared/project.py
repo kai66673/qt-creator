@@ -23,9 +23,6 @@
 #
 ############################################################################
 
-import __builtin__
-import re
-
 def openQbsProject(projectPath):
     cleanUpUserFiles(projectPath)
     invokeMenuItem("File", "Open File or Project...")
@@ -158,8 +155,8 @@ def __createProjectHandleQtQuickSelection__(minimumQtVersion):
 # withoutQt4 if True Qt4 will get unchecked / not selected while checking the targets
 def __selectQtVersionDesktop__(checks, available=None, withoutQt4=False):
     wanted = Targets.desktopTargetClasses()
-    if withoutQt4 and Targets.DESKTOP_4_8_7_DEFAULT in wanted:
-        wanted.remove(Targets.DESKTOP_4_8_7_DEFAULT)
+    if withoutQt4:
+        wanted.discard(Targets.DESKTOP_4_8_7_DEFAULT)
     checkedTargets = __chooseTargets__(wanted, available)
     if checks:
         for target in checkedTargets:
@@ -171,6 +168,8 @@ def __selectQtVersionDesktop__(checks, available=None, withoutQt4=False):
                 cbObject = ("{type='QCheckBox' text='%s' unnamed='1' visible='1' "
                             "container=%s}")
                 verifyChecked(cbObject % ("Debug", objectMap.realName(detailsWidget)))
+                if target not in (Targets.DESKTOP_4_8_7_DEFAULT, Targets.EMBEDDED_LINUX):
+                    verifyChecked(cbObject % ("Profile", objectMap.realName(detailsWidget)))
                 verifyChecked(cbObject % ("Release", objectMap.realName(detailsWidget)))
                 clickButton(detailsButton)
     clickButton(waitForObject(":Next_QPushButton"))
@@ -198,8 +197,7 @@ def __modifyAvailableTargets__(available, requiredQt, asStrings=False):
         toBeRemoved = Targets.EMBEDDED_LINUX
         if asStrings:
             toBeRemoved = Targets.getStringForTarget(toBeRemoved)
-        if toBeRemoved in available:
-            available.remove(toBeRemoved)
+        available.discard(toBeRemoved)
     for currentItem in tmp:
         if asStrings:
             item = currentItem
@@ -208,7 +206,7 @@ def __modifyAvailableTargets__(available, requiredQt, asStrings=False):
         found = versionFinder.search(item)
         if found:
             if Qt5Path.toVersionTuple(found.group(1)) < Qt5Path.toVersionTuple(requiredQt):
-                available.remove(currentItem)
+                available.discard(currentItem)
 
 # Creates a Qt GUI project
 # param path specifies where to create the project
@@ -343,26 +341,15 @@ def createEmptyQtProject(workingDir=None, projectName=None, targets=Targets.desk
     __createProjectHandleLastPage__()
     return projectName
 
-def createNewNonQtProject(workingDir=None, projectName=None, target=[Targets.DESKTOP_4_8_7_DEFAULT],
-                          plainC=False, cmake=False, qbs=False):
+def createNewNonQtProject(workingDir, projectName, target, plainC=False, buildSystem="qmake"):
     if plainC:
         template = "Plain C Application"
     else:
         template = "Plain C++ Application"
 
     available = __createProjectOrFileSelectType__("  Non-Qt Project", template)
-    if workingDir == None:
-        workingDir = tempDir()
     projectName = __createProjectSetNameAndPath__(workingDir, projectName)
 
-    buildSystem = "qmake"
-    if qbs:
-        buildSystem = "Qbs"
-        if cmake:
-            test.warning("Unsupported combination, at least one of parameters cmake and qbs must "
-                         "be False, ignoring the value of cmake")
-    elif cmake:
-        buildSystem = "CMake"
     selectFromCombo("{name='BuildSystem' type='QComboBox' visible='1'}", buildSystem)
     clickButton(waitForObject(":Next_QPushButton"))
 
@@ -371,9 +358,8 @@ def createNewNonQtProject(workingDir=None, projectName=None, target=[Targets.DES
     __createProjectHandleLastPage__()
     return projectName
 
-def createNewCPPLib(projectDir = None, projectName = None, className = None, fromWelcome = False,
-                    target = [Targets.DESKTOP_4_8_7_DEFAULT], isStatic = False, modules = ["QtCore"]):
-    available = __createProjectOrFileSelectType__("  Library", "C++ Library", fromWelcome, True)
+def createNewCPPLib(projectDir, projectName, className, target, isStatic):
+    available = __createProjectOrFileSelectType__("  Library", "C++ Library", False, True)
     if isStatic:
         libType = LibType.STATIC
     else:
@@ -384,16 +370,13 @@ def createNewCPPLib(projectDir = None, projectName = None, className = None, fro
     __chooseTargets__(target, available)
     snooze(1)
     clickButton(waitForObject(":Next_QPushButton"))
-    __createProjectHandleModuleSelection__(modules)
+    __createProjectHandleModuleSelection__(["QtCore"])
     className = __createProjectHandleClassInformation__(className)
     __createProjectHandleLastPage__()
     return projectName, className
 
-def createNewQtPlugin(projectDir=None, projectName=None, className=None, fromWelcome=False,
-                      target=[Targets.DESKTOP_4_8_7_DEFAULT], baseClass="QGenericPlugin"):
-    available = __createProjectOrFileSelectType__("  Library", "C++ Library", fromWelcome, True)
-    if projectDir == None:
-        projectDir = tempDir()
+def createNewQtPlugin(projectDir, projectName, className, target, baseClass="QGenericPlugin"):
+    available = __createProjectOrFileSelectType__("  Library", "C++ Library", False, True)
     projectName = __createProjectSetNameAndPath__(projectDir, projectName, False, LibType.QT_PLUGIN)
     __chooseTargets__(target, available)
     snooze(1)
@@ -408,20 +391,20 @@ def createNewQtPlugin(projectDir=None, projectName=None, className=None, fromWel
 # parameter additionalFunc function to be executed inside the detailed view of each chosen kit
 #           if present, 'Details' button will be clicked, function will be executed,
 #           'Details' button will be clicked again
-def __chooseTargets__(targets=[Targets.DESKTOP_4_8_7_DEFAULT], availableTargets=None, additionalFunc=None):
+def __chooseTargets__(targets, availableTargets=None, additionalFunc=None):
     if availableTargets != None:
         available = availableTargets
     else:
         # following targets depend on the build environment - added for further/later tests
         available = Targets.availableTargetClasses()
-    checkedTargets = []
+    checkedTargets = set()
     for current in available:
         mustCheck = current in targets
         try:
             ensureChecked("{type='QCheckBox' text='%s' visible='1'}" % Targets.getStringForTarget(current),
                           mustCheck, 3000)
             if mustCheck:
-                checkedTargets.append(current)
+                checkedTargets.add(current)
 
                 # perform additional function on detailed kits view
                 if additionalFunc:
@@ -533,26 +516,26 @@ def __getSupportedPlatforms__(text, templateName, getAsStrings=False):
         version = None
     if templateName.startswith("Qt Quick Application - "):
         if templateName == "Qt Quick Application - Empty":
-            result = [Targets.DESKTOP_5_6_1_DEFAULT, Targets.DESKTOP_5_10_1_DEFAULT]
+            result = set([Targets.DESKTOP_5_6_1_DEFAULT, Targets.DESKTOP_5_10_1_DEFAULT])
         else:
-            result = [Targets.DESKTOP_5_10_1_DEFAULT]
+            result = set([Targets.DESKTOP_5_10_1_DEFAULT])
     elif 'Supported Platforms' in text:
         supports = text[text.find('Supported Platforms'):].split(":")[1].strip().split(" ")
-        result = []
+        result = set()
         if 'Desktop' in supports:
             if (version == None or version < "5.0"):
-                result.append(Targets.DESKTOP_4_8_7_DEFAULT)
+                result.add(Targets.DESKTOP_4_8_7_DEFAULT)
                 if platform.system() in ("Linux", "Darwin"):
-                    result.append(Targets.EMBEDDED_LINUX)
-            result.extend([Targets.DESKTOP_5_6_1_DEFAULT, Targets.DESKTOP_5_10_1_DEFAULT])
+                    result.add(Targets.EMBEDDED_LINUX)
+            result = result.union(set([Targets.DESKTOP_5_6_1_DEFAULT, Targets.DESKTOP_5_10_1_DEFAULT]))
             if platform.system() != 'Darwin':
-                result.append(Targets.DESKTOP_5_4_1_GCC)
+                result.add(Targets.DESKTOP_5_4_1_GCC)
     elif 'Platform independent' in text:
         result = Targets.desktopTargetClasses()
     else:
         test.warning("Returning None (__getSupportedPlatforms__())",
                      "Parsed text: '%s'" % text)
-        return [], None
+        return set(), None
     if getAsStrings:
         result = Targets.getTargetsAsStrings(result)
     return result, version

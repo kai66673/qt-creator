@@ -126,7 +126,7 @@ public:
 
     VcsBase::VcsCommand *vcsExecAbortable(const QString &workingDirectory,
                                           const QStringList &arguments,
-                                          bool createProgressParser = false);
+                                          bool isRebase = false);
 
     QString findRepositoryForDirectory(const QString &dir) const;
     QString findGitDirForRepository(const QString &repositoryDir) const;
@@ -235,14 +235,14 @@ public:
     QString synchronousTopic(const QString &workingDirectory) const;
     bool synchronousRevParseCmd(const QString &workingDirectory, const QString &ref,
                                 QString *output, QString *errorMessage = nullptr) const;
-    QString synchronousTopRevision(const QString &workingDirectory, QString *errorMessage = nullptr);
+    QString synchronousTopRevision(const QString &workingDirectory);
     void synchronousTagsForCommit(const QString &workingDirectory, const QString &revision,
                                   QString &precedes, QString &follows) const;
     bool isRemoteCommit(const QString &workingDirectory, const QString &commit);
     bool isFastForwardMerge(const QString &workingDirectory, const QString &branch);
 
     void fetch(const QString &workingDirectory, const QString &remote);
-    bool synchronousPull(const QString &workingDirectory, bool rebase);
+    void pull(const QString &workingDirectory, bool rebase);
     void push(const QString &workingDirectory, const QStringList &pushArgs = QStringList());
     bool synchronousMerge(const QString &workingDirectory, const QString &branch,
                           bool allowFastForward = true);

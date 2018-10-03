@@ -188,6 +188,22 @@ ProjectImporter *QbsProject::projectImporter() const
     return m_importer;
 }
 
+QVariant QbsProject::additionalData(Id id, const Target *target) const
+{
+    if (id == "QmlDesignerImportPath") {
+        const qbs::Project qbsProject = m_qbsProjects.value(const_cast<Target *>(target));
+        const qbs::ProjectData projectData = qbsProject.isValid()
+                ? qbsProject.projectData() : qbs::ProjectData();
+        QStringList designerImportPaths;
+        foreach (const qbs::ProductData &product, projectData.allProducts()) {
+            designerImportPaths << product.properties()
+                                   .value("qmlDesignerImportPaths").toStringList();
+        }
+        return designerImportPaths;
+    }
+    return Project::additionalData(id, target);
+}
+
 QStringList QbsProject::filesGeneratedFrom(const QString &sourceFile) const
 {
     QStringList generated;
@@ -546,11 +562,19 @@ void QbsProject::handleRuleExecutionDone()
 
 void QbsProject::changeActiveTarget(Target *t)
 {
-    if (t) {
-        m_qbsProject = m_qbsProjects.value(t);
-        if (t->isActive())
-            delayParsing();
+    bool targetFound = false;
+    for (auto it = m_qbsProjects.begin(); it != m_qbsProjects.end(); ++it) {
+        qbs::Project &qbsProjectForTarget = it.value();
+        if (it.key() == t) {
+            m_qbsProject = qbsProjectForTarget;
+            targetFound = true;
+        } else if (qbsProjectForTarget.isValid() && !BuildManager::isBuilding(it.key())) {
+            qbsProjectForTarget = qbs::Project();
+        }
     }
+    QTC_ASSERT(targetFound || !t, m_qbsProject = qbs::Project());
+    if (t && t->isActive())
+        delayParsing();
 }
 
 void QbsProject::startParsing()
@@ -822,13 +846,15 @@ static void getExpandedCompilerFlags(QStringList &cFlags, QStringList &cxxFlags,
         }
         cFlags = cxxFlags = commonFlags;
 
-        const QString cxxLanguageVersion = getCppProp("cxxLanguageVersion").toString();
-        if (cxxLanguageVersion == "c++11")
-            cxxFlags << "-std=c++0x";
-        else if (cxxLanguageVersion == "c++14")
-            cxxFlags << "-std=c++1y";
+        const auto cxxLanguageVersion = getCppProp("cxxLanguageVersion").toStringList();
+        if (cxxLanguageVersion.contains("c++17"))
+            cxxFlags << "-std=c++17";
+        else if (cxxLanguageVersion.contains("c++14"))
+            cxxFlags << "-std=c++14";
+        else if (cxxLanguageVersion.contains("c++11"))
+            cxxFlags << "-std=c++11";
         else if (!cxxLanguageVersion.isEmpty())
-            cxxFlags << ("-std=" + cxxLanguageVersion);
+            cxxFlags << ("-std=" + cxxLanguageVersion.first());
         const QString cxxStandardLibrary = getCppProp("cxxStandardLibrary").toString();
         if (!cxxStandardLibrary.isEmpty() && toolchain.contains("clang"))
             cxxFlags << ("-stdlib=" + cxxStandardLibrary);
@@ -839,11 +865,13 @@ static void getExpandedCompilerFlags(QStringList &cFlags, QStringList &cxxFlags,
         if (enableRtti.isValid())
             cxxFlags << QLatin1String(enableRtti.toBool() ? "-frtti" : "-fno-rtti");
 
-        const QString cLanguageVersion = getCppProp("cLanguageVersion").toString();
-        if (cLanguageVersion == "c11")
-            cFlags << "-std=c1x";
+        const auto cLanguageVersion = getCppProp("cLanguageVersion").toStringList();
+        if (cLanguageVersion.contains("c11"))
+            cFlags << "-std=c11";
+        else if (cLanguageVersion.contains("c99"))
+            cFlags << "-std=c99";
         else if (!cLanguageVersion.isEmpty())
-            cFlags << ("-std=" + cLanguageVersion);
+            cFlags << ("-std=" + cLanguageVersion.first());
     } else if (toolchain.contains("msvc")) {
         if (enableExceptions.toBool()) {
             const QString exceptionModel = getCppProp("exceptionHandlingModel").toString();
@@ -859,6 +887,8 @@ static void getExpandedCompilerFlags(QStringList &cFlags, QStringList &cxxFlags,
         cxxFlags << "/TP";
         if (enableRtti.isValid())
             cxxFlags << QLatin1String(enableRtti.toBool() ? "/GR" : "/GR-");
+        if (getCppProp("cxxLanguageVersion").toStringList().contains("c++17"))
+            cxxFlags << "/std:c++17";
     }
 }
 
@@ -951,11 +981,9 @@ void QbsProject::updateCppCodeModel()
             list.append(props.getModulePropertiesAsStringList(QLatin1String(CONFIG_CPP_MODULE),
                                                               QLatin1String(CONFIG_SYSTEM_INCLUDEPATHS)));
             list.removeDuplicates();
-            CppTools::ProjectPartHeaderPaths grpHeaderPaths;
+            ProjectExplorer::HeaderPaths grpHeaderPaths;
             foreach (const QString &p, list)
-                grpHeaderPaths += CppTools::ProjectPartHeaderPath(
-                            FileName::fromUserInput(p).toString(),
-                            CppTools::ProjectPartHeaderPath::IncludePath);
+                grpHeaderPaths += {FileName::fromUserInput(p).toString(),  HeaderPathType::User};
 
             list = props.getModulePropertiesAsStringList(QLatin1String(CONFIG_CPP_MODULE),
                                                          QLatin1String(CONFIG_FRAMEWORKPATHS));
@@ -963,9 +991,7 @@ void QbsProject::updateCppCodeModel()
                                                               QLatin1String(CONFIG_SYSTEM_FRAMEWORKPATHS)));
             list.removeDuplicates();
             foreach (const QString &p, list)
-                grpHeaderPaths += CppTools::ProjectPartHeaderPath(
-                            FileName::fromUserInput(p).toString(),
-                            CppTools::ProjectPartHeaderPath::FrameworkPath);
+                grpHeaderPaths += {FileName::fromUserInput(p).toString(), HeaderPathType::Framework};
 
             rpp.setHeaderPaths(grpHeaderPaths);
 

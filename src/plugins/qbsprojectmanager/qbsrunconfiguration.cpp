@@ -52,26 +52,21 @@ namespace Internal {
 QbsRunConfiguration::QbsRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto envAspect = new LocalEnvironmentAspect(this,
-            [](RunConfiguration *rc, Environment &env) {
-                static_cast<QbsRunConfiguration *>(rc)->addToBaseEnvironment(env);
-            });
-    addExtraAspect(envAspect);
+    auto envAspect = addAspect<LocalEnvironmentAspect>(target,
+            [this](Environment &env) { addToBaseEnvironment(env); });
 
-    addExtraAspect(new ExecutableAspect(this));
-    addExtraAspect(new ArgumentsAspect(this, "Qbs.RunConfiguration.CommandLineArguments"));
-    addExtraAspect(new WorkingDirectoryAspect(this, "Qbs.RunConfiguration.WorkingDirectory"));
-    addExtraAspect(new TerminalAspect(this, "Qbs.RunConfiguration.UseTerminal"));
+    addAspect<ExecutableAspect>();
+    addAspect<ArgumentsAspect>();
+    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<TerminalAspect>();
 
     setOutputFormatter<QtSupport::QtOutputFormatter>();
 
-    auto libAspect = new UseLibraryPathsAspect(this, "Qbs.RunConfiguration.UsingLibraryPaths");
-    addExtraAspect(libAspect);
+    auto libAspect = addAspect<UseLibraryPathsAspect>();
     connect(libAspect, &UseLibraryPathsAspect::changed,
             envAspect, &EnvironmentAspect::environmentChanged);
     if (HostOsInfo::isMacHost()) {
-        auto dyldAspect = new UseDyldSuffixAspect(this, "Qbs.RunConfiguration.UseDyldImageSuffix");
-        addExtraAspect(dyldAspect);
+        auto dyldAspect = addAspect<UseDyldSuffixAspect>();
         connect(dyldAspect, &UseDyldSuffixAspect::changed,
                 envAspect, &EnvironmentAspect::environmentChanged);
     }

@@ -44,7 +44,7 @@ public:
 
     bool operator ==(const ProjectExplorer::ToolChain &) const override;
 
-    ProjectExplorer::ToolChainConfigWidget *configurationWidget() override;
+    std::unique_ptr<ProjectExplorer::ToolChainConfigWidget> createConfigurationWidget() override;
     Utils::FileName suggestedDebugger() const override;
     Utils::FileName suggestedGdbServer() const;
 
@@ -58,7 +58,7 @@ public:
     bool isSecondaryToolChain() const;
     void setSecondaryToolChain(bool b);
 
-    SystemHeaderPathsRunner createSystemHeaderPathsRunner() const override;
+    BuiltInHeaderPathsRunner createBuiltInHeaderPathsRunner() const override;
 
 protected:
     DetectedAbisResult detectSupportedAbis() const override;
