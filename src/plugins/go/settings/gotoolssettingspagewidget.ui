@@ -17,14 +17,14 @@
    <item>
     <widget class="QCheckBox" name="goImportsCheckBox">
      <property name="text">
-      <string>Exexute go&amp;imports on save</string>
+      <string>Execute go&amp;imports on save</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QCheckBox" name="goFmtCheckBox">
      <property name="text">
-      <string>Exexute go&amp;fmt on save</string>
+      <string>Execute go&amp;fmt on save</string>
      </property>
     </widget>
    </item>
