@@ -42,7 +42,7 @@ GoBuildConfiguration::GoBuildConfiguration(ProjectExplorer::Target *target, Core
     : BuildConfiguration(target, id)
 { }
 
-void GoBuildConfiguration::initialize(const BuildInfo *info)
+void GoBuildConfiguration::initialize(const BuildInfo &info)
 {
     BuildConfiguration::initialize(info);
 

@@ -42,8 +42,8 @@ GoRunConfigurationWidget::GoRunConfigurationWidget(GoRunConfiguration *rc, QWidg
     QFormLayout *fl = new QFormLayout(this);
     fl->setMargin(0);
     fl->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
-    rc->extraAspect<ArgumentsAspect>()->addToConfigurationLayout(fl);
-    rc->extraAspect<TerminalAspect>()->addToConfigurationLayout(fl);
+    rc->aspect<ArgumentsAspect>()->addToConfigurationLayout(fl);
+    rc->aspect<TerminalAspect>()->addToConfigurationLayout(fl);
     connect(rc, &GoRunConfiguration::enabledChanged, this, &GoRunConfigurationWidget::updateUi);
     updateUi();
 }

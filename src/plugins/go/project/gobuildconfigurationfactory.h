@@ -31,7 +31,7 @@ namespace GoLang {
 
 class GoBuildInfo;
 
-class GoBuildConfigurationFactory : public ProjectExplorer::IBuildConfigurationFactory
+class GoBuildConfigurationFactory : public ProjectExplorer::BuildConfigurationFactory
 {
     Q_OBJECT
 
@@ -39,13 +39,13 @@ public:
     GoBuildConfigurationFactory();
 
 private:
-    QList<ProjectExplorer::BuildInfo *> availableBuilds(const ProjectExplorer::Target *parent) const override;
+    QList<ProjectExplorer::BuildInfo> availableBuilds(const ProjectExplorer::Target *parent) const override;
 
-    QList<ProjectExplorer::BuildInfo *> availableSetups(const ProjectExplorer::Kit *k,
-                                                        const QString &projectPath) const override;
+    QList<ProjectExplorer::BuildInfo> availableSetups(const ProjectExplorer::Kit *k,
+                                                      const QString &projectPath) const override;
 
-    ProjectExplorer::BuildInfo *createBuildInfo(const ProjectExplorer::Kit *k,
-                                                const QString &projectPath) const;
+    ProjectExplorer::BuildInfo createBuildInfo(const ProjectExplorer::Kit *k,
+                                               const QString &projectPath) const;
 };
 
 }   // namespace GoLang

@@ -36,7 +36,7 @@ class GoRunConfigurationWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit GoRunConfigurationWidget(GoRunConfiguration *rc, QWidget *parent = 0);
+    explicit GoRunConfigurationWidget(GoRunConfiguration *rc, QWidget *parent = nullptr);
 
 private:
     void updateUi();

@@ -29,6 +29,7 @@
 #include "golangconstants.h"
 #include "goproject.h"
 
+#include <projectexplorer/processparameters.h>
 #include <utils/qtcassert.h>
 
 #include <QComboBox>
@@ -40,11 +41,26 @@ using namespace Utils;
 namespace GoLang {
 
 GoCompilerBuildStepConfigWidget::GoCompilerBuildStepConfigWidget(BaseGoCompilerStep *buildStep)
-    : BuildStepConfigWidget()
-    , m_buildStep(buildStep)
+    : BuildStepConfigWidget(buildStep)
+    , m_buildStep()
     , m_ui(new Ui::GoCompilerBuildStepConfigWidget())
 {
     m_ui->setupUi(this);
+
+    switch (m_buildStep->goOption()) {
+        case BaseGoCompilerStep::Get:
+            setSummaryText(tr(Constants::C_GOCOMPILERGETSTEPWIDGET_SUMMARY));
+            setDisplayName(tr(Constants::C_GOCOMPILERGETSTEPWIDGET_DISPLAY));
+            break;
+        case BaseGoCompilerStep::Build:
+            setSummaryText(tr(Constants::C_GOCOMPILERBUILDSTEPWIDGET_SUMMARY));
+            setDisplayName(tr(Constants::C_GOCOMPILERBUILDSTEPWIDGET_DISPLAY));
+            break;
+        case BaseGoCompilerStep::Clean:
+            setSummaryText(tr(Constants::C_GOCOMPILERCLEANSTEPWIDGET_SUMMARY));
+            setDisplayName(tr(Constants::C_GOCOMPILERCLEANSTEPWIDGET_DISPLAY));
+            break;
+    }
 
     // Connect the project signals
     auto project = static_cast<GoProject *>(m_buildStep->project());
@@ -64,44 +80,6 @@ GoCompilerBuildStepConfigWidget::GoCompilerBuildStepConfigWidget(BaseGoCompilerS
 
 GoCompilerBuildStepConfigWidget::~GoCompilerBuildStepConfigWidget()
 { }
-
-QString GoCompilerBuildStepConfigWidget::summaryText() const
-{
-    QString result;
-
-    switch (m_buildStep->goOption()) {
-        case BaseGoCompilerStep::Get:
-            result = Constants::C_GOCOMPILERGETSTEPWIDGET_SUMMARY;
-            break;
-        case BaseGoCompilerStep::Build:
-            result = Constants::C_GOCOMPILERBUILDSTEPWIDGET_SUMMARY;
-            break;
-        case BaseGoCompilerStep::Clean:
-            result = Constants::C_GOCOMPILERCLEANSTEPWIDGET_SUMMARY;
-            break;
-    }
-
-    return result;
-}
-
-QString GoCompilerBuildStepConfigWidget::displayName() const
-{
-    QString result;
-
-    switch (m_buildStep->goOption()) {
-        case BaseGoCompilerStep::Get:
-            result = Constants::C_GOCOMPILERGETSTEPWIDGET_DISPLAY;
-            break;
-        case BaseGoCompilerStep::Build:
-            result = Constants::C_GOCOMPILERBUILDSTEPWIDGET_DISPLAY;
-            break;
-        case BaseGoCompilerStep::Clean:
-            result = Constants::C_GOCOMPILERCLEANSTEPWIDGET_DISPLAY;
-            break;
-    }
-
-    return result;
-}
 
 void GoCompilerBuildStepConfigWidget::updateUi()
 {

@@ -70,7 +70,7 @@ void GoPackageProcessor::checkToolChain()
     GoToolChain *toolChain = nullptr;
     if (ProjectExplorer::Target *activeTarget = m_project->activeTarget())
         if (ProjectExplorer::Kit *kit = activeTarget->kit())
-            toolChain = static_cast<GoToolChain *>(ProjectExplorer::ToolChainKitInformation::toolChain(kit, Constants::C_GOLANGUAGE_ID));
+            toolChain = static_cast<GoToolChain *>(ProjectExplorer::ToolChainKitAspect::toolChain(kit, Constants::C_GOLANGUAGE_ID));
 
     if (m_toolChain != toolChain) {
         m_toolChain = toolChain;

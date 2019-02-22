@@ -52,9 +52,9 @@ public:
     ProjectExplorer::Abi targetAbi() const override;
     QString originalTargetTriple() const override;
     bool isValid() const override;
-    PredefinedMacrosRunner createPredefinedMacrosRunner() const override;
+    MacroInspectionRunner createMacroInspectionRunner() const override;
     ProjectExplorer::Macros predefinedMacros(const QStringList &) const override;
-    CompilerFlags compilerFlags(const QStringList &) const override;
+    Utils::LanguageExtensions languageExtensions(const QStringList &flags) const final;
     ProjectExplorer::WarningFlags warningFlags(const QStringList &) const override;
     BuiltInHeaderPathsRunner createBuiltInHeaderPathsRunner() const override;
     ProjectExplorer::HeaderPaths builtInHeaderPaths(const QStringList &flags,

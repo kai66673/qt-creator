@@ -137,11 +137,10 @@ void GoProject::collectProjectFiles()
     m_lastProjectScan.start();
     QTC_ASSERT(!m_futureWatcher.future().isRunning(), return);
     Utils::FileName prjDir = projectDirectory();
-    const QList<Core::IVersionControl *> versionControls = Core::VcsManager::versionControls();
-    QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir, versionControls] {
-        return ProjectExplorer::FileNode::scanForFilesWithVersionControls(prjDir, [](const Utils::FileName &fn) {
+    QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir] {
+        return ProjectExplorer::FileNode::scanForFiles(prjDir, [](const Utils::FileName &fn) {
             return new ProjectExplorer::FileNode(fn, ProjectExplorer::FileType::Source, false);
-        }, versionControls);
+        });
     });
 
     m_futureWatcher.setFuture(future);

@@ -43,9 +43,6 @@ public:
     GoCompilerBuildStepConfigWidget(BaseGoCompilerStep *buildStep);
     ~GoCompilerBuildStepConfigWidget();
 
-    QString summaryText() const override;
-    QString displayName() const override;
-
 private:
     void updateUi();
     void updateCommandLineText();

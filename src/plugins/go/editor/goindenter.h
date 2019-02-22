@@ -27,23 +27,23 @@
 
 #include "gotoken.h"
 
-#include <texteditor/indenter.h>
+#include <texteditor/textindenter.h>
 
 #include <QtCore/QSet>
 
 namespace GoEditor {
 namespace Internal {
 
-class GoIndenter : public TextEditor::Indenter
+class GoIndenter : public TextEditor::TextIndenter
 {
 public:
-    GoIndenter();
+    GoIndenter(QTextDocument *doc);
 
     bool isElectricCharacter(const QChar &ch) const;
-    void indentBlock(QTextDocument *doc,
-                     const QTextBlock &block,
+    void indentBlock(const QTextBlock &block,
                      const QChar &typedChar,
-                     const TextEditor::TabSettings &tabSettings);
+                     const TextEditor::TabSettings &tabSettings,
+                     int cursorPositionInEditor = -1);
 };
 
 } // namespace Internal

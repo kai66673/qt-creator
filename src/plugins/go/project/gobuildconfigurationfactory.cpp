@@ -46,43 +46,43 @@ using namespace Utils;
 namespace GoLang {
 
 GoBuildConfigurationFactory::GoBuildConfigurationFactory()
-    : IBuildConfigurationFactory()
+    : BuildConfigurationFactory()
 {
     registerBuildConfiguration<GoBuildConfiguration>(Constants::C_GOBUILDCONFIGURATION_ID);
     setSupportedProjectType(Constants::C_GOPROJECT_ID);
     setSupportedProjectMimeTypeName(Constants::C_GO_PROJECT_MIMETYPE);
 }
 
-QList<BuildInfo *> GoBuildConfigurationFactory::availableBuilds(const Target *parent) const
+QList<BuildInfo> GoBuildConfigurationFactory::availableBuilds(const Target *parent) const
 {
     // Retrieve the project path
     GoProject *project = qobject_cast<GoProject *>(parent->project());
     QTC_ASSERT(project, return {});
 
     // Create the build info
-    BuildInfo *info = createBuildInfo(parent->kit(), project->projectFilePath().toString());
+    BuildInfo info = createBuildInfo(parent->kit(), project->projectFilePath().toString());
 
-    info->displayName.clear(); // ask for a name
-    info->buildDirectory.clear(); // This depends on the displayName
+    info.displayName.clear(); // ask for a name
+    info.buildDirectory.clear(); // This depends on the displayName
 
     return {info};
 }
 
-QList<BuildInfo *> GoBuildConfigurationFactory::availableSetups(const Kit *k, const QString &projectPath) const
+QList<BuildInfo> GoBuildConfigurationFactory::availableSetups(const Kit *k, const QString &projectPath) const
 {
     return { createBuildInfo(k, projectPath) };
 }
 
-BuildInfo *GoBuildConfigurationFactory::createBuildInfo(const Kit *k, const QString &projectPath) const
+BuildInfo GoBuildConfigurationFactory::createBuildInfo(const Kit *k, const QString &projectPath) const
 {
     QFileInfo projFileInfo(projectPath);
 
-    ProjectExplorer::BuildInfo *goBuild = new ProjectExplorer::BuildInfo(this);
-    goBuild->buildType = ProjectExplorer::BuildConfiguration::Debug;
-    goBuild->displayName = ProjectExplorer::BuildConfiguration::buildTypeName(ProjectExplorer::BuildConfiguration::Debug);
-    goBuild->buildDirectory = Utils::FileName::fromString(projFileInfo.absolutePath());
-    goBuild->kitId = k->id();
-    goBuild->typeName = tr("Default");
+    ProjectExplorer::BuildInfo goBuild(this);
+    goBuild.buildType = ProjectExplorer::BuildConfiguration::Debug;
+    goBuild.displayName = ProjectExplorer::BuildConfiguration::buildTypeName(ProjectExplorer::BuildConfiguration::Debug);
+    goBuild.buildDirectory = Utils::FileName::fromString(projFileInfo.absolutePath());
+    goBuild.kitId = k->id();
+    goBuild.typeName = tr("Default");
     return  goBuild;
 }
 

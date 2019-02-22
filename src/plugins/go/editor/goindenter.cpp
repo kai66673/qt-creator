@@ -31,12 +31,12 @@
 namespace GoEditor {
 namespace Internal {
 
-GoIndenter::GoIndenter() :
-    TextEditor::Indenter()
+GoIndenter::GoIndenter(QTextDocument *doc)
+    : TextEditor::TextIndenter(doc)
 { }
 
-void GoIndenter::indentBlock(QTextDocument * /*doc*/, const QTextBlock &block,
-                             const QChar &typedChar, const TextEditor::TabSettings &tabSettings)
+void GoIndenter::indentBlock(const QTextBlock &block,
+                             const QChar &typedChar, const TextEditor::TabSettings &tabSettings, int cursorPositionInEditor)
 {
     GoCodeFormatter codeFormatter(tabSettings);
 

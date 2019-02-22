@@ -49,7 +49,7 @@ class GoDocument : public TextEditor::TextDocument
 
 public:
     explicit GoDocument();
-    ~GoDocument();
+    ~GoDocument() override;
 
     QByteArray contentsText() const;
     unsigned contentsRevision() const;

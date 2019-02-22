@@ -34,6 +34,7 @@
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/ioutputparser.h>
+#include <projectexplorer/processparameters.h>
 #include <utils/qtcassert.h>
 
 #include <QDir>
@@ -81,16 +82,16 @@ ProjectExplorer::BuildStepConfigWidget *BaseGoCompilerStep::createConfigWidget()
     return new GoCompilerBuildStepConfigWidget(this);
 }
 
-bool BaseGoCompilerStep::init(QList<const BuildStep *> &earlierSteps)
+bool BaseGoCompilerStep::init()
 {
     setOutputParser(new GoOutputParser());
     if (IOutputParser *parser = target()->kit()->createOutputParser())
         appendOutputParser(parser);
     outputParser()->setWorkingDirectory(processParameters()->workingDirectory());
-    return AbstractProcessStep::init(earlierSteps);
+    return AbstractProcessStep::init();
 }
 
-void BaseGoCompilerStep::run(QFutureInterface<bool> &fi)
+void BaseGoCompilerStep::doRun()
 {
     ProcessParameters *parameters = processParameters();
     Environment env = parameters->environment();
@@ -102,7 +103,7 @@ void BaseGoCompilerStep::run(QFutureInterface<bool> &fi)
 
     env.set(QStringLiteral("GOPATH"), goPath);
     parameters->setEnvironment(env);
-    AbstractProcessStep::run(fi);
+    AbstractProcessStep::run();
 }
 
 bool BaseGoCompilerStep::fromMap(const QVariantMap &map)

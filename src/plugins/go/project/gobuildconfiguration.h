@@ -37,10 +37,10 @@ class GoBuildConfiguration : public ProjectExplorer::BuildConfiguration
 {
     Q_OBJECT
 
-    friend class ProjectExplorer::IBuildConfigurationFactory;
+    friend class ProjectExplorer::BuildConfigurationFactory;
     GoBuildConfiguration(ProjectExplorer::Target *target, Core::Id id);
 
-    void initialize(const ProjectExplorer::BuildInfo *info) override;
+    void initialize(const ProjectExplorer::BuildInfo &info) override;
     ProjectExplorer::NamedWidget *createConfigWidget() override;
     ProjectExplorer::BuildConfiguration::BuildType buildType() const override;
 

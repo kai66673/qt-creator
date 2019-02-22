@@ -118,7 +118,7 @@ GoEditor::GoEditor()
 void GoEditor::decorateEditor(TextEditorWidget *editor)
 {
     editor->textDocument()->setSyntaxHighlighter(new GoHighlighter);
-    editor->textDocument()->setIndenter(new GoIndenter);
+    editor->textDocument()->setIndenter(new GoIndenter(editor->document()));
     editor->setAutoCompleter(new GoAutoCompleter);
 }
 

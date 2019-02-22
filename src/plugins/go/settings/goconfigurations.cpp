@@ -59,7 +59,7 @@ static QSet<Kit *> existingAutoDetectedGoKits()
     return Utils::filtered(KitManager::kits(), [](Kit *kit) -> bool {
         if (!kit->isAutoDetected())
             return false;
-        return ToolChainKitInformation::toolChain(kit, Constants::C_GOLANGUAGE_ID) != nullptr;
+        return ToolChainKitAspect::toolChain(kit, Constants::C_GOLANGUAGE_ID) != nullptr;
     }).toSet();
 }
 
@@ -98,16 +98,16 @@ void GoConfigurations::updateAutomaticKitList()
 
     kit->setAutoDetected(true);
     kit->setUnexpandedDisplayName("Go-Desktop");
-    DeviceTypeKitInformation::setDeviceTypeId(kit, ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE);
-    ToolChainKitInformation::setToolChain(kit, goToolChain);
+    DeviceTypeKitAspect::setDeviceTypeId(kit, ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE);
+    ToolChainKitAspect::setToolChain(kit, goToolChain);
     if (debuggerId.isValid())
-        DebuggerKitInformation::setDebugger(kit, debuggerId);
+        DebuggerKitAspect::setDebugger(kit, debuggerId);
 
-    kit->setMutable(DeviceKitInformation::id(), true);
-    kit->setSticky(ToolChainKitInformation::id(), true);
-    kit->setSticky(DeviceTypeKitInformation::id(), true);
-    kit->setSticky(SysRootKitInformation::id(), true);
-    kit->setSticky(DebuggerKitInformation::id(), true);
+    kit->setMutable(DeviceKitAspect::id(), true);
+    kit->setSticky(ToolChainKitAspect::id(), true);
+    kit->setSticky(DeviceTypeKitAspect::id(), true);
+    kit->setSticky(SysRootKitAspect::id(), true);
+    kit->setSticky(DebuggerKitAspect::id(), true);
 
     kit->unblockNotification();
     KitManager::registerKit(std::move(newKit));

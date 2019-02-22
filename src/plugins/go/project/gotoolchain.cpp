@@ -329,14 +329,14 @@ bool GoToolChain::isValid() const
     return fi.isExecutable() && dir.isDir();
 }
 
-ToolChain::PredefinedMacrosRunner GoToolChain::createPredefinedMacrosRunner() const
-{ return ToolChain::PredefinedMacrosRunner(); }
+ToolChain::MacroInspectionRunner GoToolChain::createMacroInspectionRunner() const
+{ return ToolChain::MacroInspectionRunner(); }
 
 Macros GoToolChain::predefinedMacros(const QStringList &) const
 { return Macros(); }
 
-ToolChain::CompilerFlags GoToolChain::compilerFlags(const QStringList &) const
-{ return NoFlags; }
+LanguageExtensions GoToolChain::languageExtensions(const QStringList &) const
+{ return LanguageExtension::None; }
 
 WarningFlags GoToolChain::warningFlags(const QStringList &) const
 { return WarningFlags::NoWarnings; }
@@ -409,7 +409,7 @@ QList<Task> GoToolChain::validateKit(const Kit *k) const
 {
     QList<Task> result;
 
-    ToolChain *tc = ToolChainKitInformation::toolChain(k, Constants::C_GOLANGUAGE_ID);
+    ToolChain *tc = ToolChainKitAspect::toolChain(k, Constants::C_GOLANGUAGE_ID);
     if(tc) {
         Abi targetAbi = tc->targetAbi();
         bool compMatch = targetAbi.isCompatibleWith(m_targetAbi);

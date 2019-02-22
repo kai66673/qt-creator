@@ -60,7 +60,7 @@ GoDocument::GoDocument()
     , m_completionAssistProvider(new GoCompletionAssistProvider)
 {
     setSyntaxHighlighter(new GoHighlighter);
-    setIndenter(new GoIndenter);
+    setIndenter(new GoIndenter(document()));
 
     connect(this, &Core::IDocument::mimeTypeChanged,
             this, &GoDocument::onMimeTypeChanged);

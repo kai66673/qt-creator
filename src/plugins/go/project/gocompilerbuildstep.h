@@ -46,8 +46,8 @@ public:
     BaseGoCompilerStep(ProjectExplorer::BuildStepList *parentList, GoOption option);
 
     ProjectExplorer::BuildStepConfigWidget *createConfigWidget() override;
-    bool init(QList<const BuildStep *> &earlierSteps) override;
-    void run(QFutureInterface<bool> &fi) override;
+    bool init() override;
+    void doRun() override;
 
     bool fromMap(const QVariantMap &map) override;
     QVariantMap toMap() const override;
