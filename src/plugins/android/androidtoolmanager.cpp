@@ -26,16 +26,16 @@
 
 #include "androidmanager.h"
 
-#include "utils/algorithm.h"
-#include "utils/environment.h"
-#include "utils/qtcassert.h"
-#include "utils/runextensions.h"
-#include "utils/synchronousprocess.h"
+#include <utils/algorithm.h>
+#include <utils/environment.h>
+#include <utils/qtcassert.h>
+#include <utils/runextensions.h>
+#include <utils/synchronousprocess.h>
 
 #include <QLoggingCategory>
 
 namespace {
-Q_LOGGING_CATEGORY(androidToolLog, "qtc.android.sdkManager")
+Q_LOGGING_CATEGORY(androidToolLog, "qtc.android.sdkManager", QtWarningMsg)
 }
 
 namespace Android {

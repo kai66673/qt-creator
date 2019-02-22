@@ -36,6 +36,8 @@
 #include <coreplugin/icore.h>
 #include <coreplugin/variablechooser.h>
 
+#include <debugger/analyzer/analyzericons.h>
+
 #include <QCheckBox>
 #include <QDir>
 #include <QFormLayout>
@@ -45,6 +47,7 @@ namespace Internal {
 
 class OptionsWidget final : public QWidget
 {
+    Q_DECLARE_TR_FUNCTIONS(CppcheckOptionsPage)
 public:
     explicit OptionsWidget(QWidget *parent = nullptr)
         : QWidget(parent),
@@ -57,7 +60,7 @@ public:
           m_portability(new QCheckBox(tr("Portability"), this)),
           m_information(new QCheckBox(tr("Information"), this)),
           m_unusedFunction(new QCheckBox(tr("Unused functions"), this)),
-          m_missingInclude(new QCheckBox(tr("Missing include"), this)),
+          m_missingInclude(new QCheckBox(tr("Missing includes"), this)),
           m_inconclusive(new QCheckBox(tr("Inconclusive errors"), this)),
           m_forceDefines(new QCheckBox(tr("Check all define combinations"), this)),
           m_showOutput(new QCheckBox(tr("Show raw output"), this)),
@@ -71,7 +74,7 @@ public:
         variableChooser->addSupportedWidget (m_customArguments);
 
         m_unusedFunction->setToolTip(tr("Disables multithreaded check."));
-        m_ignorePatterns->setToolTip(tr("Comma-separated wildcards of full file paths."
+        m_ignorePatterns->setToolTip(tr("Comma-separated wildcards of full file paths. "
                                         "Files still can be checked if others include them."));
         m_addIncludePaths->setToolTip(tr("Can find missing includes but makes "
                                          "checking slower. Use only when needed."));
@@ -164,6 +167,8 @@ CppcheckOptionsPage::CppcheckOptionsPage(CppcheckTool &tool, CppcheckTrigger &tr
     setId(Constants::OPTIONS_PAGE_ID);
     setDisplayName(tr("Cppcheck"));
     setCategory("T.Analyzer");
+    setDisplayCategory(QCoreApplication::translate("Analyzer", "Analyzer"));
+    setCategoryIcon(Analyzer::Icons::SETTINGSCATEGORY_ANALYZER);
 
     CppcheckOptions options;
     if (Utils::HostOsInfo::isAnyUnixHost()) {

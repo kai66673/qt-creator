@@ -37,7 +37,9 @@
 #include <utils/qtcassert.h>
 #include <utils/icon.h>
 
+#include <QHash>
 #include <QPointer>
+#include <QVariant>
 #include <QWidget>
 
 #include <functional>
@@ -46,7 +48,6 @@
 namespace Utils { class OutputFormatter; }
 
 namespace ProjectExplorer {
-class Abi;
 class BuildConfiguration;
 class GlobalOrProjectAspect;
 class Node;
@@ -138,6 +139,7 @@ public:
     QString workingDirectory;
     Utils::Environment environment;
     IDevice::ConstPtr device; // Override the kit's device. Keep unset by default.
+    QHash<Core::Id, QVariant> extraData;
 
     // FIXME: Not necessarily a display name
     QString displayName() const { return executable; }
@@ -172,7 +174,6 @@ public:
     QVariantMap toMap() const override;
 
     virtual Runnable runnable() const;
-    virtual Abi abi() const;
 
     // Return a handle to the build system target that created this run configuration.
     // May return an empty string if no target built the executable!
@@ -185,8 +186,8 @@ public:
 
     template <class T = ISettingsAspect> T *currentSettings(Core::Id id) const
     {
-        if (auto aspect = qobject_cast<GlobalOrProjectAspect *>(extraAspect(id)))
-            return qobject_cast<T *>(aspect->currentSettings());
+        if (auto a = qobject_cast<GlobalOrProjectAspect *>(aspect(id)))
+            return qobject_cast<T *>(a->currentSettings());
         return nullptr;
     }
 
@@ -205,7 +206,6 @@ protected:
 
     /// convenience function to get current build configuration.
     BuildConfiguration *activeBuildConfiguration() const;
-    QWidget *wrapWidget(QWidget *inner) const;
 
     template<class T> void setOutputFormatter()
     {
@@ -234,6 +234,8 @@ public:
     Core::Id id;
     QString buildKey;
     QString displayName;
+    QString displayNameUniquifier;
+    Utils::FileName projectFilePath;
     CreationMode creationMode = AlwaysCreate;
     bool useTerminal = false;
 };
@@ -242,6 +244,8 @@ class PROJECTEXPLORER_EXPORT RunConfigurationFactory
 {
 public:
     RunConfigurationFactory();
+    RunConfigurationFactory(const RunConfigurationFactory &) = delete;
+    RunConfigurationFactory operator=(const RunConfigurationFactory &) = delete;
     virtual ~RunConfigurationFactory();
 
     static RunConfiguration *restore(Target *parent, const QVariantMap &map);
@@ -250,7 +254,7 @@ public:
 
     Core::Id runConfigurationBaseId() const { return m_runConfigBaseId; }
 
-    static QString decoratedTargetName(const QString targetName, Target *kit);
+    static QString decoratedTargetName(const QString &targetName, Target *kit);
 
 protected:
     virtual QList<RunConfigurationCreationInfo> availableCreators(Target *parent) const;
@@ -282,9 +286,6 @@ protected:
 private:
     RunWorkerFactory *addRunWorkerFactoryHelper
         (Core::Id runMode, const std::function<RunWorker *(RunControl *)> &creator);
-
-    RunConfigurationFactory(const RunConfigurationFactory &) = delete;
-    RunConfigurationFactory operator=(const RunConfigurationFactory &) = delete;
 
     bool canHandle(Target *target) const;
 
@@ -440,7 +441,6 @@ public:
 
     Utils::ProcessHandle applicationProcessHandle() const;
     void setApplicationProcessHandle(const Utils::ProcessHandle &handle);
-    Abi abi() const;
     IDevice::ConstPtr device() const;
 
     RunConfiguration *runConfiguration() const;

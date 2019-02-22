@@ -20,6 +20,7 @@ DEFINES += \
     QT_USE_FAST_CONCATENATION \
     UNIT_TESTS \
     DONT_CHECK_MESSAGE_COUNTER \
+    QTC_RESOURCE_DIR=\"R\\\"xxx($$PWD/../../../share/qtcreator)xxx\\\"\" \
     TESTDATA_DIR=\"R\\\"xxx($$PWD/data)xxx\\\"\"
 msvc: QMAKE_CXXFLAGS_WARN_ON -= -w34100 # 'unreferenced formal parameter' in MATCHER_* functions
 win32:DEFINES += ECHOSERVER=\"R\\\"xxx($$OUT_PWD/../echo)xxx\\\"\"
@@ -32,6 +33,7 @@ CONFIG(release, debug|release):QMAKE_LFLAGS += -Wl,--strip-debug
 }
 
 gcc:!clang: QMAKE_CXXFLAGS += -Wno-noexcept-type
+msvc: QMAKE_CXXFLAGS += /bigobj
 
 # create fake CppTools.json for the mime type definitions
 dependencyList = "\"Dependencies\" : []"
@@ -79,7 +81,6 @@ SOURCES += \
     symbolstorage-test.cpp \
     mocksqlitereadstatement.cpp \
     symbolquery-test.cpp \
-    storagesqlitestatementfactory-test.cpp \
     sqliteindex-test.cpp \
     sqlitetransaction-test.cpp \
     refactoringdatabaseinitializer-test.cpp \
@@ -99,9 +100,21 @@ SOURCES += \
     sourcesmanager-test.cpp \
     symbolindexertaskqueue-test.cpp \
     refactoringprojectupdater-test.cpp \
-    projectpartqueue-test.cpp \
     processormanager-test.cpp \
     taskscheduler-test.cpp \
+    compileroptionsbuilder-test.cpp \
+    progresscounter-test.cpp \
+    pchtaskgenerator-test.cpp \
+    compilationdatabaseutils-test.cpp \
+    builddependenciesprovider-test.cpp \
+    builddependenciesstorage-test.cpp \
+    usedmacrofilter-test.cpp \
+    pchtasksmerger-test.cpp \
+    pchtaskqueue-test.cpp \
+    commandlinebuilder-test.cpp \
+    headerpathfilter-test.cpp \
+    toolchainargumentscache-test.cpp \
+    modifiedtimechecker-test.cpp
 
 !isEmpty(LIBCLANG_LIBS) {
 SOURCES += \
@@ -167,7 +180,6 @@ SOURCES += \
     clangqueryprojectfindfilter-test.cpp \
     clangquery-test.cpp \
     gtest-clang-printing.cpp \
-    includecollector-test.cpp \
     pchcreator-test.cpp \
     refactoringclientserverinprocess-test.cpp \
     refactoringclient-test.cpp \
@@ -178,7 +190,13 @@ SOURCES += \
     symbolindexing-test.cpp \
     symbolscollector-test.cpp \
     symbolfinder-test.cpp \
-    testclangtool.cpp
+    testclangtool.cpp \
+    usedmacrocollector-test.cpp \
+    builddependencycollector-test.cpp
+}
+
+!isEmpty(CLANGFORMAT_LIBS) {
+    SOURCES += clangformat-test.cpp
 }
 
 exists($$GOOGLEBENCHMARK_DIR) {
@@ -243,7 +261,16 @@ HEADERS += \
     mockprojectpartqueue.h \
     mockprocessor.h \
     mockprocessormanager.h \
-    mocktaskscheduler.h
+    mocktaskscheduler.h \
+    mockprogressmanager.h \
+    mockfutureinterface.h \
+    mockbuilddependenciesprovider.h \
+    mockmodifiedtimechecker.h \
+    mockbuilddependenciesstorage.h \
+    mockbuilddependencygenerator.h \
+    mockpchtasksmerger.h \
+    mockpchtaskqueue.h \
+    mockpchtaskgenerator.h
 
 !isEmpty(LIBCLANG_LIBS) {
 HEADERS += \

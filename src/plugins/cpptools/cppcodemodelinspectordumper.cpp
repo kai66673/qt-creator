@@ -103,37 +103,39 @@ QString Utils::toString(ProjectExplorer::HeaderPathType type)
     return QString();
 }
 
-QString Utils::toString(ProjectPart::LanguageVersion languageVersion)
+QString Utils::toString(::Utils::LanguageVersion languageVersion)
 {
-#define CASE_LANGUAGEVERSION(x) case ProjectPart::x: return QLatin1String(#x)
+#define CASE_LANGUAGEVERSION(x) case ::Utils::LanguageVersion::x: return QLatin1String(#x)
     switch (languageVersion) {
     CASE_LANGUAGEVERSION(C89);
     CASE_LANGUAGEVERSION(C99);
     CASE_LANGUAGEVERSION(C11);
+    CASE_LANGUAGEVERSION(C18);
     CASE_LANGUAGEVERSION(CXX98);
     CASE_LANGUAGEVERSION(CXX03);
     CASE_LANGUAGEVERSION(CXX11);
     CASE_LANGUAGEVERSION(CXX14);
     CASE_LANGUAGEVERSION(CXX17);
+    CASE_LANGUAGEVERSION(CXX2a);
     // no default to get a compiler warning if anything is added
     }
 #undef CASE_LANGUAGEVERSION
     return QString();
 }
 
-QString Utils::toString(ProjectPart::LanguageExtensions languageExtension)
+QString Utils::toString(::Utils::LanguageExtensions languageExtension)
 {
     QString result;
 
-#define CASE_LANGUAGE_EXTENSION(ext) if (languageExtension & ProjectPart::ext) \
+#define CASE_LANGUAGE_EXTENSION(ext) if (languageExtension & ::Utils::LanguageExtension::ext) \
     result += QLatin1String(#ext ", ");
 
-    CASE_LANGUAGE_EXTENSION(NoExtensions);
-    CASE_LANGUAGE_EXTENSION(GnuExtensions);
-    CASE_LANGUAGE_EXTENSION(MicrosoftExtensions);
-    CASE_LANGUAGE_EXTENSION(BorlandExtensions);
-    CASE_LANGUAGE_EXTENSION(OpenMPExtensions);
-    CASE_LANGUAGE_EXTENSION(ObjectiveCExtensions);
+    CASE_LANGUAGE_EXTENSION(None);
+    CASE_LANGUAGE_EXTENSION(Gnu);
+    CASE_LANGUAGE_EXTENSION(Microsoft);
+    CASE_LANGUAGE_EXTENSION(Borland);
+    CASE_LANGUAGE_EXTENSION(OpenMP);
+    CASE_LANGUAGE_EXTENSION(ObjectiveC);
 #undef CASE_LANGUAGE_EXTENSION
     if (result.endsWith(QLatin1String(", ")))
         result.chop(2);
@@ -146,8 +148,7 @@ QString Utils::toString(ProjectPart::QtVersion qtVersion)
     switch (qtVersion) {
     CASE_QTVERSION(UnknownQt);
     CASE_QTVERSION(NoQt);
-    CASE_QTVERSION(Qt4_8_6AndOlder);
-    CASE_QTVERSION(Qt4Latest);
+    CASE_QTVERSION(Qt4);
     CASE_QTVERSION(Qt5);
     // no default to get a compiler warning if anything is added
     }
@@ -504,6 +505,7 @@ void Dumper::dumpProjectInfos( const QList<ProjectInfo> &projectInfos)
             m_out << i3 << "Project Part Name    : " << part->displayName << "\n";
             m_out << i3 << "Project Name         : " << projectName << "\n";
             m_out << i3 << "Project File         : " << projectFilePath << "\n";
+            m_out << i3 << "Compiler Flags       : " << part->compilerFlags.join(", ") << "\n";
             m_out << i3 << "Selected For Building: " << part->selectedForBuilding << "\n";
             m_out << i3 << "Build Target Type    : " << Utils::toString(part->buildTargetType) << "\n";
             m_out << i3 << "Lanugage Version     : " << Utils::toString(part->languageVersion)<<"\n";
@@ -514,8 +516,10 @@ void Dumper::dumpProjectInfos( const QList<ProjectInfo> &projectInfos)
             if (!part->files.isEmpty()) {
                 m_out << i3 << "Files:{{{4\n";
                 foreach (const ProjectFile &projectFile, part->files) {
-                    m_out << i4 << Utils::toString(projectFile.kind) << ": " << projectFile.path
-                          << "\n";
+                    m_out << i4 << Utils::toString(projectFile.kind) << ": " << projectFile.path;
+                    if (!projectFile.active)
+                        m_out << " (inactive)";
+                    m_out << "\n";
                 }
             }
 
@@ -661,8 +665,8 @@ void Dumper::dumpDocuments(const QList<CPlusPlus::Document::Ptr> &documents, boo
         if (!diagnosticMessages.isEmpty()) {
             m_out << i3 << "Diagnostic Messages:{{{4\n";
             foreach (const CPlusPlus::Document::DiagnosticMessage &msg, diagnosticMessages) {
-                const CPlusPlus::Document::DiagnosticMessage::Level level
-                        = static_cast<CPlusPlus::Document::DiagnosticMessage::Level>(msg.level());
+                const auto level =
+                    static_cast<CPlusPlus::Document::DiagnosticMessage::Level>(msg.level());
                 m_out << i4 << "at " << msg.line() << ":" << msg.column() << ", " << Utils::toString(level)
                       << ": " << msg.text() << "\n";
             }

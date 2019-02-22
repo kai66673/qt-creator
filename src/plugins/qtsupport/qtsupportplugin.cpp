@@ -27,14 +27,17 @@
 
 #include "codegenerator.h"
 #include "codegensettingspage.h"
-#include "desktopqtversionfactory.h"
+#include "desktopqtversion.h"
 #include "gettingstartedwelcomepage.h"
 #include "qtkitinformation.h"
 #include "qtoptionspage.h"
+#include "qtsupportconstants.h"
+#include "qtversionfactory.h"
 #include "qtversionmanager.h"
 #include "uicgenerator.h"
 #include "qscxmlcgenerator.h"
 
+#include "desktopqtversion.h"
 #include "profilereader.h"
 
 #include <coreplugin/icore.h>
@@ -84,7 +87,7 @@ bool QtSupportPlugin::initialize(const QStringList &arguments, QString *errorMes
 
     d = new QtSupportPluginPrivate;
 
-    ProjectExplorer::KitManager::registerKitInformation<QtKitInformation>();
+    ProjectExplorer::KitManager::registerKitAspect<QtKitAspect>();
 
     (void) new UicGeneratorFactory(this);
     (void) new QScxmlcGeneratorFactory(this);
@@ -100,7 +103,7 @@ static QString qmakeProperty(const char *propertyName)
     if (!project || !project->activeTarget())
         return QString();
 
-    const BaseQtVersion *qtVersion = QtKitInformation::qtVersion(project->activeTarget()->kit());
+    const BaseQtVersion *qtVersion = QtKitAspect::qtVersion(project->activeTarget()->kit());
     if (!qtVersion)
         return QString();
     return qtVersion->qmakeProperty(propertyName);

@@ -35,6 +35,7 @@
 #include <coreplugin/icore.h>
 #include <cppeditor/cppeditorconstants.h>
 #include <texteditor/codestyleeditor.h>
+#include <texteditor/icodestylepreferencesfactory.h>
 #include <texteditor/textdocument.h>
 #include <texteditor/displaysettings.h>
 #include <texteditor/snippets/snippetprovider.h>
@@ -223,7 +224,7 @@ static void applyRefactorings(QTextDocument *textDocument, TextEditorWidget *edi
 {
     // Preprocess source
     Environment env;
-    Preprocessor preprocess(0, &env);
+    Preprocessor preprocess(nullptr, &env);
     const QByteArray preprocessedSource
         = preprocess.run(QLatin1String("<no-file>"), textDocument->toPlainText());
 
@@ -237,7 +238,7 @@ static void applyRefactorings(QTextDocument *textDocument, TextEditorWidget *edi
     // Run the formatter
     Overview overview;
     overview.showReturnTypes = true;
-    overview.starBindFlags = Overview::StarBindFlags(0);
+    overview.starBindFlags = Overview::StarBindFlags(nullptr);
 
     if (settings.bindStarToIdentifier)
         overview.starBindFlags |= Overview::BindToIdentifier;
@@ -260,9 +261,7 @@ static void applyRefactorings(QTextDocument *textDocument, TextEditorWidget *edi
 
 CppCodeStylePreferencesWidget::CppCodeStylePreferencesWidget(QWidget *parent)
     : QWidget(parent),
-      m_preferences(0),
-      m_ui(new Ui::CppCodeStyleSettingsPage),
-      m_blockUpdates(false)
+      m_ui(new Ui::CppCodeStyleSettingsPage)
 {
     m_ui->setupUi(this);
     m_ui->categoryTab->setProperty("_q_custom_style_disabled", true);
@@ -441,7 +440,7 @@ void CppCodeStylePreferencesWidget::slotCodeStyleSettingsChanged()
         return;
 
     if (m_preferences) {
-        CppCodeStylePreferences *current = qobject_cast<CppCodeStylePreferences *>(m_preferences->currentPreferences());
+        auto current = qobject_cast<CppCodeStylePreferences *>(m_preferences->currentPreferences());
         if (current)
             current->setCodeStyleSettings(cppCodeStyleSettings());
     }
@@ -455,7 +454,7 @@ void CppCodeStylePreferencesWidget::slotTabSettingsChanged(const TabSettings &se
         return;
 
     if (m_preferences) {
-        CppCodeStylePreferences *current = qobject_cast<CppCodeStylePreferences *>(m_preferences->currentPreferences());
+        auto current = qobject_cast<CppCodeStylePreferences *>(m_preferences->currentPreferences());
         if (current)
             current->setTabSettings(settings);
     }
@@ -482,7 +481,7 @@ void CppCodeStylePreferencesWidget::updatePreview()
         QTextCursor tc = preview->textCursor();
         tc.beginEditBlock();
         while (block.isValid()) {
-            preview->textDocument()->indenter()->indentBlock(doc, block, QChar::Null, ts);
+            preview->textDocument()->indenter()->indentBlock(block, QChar::Null, ts);
 
             block = block.next();
         }
@@ -511,9 +510,8 @@ void CppCodeStylePreferencesWidget::setVisualizeWhitespace(bool on)
 
 // ------------------ CppCodeStyleSettingsPage
 
-CppCodeStyleSettingsPage::CppCodeStyleSettingsPage(QWidget *parent) :
-    Core::IOptionsPage(parent),
-    m_pageCppCodeStylePreferences(0)
+CppCodeStyleSettingsPage::CppCodeStyleSettingsPage(QWidget *parent)
+    : Core::IOptionsPage(parent)
 {
     setId(Constants::CPP_CODE_STYLE_SETTINGS_ID);
     setDisplayName(QCoreApplication::translate("CppTools", Constants::CPP_CODE_STYLE_SETTINGS_NAME));
@@ -523,16 +521,19 @@ CppCodeStyleSettingsPage::CppCodeStyleSettingsPage(QWidget *parent) :
 QWidget *CppCodeStyleSettingsPage::widget()
 {
     if (!m_widget) {
-        CppCodeStylePreferences *originalCodeStylePreferences
-                = CppToolsSettings::instance()->cppCodeStyle();
-        m_pageCppCodeStylePreferences = new CppCodeStylePreferences(m_widget);
-        m_pageCppCodeStylePreferences->setDelegatingPool(originalCodeStylePreferences->delegatingPool());
-        m_pageCppCodeStylePreferences->setCodeStyleSettings(originalCodeStylePreferences->codeStyleSettings());
-        m_pageCppCodeStylePreferences->setCurrentDelegate(originalCodeStylePreferences->currentDelegate());
+        CppCodeStylePreferences *originalCodeStylePreferences = CppToolsSettings::instance()
+                                                                    ->cppCodeStyle();
+        m_pageCppCodeStylePreferences = new CppCodeStylePreferences();
+        m_pageCppCodeStylePreferences->setDelegatingPool(
+            originalCodeStylePreferences->delegatingPool());
+        m_pageCppCodeStylePreferences->setCodeStyleSettings(
+            originalCodeStylePreferences->codeStyleSettings());
+        m_pageCppCodeStylePreferences->setCurrentDelegate(
+            originalCodeStylePreferences->currentDelegate());
         // we set id so that it won't be possible to set delegate to the original prefs
         m_pageCppCodeStylePreferences->setId(originalCodeStylePreferences->id());
-        m_widget = new CodeStyleEditor(TextEditorSettings::codeStyleFactory(CppTools::Constants::CPP_SETTINGS_ID),
-                                       m_pageCppCodeStylePreferences);
+        m_widget = TextEditorSettings::codeStyleFactory(CppTools::Constants::CPP_SETTINGS_ID)
+                       ->createCodeStyleEditor(m_pageCppCodeStylePreferences);
     }
     return m_widget;
 }
@@ -555,6 +556,8 @@ void CppCodeStyleSettingsPage::apply()
             originalCppCodeStylePreferences->setCurrentDelegate(m_pageCppCodeStylePreferences->currentDelegate());
             originalCppCodeStylePreferences->toSettings(QLatin1String(CppTools::Constants::CPP_SETTINGS_ID), s);
         }
+
+        m_widget->apply();
     }
 }
 

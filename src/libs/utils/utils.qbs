@@ -33,7 +33,8 @@ Project {
             cpp.frameworks: ["Foundation", "AppKit"]
         }
 
-        Depends { name: "Qt"; submodules: ["concurrent", "network", "qml", "widgets"] }
+        Depends { name: "Qt"; submodules: ["concurrent", "network", "qml", "widgets", "xml"] }
+        Depends { name: "Qt.macextras"; condition: qbs.targetOS.contains("macos") }
         Depends { name: "app_version_header" }
 
         files: [
@@ -66,6 +67,7 @@ Project {
             "consoleprocess.cpp",
             "consoleprocess.h",
             "consoleprocess_p.h",
+            "cpplanguage_details.h",
             "crumblepath.cpp",
             "crumblepath.h",
             "declarationmacros.h",
@@ -122,6 +124,8 @@ Project {
             "functiontraits.h",
             "fuzzymatcher.cpp",
             "fuzzymatcher.h",
+            "globalfilechangeblocker.cpp",
+            "globalfilechangeblocker.h",
             "guard.cpp",
             "guard.h",
             "highlightingitemdelegate.cpp",
@@ -138,6 +142,8 @@ Project {
             "itemviews.h",
             "json.cpp",
             "json.h",
+            "jsontreeitem.cpp",
+            "jsontreeitem.h",
             "linecolumn.h",
             "link.h",
             "listutils.h",
@@ -185,6 +191,8 @@ Project {
             "proxycredentialsdialog.cpp",
             "proxycredentialsdialog.h",
             "proxycredentialsdialog.ui",
+            "qrcparser.cpp",
+            "qrcparser.h",
             "qtcassert.cpp",
             "qtcassert.h",
             "qtcolorbutton.cpp",
@@ -354,6 +362,27 @@ Project {
                 "mimetypeparser.cpp",
                 "mimetypeparser_p.h",
             ]
+        }
+
+        Group {
+            name: "TouchBar support"
+            prefix: "touchbar/"
+            files: "touchbar.h"
+            Group {
+                name: "TouchBar implementation"
+                condition: qbs.targetOS.contains("macos")
+                files: [
+                    "touchbar_appdelegate_mac_p.h",
+                    "touchbar_mac_p.h",
+                    "touchbar_mac.mm",
+                    "touchbar_appdelegate_mac.mm",
+                ]
+            }
+            Group {
+                name: "TouchBar stub"
+                condition: !qbs.targetOS.contains("macos")
+                files: "touchbar.cpp"
+            }
         }
 
         Export {

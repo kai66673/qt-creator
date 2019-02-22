@@ -55,9 +55,9 @@ Utils::FileName UicGenerator::command() const
     QtSupport::BaseQtVersion *version = nullptr;
     Target *target;
     if ((target = project()->activeTarget()))
-        version = QtSupport::QtKitInformation::qtVersion(target->kit());
+        version = QtSupport::QtKitAspect::qtVersion(target->kit());
     else
-        version = QtSupport::QtKitInformation::qtVersion(KitManager::defaultKit());
+        version = QtSupport::QtKitAspect::qtVersion(KitManager::defaultKit());
 
     if (!version)
         return Utils::FileName();
@@ -100,6 +100,8 @@ ExtraCompiler *UicGeneratorFactory::create(const Project *project,
                                            const Utils::FileName &source,
                                            const Utils::FileNameList &targets)
 {
+    annouceCreation(project, source, targets);
+
     return new UicGenerator(project, source, targets, this);
 }
 

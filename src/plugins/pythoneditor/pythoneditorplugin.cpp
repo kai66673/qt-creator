@@ -59,6 +59,10 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <QTextCursor>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QJsonArray>
 
 using namespace Core;
 using namespace ProjectExplorer;
@@ -99,7 +103,7 @@ private:
     bool saveRawList(const QStringList &rawList, const QString &fileName);
     void parseProject();
     QStringList processEntries(const QStringList &paths,
-                               QHash<QString, QString> *map = 0) const;
+                               QHash<QString, QString> *map = nullptr) const;
 
     QStringList m_rawFileList;
     QStringList m_files;
@@ -113,6 +117,10 @@ public:
 
     bool showInSimpleTree() const override;
     QString addFileFilter() const override;
+    bool supportsAction(ProjectAction action, const Node *node) const override;
+    bool addFiles(const QStringList &filePaths, QStringList *) override;
+    bool removeFiles(const QStringList &filePaths, QStringList *) override;
+    bool deleteFiles(const QStringList &) override;
     bool renameFile(const QString &filePath, const QString &newFilePath) override;
 
 private:
@@ -237,9 +245,9 @@ private:
     Runnable runnable() const final;
 
     bool supportsDebugger() const { return true; }
-    QString mainScript() const { return extraAspect<MainScriptAspect>()->value(); }
-    QString arguments() const { return extraAspect<ArgumentsAspect>()->arguments(macroExpander()); }
-    QString interpreter() const { return extraAspect<InterpreterAspect>()->value(); }
+    QString mainScript() const { return aspect<MainScriptAspect>()->value(); }
+    QString arguments() const { return aspect<ArgumentsAspect>()->arguments(macroExpander()); }
+    QString interpreter() const { return aspect<InterpreterAspect>()->value(); }
 
     void updateTargetInformation();
 };
@@ -279,7 +287,7 @@ void PythonRunConfiguration::updateTargetInformation()
     const BuildTargetInfo bti = buildTargetInfo();
     const QString script = bti.targetFilePath.toString();
     setDefaultDisplayName(tr("Run %1").arg(script));
-    extraAspect<MainScriptAspect>()->setValue(script);
+    aspect<MainScriptAspect>()->setValue(script);
 }
 
 Runnable PythonRunConfiguration::runnable() const
@@ -287,9 +295,9 @@ Runnable PythonRunConfiguration::runnable() const
     Runnable r;
     QtcProcess::addArg(&r.commandLineArguments, mainScript());
     QtcProcess::addArgs(&r.commandLineArguments,
-                        extraAspect<ArgumentsAspect>()->arguments(macroExpander()));
-    r.executable = extraAspect<InterpreterAspect>()->value();
-    r.environment = extraAspect<EnvironmentAspect>()->environment();
+                        aspect<ArgumentsAspect>()->arguments(macroExpander()));
+    r.executable = aspect<InterpreterAspect>()->value();
+    r.environment = aspect<EnvironmentAspect>()->environment();
     return r;
 }
 
@@ -312,11 +320,13 @@ PythonProject::PythonProject(const FileName &fileName) :
     setDisplayName(fileName.toFileInfo().completeBaseName());
 }
 
-static QStringList readLines(const QString &absoluteFileName)
+static QStringList readLines(const Utils::FileName &projectFile)
 {
-    QStringList lines;
+    const QString projectFileName = projectFile.fileName();
+    QSet<QString> visited = { projectFileName };
+    QStringList lines = { projectFileName };
 
-    QFile file(absoluteFileName);
+    QFile file(projectFile.toString());
     if (file.open(QFile::ReadOnly)) {
         QTextStream stream(&file);
 
@@ -324,8 +334,39 @@ static QStringList readLines(const QString &absoluteFileName)
             QString line = stream.readLine();
             if (line.isNull())
                 break;
-
+            if (visited.contains(line))
+                continue;
             lines.append(line);
+            visited.insert(line);
+        }
+    }
+
+    return lines;
+}
+
+static QStringList readLinesJson(const Utils::FileName &projectFile)
+{
+    const QString projectFileName = projectFile.fileName();
+    QStringList lines = { projectFileName };
+
+    QFile file(projectFile.toString());
+    if (!file.open(QFile::ReadOnly))
+        return lines;
+    const QByteArray content = file.readAll();
+
+    // This assumes te project file is formed with only one field called
+    // 'files' that has a list associated of the files to include in the project.
+    if (!content.isEmpty()) {
+        const QJsonDocument doc = QJsonDocument::fromJson(content);
+        const QJsonObject obj = doc.object();
+        if (obj.contains("files")) {
+            QJsonValue files = obj.value("files");
+            QJsonArray files_array = files.toArray();
+            QSet<QString> visited;
+            for (const auto &file : files_array)
+                visited.insert(file.toString());
+
+            lines.append(visited.toList());
         }
     }
 
@@ -362,14 +403,6 @@ bool PythonProject::addFiles(const QStringList &filePaths)
     foreach (const QString &filePath, filePaths)
         newList.append(baseDir.relativeFilePath(filePath));
 
-    QSet<QString> toAdd;
-
-    foreach (const QString &filePath, filePaths) {
-        QString directory = QFileInfo(filePath).absolutePath();
-        if (!toAdd.contains(directory))
-            toAdd << directory;
-    }
-
     bool result = saveRawList(newList, projectFilePath().toString());
     refresh();
 
@@ -392,7 +425,7 @@ bool PythonProject::removeFiles(const QStringList &filePaths)
 bool PythonProject::setFiles(const QStringList &filePaths)
 {
     QStringList newList;
-    QDir baseDir(projectFilePath().toString());
+    QDir baseDir(projectDirectory().toString());
     foreach (const QString &filePath, filePaths)
         newList.append(baseDir.relativeFilePath(filePath));
 
@@ -407,7 +440,7 @@ bool PythonProject::renameFile(const QString &filePath, const QString &newFilePa
     if (i != m_rawListEntries.end()) {
         int index = newList.indexOf(i.value());
         if (index != -1) {
-            QDir baseDir(projectFilePath().toString());
+            QDir baseDir(projectDirectory().toString());
             newList.replace(index, baseDir.relativeFilePath(newFilePath));
         }
     }
@@ -418,8 +451,15 @@ bool PythonProject::renameFile(const QString &filePath, const QString &newFilePa
 void PythonProject::parseProject()
 {
     m_rawListEntries.clear();
-    m_rawFileList = readLines(projectFilePath().toString());
-    m_rawFileList << projectFilePath().fileName();
+    const Utils::FileName filePath = projectFilePath();
+    // The PySide project file is JSON based
+    if (filePath.endsWith(".pyproject"))
+        m_rawFileList = readLinesJson(filePath);
+    // To keep compatibility with PyQt we keep the compatibility with plain
+    // text files as project files.
+    else if (filePath.endsWith(".pyqtc"))
+        m_rawFileList = readLines(filePath);
+
     m_files = processEntries(m_rawFileList, &m_rawListEntries);
 }
 
@@ -450,7 +490,7 @@ void PythonProject::refresh(Target *target)
     auto newRoot = std::make_unique<PythonProjectNode>(this);
     for (const QString &f : m_files) {
         const QString displayName = baseDir.relativeFilePath(f);
-        FileType fileType = f.endsWith(".pyqtc") ? FileType::Project : FileType::Source;
+        FileType fileType = f.endsWith(".pyproject") || f.endsWith(".pyqtc") ? FileType::Project : FileType::Source;
         newRoot->addNestedNode(std::make_unique<PythonFileNode>(FileName::fromString(f),
                                                                 displayName, fileType));
         if (fileType == FileType::Source) {
@@ -579,6 +619,37 @@ bool PythonProjectNode::showInSimpleTree() const
 QString PythonProjectNode::addFileFilter() const
 {
     return QLatin1String("*.py");
+}
+
+bool PythonProjectNode::supportsAction(ProjectAction action, const Node *node) const
+{
+    switch (node->nodeType()) {
+    case NodeType::File:
+        return action == ProjectAction::Rename
+            || action == ProjectAction::RemoveFile;
+    case NodeType::Folder:
+    case NodeType::Project:
+        return action == ProjectAction::AddNewFile
+            || action == ProjectAction::RemoveFile
+            || action == ProjectAction::AddExistingFile;
+    default:
+        return ProjectNode::supportsAction(action, node);
+    }
+}
+
+bool PythonProjectNode::addFiles(const QStringList &filePaths, QStringList *)
+{
+    return m_project->addFiles(filePaths);
+}
+
+bool PythonProjectNode::removeFiles(const QStringList &filePaths, QStringList *)
+{
+    return m_project->removeFiles(filePaths);
+}
+
+bool PythonProjectNode::deleteFiles(const QStringList &)
+{
+    return true;
 }
 
 bool PythonProjectNode::renameFile(const QString &filePath, const QString &newFilePath)

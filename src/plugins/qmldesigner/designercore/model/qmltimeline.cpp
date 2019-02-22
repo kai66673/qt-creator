@@ -213,15 +213,41 @@ bool QmlTimeline::hasActiveTimeline(AbstractView *view)
         if (!view->model()->hasImport(Import::createLibraryImport("QtQuick.Timeline", "1.0"), true, true))
             return false;
 
-        const ModelNode root = view->rootModelNode();
-        if (root.isValid())
-            for (const ModelNode &child : root.directSubModelNodes()) {
-                if (QmlTimeline::isValidQmlTimeline(child))
-                    return QmlTimeline(child).isEnabled();
-            }
+        return view->currentTimeline().isValid();
     }
 
     return false;
+}
+
+bool QmlTimeline::isRecording() const
+{
+    QTC_ASSERT(isValid(), return false);
+
+    return modelNode().hasAuxiliaryData("Record@Internal");
+}
+
+void QmlTimeline::toogleRecording(bool record) const
+{
+    QTC_ASSERT(isValid(), return);
+
+    if (!record) {
+        if (isRecording())
+            modelNode().removeAuxiliaryData("Record@Internal");
+    } else {
+        modelNode().setAuxiliaryData("Record@Internal", true);
+    }
+}
+
+void QmlTimeline::resetGroupRecording() const
+{
+    QTC_ASSERT(isValid(), return);
+
+    for (const ModelNode &childNode : modelNode().defaultNodeListProperty().toModelNodeList()) {
+        if (QmlTimelineKeyframeGroup::isValidQmlTimelineKeyframeGroup(childNode)) {
+            const QmlTimelineKeyframeGroup frames(childNode);
+            frames.toogleRecording(false);
+        }
+    }
 }
 
 void QmlTimeline::addKeyframeGroupIfNotExists(const ModelNode &node, const PropertyName &propertyName)

@@ -10,6 +10,7 @@ include(../../shared/clang/clang_defines.pri)
 HEADERS += projectexplorer.h \
     abi.h \
     abiwidget.h \
+    addrunconfigdialog.h \
     ansifilterparser.h \
     buildinfo.h \
     clangparser.h \
@@ -17,6 +18,7 @@ HEADERS += projectexplorer.h \
     environmentaspect.h \
     environmentaspectwidget.h \
     extraabi.h \
+    filterkitaspectsdialog.h \
     gcctoolchain.h \
     importwidget.h \
     userfileaccessor.h \
@@ -31,9 +33,7 @@ HEADERS += projectexplorer.h \
     targetsetupwidget.h \
     kit.h \
     kitchooser.h \
-    kitconfigwidget.h \
     kitinformation.h \
-    kitinformationconfigwidget.h \
     kitfeatureprovider.h \
     kitmanager.h \
     kitmanagerconfigwidget.h \
@@ -89,6 +89,7 @@ HEADERS += projectexplorer.h \
     projectmodels.h \
     currentprojectfind.h \
     toolchain.h \
+    toolchaincache.h \
     toolchainconfigwidget.h \
     toolchainmanager.h \
     toolchainoptionspage.h \
@@ -129,6 +130,7 @@ HEADERS += projectexplorer.h \
     devicesupport/localprocesslist.h \
     devicesupport/sshdeviceprocess.h \
     devicesupport/sshdeviceprocesslist.h \
+    devicesupport/sshsettingspage.h \
     devicesupport/desktopdeviceconfigurationwidget.h \
     devicesupport/desktopprocesssignaloperation.h \
     deploymentdata.h \
@@ -161,6 +163,7 @@ HEADERS += projectexplorer.h \
 SOURCES += projectexplorer.cpp \
     abi.cpp \
     abiwidget.cpp \
+    addrunconfigdialog.cpp \
     ansifilterparser.cpp \
     buildinfo.cpp \
     clangparser.cpp \
@@ -168,6 +171,7 @@ SOURCES += projectexplorer.cpp \
     environmentaspect.cpp \
     environmentaspectwidget.cpp \
     extraabi.cpp \
+    filterkitaspectsdialog.cpp \
     gcctoolchain.cpp \
     importwidget.cpp \
     projectconfigurationmodel.cpp \
@@ -182,9 +186,7 @@ SOURCES += projectexplorer.cpp \
     targetsetupwidget.cpp \
     kit.cpp \
     kitchooser.cpp \
-    kitconfigwidget.cpp \
     kitinformation.cpp \
-    kitinformationconfigwidget.cpp \
     kitmanager.cpp \
     kitmanagerconfigwidget.cpp \
     kitmodel.cpp \
@@ -270,9 +272,11 @@ SOURCES += projectexplorer.cpp \
     devicesupport/localprocesslist.cpp \
     devicesupport/sshdeviceprocess.cpp \
     devicesupport/sshdeviceprocesslist.cpp \
+    devicesupport/sshsettingspage.cpp \
     devicesupport/desktopdeviceconfigurationwidget.cpp \
     devicesupport/desktopprocesssignaloperation.cpp \
     deployablefile.cpp \
+    deploymentdata.cpp \
     deploymentdatamodel.cpp \
     deploymentdataview.cpp \
     customtoolchain.cpp \
@@ -313,12 +317,10 @@ FORMS += processstep.ui \
 WINSOURCES += \
     windebuginterface.cpp \
     msvctoolchain.cpp \
-    abstractmsvctoolchain.cpp
 
 WINHEADERS += \
     windebuginterface.h \
     msvctoolchain.h \
-    abstractmsvctoolchain.h
 
 win32|equals(TEST, 1) {
     SOURCES += $$WINSOURCES

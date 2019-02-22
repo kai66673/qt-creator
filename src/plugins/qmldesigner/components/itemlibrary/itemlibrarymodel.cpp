@@ -42,7 +42,7 @@
 #include <QPen>
 #include <qdebug.h>
 
-static Q_LOGGING_CATEGORY(itemlibraryPopulate, "qtc.itemlibrary.populate")
+static Q_LOGGING_CATEGORY(itemlibraryPopulate, "qtc.itemlibrary.populate", QtWarningMsg)
 
 static bool inline registerItemLibrarySortedModel() {
     qmlRegisterType<QmlDesigner::ItemLibrarySectionModel>();
@@ -126,7 +126,7 @@ void ItemLibraryModel::setSearchText(const QString &searchText)
         bool changed = false;
         updateVisibility(&changed);
         if (changed)
-            dataChanged(QModelIndex(), QModelIndex());
+            emit dataChanged(QModelIndex(), QModelIndex());
     }
 }
 

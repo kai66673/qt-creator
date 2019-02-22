@@ -25,25 +25,23 @@
 
 #pragma once
 
-#include "qmakeprojectmanager_global.h"
-
 #include <projectexplorer/kitmanager.h>
 
 namespace QmakeProjectManager {
+namespace Internal {
 
-class QMAKEPROJECTMANAGER_EXPORT QmakeKitInformation : public ProjectExplorer::KitInformation
+class QmakeKitAspect : public ProjectExplorer::KitAspect
 {
     Q_OBJECT
 
 public:
-    QmakeKitInformation();
+    QmakeKitAspect();
 
     QVariant defaultValue(const ProjectExplorer::Kit *k) const override;
-
     QList<ProjectExplorer::Task> validate(const ProjectExplorer::Kit *k) const override;
     void setup(ProjectExplorer::Kit *k) override;
 
-    ProjectExplorer::KitConfigWidget *createConfigWidget(ProjectExplorer::Kit *k) const override;
+    ProjectExplorer::KitAspectWidget *createConfigWidget(ProjectExplorer::Kit *k) const override;
 
     ItemList toUserOutput(const ProjectExplorer::Kit *k) const override;
 
@@ -56,4 +54,5 @@ public:
     static Utils::FileName defaultMkspec(const ProjectExplorer::Kit *k);
 };
 
+} // namespace Internal
 } // namespace QmakeProjectManager

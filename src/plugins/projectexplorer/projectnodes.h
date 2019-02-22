@@ -31,12 +31,14 @@
 #include <QIcon>
 #include <QStringList>
 
+#include <coreplugin/id.h>
+
 #include <utils/fileutils.h>
 #include <utils/optional.h>
+
 #include <functional>
 
 namespace Utils { class MimeType; }
-namespace Core { class IVersionControl; }
 
 namespace ProjectExplorer {
 
@@ -66,6 +68,7 @@ enum ProjectAction {
     // Special value to indicate that the actions are handled by the parent
     InheritedFromParent,
     AddSubProject,
+    AddExistingProject,
     RemoveSubProject,
     // Let's the user select to which project file
     // the file is added
@@ -146,6 +149,8 @@ public:
     virtual ContainerNode *asContainerNode() { return nullptr; }
     virtual const ContainerNode *asContainerNode() const { return nullptr; }
 
+    virtual QString buildKey() const { return QString(); }
+
     static bool sortByPath(const Node *a, const Node *b);
     void setParentFolderNode(FolderNode *parentFolder);
 
@@ -191,10 +196,9 @@ public:
     const FileNode *asFileNode() const final { return this; }
 
     static QList<FileNode *>
-    scanForFilesWithVersionControls(const Utils::FileName &directory,
-                                    const std::function<FileNode *(const Utils::FileName &fileName)> factory,
-                                    const QList<Core::IVersionControl *> &versionControls,
-                                    QFutureInterface<QList<FileNode *>> *future = nullptr);
+    scanForFiles(const Utils::FileName &directory,
+                 const std::function<FileNode *(const Utils::FileName &fileName)> factory,
+                 QFutureInterface<QList<FileNode *>> *future = nullptr);
     bool supportsAction(ProjectAction action, const Node *node) const override;
 
 private:
@@ -218,6 +222,8 @@ public:
                      const std::function<void(FolderNode *)> &folderTask = {},
                      const std::function<bool(const FolderNode *)> &folderFilterTask = {}) const;
     void forEachGenericNode(const std::function<void(Node *)> &genericTask) const;
+    void forEachProjectNode(const std::function<void(const ProjectNode *)> &genericTask) const;
+    ProjectNode *findProjectNode(const std::function<bool(const ProjectNode *)> &predicate);
     const QList<Node *> nodes() const;
     QList<FileNode *> fileNodes() const;
     FileNode *fileNode(const Utils::FileName &file) const;
@@ -320,6 +326,7 @@ class PROJECTEXPLORER_EXPORT ProjectNode : public FolderNode
 public:
     virtual bool canAddSubProject(const QString &proFilePath) const;
     virtual bool addSubProject(const QString &proFile);
+    virtual QStringList subProjectFileNamePatterns() const;
     virtual bool removeSubProject(const QString &proFilePath);
     virtual Utils::optional<Utils::FileName> visibleAfterAddFileAction() const {
         return Utils::nullopt;
@@ -339,6 +346,13 @@ public:
 
     ProjectNode *asProjectNode() final { return this; }
     const ProjectNode *asProjectNode() const final { return this; }
+
+    virtual QStringList targetApplications() const { return {}; }
+    virtual bool parseInProgress() const { return false; }
+
+    virtual bool validParse() const { return false; }
+    virtual QVariant data(Core::Id role) const;
+    virtual bool setData(Core::Id role, const QVariant &value) const;
 
 protected:
     explicit ProjectNode(const Utils::FileName &projectFilePath, const QByteArray &id = {});

@@ -36,7 +36,7 @@
 #include "qmakeprojectmanager/qmakebuildinfo.h"
 #include "qmakeprojectmanager/qmakeprojectmanagerconstants.h"
 
-#include "utils/algorithm.h"
+#include <utils/algorithm.h>
 
 using namespace QmakeProjectManager;
 using namespace ProjectExplorer;
@@ -58,7 +58,7 @@ QList<ProjectExplorer::NamedWidget *> IosBuildConfiguration::createSubConfigWidg
 {
     auto subConfigWidgets = QmakeBuildConfiguration::createSubConfigWidgets();
 
-    Core::Id devType = ProjectExplorer::DeviceTypeKitInformation::deviceTypeId(target()->kit());
+    Core::Id devType = ProjectExplorer::DeviceTypeKitAspect::deviceTypeId(target()->kit());
     // Ownership of this widget is with BuildSettingsWidget
     auto buildSettingsWidget = new IosBuildSettingsWidget(devType, m_signingIdentifier,
                                                           m_autoManagedSigning);
@@ -113,7 +113,7 @@ void IosBuildConfiguration::updateQmakeCommand()
         if (!m_signingIdentifier.isEmpty() )
             extraArgs << forceOverrideArg;
 
-        Core::Id devType = ProjectExplorer::DeviceTypeKitInformation::deviceTypeId(target()->kit());
+        Core::Id devType = ProjectExplorer::DeviceTypeKitAspect::deviceTypeId(target()->kit());
         if (devType == Constants::IOS_DEVICE_TYPE && !m_signingIdentifier.isEmpty()) {
             if (m_autoManagedSigning) {
                 extraArgs << qmakeIosTeamSettings + m_signingIdentifier;
@@ -143,8 +143,8 @@ void IosBuildConfiguration::updateQmakeCommand()
 IosBuildConfigurationFactory::IosBuildConfigurationFactory()
 {
     registerBuildConfiguration<IosBuildConfiguration>(QmakeProjectManager::Constants::QMAKE_BC_ID);
-    setSupportedTargetDeviceTypes({Constants::IOS_DEVICE_TYPE, Constants::IOS_SIMULATOR_TYPE});
-    setBasePriority(1);
+    addSupportedTargetDeviceType(Constants::IOS_DEVICE_TYPE);
+    addSupportedTargetDeviceType(Constants::IOS_SIMULATOR_TYPE);
 }
 
 } // namespace Internal

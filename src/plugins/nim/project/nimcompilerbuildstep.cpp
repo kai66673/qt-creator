@@ -30,10 +30,11 @@
 #include "nimproject.h"
 #include "nimtoolchain.h"
 
-#include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/buildconfiguration.h>
-#include <projectexplorer/kitinformation.h>
 #include <projectexplorer/ioutputparser.h>
+#include <projectexplorer/kitinformation.h>
+#include <projectexplorer/processparameters.h>
+#include <projectexplorer/projectexplorerconstants.h>
 #include <utils/qtcassert.h>
 
 #include <QDir>
@@ -115,13 +116,13 @@ NimCompilerBuildStep::NimCompilerBuildStep(BuildStepList *parentList)
     updateProcessParameters();
 }
 
-bool NimCompilerBuildStep::init(QList<const BuildStep *> &earlierSteps)
+bool NimCompilerBuildStep::init()
 {
     setOutputParser(new NimParser());
     if (IOutputParser *parser = target()->kit()->createOutputParser())
         appendOutputParser(parser);
     outputParser()->setWorkingDirectory(processParameters()->effectiveWorkingDirectory());
-    return AbstractProcessStep::init(earlierSteps);
+    return AbstractProcessStep::init();
 }
 
 BuildStepConfigWidget *NimCompilerBuildStep::createConfigWidget()
@@ -225,7 +226,7 @@ void NimCompilerBuildStep::updateCommand()
     QTC_ASSERT(target(), return);
     QTC_ASSERT(target()->kit(), return);
     Kit *kit = target()->kit();
-    auto tc = dynamic_cast<NimToolChain*>(ToolChainKitInformation::toolChain(kit, Constants::C_NIMLANGUAGE_ID));
+    auto tc = dynamic_cast<NimToolChain*>(ToolChainKitAspect::toolChain(kit, Constants::C_NIMLANGUAGE_ID));
     QTC_ASSERT(tc, return);
     processParameters()->setCommand(tc->compilerCommand().toString());
 }

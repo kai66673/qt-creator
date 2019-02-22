@@ -28,11 +28,11 @@
 #include "iostoolhandler.h"
 
 #include <projectexplorer/devicesupport/idevice.h>
+#include <projectexplorer/devicesupport/idevicefactory.h>
 
 #include <QVariantMap>
 #include <QMap>
 #include <QString>
-#include <QSharedPointer>
 #include <QStringList>
 #include <QTimer>
 
@@ -48,15 +48,12 @@ class IosDeviceManager;
 class IosDevice : public ProjectExplorer::IDevice
 {
 public:
-    typedef QMap<QString, QString> Dict;
-    typedef QSharedPointer<const IosDevice> ConstPtr;
-    typedef QSharedPointer<IosDevice> Ptr;
+    using Dict = QMap<QString, QString>;
+    using ConstPtr = QSharedPointer<const IosDevice>;
+    using Ptr = QSharedPointer<IosDevice>;
 
     ProjectExplorer::IDevice::DeviceInfo deviceInformation() const override;
     ProjectExplorer::IDeviceWidget *createWidget() override;
-    QList<Core::Id> actionIds() const override;
-    QString displayNameForActionId(Core::Id actionId) const override;
-    void executeAction(Core::Id actionId, QWidget *parent = 0) override;
     ProjectExplorer::DeviceProcessSignalOperation::Ptr signalOperation() const override;
     QString displayType() const override;
 
@@ -82,10 +79,19 @@ protected:
     mutable quint16 m_lastPort;
 };
 
+class IosDeviceFactory : public ProjectExplorer::IDeviceFactory
+{
+    Q_OBJECT
+public:
+    IosDeviceFactory();
+
+    bool canRestore(const QVariantMap &map) const override;
+};
+
 class IosDeviceManager : public QObject {
     Q_OBJECT
 public:
-    typedef QHash<QString, QString> TranslationMap;
+    using TranslationMap = QHash<QString, QString>;
 
     static TranslationMap translationMap();
     static IosDeviceManager *instance();
@@ -101,12 +107,12 @@ public:
     void monitorAvailableDevices();
 private:
     void updateUserModeDevices();
-    IosDeviceManager(QObject *parent = 0);
+    IosDeviceManager(QObject *parent = nullptr);
     QTimer m_userModeDevicesTimer;
     QStringList m_userModeDeviceIds;
 };
 
-namespace IosKitInformation {
+namespace IosKitAspect {
 IosDevice::ConstPtr device(ProjectExplorer::Kit *);
 }
 

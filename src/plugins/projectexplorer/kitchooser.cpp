@@ -25,7 +25,6 @@
 
 #include "kitchooser.h"
 
-#include "kitconfigwidget.h"
 #include "kitinformation.h"
 #include "kitmanager.h"
 #include "project.h"
@@ -52,7 +51,7 @@ KitChooser::KitChooser(QWidget *parent) :
 {
     m_chooser = new QComboBox(this);
     m_chooser->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-    m_manageButton = new QPushButton(KitConfigWidget::msgManage(), this);
+    m_manageButton = new QPushButton(KitAspectWidget::msgManage(), this);
 
     auto layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);

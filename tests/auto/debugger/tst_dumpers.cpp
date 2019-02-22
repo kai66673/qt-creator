@@ -47,7 +47,7 @@ using namespace Internal;
 
 #ifdef Q_CC_MSVC
 
-// Copied from abstractmsvctoolchain.cpp to avoid plugin dependency.
+// Copied from msvctoolchain.cpp to avoid plugin dependency.
 static bool generateEnvironmentSettings(Utils::Environment &env,
                                         const QString &batchFile,
                                         const QString &batchArgs,
@@ -1301,6 +1301,7 @@ void tst_Dumpers::dumper()
         proFile.write(data.mainFile.toUtf8());
         proFile.write("\nTARGET = doit\n");
         proFile.write("\nCONFIG -= app_bundle\n");
+        proFile.write("\nmacos: CONFIG += sdk_no_version_check\n");
         proFile.write("\nCONFIG -= release\n");
         proFile.write("\nCONFIG += debug\n");
         proFile.write("\nCONFIG += console\n");
@@ -1698,6 +1699,8 @@ void tst_Dumpers::dumper()
             return static_cast<WatchItem *>(item)->internalName() == iname;
         }));
         if (!item) {
+            if (check.optionallyPresent)
+                return true;
             qDebug() << "NOT SEEN: " << check.iname;
             return false;
         }
@@ -1989,7 +1992,7 @@ void tst_Dumpers::dumper_data()
                + CoreProfile()
                + Check("f1", "a (1)", TypeDef("QFlags<enum Foo>", "FooFlags")) % CdbEngine
                + Check("f1", "a (0x0001)", "FooFlags") % NoCdbEngine
-               + Check("f2", "a | b (0x0003)", "FooFlags") % GdbEngine;
+               + Check("f2", "(a | b) (0x0003)", "FooFlags") % GdbEngine;
 
     QTest::newRow("QDateTime")
             << Data("#include <QDateTime>\n",
@@ -3568,6 +3571,8 @@ void tst_Dumpers::dumper_data()
                + Check("holder", "", "@QStringDataPtr") % Qt5
                + Check("holder.ptr", "\"ABC\"", TypeDef("@QTypedArrayData<unsigned short>",
                                                         "@QStringData")) % Qt5
+                // Note that the following breaks with LLDB 6.0 on Linux as LLDB reads
+                // the type wrong as "QStaticStringData<4>"
                + Check("sd", "\"Q\"", "@QStaticStringData<1>") % Qt5;
 
 
@@ -5380,6 +5385,23 @@ void tst_Dumpers::dumper_data()
                + Check("s32s", "-2147483648", TypeDef("int", "@qint32"));
 
 
+    QTest::newRow("Int128")
+            << Data("#include <limits.h>\n",
+                    "using typedef_s128 = __int128_t;\n"
+                    "using typedef_u128 = __uint128_t;\n"
+                    "__int128_t s128 = 12;\n"
+                    "__uint128_t u128 = 12;\n"
+                    "typedef_s128 ts128 = 12;\n"
+                    "typedef_u128 tu128 = 12;\n"
+                    "unused(&u128, &s128, &tu128, &ts128);\n")
+                // Sic! The expected type is what gcc 8.2.0 records.
+               + GdbEngine
+               + Check("s128", "12", "__int128")
+               + Check("u128", "12", "__int128 unsigned")
+               + Check("ts128", "12", "typedef_s128")
+               + Check("tu128", "12", "typedef_u128") ;
+
+
     QTest::newRow("Float")
             << Data("#include <QFloat16>\n",
                     "qfloat16 f1 = 45.3f; unused(&f1);\n"
@@ -5413,7 +5435,7 @@ void tst_Dumpers::dumper_data()
                     "Flags fthree = (Flags)(one|two); unused(&fthree);\n"
                     "Flags fmixed = (Flags)(two|8); unused(&fmixed);\n"
                     "Flags fbad = (Flags)(24); unused(&fbad);\n")
-               + GdbEngine
+               + NoCdbEngine
                + Check("fone", "one (1)", "Flags")
                + Check("fthree", "(one | two) (3)", "Flags")
                + Check("fmixed", "(two | unknown: 8) (10)", "Flags")
@@ -5430,18 +5452,31 @@ void tst_Dumpers::dumper_data()
                     "    Enum3 e3 = Enum3(c3 | b3);\n"
                     "};\n",
                     "E e;\n")
-                + GdbEngine
+                + NoCdbEngine
                 + Check("e.e1", "(E::b1 | E::c1) (3)", "E::Enum1")
                 + Check("e.e2", "(E::b2 | E::c2) (3)", "E::Enum2")
                 + Check("e.e3", "(E::b3 | E::c3) (3)", "E::Enum3");
 
+    QTest::newRow("QSizePolicy")
+        << Data("#include <QSizePolicy>\n",
+                "QSizePolicy qsp1;\n"
+                "qsp1.setHorizontalStretch(6);\n"
+                "qsp1.setVerticalStretch(7);\n"
+                "QSizePolicy qsp2(QSizePolicy::Preferred, QSizePolicy::MinimumExpanding);\n")
+                + GuiProfile()
+                + NoCdbEngine
+                + Check("qsp1.horStretch", "6", "int")
+                + Check("qsp1.verStretch", "7", "int")
+                + Check("qsp2.horPolicy", "QSizePolicy::Preferred (GrowFlag|ShrinkFlag) (5)", "@QSizePolicy::Policy")
+                + Check("qsp2.verPolicy", "QSizePolicy::MinimumExpanding (GrowFlag|ExpandFlag) (3)", "@QSizePolicy::Policy");
+
 
     QTest::newRow("Array")
             << Data("",
-                    "double a1[3][3];\n"
+                    "double a1[3][4];\n"
                     "for (int i = 0; i != 3; ++i)\n"
                     "    for (int j = 0; j != 3; ++j)\n"
-                    "        a1[i][j] = i + j;\n"
+                    "        a1[i][j] = i + 10 * j;\n"
                     "unused(&a1);\n\n"
 
                     "char a2[20] = { 0 };\n"
@@ -5452,11 +5487,11 @@ void tst_Dumpers::dumper_data()
                     "a2[4] = 0;\n"
                     "unused(&a2);\n")
 
-               + Check("a1", Pointer(), "double [3][3]")
-               + Check("a1.0", "[0]", Pointer(), "double [3]")
+               + Check("a1", Pointer(), "double[3][4]")
+               + Check("a1.0", "[0]", Pointer(), "double[4]")
                + Check("a1.0.0", "[0]", FloatValue("0"), "double")
-               + Check("a1.0.2", "[2]", FloatValue("2"), "double")
-               + Check("a1.2", "[2]", Pointer(), "double [3]")
+               + Check("a1.0.2", "[2]", FloatValue("20"), "double")
+               + Check("a1.2", "[2]", Pointer(), "double[4]")
 
                + Check("a2", Value("\"abcd" + QString(16, 0) + '"'), "char [20]")
                + Check("a2.0", "[0]", "97", "char")
@@ -5518,7 +5553,9 @@ void tst_Dumpers::dumper_data()
                     "enum E { V1, V2 };"
                     "struct S\n"
                     "{\n"
-                    "    S() : x(2), y(3), z(39), e(V2), c(1), b(0), f(5), d(6), i(7) {}\n"
+                    "    S() : front(13), x(2), y(3), z(39), e(V2), c(1), b(0), f(5),"
+                    "          d(6), i(7) {}\n"
+                    "    unsigned int front;\n"
                     "    unsigned int x : 3;\n"
                     "    unsigned int y : 4;\n"
                     "    unsigned int z : 18;\n"
@@ -5545,6 +5582,7 @@ void tst_Dumpers::dumper_data()
                + Check("s.x", "2", "unsigned int") % CdbEngine
                + Check("s.y", "3", "unsigned int") % CdbEngine
                + Check("s.z", "39", "unsigned int") % CdbEngine
+               + Check("s.front", "13", "unsigned int")
                + Check("s.e", "V2 (1)", TypePattern("main::[a-zA-Z0-9_]*::E")) % CdbEngine;
 
 
@@ -5755,7 +5793,11 @@ void tst_Dumpers::dumper_data()
                     "const Foo &b4 = a4;\n"
                     "typedef Foo &Ref4;\n"
                     "const Ref4 d4 = const_cast<Ref4>(a4);\n"
-                    "unused(&a4, &b4, &d4);\n")
+                    "unused(&a4, &b4, &d4);\n"
+
+                    "int *q = 0;\n"
+                    "int &qq = *q;\n"
+                    "unused(&qq, &q);\n")
 
                + CoreProfile()
                + NoCdbEngine // The Cdb has no information about references
@@ -5779,7 +5821,9 @@ void tst_Dumpers::dumper_data()
                + Check("b4", "", "Foo &")
                + Check("b4.a", "12", "int")
                //+ Check("d4", "\"hello\"", "Ref4");  FIXME: We get "Foo &" instead
-               + Check("d4.a", "12", "int");
+               + Check("d4.a", "12", "int")
+
+               + Check("qq", "<null reference>", "int &");
 
     QTest::newRow("DynamicReference")
             << Data("struct BaseClass { virtual ~BaseClass() {} };\n"
@@ -5946,6 +5990,17 @@ void tst_Dumpers::dumper_data()
                + Check("x1", "", "X &")
                + Check("x2", "", "X &")
                + Check("x3", "", "X &");
+
+    QTest::newRow("RValueReference")
+            << Data("",
+                    "struct S { int a = 32; };\n"
+                    "auto foo = [](int && i, S && s) { BREAK; return i + s.a; };\n"
+                    "foo(int(1), S());\n")
+               + Cxx11Profile()
+               + GdbVersion(80200)
+               + Check("i", "1", "int &&")
+               + CheckType("s", "S &&")
+               + Check("s.a", "32", "int");
 
     QTest::newRow("SSE")
             << Data("#include <xmmintrin.h>\n"

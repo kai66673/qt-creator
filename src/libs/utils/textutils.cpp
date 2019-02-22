@@ -39,8 +39,9 @@ bool convertPosition(const QTextDocument *document, int pos, int *line, int *col
         (*column) = -1;
         return false;
     } else {
+        // line and column are both 1-based
         (*line) = block.blockNumber() + 1;
-        (*column) = pos - block.position();
+        (*column) = pos - block.position() + 1;
         return true;
     }
 }
@@ -52,7 +53,7 @@ OptionalLineColumn convertPosition(const QTextDocument *document, int pos)
     QTextBlock block = document->findBlock(pos);
 
     if (block.isValid())
-        optional.emplace(block.blockNumber() + 1, pos - block.position());
+        optional.emplace(block.blockNumber() + 1, pos - block.position() + 1);
 
     return optional;
 }
@@ -137,6 +138,53 @@ QTextCursor wordStartCursor(const QTextCursor &textCursor)
         cursor.movePosition(QTextCursor::PreviousWord);
 
     return cursor;
+}
+
+QString wordUnderCursor(const QTextCursor &cursor)
+{
+    QTextCursor tc(cursor);
+    tc.select(QTextCursor::WordUnderCursor);
+    return tc.selectedText();
+}
+
+int utf8NthLineOffset(const QTextDocument *textDocument, const QByteArray &buffer, int line)
+{
+    if (textDocument->blockCount() < line)
+        return -1;
+
+    if (textDocument->characterCount() == buffer.size() + 1)
+        return textDocument->findBlockByNumber(line - 1).position();
+
+    int utf8Offset = 0;
+    for (int count = 0; count < line - 1; ++count) {
+        utf8Offset = buffer.indexOf('\n', utf8Offset);
+        if (utf8Offset == -1)
+            return -1; // The line does not exist.
+        ++utf8Offset;
+    }
+    return utf8Offset;
+}
+
+LineColumn utf16LineColumn(const QByteArray &utf8Buffer, int utf8Offset)
+{
+    Utils::LineColumn lineColumn;
+    lineColumn.line = static_cast<int>(
+                          std::count(utf8Buffer.begin(), utf8Buffer.begin() + utf8Offset, '\n'))
+                      + 1;
+    const int startOfLineOffset = utf8Buffer.lastIndexOf('\n', utf8Offset - 1) + 1;
+    lineColumn.column = QString::fromUtf8(
+                            utf8Buffer.mid(startOfLineOffset, utf8Offset - startOfLineOffset))
+                            .length()
+                        + 1;
+    return lineColumn;
+}
+
+QString utf16LineTextInUtf8Buffer(const QByteArray &utf8Buffer, int currentUtf8Offset)
+{
+    const int lineStartUtf8Offset = utf8Buffer.lastIndexOf('\n', currentUtf8Offset - 1) + 1;
+    const int lineEndUtf8Offset = utf8Buffer.indexOf('\n', currentUtf8Offset);
+    return QString::fromUtf8(
+        utf8Buffer.mid(lineStartUtf8Offset, lineEndUtf8Offset - lineStartUtf8Offset));
 }
 
 } // Text

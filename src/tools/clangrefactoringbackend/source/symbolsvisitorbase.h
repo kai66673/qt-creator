@@ -44,7 +44,7 @@ namespace ClangBackEnd {
 class SymbolsVisitorBase
 {
 public:
-    SymbolsVisitorBase(FilePathCachingInterface &filePathCache,
+    SymbolsVisitorBase(const FilePathCachingInterface &filePathCache,
                        const clang::SourceManager *sourceManager,
                        SourcesManager &sourcesManager)
         : m_filePathCache(filePathCache),
@@ -68,7 +68,8 @@ public:
     bool isAlreadyParsed(clang::FileID fileId)
     {
         const clang::FileEntry *fileEntry = m_sourceManager->getFileEntryForID(fileId);
-
+        if (!fileEntry)
+            return false;
         return m_sourcesManager.alreadyParsed(filePathId(fileEntry),
                                               fileEntry->getModificationTime());
     }
@@ -145,15 +146,20 @@ public:
         return SymbolIndex(reinterpret_cast<std::uintptr_t>(pointer));
     }
 
-    void setSourceManager(const clang::SourceManager *sourceManager)
+    void setSourceManager(clang::SourceManager *sourceManager)
     {
         m_sourceManager = sourceManager;
     }
 
     bool isInSystemHeader(clang::FileID fileId) const
     {
-        return clang::SrcMgr::isSystem(
-                    m_sourceManager->getSLocEntry(fileId).getFile().getFileCharacteristic());
+        return isSystem(m_sourceManager->getSLocEntry(fileId).getFile().getFileCharacteristic());
+    }
+
+    static
+    bool isSystem(clang::SrcMgr::CharacteristicKind kind)
+    {
+        return clang::SrcMgr::isSystem(kind);
     }
 
     void clear()
@@ -163,7 +169,7 @@ public:
 
 protected:
     std::vector<FilePathId> m_filePathIndices;
-    FilePathCachingInterface &m_filePathCache;
+    const FilePathCachingInterface &m_filePathCache;
     const clang::SourceManager *m_sourceManager = nullptr;
     SourcesManager &m_sourcesManager;
 };

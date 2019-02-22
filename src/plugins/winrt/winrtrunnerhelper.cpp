@@ -55,7 +55,7 @@ WinRtRunnerHelper::WinRtRunnerHelper(ProjectExplorer::RunWorker *runWorker, QStr
     ProjectExplorer::Target *target = runConfiguration->target();
     m_device = runWorker->device().dynamicCast<const WinRtDevice>();
 
-    const QtSupport::BaseQtVersion *qt = QtSupport::QtKitInformation::qtVersion(target->kit());
+    const QtSupport::BaseQtVersion *qt = QtSupport::QtKitAspect::qtVersion(target->kit());
     if (!qt) {
         *errorMessage = tr("The current kit has no Qt version.");
         return;
@@ -68,7 +68,7 @@ WinRtRunnerHelper::WinRtRunnerHelper(ProjectExplorer::RunWorker *runWorker, QStr
         return;
     }
 
-    const BuildTargetInfo bti = target->applicationTargets().buildTargetInfo(runConfiguration->buildKey());
+    const BuildTargetInfo bti = runConfiguration->buildTargetInfo();
     m_executableFilePath = bti.targetFilePath.toString();
 
     if (m_executableFilePath.isEmpty()) {
@@ -84,13 +84,13 @@ WinRtRunnerHelper::WinRtRunnerHelper(ProjectExplorer::RunWorker *runWorker, QStr
 
     bool loopbackExemptClient = false;
     bool loopbackExemptServer = false;
-    if (auto aspect = runConfiguration->extraAspect<ArgumentsAspect>())
+    if (auto aspect = runConfiguration->aspect<ArgumentsAspect>())
         m_arguments = aspect->arguments(runConfiguration->macroExpander());
-    if (auto aspect = runConfiguration->extraAspect<UninstallAfterStopAspect>())
+    if (auto aspect = runConfiguration->aspect<UninstallAfterStopAspect>())
         m_uninstallAfterStop = aspect->value();
-    if (auto aspect = runConfiguration->extraAspect<LoopbackExemptClientAspect>())
+    if (auto aspect = runConfiguration->aspect<LoopbackExemptClientAspect>())
         loopbackExemptClient = aspect->value();
-    if (auto aspect = runConfiguration->extraAspect<LoopbackExemptServerAspect>())
+    if (auto aspect = runConfiguration->aspect<LoopbackExemptServerAspect>())
         loopbackExemptServer = aspect->value();
     if (loopbackExemptClient && loopbackExemptServer)
         m_loopbackArguments = "--loopbackexempt clientserver";
@@ -152,7 +152,7 @@ void WinRtRunnerHelper::onProcessFinished(int exitCode, QProcess::ExitStatus exi
     QTC_ASSERT(m_process, return);
     m_process->disconnect();
     m_process->deleteLater();
-    m_process = 0;
+    m_process = nullptr;
     emit finished(exitCode, exitStatus);
 }
 
@@ -163,7 +163,7 @@ void WinRtRunnerHelper::onProcessError(QProcess::ProcessError processError)
                       m_process->errorString()), Utils::ErrorMessageFormat);
     m_process->disconnect();
     m_process->deleteLater();
-    m_process = 0;
+    m_process = nullptr;
     emit error(processError);
 }
 
@@ -176,7 +176,7 @@ void WinRtRunnerHelper::startWinRtRunner(const RunConf &conf)
         QtcProcess::addArg(&runnerArgs, QString::number(m_device->deviceId()));
     }
 
-    QtcProcess *process = 0;
+    QtcProcess *process = nullptr;
     bool connectProcess = false;
 
     switch (conf) {
@@ -189,7 +189,7 @@ void WinRtRunnerHelper::startWinRtRunner(const RunConf &conf)
         }
         Q_FALLTHROUGH();
     case Start:
-        QtcProcess::addArgs(&runnerArgs, QStringLiteral("--start --stop --install --wait 0"));
+        QtcProcess::addArgs(&runnerArgs, QStringLiteral("--start --stop --wait 0"));
         connectProcess = true;
         QTC_ASSERT(!m_process, m_process->deleteLater());
         m_process = new QtcProcess(this);

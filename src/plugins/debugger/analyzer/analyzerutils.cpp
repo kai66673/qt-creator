@@ -46,7 +46,7 @@ static void moveCursorToEndOfName(QTextCursor *tc)
         return;
 
     QChar ch = doc->characterAt(tc->position());
-    while (ch.isLetterOrNumber() || ch == QLatin1Char('_')) {
+    while (ch.isLetterOrNumber() || ch == '_') {
         tc->movePosition(QTextCursor::NextCharacter);
         ch = doc->characterAt(tc->position());
     }
@@ -74,7 +74,7 @@ CPlusPlus::Symbol *AnalyzerUtils::findSymbolUnderCursor()
     CPlusPlus::ExpressionUnderCursor expressionUnderCursor(doc->languageFeatures());
     moveCursorToEndOfName(&tc);
     const QString &expression = expressionUnderCursor(tc);
-    CPlusPlus::Scope *scope = doc->scopeAt(line, column);
+    CPlusPlus::Scope *scope = doc->scopeAt(line, column - 1);
 
     CPlusPlus::TypeOfExpression typeOfExpression;
     typeOfExpression.init(doc, snapshot);

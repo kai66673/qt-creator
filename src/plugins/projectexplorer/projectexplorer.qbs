@@ -24,6 +24,7 @@ Project {
                 "abi.cpp", "abi.h",
                 "abiwidget.cpp", "abiwidget.h",
                 "abstractprocessstep.cpp", "abstractprocessstep.h",
+                "addrunconfigdialog.cpp", "addrunconfigdialog.h",
                 "allprojectsfilter.cpp", "allprojectsfilter.h",
                 "allprojectsfind.cpp", "allprojectsfind.h",
                 "ansifilterparser.cpp", "ansifilterparser.h",
@@ -54,6 +55,7 @@ Project {
                 "dependenciespanel.cpp", "dependenciespanel.h",
                 "deployablefile.cpp", "deployablefile.h",
                 "deployconfiguration.cpp", "deployconfiguration.h",
+                "deploymentdata.cpp",
                 "deploymentdata.h",
                 "deploymentdataview.cpp",
                 "deploymentdataview.h",
@@ -68,6 +70,7 @@ Project {
                 "expanddata.cpp", "expanddata.h",
                 "extraabi.cpp", "extraabi.h",
                 "extracompiler.cpp", "extracompiler.h",
+                "filterkitaspectsdialog.cpp", "filterkitaspectsdialog.h",
                 "foldernavigationwidget.cpp", "foldernavigationwidget.h",
                 "gccparser.cpp", "gccparser.h",
                 "gcctoolchain.cpp", "gcctoolchain.h",
@@ -80,10 +83,8 @@ Project {
                 "itaskhandler.h",
                 "kit.cpp", "kit.h",
                 "kitchooser.cpp", "kitchooser.h",
-                "kitconfigwidget.cpp", "kitconfigwidget.h",
                 "kitfeatureprovider.h",
                 "kitinformation.cpp", "kitinformation.h",
-                "kitinformationconfigwidget.cpp", "kitinformationconfigwidget.h",
                 "kitmanager.cpp", "kitmanager.h",
                 "kitmanagerconfigwidget.cpp", "kitmanagerconfigwidget.h",
                 "kitmodel.cpp", "kitmodel.h",
@@ -145,6 +146,7 @@ Project {
                 "taskmodel.cpp", "taskmodel.h",
                 "taskwindow.cpp", "taskwindow.h",
                 "toolchain.cpp", "toolchain.h",
+                "toolchaincache.h",
                 "toolchainconfigwidget.cpp", "toolchainconfigwidget.h",
                 "toolchainmanager.cpp", "toolchainmanager.h",
                 "toolchainoptionspage.cpp", "toolchainoptionspage.h",
@@ -218,6 +220,7 @@ Project {
                 "localprocesslist.cpp", "localprocesslist.h",
                 "sshdeviceprocess.cpp", "sshdeviceprocess.h",
                 "sshdeviceprocesslist.cpp", "sshdeviceprocesslist.h",
+                "sshsettingspage.cpp", "sshsettingspage.h",
                 "desktopprocesssignaloperation.cpp", "desktopprocesssignaloperation.h",
                 "desktopdeviceconfigurationwidget.cpp", "desktopdeviceconfigurationwidget.h", "desktopdeviceconfigurationwidget.ui"
             ]
@@ -233,8 +236,6 @@ Project {
             name: "WindowsToolChains"
             condition: qbs.targetOS.contains("windows") || qtc.testsEnabled
             files: [
-                "abstractmsvctoolchain.cpp",
-                "abstractmsvctoolchain.h",
                 "msvctoolchain.cpp",
                 "msvctoolchain.h",
                 "windebuginterface.cpp",

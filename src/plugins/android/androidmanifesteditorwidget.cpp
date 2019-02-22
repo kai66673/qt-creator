@@ -29,7 +29,6 @@
 #include "androidconstants.h"
 #include "androidmanifestdocument.h"
 #include "androidmanager.h"
-#include "androidqtsupport.h"
 
 #include <coreplugin/icore.h>
 #include <coreplugin/infobar.h>
@@ -37,6 +36,7 @@
 
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/project.h>
+#include <projectexplorer/projectnodes.h>
 #include <projectexplorer/projectwindow.h>
 #include <projectexplorer/session.h>
 #include <projectexplorer/target.h>
@@ -91,7 +91,7 @@ Project *androidProject(const Utils::FileName &fileName)
         if (!project->activeTarget())
             continue;
         Kit *kit = project->activeTarget()->kit();
-        if (DeviceTypeKitInformation::deviceTypeId(kit) == Android::Constants::ANDROID_DEVICE_TYPE
+        if (DeviceTypeKitAspect::deviceTypeId(kit) == Android::Constants::ANDROID_DEVICE_TYPE
                 && fileName.isChildOf(project->projectDirectory()))
             return project;
     }
@@ -170,12 +170,8 @@ void AndroidManifestEditorWidget::initializePage()
 
         formLayout->addRow(QString(), warningRow);
 
-
-        m_versionCode = new QSpinBox(packageGroupBox);
-        m_versionCode->setMaximum(std::numeric_limits<int>::max());
-        m_versionCode->setValue(1);
-        m_versionCode->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        formLayout->addRow(tr("Version code:"), m_versionCode);
+        m_versionCodeLineEdit = new QLineEdit(packageGroupBox);
+        formLayout->addRow(tr("Version code:"), m_versionCodeLineEdit);
 
         m_versionNameLinedit = new QLineEdit(packageGroupBox);
         formLayout->addRow(tr("Version name:"), m_versionNameLinedit);
@@ -201,8 +197,8 @@ void AndroidManifestEditorWidget::initializePage()
 
         connect(m_packageNameLineEdit, &QLineEdit::textEdited,
                 this, &AndroidManifestEditorWidget::setPackageName);
-        connect(m_versionCode, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
-                this, &AndroidManifestEditorWidget::setDirty);
+        connect(m_versionCodeLineEdit, &QLineEdit::textEdited,
+                 this, setDirtyFunc);
         connect(m_versionNameLinedit, &QLineEdit::textEdited,
                 this, setDirtyFunc);
         connect(m_androidMinSdkVersion,
@@ -496,8 +492,13 @@ void AndroidManifestEditorWidget::updateTargetComboBox()
     QStringList items;
     if (project) {
         Kit *kit = project->activeTarget()->kit();
-        if (DeviceTypeKitInformation::deviceTypeId(kit) == Constants::ANDROID_DEVICE_TYPE)
-            items = AndroidManager::androidQtSupport(project->activeTarget())->projectTargetApplications(project->activeTarget());
+        if (DeviceTypeKitAspect::deviceTypeId(kit) == Constants::ANDROID_DEVICE_TYPE) {
+            ProjectNode *root = project->rootProjectNode();
+            root->forEachProjectNode([&items](const ProjectNode *projectNode) {
+                items << projectNode->targetApplications();
+            });
+            items.sort();
+        }
     }
 
     // QComboBox randomly resets what the user has entered
@@ -760,7 +761,7 @@ void AndroidManifestEditorWidget::syncToWidgets(const QDomDocument &doc)
     m_stayClean = true;
     QDomElement manifest = doc.documentElement();
     m_packageNameLineEdit->setText(manifest.attribute(QLatin1String("package")));
-    m_versionCode->setValue(manifest.attribute(QLatin1String("android:versionCode")).toInt());
+    m_versionCodeLineEdit->setText(manifest.attribute(QLatin1String("android:versionCode")));
     m_versionNameLinedit->setText(manifest.attribute(QLatin1String("android:versionName")));
 
     QDomElement usesSdkElement = manifest.firstChildElement(QLatin1String("uses-sdk"));
@@ -917,7 +918,7 @@ void AndroidManifestEditorWidget::parseManifest(QXmlStreamReader &reader, QXmlSt
             << QLatin1String("android:versionName");
     QStringList values = QStringList()
             << m_packageNameLineEdit->text()
-            << QString::number(m_versionCode->value())
+            << m_versionCodeLineEdit->text()
             << m_versionNameLinedit->text();
 
     QXmlStreamAttributes result = modifyXmlStreamAttributes(attributes, keys, values);

@@ -30,11 +30,22 @@ The standalone binary packages support the following platforms:
 * (K)Ubuntu Linux 16.04 (64-bit) or later
 * macOS 10.11 or later
 
+## Contributing
+
+For instructions on how to set up the Qt Creator repository to contribute
+patches back to Qt Creator, please check:
+
+https://wiki.qt.io/Setting_up_Gerrit
+
+See the following page for information about our coding standard:
+
+https://doc-snapshots.qt.io/qtcreator-extending/coding-style.html
+
 ## Compiling Qt Creator
 
 Prerequisites:
 
-* Qt 5.9.0 or later
+* Qt 5.11.0 or later
 * Qt WebEngine module for QtWebEngine based help viewer
 * On Windows:
     * ActiveState Active Perl
@@ -46,7 +57,6 @@ Prerequisites:
 * LLVM/Clang 6.0.0 or later (optional, needed for the Clang Code Model, see the
   section "Get LLVM/Clang for the Clang Code Model")
     * CMake (only for manual builds of LLVM/Clang)
-* Python 2.6 or later (needed for building the bundled Botan library)
 * Qbs 1.7.x (optional, sources also contain Qbs itself)
 
 The installed toolchains have to match the one Qt was compiled with.
@@ -90,7 +100,7 @@ For detailed information on the supported compilers, see
        for example, `c:\work`. If you plan to use MinGW and Microsoft Visual
        Studio simultaneously or mix different Qt versions, we recommend
        creating a directory structure which reflects that. For example:
-       `C:\work\qt5.9.0-vs12, C:\work\qt5.9.0-mingw`.
+       `C:\work\qt5.11.0-vs15, C:\work\qt5.11.0-mingw`.
 
    4.  Download and install Perl from <https://www.activestate.com/activeperl>
        and check that perl.exe is added to the path. Run `perl -v` to verify
@@ -275,13 +285,9 @@ http://llvm.org/docs/GettingStarted.html#git-mirror:
 
    1. Clone LLVM and checkout a suitable branch
 
-          git clone -b release_60-based https://code.qt.io/clang/llvm
+          git clone -b release_70-based --recursive https://code.qt.io/clang/llvm
 
-   2. Clone Clang into llvm/tools/clang and checkout a suitable branch
-
-          git clone -b release_60-based https://code.qt.io/clang/clang llvm/tools/clang
-
-   3. Build and install LLVM/Clang
+   2. Build and install LLVM/Clang
 
           mkdir build
           cd build
@@ -300,6 +306,44 @@ http://llvm.org/docs/GettingStarted.html#git-mirror:
 
 Qt Creator includes the following third-party components,
 we thank the authors who made this possible:
+
+### KSyntaxHighlighting
+
+  Syntax highlighting engine for Kate syntax definitions
+
+  This is a stand-alone implementation of the Kate syntax highlighting
+  engine. It's meant as a building block for text editors as well as
+  for simple highlighted text rendering (e.g. as HTML), supporting both
+  integration with a custom editor as well as a ready-to-use
+  QSyntaxHighlighter sub-class.
+
+  Distributed under the:
+
+  MIT License
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+  The source code of KSyntaxHighlighting can be found here:
+      https://cgit.kde.org/syntax-highlighting.git
+      QtCreator/src/libs/3rdparty/syntax-highlighting
+      https://code.qt.io/cgit/qt-creator/qt-creator.git/tree/src/libs/3rdparty/syntax-highlighting
 
 ### Clazy
 
@@ -401,54 +445,6 @@ we thank the authors who made this possible:
   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-### Botan, a C++ crypto library. Version 1.10.2
-
-  Botan (http://botan.randombit.net/) is distributed under these terms::
-
-  Copyright (C) 1999-2011 Jack Lloyd
-                2001 Peter J Jones
-                2004-2007 Justin Karneges
-                2004 Vaclav Ovsik
-                2005 Matthew Gregan
-                2005-2006 Matt Johnston
-                2006 Luca Piccarreta
-                2007 Yves Jerschow
-                2007-2008 FlexSecure GmbH
-                2007-2008 Technische Universitat Darmstadt
-                2007-2008 Falko Strenzke
-                2007-2008 Martin Doering
-                2007 Manuel Hartl
-                2007 Christoph Ludwig
-                2007 Patrick Sona
-                2010 Olivier de Gaalon
-  All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions are
-  met:
-
-  1. Redistributions of source code must retain the above copyright
-  notice, this list of conditions, and the following disclaimer.
-
-  2. Redistributions in binary form must reproduce the above copyright
-  notice, this list of conditions, and the following disclaimer in the
-  documentation and/or other materials provided with the distribution.
-
-  THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) "AS IS" AND ANY EXPRESS OR
-  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE,
-  ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTOR(S) BE
-  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-  The source code of Botan C++ crypto library can be found in
-  QtCreator/src/libs/3rdparty
 
 ### SQLite, in-process library that implements a SQL database engine
 

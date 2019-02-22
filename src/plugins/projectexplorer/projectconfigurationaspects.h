@@ -38,6 +38,7 @@ namespace ProjectExplorer {
 namespace Internal {
 class BaseBoolAspectPrivate;
 class BaseStringAspectPrivate;
+class BaseIntegerAspectPrivate;
 } // Internal
 
 class PROJECTEXPLORER_EXPORT BaseBoolAspect : public ProjectConfigurationAspect
@@ -57,6 +58,7 @@ public:
     void setDefaultValue(bool defaultValue);
 
     void setLabel(const QString &label);
+    void setToolTip(const QString &tooltip);
 
     void fromMap(const QVariantMap &map) override;
     void toMap(QVariantMap &map) const override;
@@ -91,7 +93,12 @@ public:
     bool isChecked() const;
     void makeCheckable(const QString &optionalLabel, const QString &optionalBaseKey);
 
-    enum DisplayStyle { LabelDisplay, LineEditDisplay, PathChooserDisplay };
+    enum DisplayStyle {
+        LabelDisplay,
+        LineEditDisplay,
+        TextEditDisplay,
+        PathChooserDisplay
+    };
     void setDisplayStyle(DisplayStyle style);
 
     void fromMap(const QVariantMap &map) override;
@@ -104,6 +111,32 @@ private:
     void update();
 
     std::unique_ptr<Internal::BaseStringAspectPrivate> d;
+};
+
+class PROJECTEXPLORER_EXPORT BaseIntegerAspect : public ProjectConfigurationAspect
+{
+    Q_OBJECT
+
+public:
+    BaseIntegerAspect();
+    ~BaseIntegerAspect() override;
+
+    void addToConfigurationLayout(QFormLayout *layout) override;
+
+    int value() const;
+    void setValue(int val);
+
+    void setRange(int min, int max);
+    void setLabel(const QString &label);
+    void setPrefix(const QString &prefix);
+    void setSuffix(const QString &suffix);
+    void setDisplayIntegerBase(int base);
+
+    void fromMap(const QVariantMap &map) override;
+    void toMap(QVariantMap &map) const override;
+
+private:
+    std::unique_ptr<Internal::BaseIntegerAspectPrivate> d;
 };
 
 } // namespace ProjectExplorer

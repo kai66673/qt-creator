@@ -37,6 +37,7 @@
 #include <coreplugin/documentmanager.h>
 #include <coreplugin/inavigationwidgetfactory.h>
 #include <utils/elidinglabel.h>
+#include <utils/fancylineedit.h>
 #include <utils/navigationtreeview.h>
 #include <utils/qtcassert.h>
 #include <utils/utilsicons.h>
@@ -48,6 +49,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPoint>
+#include <QSortFilterProxyModel>
 #include <QTreeView>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -57,6 +59,21 @@ using namespace Core;
 namespace Git {
 namespace Internal {
 
+class BranchFilterModel : public QSortFilterProxyModel
+{
+public:
+    BranchFilterModel(QObject *parent) : QSortFilterProxyModel(parent) {}
+protected:
+    bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override
+    {
+        QAbstractItemModel *m = sourceModel();
+        // Filter leaves only. The root node and all intermediate nodes should always be visible
+        if (!sourceParent.isValid() || m->rowCount(m->index(sourceRow, 0, sourceParent)) > 0)
+            return true;
+        return QSortFilterProxyModel::filterAcceptsRow(sourceRow, sourceParent);
+    }
+};
+
 BranchView::BranchView() :
     m_includeOldEntriesAction(new QAction(tr("Include Old Entries"), this)),
     m_includeTagsAction(new QAction(tr("Include Tags"), this)),
@@ -64,7 +81,8 @@ BranchView::BranchView() :
     m_refreshButton(new QToolButton(this)),
     m_repositoryLabel(new Utils::ElidingLabel(this)),
     m_branchView(new Utils::NavigationTreeView(this)),
-    m_model(new BranchModel(GitPlugin::client(), this))
+    m_model(new BranchModel(GitPlugin::client(), this)),
+    m_filterModel(new BranchFilterModel(this))
 {
     m_addButton->setIcon(Utils::Icons::PLUS_TOOLBAR.icon());
     m_addButton->setProperty("noArrow", true);
@@ -75,12 +93,21 @@ BranchView::BranchView() :
     m_refreshButton->setProperty("noArrow", true);
     connect(m_refreshButton, &QToolButton::clicked, this, &BranchView::refreshCurrentRepository);
 
-    m_branchView->setModel(m_model);
     m_branchView->setHeaderHidden(true);
     setFocus();
 
     m_repositoryLabel->setElideMode(Qt::ElideLeft);
+
+    m_filterModel->setSourceModel(m_model);
+    m_filterModel->setFilterRole(Qt::EditRole);
+    m_filterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    m_branchView->setModel(m_filterModel);
+    auto filterEdit = new Utils::FancyLineEdit(this);
+    filterEdit->setFiltering(true);
+    connect(filterEdit, &Utils::FancyLineEdit::textChanged,
+            m_filterModel, QOverload<const QString &>::of(&BranchFilterModel::setFilterRegExp));
     auto layout = new QVBoxLayout(this);
+    layout->addWidget(filterEdit);
     layout->addWidget(m_repositoryLabel);
     layout->addWidget(m_branchView);
     layout->setContentsMargins(0, 2, 0, 0);
@@ -99,8 +126,11 @@ BranchView::BranchView() :
             this, &BranchView::BranchView::setIncludeTags);
 
     m_branchView->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_branchView->setEditTriggers(QAbstractItemView::SelectedClicked
+                                  | QAbstractItemView::EditKeyPressed);
+    m_branchView->setItemDelegate(new BranchValidationDelegate(this, m_model));
     connect(m_branchView, &QAbstractItemView::doubleClicked,
-            this, &BranchView::log);
+            this, [this](const QModelIndex &idx) { log(m_filterModel->mapToSource(idx)); });
     connect(m_branchView, &QWidget::customContextMenuRequested,
             this, &BranchView::slotCustomContextMenu);
     connect(m_model, &QAbstractItemModel::modelReset,
@@ -161,65 +191,68 @@ void BranchView::resizeColumns()
 
 void BranchView::slotCustomContextMenu(const QPoint &point)
 {
-    const QModelIndex index = m_branchView->indexAt(point);
-    if (!index.isValid())
+    const QModelIndex filteredIndex = m_branchView->indexAt(point);
+    if (!filteredIndex.isValid())
         return;
 
+    const QModelIndex index = m_filterModel->mapToSource(filteredIndex);
     const QModelIndex currentBranch = m_model->currentBranch();
-    const bool hasSelection = index.isValid();
-    const bool currentSelected = hasSelection && index == currentBranch;
+    const bool currentSelected = index.sibling(index.row(), 0) == currentBranch;
     const bool isLocal = m_model->isLocal(index);
-    const bool isLeaf = m_model->isLeaf(index);
     const bool isTag = m_model->isTag(index);
-    const bool hasActions = hasSelection && isLeaf;
+    const bool hasActions = m_model->isLeaf(index);
     const bool currentLocal = m_model->isLocal(currentBranch);
 
     QMenu contextMenu;
-    contextMenu.addAction(tr("Add..."), this, &BranchView::add);
+    contextMenu.addAction(tr("&Add..."), this, &BranchView::add);
     const Utils::optional<QString> remote = m_model->remoteName(index);
     if (remote.has_value()) {
-        contextMenu.addAction(tr("Fetch"), this, [this, &remote]() {
+        contextMenu.addAction(tr("&Fetch"), this, [this, &remote]() {
             GitPlugin::client()->fetch(m_repository, *remote);
         });
         contextMenu.addSeparator();
-        contextMenu.addAction(tr("Manage Remotes..."), GitPlugin::instance(),
+        contextMenu.addAction(tr("Manage &Remotes..."), GitPlugin::instance(),
                               &GitPlugin::manageRemotes);
     }
     if (hasActions) {
         if (!currentSelected && (isLocal || isTag))
-            contextMenu.addAction(tr("Remove"), this, &BranchView::remove);
+            contextMenu.addAction(tr("Rem&ove..."), this, &BranchView::remove);
         if (isLocal || isTag)
-            contextMenu.addAction(tr("Rename"), this, &BranchView::rename);
+            contextMenu.addAction(tr("Re&name..."), this, &BranchView::rename);
         if (!currentSelected)
-            contextMenu.addAction(tr("Checkout"), this, &BranchView::checkout);
+            contextMenu.addAction(tr("&Checkout"), this, &BranchView::checkout);
         contextMenu.addSeparator();
-        contextMenu.addAction(tr("Diff"), this, [this] {
+        contextMenu.addAction(tr("&Diff"), this, [this] {
             const QString fullName = m_model->fullName(selectedIndex(), true);
             if (!fullName.isEmpty())
                 GitPlugin::client()->diffBranch(m_repository, fullName);
         });
-        contextMenu.addAction(tr("Log"), this, [this] { log(selectedIndex()); });
+        contextMenu.addAction(tr("&Log"), this, [this] { log(selectedIndex()); });
         contextMenu.addSeparator();
         if (!currentSelected) {
             if (currentLocal)
-                contextMenu.addAction(tr("Reset"), this, &BranchView::reset);
+                contextMenu.addAction(tr("Re&set"), this, &BranchView::reset);
             QString mergeTitle;
             if (isFastForwardMerge()) {
-                contextMenu.addAction(tr("Merge (Fast-Forward)"), this, [this] { merge(true); });
-                mergeTitle = tr("Merge (No Fast-Forward)");
+                contextMenu.addAction(tr("&Merge (Fast-Forward)"), this, [this] { merge(true); });
+                mergeTitle = tr("Merge (No &Fast-Forward)");
             } else {
-                mergeTitle = tr("Merge");
+                mergeTitle = tr("&Merge");
             }
 
             contextMenu.addAction(mergeTitle, this, [this] { merge(false); });
-            contextMenu.addAction(tr("Rebase"), this, &BranchView::rebase);
+            contextMenu.addAction(tr("&Rebase"), this, &BranchView::rebase);
             contextMenu.addSeparator();
-            contextMenu.addAction(tr("Cherry Pick"), this, &BranchView::cherryPick);
+            contextMenu.addAction(tr("Cherry &Pick"), this, &BranchView::cherryPick);
         }
         if (currentLocal && !currentSelected && !isTag) {
-            contextMenu.addAction(tr("Track"), this, [this] {
+            contextMenu.addAction(tr("&Track"), this, [this] {
                 m_model->setRemoteTracking(selectedIndex());
             });
+            if (!isLocal) {
+                contextMenu.addSeparator();
+                contextMenu.addAction(tr("&Push"), this, &BranchView::push);
+            }
         }
     }
     contextMenu.exec(m_branchView->viewport()->mapToGlobal(point));
@@ -248,7 +281,7 @@ QModelIndex BranchView::selectedIndex()
     QModelIndexList selected = m_branchView->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
         return QModelIndex();
-    return selected.at(0);
+    return m_filterModel->mapToSource(selected.at(0));
 }
 
 bool BranchView::add()
@@ -265,12 +298,12 @@ bool BranchView::add()
         trackedBranch = m_model->fullName(trackedIndex);
     }
     const bool isLocal = m_model->isLocal(trackedIndex);
-    const bool isTag = m_model->isTag(trackedIndex);
+    const bool isTracked = !m_model->isHead(trackedIndex) && !m_model->isTag(trackedIndex);
 
     const QStringList localNames = m_model->localBranchNames();
 
     QString suggestedName;
-    if (!isTag) {
+    if (isTracked) {
         const QString suggestedNameBase = trackedBranch.mid(trackedBranch.lastIndexOf('/') + 1);
         suggestedName = suggestedNameBase;
         int i = 2;
@@ -282,21 +315,22 @@ bool BranchView::add()
 
     BranchAddDialog branchAddDialog(localNames, true, this);
     branchAddDialog.setBranchName(suggestedName);
-    branchAddDialog.setTrackedBranchName(isTag ? QString() : trackedBranch, !isLocal);
+    branchAddDialog.setTrackedBranchName(isTracked ? trackedBranch : QString(), !isLocal);
+    branchAddDialog.setCheckoutVisible(true);
 
     if (branchAddDialog.exec() == QDialog::Accepted) {
-        QModelIndex idx = m_model->addBranch(branchAddDialog.branchName(), branchAddDialog.track(), trackedIndex);
+        QModelIndex idx = m_model->addBranch(branchAddDialog.branchName(), branchAddDialog.track(),
+                                             trackedIndex);
         if (!idx.isValid())
             return false;
+        QModelIndex mappedIdx = m_filterModel->mapFromSource(idx);
         QTC_ASSERT(m_branchView, return false);
-        m_branchView->selectionModel()->select(idx, QItemSelectionModel::Clear
+        m_branchView->selectionModel()->select(mappedIdx, QItemSelectionModel::Clear
                                              | QItemSelectionModel::Select
                                              | QItemSelectionModel::Current);
-        m_branchView->scrollTo(idx);
-        if (QMessageBox::question(this, tr("Checkout"), tr("Checkout branch?"),
-                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+        m_branchView->scrollTo(mappedIdx);
+        if (branchAddDialog.checkout())
             return checkout();
-        }
     }
 
     return false;
@@ -402,7 +436,6 @@ bool BranchView::remove()
 bool BranchView::rename()
 {
     const QModelIndex selected = selectedIndex();
-    QTC_CHECK(selected != m_model->currentBranch());
     const bool isTag = m_model->isTag(selected);
     QTC_CHECK(m_model->isLocal(selected) || isTag);
 
@@ -503,6 +536,22 @@ void BranchView::log(const QModelIndex &idx)
     const QString branchName = m_model->fullName(idx, true);
     if (!branchName.isEmpty())
         GitPlugin::client()->log(m_repository, QString(), false, {branchName});
+}
+
+void BranchView::push()
+{
+    const QModelIndex selected = selectedIndex();
+    QTC_CHECK(selected != m_model->currentBranch());
+
+    const QString fullTargetName = m_model->fullName(selected);
+    const int pos = fullTargetName.indexOf('/');
+
+    const QString localBranch = m_model->fullName(m_model->currentBranch());
+    const QString remoteName = fullTargetName.left(pos);
+    const QString remoteBranch = fullTargetName.mid(pos + 1);
+    const QStringList pushArgs = {remoteName, localBranch + ':' + remoteBranch};
+
+    GitPlugin::client()->push(m_repository, pushArgs);
 }
 
 BranchViewFactory::BranchViewFactory()

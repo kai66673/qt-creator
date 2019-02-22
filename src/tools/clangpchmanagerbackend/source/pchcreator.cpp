@@ -25,8 +25,10 @@
 
 #include "pchcreator.h"
 
+#include "builddependencycollector.h"
+#include "commandlinebuilder.h"
 #include "environment.h"
-#include "includecollector.h"
+#include "generatepchactionfactory.h"
 #include "pchnotcreatederror.h"
 
 #include <clangpathwatcherinterface.h>
@@ -43,41 +45,6 @@
 #include <QTemporaryFile>
 
 namespace ClangBackEnd {
-
-namespace {
-template <typename Source,
-          typename Target>
-void append(Target &target, const Source &source)
-{
-    using ValueType = typename Target::value_type;
-    Source clonedSource = source.clone();
-
-    target.reserve(target.size() + source.size());
-
-    for (auto &&entry : clonedSource)
-        target.push_back(ValueType(std::move(entry)));
-}
-
-void appendFilePathId(Utils::PathStringVector &target,
-                      const ClangBackEnd::FilePathIds &source,
-                      const ClangBackEnd::FilePathCachingInterface &filePathCache)
-{
-    for (FilePathId id : source)
-        target.emplace_back(filePathCache.filePath(id).path());
-}
-
-Utils::PathStringVector generatedFilePaths(const V2::FileContainers &generaredFiles)
-{
-    Utils::PathStringVector generaredFilePaths;
-    generaredFilePaths.reserve(generaredFiles.size());
-
-    for (const V2::FileContainer &generatedFile : generaredFiles)
-        generaredFilePaths.push_back(generatedFile.filePath.path());
-
-    return generaredFilePaths;
-}
-
-}
 
 namespace {
 
@@ -105,241 +72,61 @@ Utils::SmallString PchCreator::generatePchIncludeFileContent(const FilePathIds &
     return fileContent;
 }
 
-
-bool PchCreator::generatePch(Utils::SmallStringVector &&compilerArguments)
+bool PchCreator::generatePch(NativeFilePathView path, Utils::SmallStringView content)
 {
-    QProcess process;
+    clang::tooling::ClangTool tool = m_clangTool.createOutputTool();
 
-    process.setProcessChannelMode(QProcess::ForwardedChannels);
-    process.setArguments(QStringList(compilerArguments));
-    process.setProgram(QString(m_environment.clangCompilerPath()));
+    auto action = std::make_unique<GeneratePCHActionFactory>(llvm::StringRef{path.data(),
+                                                                             path.size()},
+                                                             llvm::StringRef{content.data(),
+                                                                             content.size()});
 
-    process.start();
-    process.waitForFinished(300000);
-
-    return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+    return tool.run(action.get()) != 1;
 }
 
-QStringList PchCreator::convertToQStringList(const Utils::SmallStringVector &compilerArguments)
+FilePath PchCreator::generatePchFilePath() const
 {
-    QStringList qStringList;
+    std::uniform_int_distribution<std::uint_fast64_t> distribution(
+        1, std::numeric_limits<std::uint_fast64_t>::max());
 
-    append(qStringList, compilerArguments);
-
-    return qStringList;
+    return FilePathView{Utils::PathString{Utils::SmallString(m_environment.pchBuildDirectory()),
+                                          "/",
+                                          std::to_string(distribution(randomNumberGenator)),
+                                          ".pch"}};
 }
 
-namespace {
-
-void hashProjectPart(QCryptographicHash &hash, const V2::ProjectPartContainer &projectPart)
+Utils::SmallStringVector PchCreator::generateClangCompilerArguments(const PchTask &pchTask,
+                                                                    FilePathView pchOutputPath)
 {
-    const auto &projectPartId = projectPart.projectPartId;
-    hash.addData(projectPartId.data(), int(projectPartId.size()));
+    CommandLineBuilder<PchTask> builder{pchTask,
+                                        pchTask.toolChainArguments,
+                                        InputFileType::Header,
+                                        {},
+                                        pchOutputPath,
+                                        pchTask.systemPchPath};
 
-    for (const auto &argument : projectPart.arguments)
-        hash.addData(argument.data(), int(argument.size()));
-}
-}
-
-Utils::SmallStringVector PchCreator::generateProjectPartCommandLine(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    const Utils::SmallStringVector &arguments = projectPart.arguments;
-
-    Utils::SmallStringVector commandLine;
-    commandLine.reserve(arguments.size() + 1);
-
-    commandLine.emplace_back(m_environment.clangCompilerPath());
-
-    append(commandLine , arguments);
-
-    return commandLine;
+    return builder.commandLine;
 }
 
-Utils::SmallString PchCreator::generateProjectPartPchFilePathWithoutExtension(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    QByteArray fileName = m_environment.pchBuildDirectory().toUtf8();
-    fileName += '/';
-    fileName += projectPartHash(projectPart);
-
-    return Utils::SmallString::fromQByteArray(fileName);
-}
-
-Utils::PathStringVector PchCreator::generateProjectPartHeaders(
-        const V2::ProjectPartContainer &projectPart) const
-{
-   Utils::PathStringVector headerPaths;
-   headerPaths.reserve(projectPart.headerPathIds.size() + m_unsavedFiles.size());
-
-   std::transform(projectPart.headerPathIds.begin(),
-                  projectPart.headerPathIds.end(),
-                  std::back_inserter(headerPaths),
-                  [&] (FilePathId filePathId) {
-       return m_filePathCache.filePath(filePathId);
-   });
-
-   Utils::PathStringVector generatedPath = generatedFilePaths(m_unsavedFiles);
-
-   std::copy(std::make_move_iterator(generatedPath.begin()),
-             std::make_move_iterator(generatedPath.end()),
-             std::back_inserter(headerPaths));
-
-   return headerPaths;
-}
-
-namespace {
-
-std::size_t sizeOfContent(const Utils::PathStringVector &paths)
-{
-    return std::accumulate(paths.begin(),
-                           paths.end(),
-                           std::size_t(0),
-                           [] (std::size_t size, const Utils::PathString &path) {
-        const char includeTemplate[] = "#include \"\"\n";
-        return size + path.size() + sizeof(includeTemplate);
-    });
-}
-
-Utils::SmallString concatContent(const Utils::PathStringVector &paths, std::size_t size)
-{
-    Utils::SmallString content;
-    content.reserve(size);
-
-    for (const Utils::PathString &path : paths) {
-        content += "#include \"";
-        content +=  path;
-        content += "\"\n";
-    };
-
-    return content;
-}
-
-}
-
-Utils::SmallString PchCreator::generateProjectPartSourcesContent(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    Utils::PathStringVector paths = generateProjectPartSourcePaths(projectPart);
-
-    return concatContent(paths, sizeOfContent(paths));
-}
-
-Utils::PathStringVector PchCreator::generateProjectPartSourcePaths(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    Utils::PathStringVector includeAndSources;
-    includeAndSources.reserve(projectPart.sourcePathIds.size());
-
-    appendFilePathId(includeAndSources, projectPart.sourcePathIds, m_filePathCache);
-
-    return includeAndSources;
-}
-
-std::pair<FilePathIds,FilePathIds> PchCreator::generateProjectPartPchIncludes(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    Utils::SmallString jointedFileContent = generateProjectPartSourcesContent(projectPart);
-    Utils::SmallString jointedFilePath = generateProjectPartSourceFilePath(projectPart);
-    auto jointFile = generateFileWithContent(jointedFilePath, jointedFileContent);
-    Utils::SmallStringVector arguments = generateProjectPartCommandLine(projectPart);
-    arguments.push_back(jointedFilePath);
-    FilePath filePath{Utils::PathString(jointedFilePath)};
-
-    IncludeCollector collector(m_filePathCache);
-
-    collector.setExcludedIncludes(generateProjectPartSourcePaths(projectPart));
-
-    collector.addFile(std::string(filePath.directory()),
-                      std::string(filePath.name()),
-                      {},
-                      arguments);
-
-    collector.addUnsavedFiles(m_unsavedFiles);
-
-    collector.collectIncludes();
-
-    jointFile->remove();
-
-    return  {collector.takeIncludeIds(), collector.takeTopIncludeIds()};
-}
-
-Utils::SmallString PchCreator::generateProjectPathPchHeaderFilePath(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    return Utils::SmallString{generateProjectPartPchFilePathWithoutExtension(projectPart), ".h"};
-}
-
-Utils::SmallString PchCreator::generateProjectPartPchFilePath(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    return Utils::SmallString{generateProjectPartPchFilePathWithoutExtension(projectPart), ".pch"};
-}
-
-Utils::SmallString PchCreator::generateProjectPartSourceFilePath(const V2::ProjectPartContainer &projectPart) const
-{
-    return Utils::SmallString{generateProjectPartPchFilePathWithoutExtension(projectPart), ".cpp"};
-}
-
-Utils::SmallStringVector PchCreator::generateProjectPartPchCompilerArguments(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    Utils::SmallStringVector arguments;
-    arguments.reserve(5);
-
-    arguments.emplace_back("-x");
-    arguments.emplace_back("c++-header");
-    arguments.emplace_back("-Xclang");
-    arguments.emplace_back("-emit-pch");
-    arguments.emplace_back("-o");
-    arguments.emplace_back(generateProjectPartPchFilePath(projectPart));
-    arguments.emplace_back(generateProjectPathPchHeaderFilePath(projectPart));
-
-    return arguments;
-}
-
-Utils::SmallStringVector PchCreator::generateProjectPartClangCompilerArguments(
-        const V2::ProjectPartContainer &projectPart) const
-{
-    Utils::SmallStringVector compilerArguments = projectPart.arguments.clone();
-    const auto pchArguments = generateProjectPartPchCompilerArguments(projectPart);
-
-    append(compilerArguments, pchArguments);
-
-    return compilerArguments;
-}
-
-IdPaths PchCreator::generateProjectPartPch(const V2::ProjectPartContainer &projectPart)
+void PchCreator::generatePch(PchTask &&pchTask)
 {
     long long lastModified = QDateTime::currentSecsSinceEpoch();
-    FilePathIds allExternalIncludes;
-    FilePathIds topExternalIncludes;
-    std::tie(allExternalIncludes, topExternalIncludes) = generateProjectPartPchIncludes(projectPart);
-    auto content = generatePchIncludeFileContent(topExternalIncludes);
-    auto pchIncludeFilePath = generateProjectPathPchHeaderFilePath(projectPart);
-    auto pchFilePath = generateProjectPartPchFilePath(projectPart);
-    generateFileWithContent(pchIncludeFilePath, content);
+    auto content = generatePchIncludeFileContent(pchTask.includes);
+    auto pchOutputPath = generatePchFilePath();
 
-    bool success = generatePch(generateProjectPartClangCompilerArguments(projectPart));
+    FilePath headerFilePath{m_environment.pchBuildDirectory().toStdString(), "dummy.h"};
+    Utils::SmallStringVector commandLine = generateClangCompilerArguments(pchTask, pchOutputPath);
 
-    m_projectPartPch.projectPartId = projectPart.projectPartId;
+    m_clangTool.addFile(std::move(headerFilePath), content.clone(), std::move(commandLine));
+    bool success = generatePch(NativeFilePath{headerFilePath}, content);
+
+    m_projectPartPch.projectPartId = pchTask.projectPartId();
 
     if (success) {
-        m_projectPartPch.pchPath = std::move(pchFilePath);
+        m_allInclues = pchTask.allIncludes;
+        m_projectPartPch.pchPath = std::move(pchOutputPath);
         m_projectPartPch.lastModified = lastModified;
     }
-
-    return {projectPart.projectPartId.clone(), std::move(allExternalIncludes)};
-}
-
-void PchCreator::generatePch(const V2::ProjectPartContainer &projectPart)
-{
-    m_projectIncludeIds = generateProjectPartPch(projectPart);
-}
-
-IdPaths PchCreator::takeProjectIncludes()
-{
-    return std::move(m_projectIncludeIds);
 }
 
 const ProjectPartPch &PchCreator::projectPartPch()
@@ -349,7 +136,17 @@ const ProjectPartPch &PchCreator::projectPartPch()
 
 void PchCreator::setUnsavedFiles(const V2::FileContainers &fileContainers)
 {
-    m_unsavedFiles = fileContainers;
+    m_generatedFilePathIds.clear();
+    m_generatedFilePathIds.reserve(fileContainers.size());
+    std::transform(fileContainers.begin(),
+                   fileContainers.end(),
+                   std::back_inserter(m_generatedFilePathIds),
+                   [&](const V2::FileContainer &fileContainer) {
+                       return m_filePathCache.filePathId(fileContainer.filePath);
+                   });
+    std::sort(m_generatedFilePathIds.begin(), m_generatedFilePathIds.end());
+
+    m_clangTool.addUnsavedFiles(fileContainers);
 }
 
 void PchCreator::setIsUsed(bool isUsed)
@@ -364,49 +161,26 @@ bool PchCreator::isUsed() const
 
 void PchCreator::clear()
 {
-    m_projectPartPch = ProjectPartPch{};
-    m_projectIncludeIds = IdPaths{};
+    m_clangTool = ClangTool{};
+    m_projectPartPch = {};
 }
 
 void PchCreator::doInMainThreadAfterFinished()
 {
+    FilePathIds existingIncludes;
+    existingIncludes.reserve(m_allInclues.size());
+    std::set_difference(m_allInclues.begin(),
+                        m_allInclues.end(),
+                        m_generatedFilePathIds.begin(),
+                        m_generatedFilePathIds.end(),
+                        std::back_inserter(existingIncludes));
+    m_clangPathwatcher.updateIdPaths({{m_projectPartPch.projectPartId, existingIncludes}});
     m_pchManagerClient.precompiledHeadersUpdated(ProjectPartPchs{m_projectPartPch});
-    m_fileSystemWatcher.updateIdPaths({takeProjectIncludes()});
-}
-
-const IdPaths &PchCreator::projectIncludes() const
-{
-    return m_projectIncludeIds;
 }
 
 const FilePathCaching &PchCreator::filePathCache()
 {
     return m_filePathCache;
-}
-
-std::unique_ptr<QFile> PchCreator::generateFileWithContent(
-        const Utils::SmallString &filePath,
-        const Utils::SmallString &content)
-{
-    std::unique_ptr<QFile> precompiledIncludeFile(new QFile(QString(filePath)));
-
-    precompiledIncludeFile->open(QIODevice::WriteOnly);
-
-    precompiledIncludeFile->write(content.data(), qint64(content.size()));
-    precompiledIncludeFile->close();
-
-    return precompiledIncludeFile;
-}
-
-QByteArray PchCreator::projectPartHash(const V2::ProjectPartContainer &projectPart)
-{
-    QCryptographicHash hash(QCryptographicHash::Sha1);
-
-    hashProjectPart(hash, projectPart);
-
-    auto result = hash.result();
-
-    return result.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
 }
 
 } // namespace ClangBackEnd

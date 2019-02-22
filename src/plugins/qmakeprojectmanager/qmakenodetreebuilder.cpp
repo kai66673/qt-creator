@@ -103,12 +103,12 @@ QmakeStaticData::QmakeStaticData()
     const unsigned count = sizeof(fileTypeDataStorage)/sizeof(FileTypeDataStorage);
     fileTypeData.reserve(count);
 
-    for (unsigned i = 0 ; i < count; ++i) {
-        const QString desc = QCoreApplication::translate("QmakeProjectManager::QmakePriFile", fileTypeDataStorage[i].typeName);
-        const QString filter = QString::fromUtf8(fileTypeDataStorage[i].addFileFilter);
-        fileTypeData.push_back(QmakeStaticData::FileTypeData(fileTypeDataStorage[i].type,
+    for (const FileTypeDataStorage &fileType : fileTypeDataStorage) {
+        const QString desc = QCoreApplication::translate("QmakeProjectManager::QmakePriFile", fileType.typeName);
+        const QString filter = QString::fromUtf8(fileType.addFileFilter);
+        fileTypeData.push_back(QmakeStaticData::FileTypeData(fileType.type,
                                                              desc, filter,
-                                                             Core::FileIconProvider::directoryIcon(QLatin1String(fileTypeDataStorage[i].icon))));
+                                                             Core::FileIconProvider::directoryIcon(QLatin1String(fileType.icon))));
     }
     // Project icon
     projectIcon = Core::FileIconProvider::directoryIcon(ProjectExplorer::Constants::FILEOVERLAY_QT);
@@ -201,7 +201,7 @@ std::unique_ptr<QmakeProFileNode> QmakeNodeTreeBuilder::buildTree(QmakeProject *
     // Remove qmake implementation details that litter up the project data:
     Target *t = project->activeTarget();
     Kit *k = t ? t->kit() : KitManager::defaultKit();
-    BaseQtVersion *qt = k ? QtKitInformation::qtVersion(k) : nullptr;
+    BaseQtVersion *qt = k ? QtKitAspect::qtVersion(k) : nullptr;
 
     const FileNameList toExclude = qt ? qt->directoriesToIgnoreInProjectTree() : FileNameList();
 

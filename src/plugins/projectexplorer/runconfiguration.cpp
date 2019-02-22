@@ -49,6 +49,7 @@
 
 #include <QDir>
 #include <QFormLayout>
+#include <QHash>
 #include <QPushButton>
 #include <QTimer>
 #include <QLoggingCategory>
@@ -66,7 +67,7 @@ using namespace Utils;
 using namespace ProjectExplorer::Internal;
 
 namespace {
-Q_LOGGING_CATEGORY(statesLog, "qtc.projectmanager.states")
+Q_LOGGING_CATEGORY(statesLog, "qtc.projectmanager.states", QtWarningMsg)
 }
 
 namespace ProjectExplorer {
@@ -193,7 +194,7 @@ RunConfiguration::RunConfiguration(Target *target, Core::Id id)
     });
     expander->registerPrefix("CurrentRun:Env", tr("Variables in the current run environment"),
                              [this](const QString &var) {
-        const auto envAspect = extraAspect<EnvironmentAspect>();
+        const auto envAspect = aspect<EnvironmentAspect>();
         return envAspect ? envAspect->environment().value(var) : QString();
     });
     expander->registerVariable(Constants::VAR_CURRENTRUN_NAME,
@@ -213,6 +214,8 @@ bool RunConfiguration::isActive() const
 
 QString RunConfiguration::disabledReason() const
 {
+    if (!target()->hasBuildTarget(m_buildKey))
+        return tr("The project no longer builds the target associated with this run configuration.");
     if (target()->project()->isParsing())
         return tr("The Project is currently being parsed.");
     if (!target()->project()->hasParsingData())
@@ -224,6 +227,8 @@ QWidget *RunConfiguration::createConfigurationWidget()
 {
     auto widget = new QWidget;
     auto formLayout = new QFormLayout(widget);
+    formLayout->setMargin(0);
+    formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
     for (ProjectConfigurationAspect *aspect : m_aspects) {
         if (aspect->isVisible())
@@ -232,14 +237,22 @@ QWidget *RunConfiguration::createConfigurationWidget()
 
     Core::VariableChooser::addSupportForChildWidgets(widget, macroExpander());
 
-    return wrapWidget(widget);
+    auto detailsWidget = new Utils::DetailsWidget;
+    detailsWidget->setState(DetailsWidget::NoSummary);
+    detailsWidget->setWidget(widget);
+    return detailsWidget;
 }
 
 void RunConfiguration::updateEnabledState()
 {
-    Project *p = target()->project();
-
-    setEnabled(!p->isParsing() && p->hasParsingData());
+    if (!target()->hasBuildTarget(m_buildKey)) {
+        // This apparently may happen for cmake builds where also outdated
+        // RunConfigurations are kept when builds change.
+        setEnabled(false); // Might happen for CMake.
+    } else {
+        Project *p = target()->project();
+        setEnabled(!p->isParsing() && p->hasParsingData());
+    }
 }
 
 void RunConfiguration::addAspectFactory(const AspectFactory &aspectFactory)
@@ -282,18 +295,6 @@ BuildConfiguration *RunConfiguration::activeBuildConfiguration() const
     return target()->activeBuildConfiguration();
 }
 
-QWidget *RunConfiguration::wrapWidget(QWidget *inner) const
-{
-    auto detailsWidget = new Utils::DetailsWidget;
-    detailsWidget->setState(DetailsWidget::NoSummary);
-    detailsWidget->setWidget(inner);
-    if (auto fl = qobject_cast<QFormLayout *>(inner->layout())){
-        fl->setMargin(0);
-        fl->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
-    }
-    return detailsWidget;
-}
-
 Target *RunConfiguration::target() const
 {
     return static_cast<Target *>(parent());
@@ -317,20 +318,9 @@ QVariantMap RunConfiguration::toMap() const
     return map;
 }
 
-Abi RunConfiguration::abi() const
-{
-    BuildConfiguration *bc = target()->activeBuildConfiguration();
-    if (!bc)
-        return Abi::hostAbi();
-    ToolChain *tc = ToolChainKitInformation::toolChain(target()->kit(), Constants::CXX_LANGUAGE_ID);
-    if (!tc)
-        return Abi::hostAbi();
-    return tc->targetAbi();
-}
-
 BuildTargetInfo RunConfiguration::buildTargetInfo() const
 {
-    return target()->applicationTargets().buildTargetInfo(m_buildKey);
+    return target()->buildTarget(m_buildKey);
 }
 
 bool RunConfiguration::fromMap(const QVariantMap &map)
@@ -383,14 +373,14 @@ bool RunConfiguration::fromMap(const QVariantMap &map)
 Runnable RunConfiguration::runnable() const
 {
     Runnable r;
-    if (auto aspect = extraAspect<ExecutableAspect>())
-        r.executable = aspect->executable().toString();
-    if (auto aspect = extraAspect<ArgumentsAspect>())
-        r.commandLineArguments = aspect->arguments(macroExpander());
-    if (auto aspect = extraAspect<WorkingDirectoryAspect>())
-        r.workingDirectory = aspect->workingDirectory(macroExpander()).toString();
-    if (auto aspect = extraAspect<EnvironmentAspect>())
-        r.environment = aspect->environment();
+    if (auto executableAspect = aspect<ExecutableAspect>())
+        r.executable = executableAspect->executable().toString();
+    if (auto argumentsAspect = aspect<ArgumentsAspect>())
+        r.commandLineArguments = argumentsAspect->arguments(macroExpander());
+    if (auto workingDirectoryAspect = aspect<WorkingDirectoryAspect>())
+        r.workingDirectory = workingDirectoryAspect->workingDirectory(macroExpander()).toString();
+    if (auto environmentAspect = aspect<EnvironmentAspect>())
+        r.environment = environmentAspect->environment();
     return r;
 }
 
@@ -447,14 +437,14 @@ RunConfigurationFactory::~RunConfigurationFactory()
     m_ownedRunWorkerFactories.clear();
 }
 
-QString RunConfigurationFactory::decoratedTargetName(const QString targetName, Target *target)
+QString RunConfigurationFactory::decoratedTargetName(const QString &targetName, Target *target)
 {
     QString displayName;
     if (!targetName.isEmpty())
         displayName = QFileInfo(targetName).completeBaseName();
-    Core::Id devType = DeviceTypeKitInformation::deviceTypeId(target->kit());
+    Core::Id devType = DeviceTypeKitAspect::deviceTypeId(target->kit());
     if (devType != Constants::DESKTOP_DEVICE_TYPE) {
-        if (IDevice::ConstPtr dev = DeviceKitInformation::device(target->kit())) {
+        if (IDevice::ConstPtr dev = DeviceKitAspect::device(target->kit())) {
             if (displayName.isEmpty()) {
                 //: Shown in Run configuration if no executable is given, %1 is device name
                 displayName = RunConfiguration::tr("Run on %1").arg(dev->displayName());
@@ -483,7 +473,9 @@ RunConfigurationFactory::availableCreators(Target *parent) const
         rci.factory = this;
         rci.id = m_runConfigBaseId;
         rci.buildKey = ti.buildKey;
+        rci.projectFilePath = ti.projectFilePath;
         rci.displayName = displayName;
+        rci.displayNameUniquifier = ti.displayNameUniquifier;
         rci.creationMode = ti.isQtcRunnable || !hasAnyQtcRunnable
                 ? RunConfigurationCreationInfo::AlwaysCreate
                 : RunConfigurationCreationInfo::ManualCreationOnly;
@@ -540,7 +532,7 @@ bool RunConfigurationFactory::canHandle(Target *target) const
 
     if (!m_supportedTargetDeviceTypes.isEmpty())
         if (!m_supportedTargetDeviceTypes.contains(
-                    DeviceTypeKitInformation::deviceTypeId(kit)))
+                    DeviceTypeKitAspect::deviceTypeId(kit)))
             return false;
 
     return true;
@@ -558,7 +550,7 @@ RunConfiguration *RunConfigurationCreationInfo::create(Target *target) const
 
     rc->m_buildKey = buildKey;
     rc->doAdditionalSetup(*this);
-    rc->setDefaultDisplayName(displayName);
+    rc->setDisplayName(displayName);
 
     return rc;
 }
@@ -592,6 +584,15 @@ const QList<RunConfigurationCreationInfo> RunConfigurationFactory::creatorsForTa
     for (RunConfigurationFactory *factory : g_runConfigurationFactories) {
         if (factory->canHandle(parent))
             items.append(factory->availableCreators(parent));
+    }
+    QHash<QString, QList<RunConfigurationCreationInfo *>> itemsPerDisplayName;
+    for (RunConfigurationCreationInfo &item : items)
+        itemsPerDisplayName[item.displayName] << &item;
+    for (auto it = itemsPerDisplayName.cbegin(); it != itemsPerDisplayName.cend(); ++it) {
+        if (it.value().size() == 1)
+            continue;
+        for (RunConfigurationCreationInfo * const rci : it.value())
+            rci->displayName += rci->displayNameUniquifier;
     }
     return items;
 }
@@ -803,7 +804,7 @@ public:
             outputFormatter = runConfiguration->createOutputFormatter();
             device = runnable.device;
             if (!device)
-                device = DeviceKitInformation::device(runConfiguration->target()->kit());
+                device = DeviceKitAspect::device(runConfiguration->target()->kit());
             project = runConfiguration->target()->project();
         } else {
             outputFormatter = new OutputFormatter();
@@ -1341,13 +1342,6 @@ Utils::Icon RunControl::icon() const
     return d->icon;
 }
 
-Abi RunControl::abi() const
-{
-    if (const RunConfiguration *rc = d->runConfiguration.data())
-        return rc->abi();
-    return Abi();
-}
-
 IDevice::ConstPtr RunControl::device() const
 {
    return d->device;
@@ -1563,7 +1557,7 @@ SimpleTargetRunner::SimpleTargetRunner(RunControl *runControl)
     m_runnable = runControl->runnable(); // Default value. Can be overridden using setRunnable.
     m_device = runControl->device(); // Default value. Can be overridden using setDevice.
     if (auto runConfig = runControl->runConfiguration()) {
-        if (auto terminalAspect = runConfig->extraAspect<TerminalAspect>())
+        if (auto terminalAspect = runConfig->aspect<TerminalAspect>())
             m_useTerminal = terminalAspect->useTerminal();
     }
 }
@@ -1580,7 +1574,8 @@ void SimpleTargetRunner::start()
     const QString displayName = isDesktop
             ? QDir::toNativeSeparators(rawDisplayName)
             : rawDisplayName;
-    const QString msg = RunControl::tr("Starting %1...").arg(displayName);
+    const QString msg = RunControl::tr("Starting %1 %2...")
+            .arg(displayName).arg(m_runnable.commandLineArguments);
     appendMessage(msg, Utils::NormalMessageFormat);
 
     if (isDesktop) {

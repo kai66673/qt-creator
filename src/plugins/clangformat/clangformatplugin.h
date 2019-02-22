@@ -27,12 +27,7 @@
 
 #include <extensionsystem/iplugin.h>
 
-#include <memory>
-
 namespace ClangFormat {
-namespace Internal {
-
-class ClangFormatOptionsPage;
 
 class ClangFormatPlugin : public ExtensionSystem::IPlugin
 {
@@ -46,9 +41,6 @@ public:
 private:
     bool initialize(const QStringList &arguments, QString *errorString) final;
     void extensionsInitialized() final {}
-
-    std::unique_ptr<ClangFormatOptionsPage> m_optionsPage;
 };
 
-} // namespace Internal
 } // namespace ClangTools

@@ -48,10 +48,10 @@
 #include <qmljs/qmljscheck.h>
 #include <qmljs/qmljsutils.h>
 #include <qmljs/qmljsmodelmanagerinterface.h>
-#include <qmljs/qmljsqrcparser.h>
 #include <qmljs/qmljsinterpreter.h>
 #include <qmljs/qmljsvalueowner.h>
 
+#include <utils/qrcparser.h>
 #include <utils/qtcassert.h>
 
 #include <QSet>
@@ -64,7 +64,7 @@
 using namespace LanguageUtils;
 using namespace QmlJS;
 
-static Q_LOGGING_CATEGORY(rewriterBenchmark, "qtc.rewriter.load")
+static Q_LOGGING_CATEGORY(rewriterBenchmark, "qtc.rewriter.load", QtWarningMsg)
 
 namespace {
 
@@ -456,7 +456,7 @@ public:
                 if (!name.isEmpty() && name != QLatin1String("."))
                     typeName.prepend(name + QLatin1Char('.'));
             } else if (importInfo.isValid() && importInfo.type() == ImportType::QrcDirectory) {
-                QString path = QrcParser::normalizedQrcDirectoryPath(importInfo.path());
+                QString path = Utils::QrcParser::normalizedQrcDirectoryPath(importInfo.path());
                 path = path.mid(1, path.size() - ((path.size() > 1) ? 2 : 1));
                 const QString name = path.replace(QLatin1Char('/'), QLatin1Char('.'));
                 if (!name.isEmpty())
@@ -1178,9 +1178,6 @@ void TextToModelMerger::syncNode(ModelNode &modelNode,
             if (property->type == AST::UiPublicMember::Signal)
                 continue; // QML designer doesn't support this yet.
 
-            if (property->name.isEmpty() || !property->isValid())
-                continue; // better safe than sorry.
-
             const QStringRef astName = property->name;
             QString astValue;
             if (property->statement)
@@ -1193,7 +1190,7 @@ void TextToModelMerger::syncNode(ModelNode &modelNode,
                 astValue = astValue.left(astValue.length() - 1);
             astValue = astValue.trimmed();
 
-            const TypeName &astType = property->memberTypeName().toUtf8();
+            const TypeName &astType = property->memberType->name.toUtf8();
             AbstractProperty modelProperty = modelNode.property(astName.toUtf8());
 
             if (property->binding) {
@@ -1250,12 +1247,12 @@ static QVariant parsePropertyExpression(AST::ExpressionNode *expressionNode)
 {
     Q_ASSERT(expressionNode);
 
-    auto arrayLiteral = AST::cast<AST::ArrayLiteral *>(expressionNode);
+    auto arrayLiteral = AST::cast<AST::ArrayPattern *>(expressionNode);
 
     if (arrayLiteral) {
         QList<QVariant> variantList;
-        for (AST::ElementList *it = arrayLiteral->elements; it; it = it->next)
-            variantList << parsePropertyExpression(it->expression);
+        for (AST::PatternElementList *it = arrayLiteral->elements; it; it = it->next)
+            variantList << parsePropertyExpression(it->element->initializer);
         return variantList;
     }
 
@@ -1734,6 +1731,11 @@ void ModelValidator::typeDiffers(bool /*isRootNode*/,
     if (modelNode.majorVersion() != majorVersion) {
         qDebug() << Q_FUNC_INFO << modelNode;
         qDebug() << typeName << modelNode.majorVersion() << majorVersion;
+    }
+
+    if (modelNode.minorVersion() != minorVersion) {
+        qDebug() << Q_FUNC_INFO << modelNode;
+        qDebug() << typeName << modelNode.minorVersion() << minorVersion;
     }
 
     QTC_ASSERT(modelNode.majorVersion() == majorVersion, return);

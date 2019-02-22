@@ -85,7 +85,7 @@ public:
     int modelId() const;
 
     bool isEnabled() const { return m_params.enabled; }
-    void setEnabled(bool enabled);
+    void setEnabled(bool enabled, bool descend = true);
 
     const BreakpointParameters &requestedParameters() const { return m_params; }
 
@@ -98,7 +98,7 @@ private:
     void updateMarker();
     void updateMarkerIcon();
     void destroyMarker();
-    void scheduleSynchronization();
+//    void scheduleSynchronization();
     QPointer<DebuggerEngine> usingEngine() const;
 
     bool isEngineRunning() const;
@@ -257,7 +257,6 @@ public:
     // Convenience.
     void setWatchpointAtAddress(quint64 address, unsigned size);
     void setWatchpointAtExpression(const QString &exp);
-    void setBreakpointEnabled(const Breakpoint &bp, bool on);
 
     void updateDisassemblerMarker(const Breakpoint &bp);
     void removeDisassemblerMarker(const Breakpoint &bp);

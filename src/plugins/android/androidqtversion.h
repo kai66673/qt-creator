@@ -26,6 +26,7 @@
 #pragma once
 
 #include <qtsupport/baseqtversion.h>
+#include <qtsupport/qtversionfactory.h>
 
 #include <QCoreApplication>
 
@@ -38,10 +39,7 @@ class AndroidQtVersion : public QtSupport::BaseQtVersion
 
 public:
     AndroidQtVersion();
-    AndroidQtVersion(const Utils::FileName &path, bool isAutodetected = false, const QString &autodetectionSource = QString());
 
-    AndroidQtVersion *clone() const override;
-    QString type() const override;
     bool isValid() const override;
     QString invalidReason() const override;
 
@@ -55,10 +53,19 @@ public:
 
     QString description() const override;
     QString targetArch() const;
+    int minimumNDK() const;
+
 protected:
     void parseMkSpec(ProFileEvaluator *) const override;
 private:
     mutable QString m_targetArch;
+    mutable int m_minNdk = -1;
+};
+
+class AndroidQtVersionFactory : public QtSupport::QtVersionFactory
+{
+public:
+    AndroidQtVersionFactory();
 };
 
 } // namespace Internal

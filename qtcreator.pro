@@ -1,9 +1,9 @@
 include(qtcreator.pri)
 
 #version check qt
-!minQtVersion(5, 9, 0) {
+!minQtVersion(5, 11, 0) {
     message("Cannot build $$IDE_DISPLAY_NAME with Qt version $${QT_VERSION}.")
-    error("Use at least Qt 5.9.0.")
+    error("Use at least Qt 5.11.0.")
 }
 
 include(doc/doc.pri)
@@ -149,5 +149,8 @@ win32 {
     bindist.commands ~= s,/,\\\\,g
     bindist_installer.commands ~= s,/,\\\\,g
 }
+
+deployqt.CONFIG += recursive
+deployqt.recurse = src
 
 QMAKE_EXTRA_TARGETS += deployqt bindist bindist_installer bindist_debug

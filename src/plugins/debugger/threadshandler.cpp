@@ -130,14 +130,14 @@ QVariant ThreadItem::threadPart(int column) const
                 ? QString::number(threadData.lineNumber) : QString();
     case ThreadData::AddressColumn:
         return threadData.address > 0
-                ? QLatin1String("0x") + QString::number(threadData.address, 16)
+                ? "0x" + QString::number(threadData.address, 16)
                 : QString();
     case ThreadData::CoreColumn:
         return threadData.core;
     case ThreadData::StateColumn:
         return threadData.state;
     case ThreadData::TargetIdColumn:
-        if (threadData.targetId.startsWith(QLatin1String("Thread ")))
+        if (threadData.targetId.startsWith("Thread "))
             return threadData.targetId.mid(7);
         return threadData.targetId;
     case ThreadData::NameColumn:
@@ -215,19 +215,17 @@ void ThreadItem::mergeThreadData(const ThreadData &other)
 ThreadsHandler::ThreadsHandler(DebuggerEngine *engine)
     : m_engine(engine)
 {
-    setObjectName(QLatin1String("ThreadsModel"));
+    setObjectName("ThreadsModel");
     setHeader({
-                  QLatin1String("  ") + tr("ID") + QLatin1String("  "),
+                  "  " + tr("ID") + "  ",
                   tr("Address"), tr("Function"), tr("File"), tr("Line"), tr("State"),
                   tr("Name"), tr("Target ID"), tr("Details"), tr("Core"),
               });
+}
 
-    m_comboBox = new QComboBox;
-    m_comboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_comboBox->setModel(this);
-    connect(m_comboBox, QOverload<int>::of(&QComboBox::activated), this, [this](int row) {
-        setData(index(row, 0), {}, BaseTreeView::ItemActivatedRole);
-    });
+ThreadsHandler::~ThreadsHandler()
+{
+    delete m_comboBox;
 }
 
 QVariant ThreadsHandler::data(const QModelIndex &index, int role) const
@@ -249,7 +247,7 @@ bool ThreadsHandler::setData(const QModelIndex &idx, const QVariant &data, int r
         const Thread thread = itemForIndexAtLevel<1>(idx);
         if (thread != m_currentThread) {
             m_currentThread = thread;
-            m_comboBox->setCurrentIndex(idx.row());
+            threadSwitcher()->setCurrentIndex(idx.row());
             m_engine->selectThread(thread);
         }
         return true;
@@ -364,6 +362,19 @@ void ThreadsHandler::notifyStopped(const QString &id)
         thread->notifyStopped();
 }
 
+QPointer<QComboBox> ThreadsHandler::threadSwitcher()
+{
+    if (!m_comboBox) {
+        m_comboBox = new QComboBox;
+        m_comboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+        m_comboBox->setModel(this);
+        connect(m_comboBox, QOverload<int>::of(&QComboBox::activated), this, [this](int row) {
+            setData(index(row, 0), {}, BaseTreeView::ItemActivatedRole);
+        });
+    }
+    return m_comboBox;
+}
+
 void ThreadsHandler::setThreads(const GdbMi &data)
 {
     rootItem()->removeChildren();
@@ -397,6 +408,11 @@ void ThreadsHandler::setThreads(const GdbMi &data)
 
     if (!m_currentThread && threads.childCount() > 0)
         m_currentThread = rootItem()->childAt(0);
+
+    if (m_currentThread) {
+        const QModelIndex currentThreadIndex = m_currentThread->index();
+        threadSwitcher()->setCurrentIndex(currentThreadIndex.row());
+    }
 }
 
 QAbstractItemModel *ThreadsHandler::model()

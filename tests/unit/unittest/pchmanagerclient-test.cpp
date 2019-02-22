@@ -28,6 +28,7 @@
 #include "mockpchmanagernotifier.h"
 #include "mockpchmanagerserver.h"
 #include "mockprecompiledheaderstorage.h"
+#include "mockprogressmanager.h"
 
 #include <pchmanagerclient.h>
 #include <pchmanagerprojectupdater.h>
@@ -35,6 +36,7 @@
 #include <filepathcaching.h>
 #include <refactoringdatabaseinitializer.h>
 #include <precompiledheadersupdatedmessage.h>
+#include <progressmessage.h>
 #include <removegeneratedfilesmessage.h>
 #include <removeprojectpartsmessage.h>
 #include <updategeneratedfilesmessage.h>
@@ -51,18 +53,19 @@ using testing::Not;
 class PchManagerClient : public ::testing::Test
 {
 protected:
+    NiceMock<MockProgressManager> mockProgressManager;
     NiceMock<MockPchManagerServer> mockPchManagerServer;
-    ClangPchManager::PchManagerClient client;
+    ClangPchManager::PchManagerClient client{mockProgressManager};
     NiceMock<MockPchManagerNotifier> mockPchManagerNotifier{client};
     Sqlite::Database database{":memory:", Sqlite::JournalMode::Memory};
     ClangBackEnd::RefactoringDatabaseInitializer<Sqlite::Database> initializer{database};
     ClangBackEnd::FilePathCaching filePathCache{database};
     ClangPchManager::PchManagerProjectUpdater projectUpdater{mockPchManagerServer, client, filePathCache};
     Utils::SmallString projectPartId{"projectPartId"};
-    Utils::SmallString pchFilePath{"/path/to/pch"};
+    ClangBackEnd::FilePath pchFilePath{"/path/to/pch"};
     PrecompiledHeadersUpdatedMessage message{{{projectPartId.clone(), pchFilePath.clone(), 1}}};
     Utils::SmallString projectPartId2{"projectPartId2"};
-    Utils::SmallString pchFilePath2{"/path/to/pch2"};
+    ClangBackEnd::FilePath pchFilePath2{"/path/to/pch2"};
     PrecompiledHeadersUpdatedMessage message2{{{projectPartId2.clone(), pchFilePath2.clone(), 1}}};
 };
 
@@ -153,6 +156,13 @@ TEST_F(PchManagerClient, ProjectPartPchForProjectPartIdIsUpdated)
 
     ASSERT_THAT(client.projectPartPch(projectPartId).value().lastModified,
                 42);
+}
+
+TEST_F(PchManagerClient, SetProgress)
+{
+    EXPECT_CALL(mockProgressManager, setProgress(10, 20));
+
+    client.progress({ClangBackEnd::ProgressType::PrecompiledHeader, 10, 20});
 }
 
 }

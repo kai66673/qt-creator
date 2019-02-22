@@ -102,6 +102,8 @@ public:
         TextMark::updateLineNumber(lineNumber);
         QTC_ASSERT(m_bp, return);
         m_bp->setLineNumber(lineNumber);
+        if (GlobalBreakpoint gbp = m_bp->globalBreakpoint())
+            gbp->m_params.lineNumber = lineNumber;
     }
 
     void updateFileName(const FileName &fileName) final
@@ -109,6 +111,8 @@ public:
         TextMark::updateFileName(fileName);
         QTC_ASSERT(m_bp, return);
         m_bp->setFileName(fileName.toString());
+        if (GlobalBreakpoint gbp = m_bp->globalBreakpoint())
+            gbp->m_params.fileName = fileName.toString();
     }
 
     bool isDraggable() const final { return true; }
@@ -403,7 +407,7 @@ BreakpointDialog::BreakpointDialog(unsigned int enabledParts, QWidget *parent)
     m_labelType->setBuddy(m_comboBoxType);
 
     m_pathChooserFileName = new PathChooser(groupBoxBasic);
-    m_pathChooserFileName->setHistoryCompleter(QLatin1String("Debugger.Breakpoint.File.History"));
+    m_pathChooserFileName->setHistoryCompleter("Debugger.Breakpoint.File.History");
     m_pathChooserFileName->setExpectedKind(PathChooser::File);
     m_labelFileName = new QLabel(tr("&File name:"), groupBoxBasic);
     m_labelFileName->setBuddy(m_pathChooserFileName);
@@ -1028,7 +1032,7 @@ int BreakHandler::threadSpecFromDisplay(const QString &str)
     return ok ? result : -1;
 }
 
-const QString empty(QLatin1Char('-'));
+const QString empty("-");
 
 QVariant BreakpointItem::data(int column, int role) const
 {
@@ -1082,17 +1086,7 @@ QVariant BreakpointItem::data(int column, int role) const
             break;
         case BreakpointFileColumn:
             if (role == Qt::DisplayRole) {
-                QString str;
-                if (!m_parameters.fileName.isEmpty())
-                    str = m_parameters.fileName;
-                if (str.isEmpty()) {
-                    QString s = FileName::fromString(str).fileName();
-                    if (!s.isEmpty())
-                        str = s;
-                }
-                // FIXME: better?
-                //if (params.multiple && str.isEmpty() && !response.fileName.isEmpty())
-                //    str = response.fileName;
+                const QString str = markerFileName();
                 if (!str.isEmpty())
                     return QDir::toNativeSeparators(str);
                 return empty;
@@ -1100,8 +1094,9 @@ QVariant BreakpointItem::data(int column, int role) const
             break;
         case BreakpointLineColumn:
             if (role == Qt::DisplayRole) {
-                if (m_parameters.lineNumber > 0)
-                    return m_parameters.lineNumber;
+                const int line = markerLineNumber();
+                if (line > 0)
+                    return line;
                 return empty;
             }
             if (role == Qt::UserRole + 1)
@@ -1331,12 +1326,6 @@ void BreakpointItem::setEnabled(bool on)
     adjustMarker();
 }
 
-void BreakHandler::setBreakpointEnabled(const Breakpoint &bp, bool on)
-{
-    bp->setEnabled(on);
-    requestBreakpointUpdate(bp);
-}
-
 void DebuggerEngine::notifyBreakpointInsertProceeding(const Breakpoint &bp)
 {
     QTC_ASSERT(bp, return);
@@ -1423,8 +1412,9 @@ void BreakHandler::handleAlienBreakpoint(const QString &responseId, const Breakp
     } else {
         bp = new BreakpointItem(nullptr);
         bp->m_responseId = responseId;
-        bp->setState(BreakpointInserted);
-        bp->setParameters(params);
+        bp->m_parameters = params;
+        bp->m_state = BreakpointInserted;
+        bp->updateMarker();
         rootItem()->appendChild(bp);
         // This has no global breakpoint, so there's nothing to update here.
     }
@@ -1432,8 +1422,6 @@ void BreakHandler::handleAlienBreakpoint(const QString &responseId, const Breakp
 
 SubBreakpoint BreakpointItem::findOrCreateSubBreakpoint(const QString &responseId)
 {
-    const QString minorPart = responseId.section('.', 1);
-
     SubBreakpoint loc = findFirstLevelChild([&](const SubBreakpoint &l) {
         return l->responseId == responseId;
     });
@@ -1557,8 +1545,11 @@ bool BreakHandler::setData(const QModelIndex &idx, const QVariant &value, int ro
                     const bool isEnabled = (bps.isEmpty() && sbps.isEmpty())
                             || (!bps.isEmpty() && bps.at(0)->isEnabled())
                             || (!sbps.isEmpty() && sbps.at(0)->params.enabled);
-                    for (Breakpoint bp : bps)
+                    for (Breakpoint bp : bps) {
                         requestBreakpointEnabling(bp, !isEnabled);
+                        if (GlobalBreakpoint gbp = bp->globalBreakpoint())
+                            gbp->setEnabled(!isEnabled, false);
+                    }
                     for (SubBreakpoint sbp : sbps)
                         requestSubBreakpointEnabling(sbp, !isEnabled);
                     return true;
@@ -1642,8 +1633,11 @@ bool BreakHandler::contextMenuEvent(const ItemViewEvent &ev)
                   : breakpointsEnabled ? tr("Disable Breakpoint") : tr("Enable Breakpoint"),
               !selectedBreakpoints.isEmpty(),
               [this, selectedBreakpoints, breakpointsEnabled] {
-                    for (Breakpoint bp : selectedBreakpoints)
+                    for (Breakpoint bp : selectedBreakpoints) {
                         requestBreakpointEnabling(bp, !breakpointsEnabled);
+                        if (GlobalBreakpoint gbp = bp->globalBreakpoint())
+                            gbp->setEnabled(!breakpointsEnabled, false);
+                    }
               }
     );
 
@@ -1703,7 +1697,6 @@ void BreakHandler::removeBreakpoint(const Breakpoint &bp)
         break;
     case BreakpointInserted:
     case BreakpointInsertionProceeding:
-        bp->setState(BreakpointRemoveRequested);
         requestBreakpointRemoval(bp);
         break;
     case BreakpointNew:
@@ -1831,7 +1824,9 @@ QString BreakpointItem::markerFileName() const
 
 int BreakpointItem::markerLineNumber() const
 {
-    return m_parameters.lineNumber;
+    if (m_parameters.lineNumber > 0)
+        return m_parameters.lineNumber;
+    return requestedParameters().lineNumber;
 }
 
 const BreakpointParameters &BreakpointItem::requestedParameters() const
@@ -2311,18 +2306,21 @@ void GlobalBreakpointItem::updateMarker()
         m_marker->setToolTip(toolTip());
 }
 
-void GlobalBreakpointItem::setEnabled(bool enabled)
+void GlobalBreakpointItem::setEnabled(bool enabled, bool descend)
 {
-    QTC_CHECK(m_params.enabled != enabled);
-    m_params.enabled = enabled;
-    updateMarkerIcon();
-    update();
+    if (m_params.enabled != enabled) {
+        m_params.enabled = enabled;
+        updateMarkerIcon();
+        update();
+    }
 
-    for (QPointer<DebuggerEngine> engine : EngineManager::engines()) {
-        BreakHandler *handler = engine->breakHandler();
-        for (Breakpoint bp : handler->breakpoints()) {
-            if (bp->globalBreakpoint() == this)
-                handler->requestBreakpointEnabling(bp, enabled);
+    if (descend) {
+        for (QPointer<DebuggerEngine> engine : EngineManager::engines()) {
+            BreakHandler *handler = engine->breakHandler();
+            for (Breakpoint bp : handler->breakpoints()) {
+                if (bp->globalBreakpoint() == this)
+                    handler->requestBreakpointEnabling(bp, enabled);
+            }
         }
     }
 }
@@ -2557,17 +2555,17 @@ bool BreakpointManager::setData(const QModelIndex &idx, const QVariant &value, i
 //                setCurrentIndex(index(row, 0));   FIXME
                 return true;
             }
-//            if (kev->key() == Qt::Key_Space) {
-//                const QModelIndexList selectedIds = ev.selectedRows();
-//                if (!selectedIds.isEmpty()) {
-//                    const GlobalBreakpoints gbps = findBreakpointsByIndex(selectedIds);
-//                    const bool isEnabled = gbps.isEmpty() || gbps.at(0)->isEnabled();
-//                    for (GlobalBreakpoint gbp : gbps)
-//                        gbp->m_parameters.enabled = isEnabled;
+            if (kev->key() == Qt::Key_Space) {
+                const QModelIndexList selectedIds = ev.selectedRows();
+                if (!selectedIds.isEmpty()) {
+                    const GlobalBreakpoints gbps = findBreakpointsByIndex(selectedIds);
+                    const bool isEnabled = gbps.isEmpty() || gbps.at(0)->isEnabled();
+                    for (GlobalBreakpoint gbp : gbps)
+                        gbp->setEnabled(!isEnabled);
 //                    scheduleSynchronization();
-//                    return true;
-//                }
-//            }
+                    return true;
+                }
+            }
         }
 
         if (ev.as<QMouseEvent>(QEvent::MouseButtonDblClick)) {

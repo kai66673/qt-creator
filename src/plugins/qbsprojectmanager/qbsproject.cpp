@@ -59,6 +59,7 @@
 #include <projectexplorer/taskhub.h>
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/headerpath.h>
+#include <qtsupport/qtcppkitinfo.h>
 #include <qtsupport/qtkitinformation.h>
 #include <cpptools/generatedcodemodelsupport.h>
 #include <qmljstools/qmljsmodelmanager.h>
@@ -72,6 +73,7 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QSet>
 #include <QVariantMap>
 
 #include <algorithm>
@@ -121,7 +123,7 @@ private:
 
 QbsProject::QbsProject(const FileName &fileName) :
     Project(Constants::MIME_TYPE, fileName, [this] { delayParsing(); }),
-    m_cppCodeModelUpdater(new CppTools::CppProjectUpdater(this))
+    m_cppCodeModelUpdater(new CppTools::CppProjectUpdater)
 {
     m_parsingDelay.setInterval(1000); // delay parsing by 1s.
 
@@ -153,11 +155,6 @@ QbsProject::QbsProject(const FileName &fileName) :
     subscribeSignal(&Target::activeBuildConfigurationChanged, this, delayedParsing);
 
     connect(&m_parsingDelay, &QTimer::timeout, this, &QbsProject::startParsing);
-
-    connect(m_cppCodeModelUpdater, &CppTools::CppProjectUpdater::projectInfoUpdated, this,
-            [this](const CppTools::ProjectInfo &projectInfo){
-        m_cppCodeModelProjectInfo = projectInfo;
-    });
 }
 
 QbsProject::~QbsProject()
@@ -435,11 +432,6 @@ qbs::ProjectData QbsProject::qbsProjectData() const
     return m_projectData;
 }
 
-bool QbsProject::needsSpecialDeployment() const
-{
-    return true;
-}
-
 bool QbsProject::checkCancelStatus()
 {
     const CancelStatus cancelStatus = m_cancelStatus;
@@ -694,26 +686,20 @@ QString QbsProject::uniqueProductName(const qbs::ProductData &product)
 
 void QbsProject::configureAsExampleProject(const QSet<Id> &platforms)
 {
-    QList<const BuildInfo *> infoList;
+    QList<BuildInfo> infoList;
     QList<Kit *> kits = KitManager::kits();
     const auto qtVersionMatchesPlatform = [platforms](const QtSupport::BaseQtVersion *version) {
         return platforms.isEmpty() || platforms.intersects(version->targetDeviceTypes());
     };
     foreach (Kit *k, kits) {
         const QtSupport::BaseQtVersion * const qtVersion
-                = QtSupport::QtKitInformation::qtVersion(k);
+                = QtSupport::QtKitAspect::qtVersion(k);
         if (!qtVersion || !qtVersionMatchesPlatform(qtVersion))
             continue;
-        const IBuildConfigurationFactory * const factory
-                = IBuildConfigurationFactory::find(k, projectFilePath().toString());
-        if (!factory)
-            continue;
-        const auto &buildInfos = factory->availableSetups(k, projectFilePath().toString());
-        for (BuildInfo * const info : buildInfos)
-            infoList << info;
+        if (auto factory = BuildConfigurationFactory::find(k, projectFilePath().toString()))
+            infoList << factory->allAvailableSetups(k, projectFilePath().toString());
     }
     setup(infoList);
-    qDeleteAll(infoList);
     prepareForParsing();
 }
 
@@ -898,31 +884,6 @@ void QbsProject::updateCppCodeModel()
     if (!m_projectData.isValid())
         return;
 
-    const Kit *k = nullptr;
-    if (Target *target = activeTarget())
-        k = target->kit();
-    else
-        k = KitManager::defaultKit();
-    QTC_ASSERT(k, return);
-
-    ToolChain *cToolChain
-            = ToolChainKitInformation::toolChain(k, ProjectExplorer::Constants::C_LANGUAGE_ID);
-    ToolChain *cxxToolChain
-            = ToolChainKitInformation::toolChain(k, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
-
-    QtSupport::BaseQtVersion *qtVersion =
-            QtSupport::QtKitInformation::qtVersion(activeTarget()->kit());
-
-    CppTools::ProjectPart::QtVersion qtVersionFromKit = CppTools::ProjectPart::NoQt;
-    if (qtVersion) {
-        if (qtVersion->qtVersion() <= QtSupport::QtVersionNumber(4,8,6))
-            qtVersionFromKit = CppTools::ProjectPart::Qt4_8_6AndOlder;
-        else if (qtVersion->qtVersion() < QtSupport::QtVersionNumber(5,0,0))
-            qtVersionFromKit = CppTools::ProjectPart::Qt4Latest;
-        else
-            qtVersionFromKit = CppTools::ProjectPart::Qt5;
-    }
-
     QList<ProjectExplorer::ExtraCompilerFactory *> factories =
             ProjectExplorer::ExtraCompilerFactory::extraCompilerFactories();
     const auto factoriesBegin = factories.constBegin();
@@ -931,6 +892,9 @@ void QbsProject::updateCppCodeModel()
     qDeleteAll(m_extraCompilers);
     m_extraCompilers.clear();
 
+    QtSupport::CppKitInfo kitInfo(this);
+    QTC_ASSERT(kitInfo.isValid(), return);
+
     CppTools::RawProjectParts rpps;
     foreach (const qbs::ProductData &prd, m_projectData.allProducts()) {
         QString cPch;
@@ -938,13 +902,14 @@ void QbsProject::updateCppCodeModel()
         QString objcPch;
         QString objcxxPch;
         const auto &pchFinder = [&cPch, &cxxPch, &objcPch, &objcxxPch](const qbs::ArtifactData &a) {
-            if (a.fileTags().contains("c_pch_src"))
+            const QStringList fileTags = a.fileTags();
+            if (fileTags.contains("c_pch_src"))
                 cPch = a.filePath();
-            else if (a.fileTags().contains("cpp_pch_src"))
+            if (fileTags.contains("cpp_pch_src"))
                 cxxPch = a.filePath();
-            else if (a.fileTags().contains("objc_pch_src"))
+            if (fileTags.contains("objc_pch_src"))
                 objcPch = a.filePath();
-            else if (a.fileTags().contains("objcpp_pch_src"))
+            if (fileTags.contains("objcpp_pch_src"))
                 objcxxPch = a.filePath();
         };
         const QList<qbs::ArtifactData> &generatedArtifacts = prd.generatedArtifacts();
@@ -956,7 +921,7 @@ void QbsProject::updateCppCodeModel()
 
         const CppTools::ProjectPart::QtVersion qtVersionForPart =
                  prd.moduleProperties().getModuleProperty("Qt.core", "version").isValid()
-                    ? qtVersionFromKit
+                    ? kitInfo.projectPartQtVersion
                     : CppTools::ProjectPart::NoQt;
 
         foreach (const qbs::GroupData &grp, prd.groups()) {
@@ -968,8 +933,8 @@ void QbsProject::updateCppCodeModel()
             QStringList cFlags;
             QStringList cxxFlags;
             getExpandedCompilerFlags(cFlags, cxxFlags, props);
-            rpp.setFlagsForC({cToolChain, cFlags});
-            rpp.setFlagsForCxx({cxxToolChain, cxxFlags});
+            rpp.setFlagsForC({kitInfo.cToolChain, cFlags});
+            rpp.setFlagsForCxx({kitInfo.cxxToolChain, cxxFlags});
 
             QStringList list = props.getModulePropertiesAsStringList(
                         QLatin1String(CONFIG_CPP_MODULE),
@@ -1040,7 +1005,7 @@ void QbsProject::updateCppCodeModel()
                 }
             }
 
-            QStringList pchFiles;
+            QSet<QString> pchFiles;
             if (hasCFiles && props.getModuleProperty("cpp", "useCPrecompiledHeader").toBool()
                     && !cPch.isEmpty()) {
                 pchFiles << cPch;
@@ -1063,10 +1028,11 @@ void QbsProject::updateCppCodeModel()
                                     << grp.name() << "in product" << prd.name();
                 qCWarning(qbsPmLog) << "Expect problems with code model";
             }
-            rpp.setPreCompiledHeaders(pchFiles);
+            rpp.setPreCompiledHeaders(pchFiles.toList());
             rpp.setFiles(grp.allFilePaths(), [filePathToSourceArtifact](const QString &filePath) {
                 // Keep this lambda thread-safe!
-                return cppFileType(filePathToSourceArtifact.value(filePath));
+                return CppTools::ProjectFile(filePath,
+                                             cppFileType(filePathToSourceArtifact.value(filePath)));
             });
 
             rpps.append(rpp);
@@ -1075,7 +1041,7 @@ void QbsProject::updateCppCodeModel()
     }
 
     CppTools::GeneratedCodeModelSupport::update(m_extraCompilers);
-    m_cppCodeModelUpdater->update({this, cToolChain, cxxToolChain, k, rpps});
+    m_cppCodeModelUpdater->update({this, kitInfo, rpps});
 }
 
 void QbsProject::updateQmlJsCodeModel()
@@ -1126,6 +1092,8 @@ void QbsProject::updateApplicationTargets()
         bti.usesTerminal = usesTerminal;
         bti.displayName = productData.fullDisplayName();
         bti.runEnvModifier = [targetFile, productData, this](Utils::Environment &env, bool usingLibraryPaths) {
+            if (!qbsProject().isValid())
+                return;
             QProcessEnvironment procEnv = env.toProcessEnvironment();
             procEnv.insert(QLatin1String("QBS_RUN_FILE_PATH"), targetFile);
             QStringList setupRunEnvConfig;

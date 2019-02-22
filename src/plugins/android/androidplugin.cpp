@@ -28,17 +28,15 @@
 #include "androidconfigurations.h"
 #include "androidconstants.h"
 #include "androiddebugsupport.h"
-#include "androiddeployconfiguration.h"
 #include "androiddeployqtstep.h"
 #include "androiddevice.h"
-#include "androiddevicefactory.h"
 #include "androidgdbserverkitinformation.h"
 #include "androidmanager.h"
 #include "androidmanifesteditorfactory.h"
 #include "androidpackageinstallationstep.h"
 #include "androidpotentialkit.h"
 #include "androidqmltoolingsupport.h"
-#include "androidqtversionfactory.h"
+#include "androidqtversion.h"
 #include "androidrunconfiguration.h"
 #include "androidruncontrol.h"
 #include "androidsettingspage.h"
@@ -50,8 +48,12 @@
 #endif
 
 #include <projectexplorer/devicesupport/devicemanager.h>
+#include <projectexplorer/buildconfiguration.h>
+#include <projectexplorer/deployconfiguration.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/kitmanager.h>
+#include <projectexplorer/project.h>
+#include <projectexplorer/session.h>
 #include <projectexplorer/target.h>
 
 #include <qtsupport/qtversionmanager.h>
@@ -61,6 +63,19 @@ using namespace ProjectExplorer::Constants;
 
 namespace Android {
 namespace Internal {
+
+class AndroidDeployConfigurationFactory : public DeployConfigurationFactory
+{
+public:
+    AndroidDeployConfigurationFactory()
+    {
+        setConfigBaseId("Qt4ProjectManager.AndroidDeployConfiguration2");
+        addSupportedTargetDeviceType(Constants::ANDROID_DEVICE_TYPE);
+        setDefaultDisplayName(QCoreApplication::translate("Android::Internal",
+                                                          "Deploy to Android device"));
+        addInitialStep(AndroidDeployQtStep::stepId());
+    }
+};
 
 class AndroidRunConfigurationFactory : public RunConfigurationFactory
 {
@@ -77,9 +92,37 @@ public:
     }
 };
 
-class AndroidPluginPrivate
+class AndroidPluginPrivate : public QObject
 {
 public:
+    AndroidPluginPrivate()
+    {
+        connect(SessionManager::instance(), &SessionManager::projectAdded, this, [=](Project *project) {
+            for (Target *target : project->targets())
+                handleNewTarget(target);
+            connect(project, &Project::addedTarget, this, &AndroidPluginPrivate::handleNewTarget);
+        });
+    }
+
+    void handleNewTarget(Target *target)
+    {
+        if (DeviceTypeKitAspect::deviceTypeId(target->kit()) != Android::Constants::ANDROID_DEVICE_TYPE)
+            return;
+
+        for (BuildConfiguration *bc : target->buildConfigurations())
+            handleNewBuildConfiguration(bc);
+
+        connect(target, &Target::addedBuildConfiguration,
+                this, &AndroidPluginPrivate::handleNewBuildConfiguration);
+    }
+
+    void handleNewBuildConfiguration(BuildConfiguration *bc)
+    {
+        connect(bc->target()->project(), &Project::parsingFinished, bc, [bc] {
+            AndroidManager::updateGradleProperties(bc->target());
+        });
+    }
+
     AndroidConfigurations androidConfiguration;
     AndroidSettingsPage settingsPage;
     AndroidDeployQtStepFactory deployQtStepFactory;
@@ -111,13 +154,13 @@ bool AndroidPlugin::initialize(const QStringList &arguments, QString *errorMessa
     }, [](RunConfiguration *runConfig) {
         return runConfig->isEnabled()
                 && runConfig->id().name().startsWith("QmlProjectManager.QmlRunConfiguration")
-                && DeviceTypeKitInformation::deviceTypeId(runConfig->target()->kit())
+                && DeviceTypeKitAspect::deviceTypeId(runConfig->target()->kit())
                     == Android::Constants::ANDROID_DEVICE_TYPE;
     });
 
     d = new AndroidPluginPrivate;
 
-    KitManager::registerKitInformation<Internal::AndroidGdbServerKitInformation>();
+    KitManager::registerKitAspect<Internal::AndroidGdbServerKitAspect>();
 
     connect(KitManager::instance(), &KitManager::kitsLoaded,
             this, &AndroidPlugin::kitsRestored);

@@ -28,7 +28,6 @@ QtcPlugin {
         "cmake_global.h",
         "cmakebuildconfiguration.cpp",
         "cmakebuildconfiguration.h",
-        "cmakebuildinfo.h",
         "cmakebuildsettingswidget.cpp",
         "cmakebuildsettingswidget.h",
         "cmakebuildstep.cpp",
@@ -43,8 +42,6 @@ QtcPlugin {
         "cmakeeditor.h",
         "cmakefilecompletionassist.cpp",
         "cmakefilecompletionassist.h",
-        "cmakekitconfigwidget.h",
-        "cmakekitconfigwidget.cpp",
         "cmakekitinformation.h",
         "cmakekitinformation.cpp",
         "cmakelocatorfilter.cpp",
@@ -93,6 +90,6 @@ QtcPlugin {
         "tealeafreader.cpp",
         "tealeafreader.h",
         "treescanner.cpp",
-        "treescanner.h"
+        "treescanner.h",
     ]
 }

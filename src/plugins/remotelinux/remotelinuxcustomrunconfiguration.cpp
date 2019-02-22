@@ -27,11 +27,14 @@
 
 #include "remotelinux_constants.h"
 #include "remotelinuxenvironmentaspect.h"
+#include "remotelinuxx11forwardingaspect.h"
 
 #include <projectexplorer/runconfigurationaspects.h>
 #include <projectexplorer/target.h>
 
 #include <qtsupport/qtoutputformatter.h>
+
+#include <utils/hostosinfo.h>
 
 using namespace ProjectExplorer;
 using namespace Utils;
@@ -57,7 +60,11 @@ RemoteLinuxCustomRunConfiguration::RemoteLinuxCustomRunConfiguration(Target *tar
 
     addAspect<ArgumentsAspect>();
     addAspect<WorkingDirectoryAspect>();
+    if (HostOsInfo::isAnyUnixHost())
+        addAspect<TerminalAspect>();
     addAspect<RemoteLinuxEnvironmentAspect>(target);
+    if (Utils::HostOsInfo::isAnyUnixHost())
+        addAspect<X11ForwardingAspect>();
 
     setDefaultDisplayName(runConfigDefaultDisplayName());
     setOutputFormatter<QtSupport::QtOutputFormatter>();
@@ -65,7 +72,7 @@ RemoteLinuxCustomRunConfiguration::RemoteLinuxCustomRunConfiguration(Target *tar
 
 bool RemoteLinuxCustomRunConfiguration::isConfigured() const
 {
-    return !extraAspect<ExecutableAspect>()->executable().isEmpty();
+    return !aspect<ExecutableAspect>()->executable().isEmpty();
 }
 
 RunConfiguration::ConfigurationState
@@ -88,10 +95,18 @@ Core::Id RemoteLinuxCustomRunConfiguration::runConfigId()
 
 QString RemoteLinuxCustomRunConfiguration::runConfigDefaultDisplayName()
 {
-    QString remoteExecutable = extraAspect<ExecutableAspect>()->executable().toString();
+    QString remoteExecutable = aspect<ExecutableAspect>()->executable().toString();
     QString display = remoteExecutable.isEmpty()
             ? tr("Custom Executable") : tr("Run \"%1\"").arg(remoteExecutable);
     return  RunConfigurationFactory::decoratedTargetName(display, target());
+}
+
+Runnable RemoteLinuxCustomRunConfiguration::runnable() const
+{
+    ProjectExplorer::Runnable r = RunConfiguration::runnable();
+    r.extraData.insert("Ssh.X11ForwardToDisplay",
+                       aspect<X11ForwardingAspect>()->display(macroExpander()));
+    return r;
 }
 
 // RemoteLinuxCustomRunConfigurationFactory

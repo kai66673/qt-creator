@@ -48,6 +48,7 @@
 #include <clangsupport/filecontainer.h>
 #include <clangsupport/clangcodemodelservermessages.h>
 
+#include <utils/globalfilechangeblocker.h>
 #include <utils/qtcassert.h>
 
 #include <QDateTime>
@@ -62,9 +63,7 @@ enum { backEndStartTimeOutInMs = 10000 };
 
 static QString backendProcessPath()
 {
-    return Core::ICore::libexecPath()
-            + QStringLiteral("/clangbackend")
-            + QStringLiteral(QTC_HOST_EXE_SUFFIX);
+    return Core::ICore::libexecPath() + "/clangbackend" + QTC_HOST_EXE_SUFFIX;
 }
 
 namespace ClangCodeModel {
@@ -104,19 +103,23 @@ BackendCommunicator::BackendCommunicator()
             this, &BackendCommunicator::onEditorAboutToClose);
     connect(Core::ICore::instance(), &Core::ICore::coreAboutToClose,
             this, &BackendCommunicator::setupDummySender);
+    auto globalFCB = ::Utils::GlobalFileChangeBlocker::instance();
+    m_postponeBackendJobs = globalFCB->isBlocked();
+    connect(globalFCB, &::Utils::GlobalFileChangeBlocker::stateChanged,
+            this, &BackendCommunicator::setBackendJobsPostponed);
 
     initializeBackend();
 }
 
 BackendCommunicator::~BackendCommunicator()
 {
-    disconnect(&m_connection, 0, this, 0);
+    disconnect(&m_connection, nullptr, this, nullptr);
 }
 
 void BackendCommunicator::initializeBackend()
 {
     const QString clangBackEndProcessPath = backendProcessPath();
-    if (!QFileInfo(clangBackEndProcessPath).exists()) {
+    if (!QFileInfo::exists(clangBackEndProcessPath)) {
         logExecutableDoesNotExist();
         return;
     }
@@ -135,20 +138,6 @@ void BackendCommunicator::initializeBackend()
 }
 
 namespace {
-Utf8String currentCppEditorDocumentFilePath()
-{
-    Utf8String currentCppEditorDocumentFilePath;
-
-    const auto currentEditor = Core::EditorManager::currentEditor();
-    if (currentEditor && CppTools::CppModelManager::isCppEditor(currentEditor)) {
-        const auto currentDocument = currentEditor->document();
-        if (currentDocument)
-            currentCppEditorDocumentFilePath = currentDocument->filePath().toString();
-    }
-
-    return currentCppEditorDocumentFilePath;
-}
-
 void removeDuplicates(Utf8StringVector &visibleEditorDocumentsFilePaths)
 {
     std::sort(visibleEditorDocumentsFilePaths.begin(),
@@ -199,7 +188,8 @@ Utf8StringVector visibleCppEditorDocumentsFilePaths()
 
 void BackendCommunicator::documentVisibilityChanged()
 {
-    documentVisibilityChanged(currentCppEditorDocumentFilePath(), visibleCppEditorDocumentsFilePaths());
+    documentVisibilityChanged(Utils::currentCppEditorDocumentFilePath(),
+                              visibleCppEditorDocumentsFilePaths());
 }
 
 bool BackendCommunicator::isNotWaitingForCompletion() const
@@ -207,9 +197,23 @@ bool BackendCommunicator::isNotWaitingForCompletion() const
     return !m_receiver.isExpectingCompletionsMessage();
 }
 
+void BackendCommunicator::setBackendJobsPostponed(bool postponed)
+{
+    if (postponed) {
+        documentVisibilityChanged(Utf8String(), {});
+        m_postponeBackendJobs = postponed;
+    } else {
+        m_postponeBackendJobs = postponed;
+        documentVisibilityChanged();
+    }
+}
+
 void BackendCommunicator::documentVisibilityChanged(const Utf8String &currentEditorFilePath,
                                                     const Utf8StringVector &visibleEditorsFilePaths)
 {
+    if (m_postponeBackendJobs)
+        return;
+
     const DocumentVisibilityChangedMessage message(currentEditorFilePath, visibleEditorsFilePaths);
     m_sender->documentVisibilityChanged(message);
 }
@@ -236,7 +240,7 @@ void BackendCommunicator::unsavedFilesUpdatedForUiHeaders()
     const auto editorSupports = CppModelManager::instance()->abstractEditorSupports();
     foreach (const AbstractEditorSupport *es, editorSupports) {
         const QString mappedPath
-                = ModelManagerSupportClang::instance()->dummyUiHeaderOnDiskPath(es->fileName());
+                = ClangModelManagerSupport::instance()->dummyUiHeaderOnDiskPath(es->fileName());
         unsavedFilesUpdated(mappedPath, es->contents(), es->revision());
     }
 }
@@ -244,14 +248,14 @@ void BackendCommunicator::unsavedFilesUpdatedForUiHeaders()
 void BackendCommunicator::documentsChangedFromCppEditorDocument(const QString &filePath)
 {
     const CppTools::CppEditorDocumentHandle *document = ClangCodeModel::Utils::cppDocument(filePath);
-
+    QTC_ASSERT(document, return);
     documentsChanged(filePath, document->contents(), document->revision());
 }
 
 void BackendCommunicator::unsavedFielsUpdatedFromCppEditorDocument(const QString &filePath)
 {
     const CppTools::CppEditorDocumentHandle *document = ClangCodeModel::Utils::cppDocument(filePath);
-
+    QTC_ASSERT(document, return);
     unsavedFilesUpdated(filePath, document->contents(), document->revision());
 }
 
@@ -357,9 +361,8 @@ void BackendCommunicator::documentsChangedWithRevisionCheck(Core::IDocument *doc
     const auto textDocument = qobject_cast<TextDocument*>(document);
     const auto filePath = textDocument->filePath().toString();
 
-    documentsChangedWithRevisionCheck(FileContainer(filePath,
-                                                    Utf8StringVector(),
-                                                    textDocument->document()->revision()));
+    documentsChangedWithRevisionCheck(
+        FileContainer(filePath, {}, {}, textDocument->document()->revision()));
 }
 
 void BackendCommunicator::updateChangeContentStartPosition(const QString &filePath, int position)
@@ -459,9 +462,14 @@ void BackendCommunicator::initializeBackendWithCurrentData()
 
 void BackendCommunicator::documentsOpened(const FileContainers &fileContainers)
 {
-    const DocumentsOpenedMessage message(fileContainers,
-                                         currentCppEditorDocumentFilePath(),
-                                         visibleCppEditorDocumentsFilePaths());
+    Utf8String currentDocument;
+    Utf8StringVector visibleDocuments;
+    if (!m_postponeBackendJobs) {
+        currentDocument = Utils::currentCppEditorDocumentFilePath();
+        visibleDocuments = visibleCppEditorDocumentsFilePaths();
+    }
+
+    const DocumentsOpenedMessage message(fileContainers, currentDocument, visibleDocuments);
     m_sender->documentsOpened(message);
 }
 

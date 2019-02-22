@@ -29,11 +29,9 @@
 #include "qnxconfigurationmanager.h"
 #include "qnxconstants.h"
 #include "qnxdebugsupport.h"
-#include "qnxdeployconfiguration.h"
 #include "qnxdevice.h"
 #include "qnxdevicefactory.h"
 #include "qnxqtversion.h"
-#include "qnxqtversionfactory.h"
 #include "qnxrunconfiguration.h"
 #include "qnxsettingspage.h"
 #include "qnxtoolchain.h"
@@ -46,6 +44,7 @@
 #include <coreplugin/icore.h>
 
 #include <projectexplorer/devicesupport/devicecheckbuildstep.h>
+#include <projectexplorer/deployconfiguration.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/projectexplorerconstants.h>
@@ -78,6 +77,23 @@ public:
         setDisplayName(Step::displayName());
         setSupportedConfiguration(Constants::QNX_QNX_DEPLOYCONFIGURATION_ID);
         setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_DEPLOY);
+    }
+};
+
+class QnxDeployConfigurationFactory : public DeployConfigurationFactory
+{
+public:
+    QnxDeployConfigurationFactory()
+    {
+        setConfigBaseId(Constants::QNX_QNX_DEPLOYCONFIGURATION_ID);
+        setDefaultDisplayName(QCoreApplication::translate("Qnx::Internal::QnxDeployConfiguration",
+                                                          "Deploy to QNX Device"));
+        addSupportedTargetDeviceType(Constants::QNX_QNX_OS_TYPE);
+        setUseDeploymentDataView();
+
+        addInitialStep(DeviceCheckBuildStep::stepId());
+        addInitialStep(RemoteLinux::RemoteLinuxCheckForFreeDiskSpaceStep::stepId());
+        addInitialStep(RemoteLinux::GenericDirectUploadStep::stepId());
     }
 };
 
@@ -121,7 +137,7 @@ bool QnxPlugin::initialize(const QStringList &arguments, QString *errorString)
             return false;
         }
 
-        auto dev = DeviceKitInformation::device(runConfig->target()->kit())
+        auto dev = DeviceKitAspect::device(runConfig->target()->kit())
                 .dynamicCast<const QnxDevice>();
         return !dev.isNull();
     };
@@ -157,15 +173,11 @@ void QnxPlugin::extensionsInitialized()
 
 void QnxPluginPrivate::updateDebuggerActions()
 {
-    bool hasValidQnxKit = false;
-
-    auto matcher = DeviceTypeKitInformation::deviceTypePredicate(Constants::QNX_QNX_OS_TYPE);
-    foreach (Kit *qnxKit, KitManager::kits(matcher)) {
-        if (qnxKit->isValid() && !DeviceKitInformation::device(qnxKit).isNull()) {
-            hasValidQnxKit = true;
-            break;
-        }
-    }
+    const bool hasValidQnxKit = KitManager::kit([](const Kit *kit) {
+        return kit->isValid()
+                && DeviceTypeKitAspect::deviceTypeId(kit) == Constants::QNX_QNX_OS_TYPE
+                && !DeviceKitAspect::device(kit).isNull();
+    }) != nullptr;
 
     m_attachToQnxApplication.setVisible(hasValidQnxKit);
     m_debugSeparator->setVisible(hasValidQnxKit);

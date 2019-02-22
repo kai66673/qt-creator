@@ -26,6 +26,7 @@
 #pragma once
 
 #include <qtsupport/baseqtversion.h>
+#include <qtsupport/qtversionfactory.h>
 
 namespace RemoteLinux {
 namespace Internal {
@@ -34,17 +35,16 @@ class EmbeddedLinuxQtVersion : public QtSupport::BaseQtVersion
 {
 public:
     EmbeddedLinuxQtVersion() = default;
-    EmbeddedLinuxQtVersion(const Utils::FileName &path, bool isAutodetected = false, const QString &autodetectionSource = QString());
-    ~EmbeddedLinuxQtVersion() = default;
-    EmbeddedLinuxQtVersion *clone() const;
 
-    QString type() const;
+    QString description() const override;
 
-    QList<ProjectExplorer::Abi> detectQtAbis() const;
+    QSet<Core::Id> targetDeviceTypes() const override;
+};
 
-    QString description() const;
-
-    QSet<Core::Id> targetDeviceTypes() const;
+class EmbeddedLinuxQtVersionFactory : public QtSupport::QtVersionFactory
+{
+public:
+    EmbeddedLinuxQtVersionFactory();
 };
 
 } // namespace Internal

@@ -34,6 +34,7 @@
 
 #include <utils/qtcassert.h>
 
+#include <cmath>
 #include <limits>
 
 namespace QmlDesigner {
@@ -72,17 +73,23 @@ ModelNode QmlTimelineKeyframeGroup::target() const
 
 void QmlTimelineKeyframeGroup::setTarget(const ModelNode &target)
 {
+    QTC_ASSERT(isValid(), return);
+
     modelNode().bindingProperty("target").setExpression(target.id());
 }
 
 
 PropertyName QmlTimelineKeyframeGroup::propertyName() const
 {
+    QTC_ASSERT(isValid(), return {});
+
     return modelNode().variantProperty("property").value().toString().toUtf8();
 }
 
 void QmlTimelineKeyframeGroup::setPropertyName(const PropertyName &propertyName)
 {
+    QTC_ASSERT(isValid(), return);
+
     modelNode().variantProperty("property").setValue(QString::fromUtf8(propertyName));
 }
 
@@ -106,6 +113,8 @@ int QmlTimelineKeyframeGroup::getSupposedTargetIndex(qreal newFrame) const
 
 int QmlTimelineKeyframeGroup::indexOfKeyframe(const ModelNode &frame) const
 {
+    QTC_ASSERT(isValid(), return -1);
+
     return modelNode().defaultNodeListProperty().indexOf(frame);
 }
 
@@ -117,8 +126,38 @@ void QmlTimelineKeyframeGroup::slideKeyframe(int /*sourceIndex*/, int /*targetIn
     */
 }
 
+bool QmlTimelineKeyframeGroup::isRecording() const
+{
+    QTC_ASSERT(isValid(), return false);
+
+    return modelNode().hasAuxiliaryData("Record@Internal");
+}
+
+void QmlTimelineKeyframeGroup::toogleRecording(bool record) const
+{
+    QTC_ASSERT(isValid(), return);
+
+    if (!record) {
+        if (isRecording())
+            modelNode().removeAuxiliaryData("Record@Internal");
+    } else {
+        modelNode().setAuxiliaryData("Record@Internal", true);
+    }
+}
+
+QmlTimeline QmlTimelineKeyframeGroup::timeline() const
+{
+    QTC_ASSERT(isValid(), return {});
+
+    if (modelNode().hasParentProperty())
+        return modelNode().parentProperty().parentModelNode();
+
+    return {};
+}
+
 void QmlTimelineKeyframeGroup::setValue(const QVariant &value, qreal currentFrame)
 {
+    QTC_ASSERT(isValid(), return);
 
     for (const ModelNode &childNode : modelNode().defaultNodeListProperty().toModelNodeList()) {
         if (qFuzzyCompare(childNode.variantProperty("frame").value().toReal(), currentFrame)) {
@@ -143,6 +182,8 @@ void QmlTimelineKeyframeGroup::setValue(const QVariant &value, qreal currentFram
 
 QVariant QmlTimelineKeyframeGroup::value(qreal frame) const
 {
+    QTC_ASSERT(isValid(), return {});
+
     for (const ModelNode &childNode : modelNode().defaultNodeListProperty().toModelNodeList()) {
         if (qFuzzyCompare(childNode.variantProperty("frame").value().toReal(), frame)) {
             return childNode.variantProperty("value").value();
@@ -154,6 +195,8 @@ QVariant QmlTimelineKeyframeGroup::value(qreal frame) const
 
 TypeName QmlTimelineKeyframeGroup::valueType() const
 {
+    QTC_ASSERT(isValid(), return {});
+
     const ModelNode targetNode = target();
 
     if (targetNode.isValid() && targetNode.hasMetaInfo())
@@ -174,6 +217,8 @@ bool QmlTimelineKeyframeGroup::hasKeyframe(qreal frame)
 
 qreal QmlTimelineKeyframeGroup::minActualKeyframe() const
 {
+    QTC_ASSERT(isValid(), return -1);
+
     qreal min = std::numeric_limits<double>::max();
     for (const ModelNode &childNode : modelNode().defaultNodeListProperty().toModelNodeList()) {
         QVariant value = childNode.variantProperty("frame").value();
@@ -186,6 +231,8 @@ qreal QmlTimelineKeyframeGroup::minActualKeyframe() const
 
 qreal QmlTimelineKeyframeGroup::maxActualKeyframe() const
 {
+    QTC_ASSERT(isValid(), return -1);
+
     qreal max = std::numeric_limits<double>::min();
     for (const ModelNode &childNode : modelNode().defaultNodeListProperty().toModelNodeList()) {
         QVariant value = childNode.variantProperty("frame").value();
@@ -236,7 +283,7 @@ void QmlTimelineKeyframeGroup::moveAllKeyframes(qreal offset)
     for (const ModelNode &childNode : modelNode().defaultNodeListProperty().toModelNodeList()) {
         auto property = childNode.variantProperty("frame");
         if (property.isValid())
-            property.setValue(property.value().toReal() + offset);
+            property.setValue(std::round(property.value().toReal() + offset));
     }
 }
 
@@ -246,7 +293,7 @@ void QmlTimelineKeyframeGroup::scaleAllKeyframes(qreal factor)
         auto property = childNode.variantProperty("frame");
 
         if (property.isValid())
-            property.setValue(property.value().toReal() * factor);
+            property.setValue(std::round(property.value().toReal() * factor));
     }
 }
 

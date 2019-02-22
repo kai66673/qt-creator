@@ -94,9 +94,9 @@ void TextEditorWidget::setTextEditor(TextEditor::BaseTextEditor *textEditor)
         oldEditor->deleteLater();
 }
 
-void TextEditorWidget::contextHelpId(const Core::IContext::HelpIdCallback &callback) const
+void TextEditorWidget::contextHelp(const Core::IContext::HelpCallback &callback) const
 {
-    m_textEditorView->contextHelpId(callback);
+    m_textEditorView->contextHelp(callback);
 }
 
 void TextEditorWidget::updateSelectionByCursorPosition()
@@ -133,9 +133,10 @@ void TextEditorWidget::jumpTextCursorToSelectedModelNode()
 
         const int nodeOffset = rewriterView->nodeOffset(selectedNode);
         if (nodeOffset > 0) {
-                int line, column;
-                m_textEditor->editorWidget()->convertPosition(nodeOffset, &line, &column);
-                m_textEditor->editorWidget()->gotoLine(line, column);
+            int line, column;
+            m_textEditor->editorWidget()->convertPosition(nodeOffset, &line, &column);
+            // line has to be 1 based, column 0 based!
+            m_textEditor->editorWidget()->gotoLine(line, column - 1);
         }
     }
     m_updateSelectionTimer.stop();

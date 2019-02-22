@@ -25,6 +25,10 @@
 
 
 #include "clangformatconfigwidget.h"
+
+#include "clangformatconstants.h"
+#include "clangformatsettings.h"
+#include "clangformatutils.h"
 #include "ui_clangformatconfigwidget.h"
 
 #include <clang/Format/Format.h>
@@ -40,23 +44,6 @@
 using namespace ProjectExplorer;
 
 namespace ClangFormat {
-namespace Internal {
-
-static void createGlobalClangFormatFileIfNeeded(const QString &settingsDir)
-{
-    const QString fileName = settingsDir + "/.clang-format";
-    if (QFile::exists(fileName))
-        return;
-
-    QFile file(fileName);
-    if (!file.open(QFile::WriteOnly))
-        return;
-
-    const clang::format::FormatStyle defaultStyle = clang::format::getLLVMStyle();
-    const std::string configuration = clang::format::configurationAsText(defaultStyle);
-    file.write(configuration.c_str());
-    file.close();
-}
 
 static void readTable(QTableWidget *table, std::istringstream &stream)
 {
@@ -131,68 +118,112 @@ static QByteArray tableToYAML(QTableWidget *table)
 
 ClangFormatConfigWidget::ClangFormatConfigWidget(ProjectExplorer::Project *project,
                                                  QWidget *parent)
-    : QWidget(parent)
+    : CodeStyleEditorWidget(parent)
     , m_project(project)
     , m_ui(std::make_unique<Ui::ClangFormatConfigWidget>())
 {
     m_ui->setupUi(this);
 
-    std::string testFilePath;
-    if (m_project && !m_project->projectDirectory().appendPath(".clang-format").exists()) {
-        m_ui->projectHasClangFormat->setText("No .clang-format file for the project");
+    initialize();
+}
+
+void ClangFormatConfigWidget::hideGlobalCheckboxes()
+{
+    m_ui->formatAlways->hide();
+    m_ui->formatWhileTyping->hide();
+    m_ui->formatOnSave->hide();
+}
+
+void ClangFormatConfigWidget::showGlobalCheckboxes()
+{
+    m_ui->formatAlways->setChecked(ClangFormatSettings::instance().formatCodeInsteadOfIndent());
+    m_ui->formatAlways->show();
+
+    m_ui->formatWhileTyping->setChecked(ClangFormatSettings::instance().formatWhileTyping());
+    m_ui->formatWhileTyping->show();
+
+    m_ui->formatOnSave->setChecked(ClangFormatSettings::instance().formatOnSave());
+    m_ui->formatOnSave->show();
+}
+
+void ClangFormatConfigWidget::initialize()
+{
+    m_ui->projectHasClangFormat->show();
+    m_ui->clangFormatOptionsTable->show();
+    m_ui->applyButton->show();
+    hideGlobalCheckboxes();
+
+    QLayoutItem *lastItem = m_ui->verticalLayout->itemAt(m_ui->verticalLayout->count() - 1);
+    if (lastItem->spacerItem())
+        m_ui->verticalLayout->removeItem(lastItem);
+
+    if (m_project
+        && !m_project->projectDirectory().appendPath(Constants::SETTINGS_FILE_NAME).exists()) {
+        m_ui->projectHasClangFormat->setText(tr("No .clang-format file for the project."));
         m_ui->clangFormatOptionsTable->hide();
         m_ui->applyButton->hide();
+        m_ui->verticalLayout->addStretch(1);
+
+        connect(m_ui->createFileButton, &QPushButton::clicked,
+                this, [this]() {
+            createStyleFileIfNeeded(false);
+            initialize();
+        });
         return;
     }
 
+    m_ui->createFileButton->hide();
+
     if (m_project) {
-        testFilePath = m_project->projectDirectory().appendPath("t.cpp").toString().toStdString();
+        m_ui->projectHasClangFormat->hide();
         connect(m_ui->applyButton, &QPushButton::clicked, this, &ClangFormatConfigWidget::apply);
     } else {
-        const QString settingsDir = Core::ICore::userResourcePath();
-        createGlobalClangFormatFileIfNeeded(settingsDir);
-        testFilePath = settingsDir.toStdString() + "/t.cpp";
+        const Project *currentProject = SessionManager::startupProject();
+        if (!currentProject
+            || !currentProject->projectDirectory()
+                    .appendPath(Constants::SETTINGS_FILE_NAME)
+                    .exists()) {
+            m_ui->projectHasClangFormat->hide();
+        } else {
+            m_ui->projectHasClangFormat->setText(
+                    tr("Current project has its own .clang-format file "
+                       "and can be configured in Projects > Code Style > C++."));
+        }
+        createStyleFileIfNeeded(true);
+        showGlobalCheckboxes();
         m_ui->applyButton->hide();
     }
 
-    llvm::Expected<clang::format::FormatStyle> formatStyle =
-        clang::format::getStyle("file", testFilePath, "LLVM", "");
-    if (!formatStyle)
-        return;
+    fillTable();
+}
 
-    const std::string configText = clang::format::configurationAsText(*formatStyle);
+void ClangFormatConfigWidget::fillTable()
+{
+    clang::format::FormatStyle style = m_project ? currentProjectStyle() : currentGlobalStyle();
+
+    std::string configText = clang::format::configurationAsText(style);
     std::istringstream stream(configText);
-
     readTable(m_ui->clangFormatOptionsTable, stream);
-
-    if (m_project) {
-        m_ui->projectHasClangFormat->hide();
-        return;
-    }
-
-    const Project *currentProject = SessionManager::startupProject();
-    if (!currentProject || !currentProject->projectDirectory().appendPath(".clang-format").exists())
-        m_ui->projectHasClangFormat->hide();
-
-    connect(SessionManager::instance(), &SessionManager::startupProjectChanged,
-            this, [this](ProjectExplorer::Project *project) {
-        if (project && project->projectDirectory().appendPath(".clang-format").exists())
-            m_ui->projectHasClangFormat->show();
-        else
-            m_ui->projectHasClangFormat->hide();
-    });
 }
 
 ClangFormatConfigWidget::~ClangFormatConfigWidget() = default;
 
 void ClangFormatConfigWidget::apply()
 {
+    if (!m_project) {
+        ClangFormatSettings &settings = ClangFormatSettings::instance();
+        settings.setFormatCodeInsteadOfIndent(m_ui->formatAlways->isChecked());
+        settings.setFormatWhileTyping(m_ui->formatWhileTyping->isChecked());
+        settings.setFormatOnSave(m_ui->formatOnSave->isChecked());
+        settings.write();
+    }
+
     const QByteArray text = tableToYAML(m_ui->clangFormatOptionsTable);
     QString filePath;
     if (m_project)
-        filePath = m_project->projectDirectory().appendPath(".clang-format").toString();
+        filePath = m_project->projectDirectory().appendPath(Constants::SETTINGS_FILE_NAME).toString();
     else
-        filePath = Core::ICore::userResourcePath() + "/.clang-format";
+        filePath = Core::ICore::userResourcePath() + "/" + Constants::SETTINGS_FILE_NAME;
     QFile file(filePath);
     if (!file.open(QFile::WriteOnly))
         return;
@@ -201,5 +232,4 @@ void ClangFormatConfigWidget::apply()
     file.close();
 }
 
-} // namespace Internal
 } // namespace ClangFormat

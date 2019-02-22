@@ -1,9 +1,10 @@
 include(../../qtcreatorplugin.pri)
+include(clangformat-source.pri)
 include(../../shared/clang/clang_installation.pri)
 
 include(../../shared/clang/clang_defines.pri)
 
-requires(!isEmpty(LLVM_VERSION))
+requires(!isEmpty(CLANGFORMAT_LIBS))
 
 win32 {
     LLVM_BUILDMODE = $$system($$llvm_config --build-mode, lines)
@@ -13,18 +14,25 @@ win32 {
 LIBS += $$CLANGFORMAT_LIBS
 INCLUDEPATH += $$LLVM_INCLUDEPATH
 
-QMAKE_CXXFLAGS += $$LLVM_CXXFLAGS
+QMAKE_CXXFLAGS_WARN_ON *= $$LLVM_CXXFLAGS_WARNINGS
+QMAKE_CXXFLAGS *= $$LLVM_CXXFLAGS
+# clang/Format/Format.h has intentional multiline comments
+gcc:QMAKE_CXXFLAGS *= -Wno-comment
+unix:!macos:QMAKE_LFLAGS += -Wl,--exclude-libs,ALL
 
-SOURCES = \
+SOURCES += \
     clangformatconfigwidget.cpp \
     clangformatindenter.cpp \
-    clangformatplugin.cpp
+    clangformatplugin.cpp \
+    clangformatsettings.cpp \
+    clangformatutils.cpp
 
-HEADERS = \
+HEADERS += \
     clangformatconfigwidget.h \
     clangformatindenter.h \
     clangformatplugin.h \
-    clangformatconstants.h
+    clangformatsettings.h \
+    clangformatutils.h
 
 FORMS += \
     clangformatconfigwidget.ui

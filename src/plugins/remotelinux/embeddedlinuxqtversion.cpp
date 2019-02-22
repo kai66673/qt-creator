@@ -35,27 +35,6 @@
 namespace RemoteLinux {
 namespace Internal {
 
-EmbeddedLinuxQtVersion::EmbeddedLinuxQtVersion(const Utils::FileName &path, bool isAutodetected, const QString &autodetectionSource)
-    : BaseQtVersion(path, isAutodetected, autodetectionSource)
-{
-    setUnexpandedDisplayName(defaultUnexpandedDisplayName(path, false));
-}
-
-EmbeddedLinuxQtVersion *EmbeddedLinuxQtVersion::clone() const
-{
-    return new EmbeddedLinuxQtVersion(*this);
-}
-
-QString EmbeddedLinuxQtVersion::type() const
-{
-    return QLatin1String(RemoteLinux::Constants::EMBEDDED_LINUX_QT);
-}
-
-QList<ProjectExplorer::Abi> EmbeddedLinuxQtVersion::detectQtAbis() const
-{
-    return qtAbisFromLibrary(qtCorePaths());
-}
-
 QString EmbeddedLinuxQtVersion::description() const
 {
     return QCoreApplication::translate("QtVersion", "Embedded Linux", "Qt Version is used for embedded Linux development");
@@ -64,6 +43,26 @@ QString EmbeddedLinuxQtVersion::description() const
 QSet<Core::Id> EmbeddedLinuxQtVersion::targetDeviceTypes() const
 {
     return {Constants::GenericLinuxOsType};
+}
+
+
+// Factory
+
+EmbeddedLinuxQtVersionFactory::EmbeddedLinuxQtVersionFactory()
+{
+    setQtVersionCreator([] { return new EmbeddedLinuxQtVersion; });
+    setSupportedType(RemoteLinux::Constants::EMBEDDED_LINUX_QT);
+    setPriority(10);
+
+    setRestrictionChecker([](const SetupData &) {
+        EmbeddedLinuxQtVersion tempVersion;
+        QList<ProjectExplorer::Abi> abis = tempVersion.qtAbis();
+
+        // Note: This fails for e.g. intel/meego cross builds on x86 linux machines.
+        return  abis.count() == 1
+                && abis.at(0).os() == ProjectExplorer::Abi::LinuxOS
+                && !ProjectExplorer::Abi::hostAbi().isCompatibleWith(abis.at(0));
+    });
 }
 
 } // namespace Internal

@@ -51,7 +51,8 @@ struct Data {
     ClangBackEnd::UnsavedFiles unsavedFiles;
     ClangBackEnd::Documents documents{unsavedFiles};
     Document document{Utf8StringLiteral(TESTDATA_DIR"/diagnostic_source_location.cpp"),
-                      Utf8StringVector(),
+                      {},
+                      {},
                       documents};
     UnitTest::RunDocumentParse _1{document};
     DiagnosticSet diagnosticSet{document.translationUnit().diagnostics()};
@@ -86,7 +87,7 @@ TEST_F(SourceLocation, Column)
     ASSERT_THAT(sourceLocation.column(), 1);
 }
 
-TEST_F(SourceLocation, DISABLED_ON_WINDOWS(Offset))
+TEST_F(SourceLocation, Offset)
 {
     ASSERT_THAT(sourceLocation.offset(), 18);
 }
@@ -99,6 +100,30 @@ TEST_F(SourceLocation, Create)
 TEST_F(SourceLocation, NotEqual)
 {
     ASSERT_THAT(document.translationUnit().sourceLocationAt(3, 1), Not(sourceLocation));
+}
+
+TEST_F(SourceLocation, BeforeMultibyteCharacter)
+{
+    ClangBackEnd::SourceLocation sourceLocation(
+                document.translationUnit().cxTranslationUnit(),
+                clang_getLocation(document.translationUnit().cxTranslationUnit(),
+                                  clang_getFile(document.translationUnit().cxTranslationUnit(),
+                                                document.filePath().constData()),
+                                  8, 10));
+
+    ASSERT_THAT(document.translationUnit().sourceLocationAt(8, 10).column(), sourceLocation.column());
+}
+
+TEST_F(SourceLocation, AfterMultibyteCharacter)
+{
+    ClangBackEnd::SourceLocation sourceLocation(
+                document.translationUnit().cxTranslationUnit(),
+                clang_getLocation(document.translationUnit().cxTranslationUnit(),
+                                  clang_getFile(document.translationUnit().cxTranslationUnit(),
+                                                document.filePath().constData()),
+                                  8, 12));
+
+    ASSERT_THAT(document.translationUnit().sourceLocationAt(8, 13).column(), sourceLocation.column());
 }
 
 std::unique_ptr<const Data> SourceLocation::data;

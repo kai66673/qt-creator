@@ -26,57 +26,24 @@
 #pragma once
 
 #include <projectexplorer/kitinformation.h>
-#include <projectexplorer/kitconfigwidget.h>
-
-QT_BEGIN_NAMESPACE
-class QLabel;
-class QPushButton;
-QT_END_NAMESPACE
 
 namespace Android {
 namespace Internal {
 
-class AndroidGdbServerKitInformationWidget : public ProjectExplorer::KitConfigWidget
+class AndroidGdbServerKitAspect : public ProjectExplorer::KitAspect
 {
     Q_OBJECT
 public:
-    AndroidGdbServerKitInformationWidget(ProjectExplorer::Kit *kit,
-                                         const ProjectExplorer::KitInformation *ki);
-    ~AndroidGdbServerKitInformationWidget() override;
-
-    QString displayName() const override;
-    QString toolTip() const override;
-    void makeReadOnly() override;
-    void refresh() override;
-    bool visibleInKit() override;
-
-    QWidget *mainWidget() const override;
-    QWidget *buttonWidget() const override;
-
-private:
-    void autoDetectDebugger();
-    void showDialog();
-
-    QLabel *m_label;
-    QPushButton *m_button;
-};
-
-class AndroidGdbServerKitInformation : public ProjectExplorer::KitInformation
-{
-    Q_OBJECT
-public:
-    AndroidGdbServerKitInformation();
+    AndroidGdbServerKitAspect();
 
     QVariant defaultValue(const ProjectExplorer::Kit *) const override;
-
     QList<ProjectExplorer::Task> validate(const ProjectExplorer::Kit *) const override;
-
+    bool isApplicableToKit(const ProjectExplorer::Kit *k) const override;
     ItemList toUserOutput(const ProjectExplorer::Kit *) const override;
 
-    ProjectExplorer::KitConfigWidget *createConfigWidget(ProjectExplorer::Kit *) const override;
+    ProjectExplorer::KitAspectWidget *createConfigWidget(ProjectExplorer::Kit *) const override;
 
     static Core::Id id();
-    static bool isAndroidKit(const ProjectExplorer::Kit *kit);
     static Utils::FileName gdbServer(const ProjectExplorer::Kit *kit);
     static void setGdbSever(ProjectExplorer::Kit *kit, const Utils::FileName &gdbServerCommand);
     static Utils::FileName autoDetect(const ProjectExplorer::Kit *kit);

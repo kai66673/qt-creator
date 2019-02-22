@@ -92,7 +92,7 @@ public:
     void goToPrev() override;
 
     void addTestResult(const TestResultPtr &result);
-    void addOutput(const QByteArray &output);
+    void addOutput(const QByteArray &outputWithNewLine);
     void showTestResult(const QModelIndex &index);
 
 private:
@@ -101,7 +101,7 @@ private:
     void onItemActivated(const QModelIndex &index);
     void onRunAllTriggered();
     void onRunSelectedTriggered();
-    void enableAllFilter();
+    void checkAllFilter(bool checked);
     void filterMenuTriggered(QAction *action);
 
     void initializeFilterMenu();

@@ -185,7 +185,7 @@ static inline int askMsgSendFailed()
                 QMessageBox::Retry);
 }
 
-// taken from utils/fileutils.cpp. We can not use utils here since that depends app_version.h.
+// taken from utils/fileutils.cpp. We cannot use utils here since that depends app_version.h.
 static bool copyRecursively(const QString &srcFilePath,
                             const QString &tgtFilePath)
 {
@@ -413,8 +413,6 @@ int main(int argc, char **argv)
     }
 
     Utils::TemporaryDirectory::setMasterTemporaryDirectory(QDir::tempPath() + "/" + Core::Constants::IDE_CASED_ID + "-XXXXXX");
-
-    QLoggingCategory::setFilterRules(QLatin1String("qtc.*.debug=false\nqtc.*.info=false"));
 
 #ifdef Q_OS_MAC
     // increase the number of file that can be opened in Qt Creator.

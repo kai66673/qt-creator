@@ -99,7 +99,6 @@ public:
         table.addColumn("sourceId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
         const Sqlite::Column &directoryIdColumn = table.addColumn("directoryId", Sqlite::ColumnType::Integer);
         const Sqlite::Column &sourceNameColumn = table.addColumn("sourceName", Sqlite::ColumnType::Text);
-        table.addColumn("sourceType", Sqlite::ColumnType::Integer);
         table.addUniqueIndex({directoryIdColumn, sourceNameColumn});
 
         table.initialize(database);
@@ -124,9 +123,13 @@ public:
         table.setName("projectParts");
         table.addColumn("projectPartId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
         const Sqlite::Column &projectPartNameColumn = table.addColumn("projectPartName", Sqlite::ColumnType::Text);
-        table.addColumn("compilerArguments", Sqlite::ColumnType::Text);
+        table.addColumn("toolChainArguments", Sqlite::ColumnType::Text);
         table.addColumn("compilerMacros", Sqlite::ColumnType::Text);
-        table.addColumn("includeSearchPaths", Sqlite::ColumnType::Text);
+        table.addColumn("systemIncludeSearchPaths", Sqlite::ColumnType::Text);
+        table.addColumn("projectIncludeSearchPaths", Sqlite::ColumnType::Text);
+        table.addColumn("language", Sqlite::ColumnType::Integer);
+        table.addColumn("languageVersion", Sqlite::ColumnType::Integer);
+        table.addColumn("languageExtension", Sqlite::ColumnType::Integer);
         table.addUniqueIndex({projectPartNameColumn});
 
         table.initialize(database);
@@ -139,6 +142,7 @@ public:
         table.setName("projectPartsSources");
         const Sqlite::Column &projectPartIdColumn = table.addColumn("projectPartId", Sqlite::ColumnType::Integer);
         const Sqlite::Column &sourceIdColumn = table.addColumn("sourceId", Sqlite::ColumnType::Integer);
+        table.addColumn("sourceType", Sqlite::ColumnType::Integer);
         table.addUniqueIndex({sourceIdColumn, projectPartIdColumn});
         table.addIndex({projectPartIdColumn});
 
@@ -167,6 +171,7 @@ public:
         table.addColumn("sourceId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
         table.addColumn("size", Sqlite::ColumnType::Integer);
         table.addColumn("lastModified", Sqlite::ColumnType::Integer);
+        table.addColumn("buildDependencyTimeStamp", Sqlite::ColumnType::Integer);
         table.addColumn("isInPrecompiledHeader", Sqlite::ColumnType::Integer);
         table.initialize(database);
     }
@@ -189,9 +194,10 @@ public:
         table.setUseIfNotExists(true);
         table.setName("precompiledHeaders");
         table.addColumn("projectPartId", Sqlite::ColumnType::Integer, Sqlite::Contraint::PrimaryKey);
-        table.addColumn("pchPath", Sqlite::ColumnType::Text);
-        table.addColumn("pchBuildTime", Sqlite::ColumnType::Integer);
-
+        table.addColumn("projectPchPath", Sqlite::ColumnType::Text);
+        table.addColumn("projectPchBuildTime", Sqlite::ColumnType::Integer);
+        table.addColumn("systemPchPath", Sqlite::ColumnType::Text);
+        table.addColumn("systemPchBuildTime", Sqlite::ColumnType::Integer);
         table.initialize(database);
     }
 

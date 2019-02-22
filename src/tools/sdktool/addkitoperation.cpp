@@ -57,7 +57,7 @@ const char SDK[] = "PE.Profile.SDK";
 const char ENV[] = "PE.Profile.Environment";
 const char DATA[] = "PE.Profile.Data";
 
-// Standard KitInformation:
+// Standard KitAspects:
 const char DEBUGGER[] = "Debugger.Information";
 const char DEBUGGER_ENGINE[] = "EngineType";
 const char DEBUGGER_BINARY[] = "Binary";
@@ -280,7 +280,7 @@ bool AddKitOperation::setArguments(const QStringList &args)
     if (m_deviceType.isEmpty())
         std::cerr << "No devicetype given for kit." << std::endl << std::endl;
     if (!m_debuggerId.isEmpty() && (!m_debugger.isEmpty() || m_debuggerEngine != 0)) {
-        std::cerr << "Can not set both debugger id and debugger/debuggerengine." << std::endl << std::endl;
+        std::cerr << "Cannot set both debugger id and debugger/debuggerengine." << std::endl << std::endl;
         return false;
     }
 

@@ -347,7 +347,7 @@ DeploymentData Target::deploymentData() const
 
 void Target::setApplicationTargets(const BuildTargetInfoList &appTargets)
 {
-    if (d->m_appTargets != appTargets) {
+    if (appTargets.list.toSet() != d->m_appTargets.list.toSet()) {
         d->m_appTargets = appTargets;
         emit applicationTargetsChanged();
     }
@@ -356,6 +356,20 @@ void Target::setApplicationTargets(const BuildTargetInfoList &appTargets)
 BuildTargetInfoList Target::applicationTargets() const
 {
     return d->m_appTargets;
+}
+
+BuildTargetInfo Target::buildTarget(const QString &buildKey) const
+{
+    return Utils::findOrDefault(d->m_appTargets.list, [&buildKey](const BuildTargetInfo &ti) {
+        return ti.buildKey == buildKey;
+    });
+}
+
+bool Target::hasBuildTarget(const QString &buildKey) const
+{
+    return Utils::anyOf(d->m_appTargets.list, [buildKey](const BuildTargetInfo &bti) {
+        return bti.buildKey == buildKey;
+    });
 }
 
 QList<ProjectConfiguration *> Target::projectConfigurations() const
@@ -452,7 +466,7 @@ void Target::setOverlayIcon(const QIcon &icon)
 
 QString Target::overlayIconToolTip()
 {
-    IDevice::ConstPtr current = DeviceKitInformation::device(kit());
+    IDevice::ConstPtr current = DeviceKitAspect::device(kit());
     return current.isNull() ? QString() : formatDeviceInfo(current->deviceInformation());
 }
 
@@ -488,19 +502,15 @@ QVariantMap Target::toMap() const
 
 void Target::updateDefaultBuildConfigurations()
 {
-    IBuildConfigurationFactory *bcFactory = IBuildConfigurationFactory::find(this);
+    BuildConfigurationFactory *bcFactory = BuildConfigurationFactory::find(this);
     if (!bcFactory) {
         qWarning("No build configuration factory found for target id '%s'.", qPrintable(id().toString()));
         return;
     }
-    QList<BuildInfo *> infoList = bcFactory->availableSetups(this->kit(), project()->projectFilePath().toString());
-    foreach (BuildInfo *info, infoList) {
-        BuildConfiguration *bc = bcFactory->create(this, info);
-        if (!bc)
-            continue;
-        addBuildConfiguration(bc);
+    for (const BuildInfo &info : bcFactory->allAvailableSetups(kit(), project()->projectFilePath().toString())) {
+        if (BuildConfiguration *bc = bcFactory->create(this, info))
+            addBuildConfiguration(bc);
     }
-    qDeleteAll(infoList);
 }
 
 void Target::updateDefaultDeployConfigurations()
@@ -513,7 +523,7 @@ void Target::updateDefaultDeployConfigurations()
 
     QList<Core::Id> dcIds;
     foreach (DeployConfigurationFactory *dcFactory, dcFactories)
-        dcIds.append(dcFactory->availableCreationIds(this));
+        dcIds.append(dcFactory->creationId());
 
     QList<DeployConfiguration *> dcList = deployConfigurations();
     QList<Core::Id> toCreate = dcIds;
@@ -527,8 +537,8 @@ void Target::updateDefaultDeployConfigurations()
 
     foreach (Core::Id id, toCreate) {
         foreach (DeployConfigurationFactory *dcFactory, dcFactories) {
-            if (dcFactory->canCreate(this, id)) {
-                DeployConfiguration *dc = dcFactory->create(this, id);
+            if (dcFactory->creationId() == id) {
+                DeployConfiguration *dc = dcFactory->create(this);
                 if (dc) {
                     QTC_CHECK(dc->id() == id);
                     addDeployConfiguration(dc);
@@ -686,7 +696,7 @@ QVariant Target::additionalData(Core::Id id) const
 
 void Target::updateDeviceState()
 {
-    IDevice::ConstPtr current = DeviceKitInformation::device(kit());
+    IDevice::ConstPtr current = DeviceKitAspect::device(kit());
 
     QIcon overlay;
     static const QIcon disconnected = Icons::DEVICE_DISCONNECTED_INDICATOR_OVERLAY.icon();
@@ -752,7 +762,7 @@ bool Target::fromMap(const QVariantMap &map)
         if (!map.contains(key))
             return false;
         const QVariantMap valueMap = map.value(key).toMap();
-        BuildConfiguration *bc = IBuildConfigurationFactory::restore(this, valueMap);
+        BuildConfiguration *bc = BuildConfigurationFactory::restore(this, valueMap);
         if (!bc) {
             qWarning("No factory found to restore build configuration!");
             continue;
@@ -762,7 +772,7 @@ bool Target::fromMap(const QVariantMap &map)
         if (i == activeConfiguration)
             setActiveBuildConfiguration(bc);
     }
-    if (buildConfigurations().isEmpty() && IBuildConfigurationFactory::find(this))
+    if (buildConfigurations().isEmpty() && BuildConfigurationFactory::find(this))
         return false;
 
     int dcCount = map.value(QLatin1String(DC_COUNT_KEY), 0).toInt(&ok);

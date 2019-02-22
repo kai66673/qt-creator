@@ -48,7 +48,6 @@ HEADERS += \
     cpplocatorfilter.h \
     cppmodelmanager.h \
     cppmodelmanagersupport.h \
-    cppmodelmanagersupportinternal.h \
     cppoverviewmodel.h \
     cpppointerdeclarationformatter.h \
     cppprojectfile.h \
@@ -101,7 +100,11 @@ HEADERS += \
     wrappablelineedit.h \
     usages.h \
     cpptools_clangtidychecks.h \
-    cppmodelmanagerinterface.h
+    cppmodelmanagerinterface.h \
+    cppbuiltinmodelmanagersupport.h \
+    headerpathfilter.h \
+    cppkitinfo.h \
+    cpptools_clazychecks.h
 
 SOURCES += \
     abstracteditorsupport.cpp \
@@ -146,7 +149,6 @@ SOURCES += \
     cpplocatorfilter.cpp \
     cppmodelmanager.cpp \
     cppmodelmanagersupport.cpp \
-    cppmodelmanagersupportinternal.cpp \
     cppoverviewmodel.cpp \
     cpppointerdeclarationformatter.cpp \
     cppprojectfile.cpp \
@@ -187,7 +189,10 @@ SOURCES += \
     compileroptionsbuilder.cpp \
     cppprojectfilecategorizer.cpp \
     cppprojectpartchooser.cpp \
-    wrappablelineedit.cpp
+    wrappablelineedit.cpp \
+    cppbuiltinmodelmanagersupport.cpp \
+    headerpathfilter.cpp \
+    cppkitinfo.cpp
 
 FORMS += \
     clangdiagnosticconfigswidget.ui \

@@ -64,6 +64,7 @@ struct Data {
     Utf8String filePath{Utf8StringLiteral(TESTDATA_DIR"/cursor.cpp")};
     Document document{filePath,
                       TestEnvironment::addPlatformArguments({Utf8StringLiteral("-std=c++11")}),
+                      {},
                       documents};
     TranslationUnit translationUnit{filePath,
                                     filePath,
@@ -185,7 +186,7 @@ TEST_F(Cursor, BriefComment)
     ASSERT_THAT(cursor.briefComment(), Eq("A brief comment"));
 }
 
-TEST_F(Cursor, DISABLED_ON_WINDOWS(RawComment))
+TEST_F(Cursor, RawComment)
 {
     auto cursor = translationUnit.cursorAt(Utf8StringLiteral(TESTDATA_DIR"/cursor.h"), 10, 7);
 
@@ -885,6 +886,42 @@ TEST_F(Cursor, InvalidStorageClass)
     auto storageClass = functionTemplateCursor.storageClass();
 
     ASSERT_THAT(storageClass, ClangBackEnd::StorageClass::Invalid);
+}
+
+TEST_F(Cursor, IsAnonymousNamespace)
+{
+    auto anonymousCursor = translationUnit.cursorAt(140, 1);
+
+    bool anonymous = anonymousCursor.isAnonymous();
+
+    ASSERT_THAT(anonymous, true);
+}
+
+TEST_F(Cursor, IsNotAnonymousNamespace)
+{
+    auto anonymousCursor = translationUnit.cursorAt(139, 1);
+
+    bool anonymous = anonymousCursor.isAnonymous();
+
+    ASSERT_THAT(anonymous, false);
+}
+
+TEST_F(Cursor, AnonymousNamespaceDisplayName)
+{
+    auto anonymousCursor = translationUnit.cursorAt(140, 1);
+
+    auto name = anonymousCursor.displayName();
+
+    ASSERT_THAT(name, Utf8String("(anonymous)"));
+}
+
+TEST_F(Cursor, AnonymousEnumDisplayName)
+{
+    auto anonymousCursor = translationUnit.cursorAt(144, 1);
+
+    auto name = anonymousCursor.displayName();
+
+    ASSERT_THAT(name, Utf8String("(anonymous)"));
 }
 
 Data *Cursor::d;

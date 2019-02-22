@@ -26,15 +26,16 @@
 #include "lsptypes.h"
 #include "lsputils.h"
 
-#include "utils/mimetypes/mimedatabase.h"
+#include <utils/mimetypes/mimedatabase.h>
+#include <utils/textutils.h>
 
+#include <QFile>
 #include <QHash>
-#include <QTextBlock>
-#include <QTextDocument>
 #include <QJsonArray>
 #include <QMap>
+#include <QTextBlock>
+#include <QTextDocument>
 #include <QVector>
-#include <QFile>
 
 namespace LanguageServerProtocol {
 
@@ -75,22 +76,20 @@ bool Diagnostic::isValid(QStringList *error) const
             && check<QString>(error, messageKey);
 }
 
-Utils::optional<QMap<QString, QList<TextEdit>>> WorkspaceEdit::changes() const
+Utils::optional<WorkspaceEdit::Changes> WorkspaceEdit::changes() const
 {
-    using Changes = Utils::optional<QMap<QString, QList<TextEdit>>>;
-    Changes changes;
     auto it = find(changesKey);
-    if (it != end())
+    if (it == end())
         return Utils::nullopt;
     QTC_ASSERT(it.value().type() == QJsonValue::Object, return Changes());
     QJsonObject changesObject(it.value().toObject());
-    QMap<QString, QList<TextEdit>> changesResult;
+    Changes changesResult;
     for (const QString &key : changesObject.keys())
-        changesResult[key] = LanguageClientArray<TextEdit>(changesObject.value(key)).toList();
+        changesResult[DocumentUri::fromProtocol(key)] = LanguageClientArray<TextEdit>(changesObject.value(key)).toList();
     return Utils::make_optional(changesResult);
 }
 
-void WorkspaceEdit::setChanges(const QMap<QString, QList<TextEdit> > &changes)
+void WorkspaceEdit::setChanges(const Changes &changes)
 {
     QJsonObject changesObject;
     const auto end = changes.end();
@@ -98,7 +97,7 @@ void WorkspaceEdit::setChanges(const QMap<QString, QList<TextEdit> > &changes)
         QJsonArray edits;
         for (const TextEdit &edit : it.value())
             edits.append(QJsonValue(edit));
-        changesObject.insert(it.key(), edits);
+        changesObject.insert(it.key().toFileName().toString(), edits);
     }
     insert(changesKey, changesObject);
 }
@@ -136,7 +135,7 @@ bool MarkupOrString::isValid(QStringList *error) const
         return true;
     if (error) {
         *error << QCoreApplication::translate("LanguageServerProtocoll::MarkupOrString",
-                                              "Expected a string or MarkupContent in MarkupOrString");
+                                              "Expected a string or MarkupContent in MarkupOrString.");
     }
     return false;
 }
@@ -284,7 +283,7 @@ QMap<QString, QString> languageIds()
 
 QString TextDocumentItem::mimeTypeToLanguageId(const Utils::MimeType &mimeType)
 {
-    return mimeTypeLanguageIdMap()[mimeType];
+    return mimeTypeLanguageIdMap().value(mimeType);
 }
 
 QString TextDocumentItem::mimeTypeToLanguageId(const QString &mimeTypeName)
@@ -329,10 +328,35 @@ int Position::toPositionInDocument(QTextDocument *doc) const
     return block.position() + character();
 }
 
+QTextCursor Position::toTextCursor(QTextDocument *doc) const
+{
+    QTextCursor cursor(doc);
+    cursor.setPosition(toPositionInDocument(doc));
+    return cursor;
+}
+
 Range::Range(const Position &start, const Position &end)
 {
     setStart(start);
     setEnd(end);
+}
+
+Range::Range(const QTextCursor &cursor)
+{
+    int line, character = 0;
+    Utils::Text::convertPosition(cursor.document(), cursor.selectionStart(), &line, &character);
+    if (line <= 0 || character <= 0)
+        return;
+    setStart(Position(line - 1, character - 1));
+    Utils::Text::convertPosition(cursor.document(), cursor.selectionEnd(), &line, &character);
+    if (line <= 0 || character <= 0)
+        return;
+    setEnd(Position(line - 1, character - 1));
+}
+
+bool Range::overlaps(const Range &range) const
+{
+    return contains(range.start()) || contains(range.end());
 }
 
 bool DocumentFilter::applies(const Utils::FileName &fileName, const Utils::MimeType &mimeType) const

@@ -69,7 +69,7 @@ QString SnapshotData::function() const
     if (m_frames.isEmpty())
         return QString();
     const StackFrame &frame = m_frames.at(0);
-    return frame.function + QLatin1Char(':') + QString::number(frame.line);
+    return frame.function + ':' + QString::number(frame.line);
 }
 
 QString SnapshotData::toString() const
@@ -132,8 +132,12 @@ class EngineManagerPrivate : public QObject
 public:
     EngineManagerPrivate()
     {
-        m_engineModel.setHeader({EngineManager::tr("Name"), EngineManager::tr("File")});
-        m_engineModel.rootItem()->appendChild(new EngineItem); // The preset case.
+        m_engineModel.setHeader({EngineManager::tr("Perspective"),
+                                 EngineManager::tr("Debugged Application")});
+        // The preset case:
+        auto preset = new EngineItem;
+        m_engineModel.rootItem()->appendChild(preset);
+        m_currentItem = preset;
 
         m_engineChooser = new QComboBox;
         m_engineChooser->setModel(&m_engineModel);
@@ -251,7 +255,9 @@ QVariant EngineItem::data(int column, int role) const
     } else {
         switch (role) {
         case Qt::DisplayRole:
-            return EngineManager::tr("Debugger Preset");
+            if (column == 0)
+                return EngineManager::tr("Debugger Preset");
+            return QString("-");
         default:
             break;
         }
@@ -278,11 +284,11 @@ bool EngineItem::setData(int row, const QVariant &value, int role)
 
             auto menu = new QMenu(ev.view());
 
-            QAction *actCreate = menu->addAction(tr("Create Snapshot"));
+            QAction *actCreate = menu->addAction(EngineManager::tr("Create Snapshot"));
             actCreate->setEnabled(m_engine->hasCapability(SnapshotCapabilityRole));
             menu->addSeparator();
 
-            QAction *actRemove = menu->addAction(tr("Abort Debugger"));
+            QAction *actRemove = menu->addAction(EngineManager::tr("Abort Debugger"));
             actRemove->setEnabled(true);
 
             QAction *act = menu->exec(cmev->globalPos());
@@ -315,23 +321,29 @@ void EngineManagerPrivate::activateEngineByIndex(int index)
 
 void EngineManagerPrivate::activateEngineItem(EngineItem *engineItem)
 {
+    Context previousContext;
     if (m_currentItem) {
         if (DebuggerEngine *engine = m_currentItem->m_engine) {
-            const Context context = engine->languageContext();
-            ICore::removeAdditionalContext(context);
+            previousContext.add(engine->languageContext());
+            previousContext.add(engine->debuggerContext());
+        } else {
+            previousContext.add(Context(Constants::C_DEBUGGER_NOTRUNNING));
         }
     }
 
     m_currentItem = engineItem;
 
+    Context newContext;
     if (m_currentItem) {
         if (DebuggerEngine *engine = m_currentItem->m_engine) {
-            const Context context = engine->languageContext();
-            ICore::addAdditionalContext(context);
-            engine->gotoCurrentLocation();
+            newContext.add(engine->languageContext());
+            newContext.add(engine->debuggerContext());
+        } else {
+            newContext.add(Context(Constants::C_DEBUGGER_NOTRUNNING));
         }
     }
 
+    ICore::updateAdditionalContexts(previousContext, newContext);
     selectUiForCurrentEngine();
 }
 
@@ -343,16 +355,15 @@ void EngineManagerPrivate::selectUiForCurrentEngine()
     Perspective *perspective = nullptr;
     int row = 0;
 
-    if (m_currentItem && m_currentItem->m_engine) {
+    if (m_currentItem && m_currentItem->m_engine)
         perspective = m_currentItem->m_engine->perspective();
-        m_currentItem->m_engine->updateState(false);
-    }
 
     if (m_currentItem)
         row = m_engineModel.rootItem()->indexOf(m_currentItem);
 
     m_engineChooser->setCurrentIndex(row);
-    const int contentWidth = m_engineChooser->fontMetrics().width(m_engineChooser->currentText() + "xx");
+    const int contentWidth =
+        m_engineChooser->fontMetrics().horizontalAdvance(m_engineChooser->currentText() + "xx");
     QStyleOptionComboBox option;
     option.initFrom(m_engineChooser);
     const QSize sz(contentWidth, 1);
@@ -366,17 +377,12 @@ void EngineManagerPrivate::selectUiForCurrentEngine()
     QTC_ASSERT(perspective, return);
     perspective->select();
 
-    m_engineModel.rootItem()->forFirstLevelChildren([](EngineItem *engineItem) {
+    m_engineModel.rootItem()->forFirstLevelChildren([this](EngineItem *engineItem) {
         if (engineItem && engineItem->m_engine)
-            engineItem->m_engine->updateMarkers();
+            engineItem->m_engine->updateUi(engineItem == m_currentItem);
     });
 
     emit theEngineManager->currentEngineChanged();
-}
-
-void EngineManager::selectUiForCurrentEngine()
-{
-    d->selectUiForCurrentEngine();
 }
 
 EngineItem *EngineManagerPrivate::findEngineItem(DebuggerEngine *engine)
@@ -414,6 +420,18 @@ void EngineManager::activateDebugMode()
     if (ModeManager::currentModeId() != Constants::MODE_DEBUG) {
         d->m_previousMode = ModeManager::currentModeId();
         ModeManager::activateMode(Constants::MODE_DEBUG);
+    }
+}
+
+void EngineManager::deactivateDebugMode()
+{
+    if (ModeManager::currentModeId() == Constants::MODE_DEBUG && d->m_previousMode.isValid()) {
+        // If stopping the application also makes Qt Creator active (as the
+        // "previously active application"), doing the switch synchronously
+        // leads to funny effects with floating dock widgets
+        const Core::Id mode = d->m_previousMode;
+        QTimer::singleShot(0, d, [mode]() { ModeManager::activateMode(mode); });
+        d->m_previousMode = Id();
     }
 }
 

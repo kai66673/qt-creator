@@ -30,6 +30,7 @@
 #include "gnumakeparser.h"
 #include "kitinformation.h"
 #include "project.h"
+#include "processparameters.h"
 #include "projectexplorer.h"
 #include "projectexplorerconstants.h"
 #include "target.h"
@@ -37,7 +38,9 @@
 
 #include <coreplugin/id.h>
 #include <coreplugin/variablechooser.h>
+#include <utils/environment.h>
 #include <utils/hostosinfo.h>
+#include <utils/optional.h>
 #include <utils/qtcprocess.h>
 #include <utils/utilsicons.h>
 
@@ -69,7 +72,7 @@ MakeStep::MakeStep(BuildStepList *parent,
         setBuildTarget(buildTarget, true);
 }
 
-bool MakeStep::init(QList<const BuildStep *> &earlierSteps)
+bool MakeStep::init()
 {
     BuildConfiguration *bc = buildConfiguration();
     if (!bc)
@@ -103,7 +106,7 @@ bool MakeStep::init(QList<const BuildStep *> &earlierSteps)
         appendOutputParser(parser);
     outputParser()->setWorkingDirectory(pp->effectiveWorkingDirectory());
 
-    return AbstractProcessStep::init(earlierSteps);
+    return AbstractProcessStep::init();
 }
 
 void MakeStep::setClean(bool clean)
@@ -123,7 +126,7 @@ QString MakeStep::defaultDisplayName()
 
 static const QList<ToolChain *> preferredToolChains(const Kit *kit)
 {
-    QList<ToolChain *> tcs = ToolChainKitInformation::toolChains(kit);
+    QList<ToolChain *> tcs = ToolChainKitAspect::toolChains(kit);
     // prefer CXX, then C, then others
     Utils::sort(tcs, [](ToolChain *tcA, ToolChain *tcB) {
         if (tcA->language() == tcB->language())
@@ -196,14 +199,50 @@ void MakeStep::setJobCountOverrideMakeflags(bool override)
     m_overrideMakeflags = override;
 }
 
+static Utils::optional<int> argsJobCount(const QString &str)
+{
+    const QStringList args = Utils::QtcProcess::splitArgs(str, Utils::HostOsInfo::hostOs());
+    const int argIndex = Utils::indexOf(args, [](const QString &arg) { return arg.startsWith("-j"); });
+    if (argIndex == -1)
+        return Utils::nullopt;
+    QString arg = args.at(argIndex);
+    bool requireNumber = false;
+    // -j [4] as separate arguments (or no value)
+    if (arg == "-j") {
+        if (args.size() <= argIndex + 1)
+            return 1000; // unlimited
+        arg = args.at(argIndex + 1);
+    } else { // -j4
+        arg = arg.mid(2).trimmed();
+        requireNumber = true;
+    }
+    bool ok = false;
+    const int res = arg.toInt(&ok);
+    if (!ok && requireNumber)
+        return Utils::nullopt;
+    return Utils::make_optional(ok && res > 0 ? res : 1000);
+}
+
+bool MakeStep::makeflagsJobCountMismatch() const
+{
+    const Utils::Environment env = environment(buildConfiguration());
+    if (!env.hasKey(MAKEFLAGS))
+        return false;
+    Utils::optional<int> makeFlagsJobCount = argsJobCount(env.value(MAKEFLAGS));
+    return makeFlagsJobCount.has_value() && *makeFlagsJobCount != m_userJobCount;
+}
+
 bool MakeStep::makeflagsContainsJobCount() const
 {
     const Utils::Environment env = environment(buildConfiguration());
     if (!env.hasKey(MAKEFLAGS))
         return false;
-    const QStringList args = Utils::QtcProcess::splitArgs(env.value(MAKEFLAGS),
-                                                          Utils::HostOsInfo::hostOs());
-    return Utils::anyOf(args, [](const QString &arg) { return arg.startsWith("-j"); });
+    return argsJobCount(env.value(MAKEFLAGS)).has_value();
+}
+
+bool MakeStep::userArgsContainsJobCount() const
+{
+    return argsJobCount(m_makeArguments).has_value();
 }
 
 Utils::Environment MakeStep::environment(BuildConfiguration *bc) const
@@ -262,8 +301,10 @@ int MakeStep::defaultJobCount()
 
 QStringList MakeStep::jobArguments() const
 {
-    if (!isJobCountSupported() || (makeflagsContainsJobCount() && !jobCountOverridesMakeflags()))
+    if (!isJobCountSupported() || userArgsContainsJobCount()
+            || (makeflagsContainsJobCount() && !jobCountOverridesMakeflags())) {
         return {};
+    }
     return {"-j" + QString::number(m_userJobCount)};
 }
 
@@ -301,11 +342,6 @@ BuildStepConfigWidget *MakeStep::createConfigWidget()
     return new MakeStepConfigWidget(this);
 }
 
-bool MakeStep::immutable() const
-{
-    return false;
-}
-
 bool MakeStep::buildsTarget(const QString &target) const
 {
     return m_buildTargets.contains(target);
@@ -331,8 +367,8 @@ QStringList MakeStep::availableTargets() const
 // GenericMakeStepConfigWidget
 //
 
-MakeStepConfigWidget::MakeStepConfigWidget(MakeStep *makeStep) :
-    m_makeStep(makeStep)
+MakeStepConfigWidget::MakeStepConfigWidget(MakeStep *makeStep)
+    : BuildStepConfigWidget(makeStep), m_makeStep(makeStep)
 {
     m_ui = new Internal::Ui::MakeStep;
     m_ui->setupUi(this);
@@ -406,24 +442,18 @@ MakeStepConfigWidget::~MakeStepConfigWidget()
     delete m_ui;
 }
 
-QString MakeStepConfigWidget::displayName() const
-{
-    return m_makeStep->displayName();
-}
-
-void MakeStepConfigWidget::setSummaryText(const QString &text)
-{
-    if (text == m_summaryText)
-        return;
-    m_summaryText = text;
-    emit updateSummary();
-}
-
 void MakeStepConfigWidget::setUserJobCountVisible(bool visible)
 {
     m_ui->jobsLabel->setVisible(visible);
     m_ui->userJobCount->setVisible(visible);
     m_ui->overrideMakeflags->setVisible(visible);
+}
+
+void MakeStepConfigWidget::setUserJobCountEnabled(bool enabled)
+{
+    m_ui->jobsLabel->setEnabled(enabled);
+    m_ui->userJobCount->setEnabled(enabled);
+    m_ui->overrideMakeflags->setEnabled(enabled);
 }
 
 void MakeStepConfigWidget::updateDetails()
@@ -446,10 +476,11 @@ void MakeStepConfigWidget::updateDetails()
     }
 
     setUserJobCountVisible(m_makeStep->isJobCountSupported());
+    setUserJobCountEnabled(!m_makeStep->userArgsContainsJobCount());
     m_ui->userJobCount->setValue(m_makeStep->jobCount());
     m_ui->overrideMakeflags->setCheckState(
         m_makeStep->jobCountOverridesMakeflags() ? Qt::Checked : Qt::Unchecked);
-    m_ui->nonOverrideWarning->setVisible(m_makeStep->makeflagsContainsJobCount()
+    m_ui->nonOverrideWarning->setVisible(m_makeStep->makeflagsJobCountMismatch()
                                          && !m_makeStep->jobCountOverridesMakeflags());
 
     ProcessParameters param;
@@ -464,11 +495,6 @@ void MakeStepConfigWidget::updateDetails()
         setSummaryText(tr("<b>Make:</b> %1 not found in the environment.").arg(param.command())); // Override display text
     else
         setSummaryText(param.summaryInWorkdir(displayName()));
-}
-
-QString MakeStepConfigWidget::summaryText() const
-{
-    return m_summaryText;
 }
 
 void MakeStepConfigWidget::itemChanged(QListWidgetItem *item)

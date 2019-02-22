@@ -26,6 +26,7 @@
 #include "debuggermainwindow.h"
 #include "debuggerconstants.h"
 #include "debuggerinternalconstants.h"
+#include "enginemanager.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -115,6 +116,7 @@ public:
     void registerPerspective(Perspective *perspective);
     void resetCurrentPerspective();
     int indexInChooser(Perspective *perspective) const;
+    void fixupLayoutIfNeeded();
 
     DebuggerMainWindow *q = nullptr;
     Perspective *m_currentPerspective = nullptr;
@@ -135,7 +137,7 @@ DebuggerMainWindowPrivate::DebuggerMainWindowPrivate(DebuggerMainWindow *parent)
     m_centralWidgetStack = new QStackedWidget;
     m_statusLabel = new Utils::StatusLabel;
     m_statusLabel->setProperty("panelwidget", true);
-    m_statusLabel->setIndent(2 * QFontMetrics(q->font()).width(QChar('x')));
+    m_statusLabel->setIndent(2 * QFontMetrics(q->font()).horizontalAdvance(QChar('x')));
     m_editorPlaceHolder = new EditorManagerPlaceHolder;
 
     m_perspectiveChooser = new QComboBox;
@@ -153,11 +155,11 @@ DebuggerMainWindowPrivate::DebuggerMainWindowPrivate(DebuggerMainWindow *parent)
     });
 
     auto viewButton = new QToolButton;
-    viewButton->setText(tr("&Views"));
+    viewButton->setText(DebuggerMainWindow::tr("&Views"));
 
     auto closeButton = new QToolButton();
     closeButton->setIcon(Utils::Icons::CLOSE_SPLIT_BOTTOM.icon());
-    closeButton->setToolTip(tr("Leave Debug Mode"));
+    closeButton->setToolTip(DebuggerMainWindow::tr("Leave Debug Mode"));
 
     auto toolbar = new Utils::StyledBar;
     toolbar->setProperty("topBorder", true);
@@ -187,12 +189,12 @@ DebuggerMainWindowPrivate::DebuggerMainWindowPrivate(DebuggerMainWindow *parent)
     hbox->addWidget(viewButton);
     hbox->addWidget(closeButton);
 
-    auto dock = new QDockWidget(tr("Toolbar"), q);
-    dock->setObjectName(QLatin1String("Toolbar"));
+    auto dock = new QDockWidget(DebuggerMainWindow::tr("Toolbar"), q);
+    dock->setObjectName("Toolbar");
     dock->setFeatures(QDockWidget::NoDockWidgetFeatures);
     dock->setAllowedAreas(Qt::BottomDockWidgetArea);
     dock->setTitleBarWidget(new QWidget(dock)); // hide title bar
-    dock->setProperty("managed_dockwidget", QLatin1String("true"));
+    dock->setProperty("managed_dockwidget", "true");
     toolbar->setParent(dock);
     dock->setWidget(toolbar);
     m_toolBarDock = dock;
@@ -300,7 +302,7 @@ void DebuggerMainWindow::onModeChanged(Core::Id mode)
         Perspective *perspective = theMainWindow->d->m_currentPerspective;
         if (!perspective) {
             const QSettings *settings = ICore::settings();
-            const QString lastPerspectiveId = settings->value(QLatin1String(LAST_PERSPECTIVE_KEY)).toString();
+            const QString lastPerspectiveId = settings->value(LAST_PERSPECTIVE_KEY).toString();
             perspective = Perspective::findPerspective(lastPerspectiveId);
             // If we don't find a perspective with the stored name, pick any.
             // This can happen e.g. when a plugin was disabled that provided
@@ -357,11 +359,37 @@ void DebuggerMainWindowPrivate::resetCurrentPerspective()
     }
     depopulateCurrentPerspective();
     populateCurrentPerspective();
+    if (m_currentPerspective)
+        m_currentPerspective->d->saveLayout();
 }
 
 int DebuggerMainWindowPrivate::indexInChooser(Perspective *perspective) const
 {
     return perspective ? m_perspectiveChooser->findData(perspective->d->m_id) : -1;
+}
+
+void DebuggerMainWindowPrivate::fixupLayoutIfNeeded()
+{
+    // Evil workaround for QTCREATORBUG-21455: In some so far unknown situation
+    // the saveLayout/restoreLayout process leads to a situation where some docks
+    // does not end up below the perspective toolbar even though they were there
+    // initially, leading to an awkward dock layout.
+    // This here tries to detect the situation (no other dock directly below the
+    // toolbar) and "corrects" that by restoring the default layout.
+    const QRect toolbarRect = m_toolBarDock->geometry();
+    const int targetX = toolbarRect.left();
+    const int targetY = toolbarRect.bottom();
+
+    const QList<QDockWidget *> docks = q->dockWidgets();
+    for (QDockWidget *dock : docks) {
+        const QRect dockRect = dock->geometry();
+        // 10 for some decoration wiggle room. Found something below? Good.
+        if (targetX == dockRect.left() && qAbs(targetY - dockRect.top()) < 10)
+            return;
+    }
+
+    qDebug() << "Scrambled dock layout found. Resetting it.";
+    resetCurrentPerspective();
 }
 
 void DebuggerMainWindowPrivate::selectPerspective(Perspective *perspective)
@@ -381,14 +409,22 @@ void DebuggerMainWindowPrivate::selectPerspective(Perspective *perspective)
 
     populateCurrentPerspective();
 
-    if (m_currentPerspective)
+    if (m_currentPerspective) {
         m_currentPerspective->d->restoreLayout();
+        fixupLayoutIfNeeded();
+    }
 
-    const int index = indexInChooser(m_currentPerspective);
+    int index = indexInChooser(m_currentPerspective);
+    if (index == -1) {
+        if (Perspective *parent = Perspective::findPerspective(m_currentPerspective->d->m_parentPerspectiveId))
+            index = indexInChooser(parent);
+    }
+
     if (index != -1) {
         m_perspectiveChooser->setCurrentIndex(index);
 
-        const int contentWidth = m_perspectiveChooser->fontMetrics().width(perspective->d->m_name);
+        const int contentWidth =
+            m_perspectiveChooser->fontMetrics().horizontalAdvance(perspective->d->m_name);
         QStyleOptionComboBox option;
         option.initFrom(m_perspectiveChooser);
         const QSize sz(contentWidth, 1);
@@ -445,6 +481,8 @@ void DebuggerMainWindowPrivate::populateCurrentPerspective()
         ActionManager::actionContainer(Core::Constants::M_WINDOW_VIEWS)->addAction(cmd);
     }
 
+    m_currentPerspective->d->showToolBar();
+
     // Pre-arrange dock widgets.
     for (const DockOperation &op : m_currentPerspective->d->m_dockOperations) {
         QTC_ASSERT(op.widget, continue);
@@ -478,11 +516,10 @@ void DebuggerMainWindowPrivate::populateCurrentPerspective()
         dock->setVisible(op.visibleByDefault);
     }
 
-    m_currentPerspective->d->showToolBar();
-
     QWidget *central = m_currentPerspective->centralWidget();
     m_centralWidgetStack->addWidget(central ? central : m_editorPlaceHolder);
-    q->showCentralWidgetAction()->setText(central ? central->windowTitle() : tr("Editor"));
+    q->showCentralWidgetAction()->setText(central ? central->windowTitle()
+                                                  : DebuggerMainWindow::tr("Editor"));
 
     m_statusLabel->clear();
 
@@ -568,6 +605,7 @@ void Perspective::setEnabled(bool enabled)
 
 QToolButton *PerspectivePrivate::setupToolButton(QAction *action)
 {
+    QTC_ASSERT(action, return nullptr);
     auto toolButton = new QToolButton(m_innerToolBar);
     toolButton->setProperty("panelwidget", true);
     toolButton->setDefaultAction(action);
@@ -577,16 +615,19 @@ QToolButton *PerspectivePrivate::setupToolButton(QAction *action)
 
 void Perspective::addToolBarAction(QAction *action)
 {
+    QTC_ASSERT(action, return);
     d->setupToolButton(action);
 }
 
 void Perspective::addToolBarAction(OptionalAction *action)
 {
+    QTC_ASSERT(action, return);
     action->m_toolButton = d->setupToolButton(action);
 }
 
 void Perspective::addToolBarWidget(QWidget *widget)
 {
+    QTC_ASSERT(widget, return);
     // QStyle::polish is called before it is added to the toolbar, explicitly make it a panel widget
     widget->setProperty("panelwidget", true);
     widget->setParent(d->m_innerToolBar);
@@ -644,6 +685,7 @@ void Perspective::addWindow(QWidget *widget,
                             bool visibleByDefault,
                             Qt::DockWidgetArea area)
 {
+    QTC_ASSERT(widget, return);
     DockOperation op;
     op.widget = widget;
     if (anchorWidget)
@@ -656,7 +698,7 @@ void Perspective::addWindow(QWidget *widget,
 
 void Perspective::select()
 {
-    ModeManager::activateMode(Debugger::Constants::MODE_DEBUG);
+    Debugger::Internal::EngineManager::activateDebugMode();
     if (Perspective::currentPerspective() == this)
         return;
     theMainWindow->d->selectPerspective(this);
@@ -666,7 +708,7 @@ void Perspective::select()
         d->m_lastActiveSubPerspectiveId.clear();
 
     const QString &lastKey = d->m_parentPerspectiveId.isEmpty() ? d->m_id : d->m_parentPerspectiveId;
-    ICore::settings()->setValue(QLatin1String(LAST_PERSPECTIVE_KEY), lastKey);
+    ICore::settings()->setValue(LAST_PERSPECTIVE_KEY, lastKey);
 }
 
 void PerspectivePrivate::restoreLayout()

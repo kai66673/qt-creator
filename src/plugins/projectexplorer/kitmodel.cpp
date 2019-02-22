@@ -46,12 +46,7 @@ class KitNode : public TreeItem
 public:
     KitNode(Kit *k)
     {
-        widget = KitManager::createConfigWidget(k);
-        if (widget) {
-            if (k && k->isAutoDetected())
-                widget->makeStickySubWidgetsReadOnly();
-            widget->setVisible(false);
-        }
+        widget = new KitManagerConfigWidget(k);
     }
 
     ~KitNode() override
@@ -224,7 +219,7 @@ void KitModel::apply()
     foreach (KitNode *n, m_toRemoveList)
         n->widget->removeKit();
 
-    layoutChanged(); // Force update.
+    emit layoutChanged(); // Force update.
 }
 
 void KitModel::markForRemoval(Kit *k)
@@ -269,6 +264,13 @@ Kit *KitModel::markForAddition(Kit *baseKit)
         setDefaultNode(node);
 
     return k;
+}
+
+void KitModel::updateVisibility()
+{
+    forItemsAtLevel<2>([](const TreeItem *ti) {
+        static_cast<const KitNode *>(ti)->widget->updateVisibility();
+    });
 }
 
 KitNode *KitModel::findWorkingCopy(Kit *k) const

@@ -112,6 +112,7 @@ static void setupPreregisteredOsFlavors() {
     registerOsFlavor(Abi::WindowsMsvc2013Flavor, "msvc2013", {Abi::OS::WindowsOS});
     registerOsFlavor(Abi::WindowsMsvc2015Flavor, "msvc2015", {Abi::OS::WindowsOS});
     registerOsFlavor(Abi::WindowsMsvc2017Flavor, "msvc2017", {Abi::OS::WindowsOS});
+    registerOsFlavor(Abi::WindowsMsvc2019Flavor, "msvc2019", {Abi::OS::WindowsOS});
     registerOsFlavor(Abi::WindowsMSysFlavor, "msys", {Abi::OS::WindowsOS});
     registerOsFlavor(Abi::WindowsCEFlavor, "ce", {Abi::OS::WindowsOS});
     registerOsFlavor(Abi::VxWorksFlavor, "vxworks", {Abi::OS::VxWorks});
@@ -279,12 +280,15 @@ static QList<Abi> parseCoffHeader(const QByteArray &data)
             flavor = Abi::WindowsMsvc2013Flavor;
             break;
         case 14:
-            flavor = minorLinker >= quint8(10)
-                ? Abi::WindowsMsvc2017Flavor // MSVC2017 RC
-                : Abi::WindowsMsvc2015Flavor;
+            if (minorLinker >= quint8(20))
+                flavor = Abi::WindowsMsvc2019Flavor;
+            else if (minorLinker >= quint8(10))
+                flavor = Abi::WindowsMsvc2017Flavor;
+            else
+                flavor = Abi::WindowsMsvc2015Flavor;
             break;
         case 15:
-            flavor = Abi::WindowsMsvc2017Flavor;
+            flavor = Abi::WindowsMsvc2019Flavor;
             break;
         default: // Keep unknown flavor
             if (minorLinker != 0)
@@ -547,6 +551,27 @@ Abi Abi::abiFromTargetTriplet(const QString &triple)
     return Abi(arch, os, flavor, format, width);
 }
 
+Utils::OsType Abi::abiOsToOsType(const Abi::OS os)
+{
+    switch (os) {
+    case ProjectExplorer::Abi::LinuxOS:
+        return Utils::OsType::OsTypeLinux;
+    case ProjectExplorer::Abi::DarwinOS:
+        return Utils::OsType::OsTypeMac;
+    case ProjectExplorer::Abi::BsdOS:
+    case ProjectExplorer::Abi::UnixOS:
+        return Utils::OsType::OsTypeOtherUnix;
+    case ProjectExplorer::Abi::WindowsOS:
+        return Utils::OsType::OsTypeWindows;
+    case ProjectExplorer::Abi::VxWorks:
+    case ProjectExplorer::Abi::QnxOS:
+    case ProjectExplorer::Abi::BareMetalOS:
+    case ProjectExplorer::Abi::UnknownOS:
+        return Utils::OsType::OsTypeOther;
+    }
+    return Utils::OsType::OsTypeOther;
+}
+
 QString Abi::toString() const
 {
     const QStringList dn = {toString(m_architecture), toString(m_os), toString(m_osFlavor),
@@ -566,6 +591,13 @@ bool Abi::operator == (const Abi &other) const
             && m_osFlavor == other.m_osFlavor
             && m_binaryFormat == other.m_binaryFormat
             && m_wordWidth == other.m_wordWidth;
+}
+
+static bool compatibleMSVCFlavors(const Abi::OSFlavor &left, const Abi ::OSFlavor &right)
+{
+    // MSVC 2019, 2017 and 2015 are compatible
+    return left >= Abi::WindowsMsvc2015Flavor && left <= Abi::WindowsMsvc2019Flavor
+           && right >= Abi::WindowsMsvc2015Flavor && right <= Abi::WindowsMsvc2019Flavor;
 }
 
 bool Abi::isCompatibleWith(const Abi &other) const
@@ -594,12 +626,9 @@ bool Abi::isCompatibleWith(const Abi &other) const
     if (isCompat && (osFlavor() == AndroidLinuxFlavor || other.osFlavor() == AndroidLinuxFlavor))
         isCompat = (architecture() == other.architecture()) &&  (osFlavor() == other.osFlavor());
 
-    // MSVC2017 is compatible with MSVC2015
-    if (!isCompat
-            && ((osFlavor() == WindowsMsvc2015Flavor && other.osFlavor() == WindowsMsvc2017Flavor)
-                || (osFlavor() == WindowsMsvc2017Flavor && other.osFlavor() == WindowsMsvc2015Flavor))) {
+    if (!isCompat && compatibleMSVCFlavors(osFlavor(), other.osFlavor()))
         isCompat = true;
-    }
+
     return isCompat;
 }
 
@@ -875,6 +904,8 @@ bool Abi::osSupportsFlavor(const Abi::OS &os, const Abi::OSFlavor &flavor)
 
 Abi::OSFlavor Abi::flavorForMsvcVersion(int version)
 {
+    if (version >= 1920)
+        return WindowsMsvc2019Flavor;
     if (version >= 1910)
         return WindowsMsvc2017Flavor;
     switch (version) {
@@ -937,6 +968,7 @@ Abi Abi::hostAbi()
     return result;
 }
 
+//! Extract available ABIs from a binary using heuristics.
 QList<Abi> Abi::abisOfBinary(const Utils::FileName &path)
 {
     QList<Abi> tmp;

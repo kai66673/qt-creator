@@ -78,6 +78,16 @@ public:
                        Utils::SmallStringView,
                        Utils::SmallStringView));
 
+    MOCK_METHOD8(write,
+                 void(Utils::SmallStringView,
+                      Utils::SmallStringView,
+                      Utils::SmallStringView,
+                      Utils::SmallStringView,
+                      Utils::SmallStringView,
+                      int,
+                      int,
+                      int));
+
     MOCK_METHOD1(write,
                  void (Utils::SmallStringView));
 
@@ -98,6 +108,12 @@ public:
 
     MOCK_METHOD2(write,
                  void (uint, uint));
+
+    MOCK_METHOD2(write,
+                 void (uchar, int));
+
+    MOCK_METHOD2(write,
+                 void (long long, int));
 
     Utils::SmallString sqlStatement;
 };

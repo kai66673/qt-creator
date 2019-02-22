@@ -372,7 +372,8 @@ void TokenInfo::identifierKind(const Cursor &cursor, Recursion recursion)
             break;
         case CXCursor_ParmDecl:
         case CXCursor_VarDecl:
-            variableKind(cursor);
+        case CXCursor_VariableRef:
+            variableKind(cursor.referenced());
             break;
         case CXCursor_DeclRefExpr:
             identifierKind(cursor.referenced(), Recursion::RecursivePass);
@@ -547,9 +548,6 @@ void TokenInfo::punctuationOrOperatorKind()
             // case CXCursor_CXXNewExpr:
             // case CXCursor_CXXDeleteExpr:
             overloadedOperatorKind();
-            break;
-        case CXCursor_Constructor:
-            collectOutputArguments(m_originalCursor);
             break;
         case CXCursor_UnaryOperator:
         case CXCursor_BinaryOperator:

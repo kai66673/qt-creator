@@ -70,7 +70,7 @@ using namespace CppTools;
 using namespace ProjectExplorer;
 using namespace Utils;
 
-static Q_LOGGING_CATEGORY(LOG, "qtc.clangtools.runcontrol")
+static Q_LOGGING_CATEGORY(LOG, "qtc.clangtools.runcontrol", QtWarningMsg)
 
 static QStringList splitArgs(QString &argsString)
 {
@@ -189,15 +189,17 @@ private:
 static AnalyzeUnits toAnalyzeUnits(const FileInfos &fileInfos)
 {
     AnalyzeUnits unitsToAnalyze;
-    const CompilerOptionsBuilder::PchUsage pchUsage = CppTools::getPchUsage();
+    const UsePrecompiledHeaders usePrecompiledHeaders = CppTools::getPchUsage();
     for (const FileInfo &fileInfo : fileInfos) {
         CompilerOptionsBuilder optionsBuilder(*fileInfo.projectPart,
-                                              CppTools::UseSystemHeader::No,
-                                              CppTools::SkipBuiltIn::No,
+                                              UseSystemHeader::No,
+                                              UseTweakedHeaderPaths::Yes,
+                                              UseLanguageDefines::No,
+                                              UseBuildSystemWarnings::No,
                                               QString(CLANG_VERSION),
                                               QString(CLANG_RESOURCE_DIR));
         QStringList arguments = extraClangToolsPrependOptions();
-        arguments.append(optionsBuilder.build(fileInfo.kind, pchUsage));
+        arguments.append(optionsBuilder.build(fileInfo.kind, usePrecompiledHeaders));
         arguments.append(extraClangToolsAppendOptions());
         unitsToAnalyze << AnalyzeUnit(fileInfo.file.toString(), arguments);
     }
@@ -256,7 +258,7 @@ void ClangToolRunControl::init()
     QTC_ASSERT(buildConfiguration, return);
     m_environment = buildConfiguration->environment();
 
-    ToolChain *toolChain = ToolChainKitInformation::toolChain(m_target->kit(),
+    ToolChain *toolChain = ToolChainKitAspect::toolChain(m_target->kit(),
                                                               ProjectExplorer::Constants::CXX_LANGUAGE_ID);
     QTC_ASSERT(toolChain, return);
     m_targetTriple = toolChain->originalTargetTriple();
@@ -265,6 +267,8 @@ void ClangToolRunControl::init()
 
 void ClangToolRunControl::start()
 {
+    TaskHub::clearTasks(Debugger::Constants::ANALYZERTASK_ID);
+
     if (ClangToolsSettings::instance()->savedBuildBeforeAnalysis()) {
         QTC_ASSERT(m_projectBuilder, return;);
         if (!m_projectBuilder->success()) {
@@ -353,7 +357,7 @@ void ClangToolRunControl::stop()
     QSetIterator<ClangToolRunner *> i(m_runners);
     while (i.hasNext()) {
         ClangToolRunner *runner = i.next();
-        QObject::disconnect(runner, 0, this, 0);
+        QObject::disconnect(runner, nullptr, this, nullptr);
         delete runner;
     }
     m_runners.clear();
@@ -386,13 +390,24 @@ void ClangToolRunControl::analyzeNextFile()
                   Utils::StdOutFormat);
 }
 
+static Utils::FileName cleanPath(const Utils::FileName &filePath)
+{
+    return Utils::FileName::fromString(QDir::cleanPath(filePath.toString()));
+}
+
 void ClangToolRunControl::onRunnerFinishedWithSuccess(const QString &filePath)
 {
     const QString logFilePath = qobject_cast<ClangToolRunner *>(sender())->logFilePath();
     qCDebug(LOG) << "onRunnerFinishedWithSuccess:" << logFilePath;
 
+    QTC_ASSERT(m_projectInfo.project(), return);
+    const Utils::FileName projectRootDir = cleanPath(m_projectInfo.project()->projectDirectory());
+
     QString errorMessage;
-    const QList<Diagnostic> diagnostics = tool()->read(filePath, logFilePath, &errorMessage);
+    const QList<Diagnostic> diagnostics = tool()->read(filePath,
+                                                       projectRootDir,
+                                                       logFilePath,
+                                                       &errorMessage);
     QFile::remove(logFilePath); // Clean-up.
 
     if (!errorMessage.isEmpty()) {
@@ -428,7 +443,7 @@ void ClangToolRunControl::onRunnerFinishedWithFailure(const QString &errorMessag
     m_success = false;
     appendMessage(message, Utils::StdErrFormat);
     appendMessage(errorDetails, Utils::StdErrFormat);
-    TaskHub::addTask(Task::Warning, message, Debugger::Constants::ANALYZERTASK_ID);
+    TaskHub::addTask(Task::Error, message, Debugger::Constants::ANALYZERTASK_ID);
     handleFinished();
 }
 

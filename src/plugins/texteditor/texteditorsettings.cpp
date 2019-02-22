@@ -25,23 +25,24 @@
 
 #include "texteditorsettings.h"
 
-#include "fontsettings.h"
-#include "texteditor.h"
 #include "behaviorsettings.h"
 #include "behaviorsettingspage.h"
 #include "completionsettings.h"
-#include "marginsettings.h"
+#include "completionsettingspage.h"
 #include "displaysettings.h"
 #include "displaysettingspage.h"
-#include "fontsettingspage.h"
-#include "typingsettings.h"
-#include "storagesettings.h"
-#include "tabsettings.h"
 #include "extraencodingsettings.h"
+#include "fontsettings.h"
+#include "fontsettingspage.h"
+#include "highlightersettingspage.h"
 #include "icodestylepreferences.h"
 #include "icodestylepreferencesfactory.h"
-#include "completionsettingspage.h"
-#include <texteditor/generichighlighter/highlightersettingspage.h>
+#include "marginsettings.h"
+#include "storagesettings.h"
+#include "tabsettings.h"
+#include "texteditor.h"
+#include "typingsettings.h"
+
 #include <texteditor/snippets/snippetssettingspage.h>
 
 #include <extensionsystem/pluginmanager.h>
@@ -92,8 +93,10 @@ TextEditorSettings::TextEditorSettings()
     // Add font preference page
     FormatDescriptions formatDescr;
     formatDescr.reserve(C_LAST_STYLE_SENTINEL);
-    formatDescr.emplace_back(C_TEXT, tr("Text"), tr("Generic text and punctuation tokens.\n"
-                                                    "Applied to text that matched no other rule."));
+    formatDescr.emplace_back(C_TEXT, tr("Text"),
+                             tr("Generic text and punctuation tokens.\n"
+                                                    "Applied to text that matched no other rule."),
+                             Format{QColor{}, Qt::white});
 
     // Special categories
     const QPalette p = QApplication::palette();
@@ -168,7 +171,7 @@ TextEditorSettings::TextEditorSettings()
     functionFormat.setForeground(QColor(0, 103, 124));
     formatDescr.emplace_back(C_FUNCTION, tr("Function"), tr("Name of a function."),
                              functionFormat);
-    Format declarationFormat = Format::createMixinFormat();
+    Format declarationFormat;
     declarationFormat.setBold(true);
     formatDescr.emplace_back(C_DECLARATION,
                              tr("Function Declaration"),
@@ -178,7 +181,6 @@ TextEditorSettings::TextEditorSettings()
     formatDescr.emplace_back(C_FUNCTION_DEFINITION,
                              tr("Function Definition"),
                              tr("Name of function at its definition."),
-                             Format::createMixinFormat(),
                              FormatDescription::ShowAllControls);
     Format virtualFunctionFormat(functionFormat);
     virtualFunctionFormat.setItalic(true);
@@ -242,7 +244,6 @@ TextEditorSettings::TextEditorSettings()
     formatDescr.emplace_back(C_OPERATOR, tr("Operator"),
                              tr("Non user-defined language operators.\n"
                                 "To style user-defined operators, use Overloaded Operator."),
-                             Format::createMixinFormat(),
                              FormatDescription::ShowAllControls);
     formatDescr.emplace_back(C_OVERLOADED_OPERATOR,
                              tr("Overloaded Operators"),
@@ -335,7 +336,7 @@ TextEditorSettings::TextEditorSettings()
                              QColor(255, 190, 0),
                              QTextCharFormat::DotLine,
                              FormatDescription::ShowAllControls);
-    Format outputArgumentFormat = Format::createMixinFormat();
+    Format outputArgumentFormat;
     outputArgumentFormat.setItalic(true);
     formatDescr.emplace_back(C_OUTPUT_ARGUMENT,
                              tr("Output Argument"),

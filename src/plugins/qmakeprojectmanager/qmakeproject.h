@@ -66,11 +66,6 @@ public:
 
     QStringList filesGeneratedFrom(const QString &file) const final;
 
-    enum Parsing {ExactParse, ExactAndCumulativeParse };
-    QList<QmakeProFile *> allProFiles(const QList<ProjectType> &projectTypes = QList<ProjectType>(),
-                                      Parsing parse = ExactParse) const;
-    QList<QmakeProFile *> applicationProFiles(Parsing parse = ExactParse) const;
-
     static void notifyChanged(const Utils::FileName &name);
 
     /// \internal
@@ -131,20 +126,17 @@ private:
 
     void setAllBuildConfigurationsEnabled(bool enabled);
 
-    QString executableFor(const QmakeProFile *file);
+    QString executableFor(const QmakeProFileNode *node);
     void updateRunConfigurations();
 
     void updateCppCodeModel();
     void updateQmlJSCodeModel();
 
-    static QList<QmakeProFile *> collectAllProFiles(QmakeProFile *file, Parsing parse,
-                                                    const QList<ProjectType> &projectTypes);
-
     static bool equalFileList(const QStringList &a, const QStringList &b);
 
     void updateBuildSystemData();
-    void collectData(const QmakeProFile *file, ProjectExplorer::DeploymentData &deploymentData);
-    void collectApplicationData(const QmakeProFile *file,
+    void collectData(const QmakeProFileNode *node, ProjectExplorer::DeploymentData &deploymentData);
+    void collectApplicationData(const QmakeProFileNode *file,
                                 ProjectExplorer::DeploymentData &deploymentData);
     void collectLibraryData(const QmakeProFile *file,
             ProjectExplorer::DeploymentData &deploymentData);

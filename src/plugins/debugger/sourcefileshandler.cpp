@@ -67,8 +67,8 @@ QVariant SourceFilesHandler::headerData(int section,
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
         static QString headers[] = {
-            tr("Internal Name") + QLatin1String("        "),
-            tr("Full Name") + QLatin1String("        "),
+            tr("Internal Name") + "        ",
+            tr("Full Name") + "        ",
         };
         return headers[section];
     }
@@ -121,7 +121,7 @@ bool SourceFilesHandler::setData(const QModelIndex &idx, const QVariant &data, i
             QModelIndex index = idx.sibling(idx.row(), 0);
             QString name = index.data().toString();
 
-            auto addAction = [menu](const QString &display, bool on, const std::function<void()> &onTriggered) {
+            auto addAction = [this, menu](const QString &display, bool on, const std::function<void()> &onTriggered) {
                 QAction *act = menu->addAction(display);
                 act->setEnabled(on);
                 QObject::connect(act, &QAction::triggered, onTriggered);

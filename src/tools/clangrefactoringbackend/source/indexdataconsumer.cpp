@@ -124,23 +124,23 @@ bool IndexDataConsumer::skipSymbol(clang::FileID fileId, clang::index::SymbolRol
     return isParsedDeclaration || isParsedReference;
 }
 
-bool IndexDataConsumer::handleDeclOccurence(const clang::Decl *declaration,
-                                            clang::index::SymbolRoleSet symbolRoles,
-                                            llvm::ArrayRef<clang::index::SymbolRelation> symbolRelations,
-                                            clang::FileID fileId,
-                                            unsigned offset,
-                                            IndexDataConsumer::ASTNodeInfo astNodeInfo)
+bool IndexDataConsumer::handleDeclOccurence(
+    const clang::Decl *declaration,
+    clang::index::SymbolRoleSet symbolRoles,
+    llvm::ArrayRef<clang::index::SymbolRelation> /*symbolRelations*/,
+    clang::SourceLocation sourceLocation,
+    IndexDataConsumer::ASTNodeInfo /*astNodeInfo*/)
 {
     const auto *namedDeclaration = clang::dyn_cast<clang::NamedDecl>(declaration);
     if (namedDeclaration) {
         if (!namedDeclaration->getIdentifier())
             return true;
 
-        if (skipSymbol(fileId, symbolRoles))
+        if (skipSymbol(m_sourceManager->getFileID(sourceLocation), symbolRoles))
+
             return true;
 
         SymbolIndex globalId = toSymbolIndex(declaration->getCanonicalDecl());
-        clang::SourceLocation sourceLocation = m_sourceManager->getLocForStartOfFile(fileId).getLocWithOffset(offset);
 
         auto found = m_symbolEntries.find(globalId);
         if (found == m_symbolEntries.end()) {

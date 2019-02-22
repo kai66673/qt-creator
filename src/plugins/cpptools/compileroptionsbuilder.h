@@ -31,57 +31,46 @@
 
 namespace CppTools {
 
-enum class UseSystemHeader
-{
-    Yes,
-    No
-};
+enum class UsePrecompiledHeaders : char { Yes, No };
+enum class UseSystemHeader : char { Yes, No };
+enum class UseTweakedHeaderPaths : char { Yes, No };
+enum class UseToolchainMacros : char { Yes, No };
+enum class UseLanguageDefines : char { Yes, No };
+enum class UseBuildSystemWarnings : char { Yes, No };
 
-enum class SkipBuiltIn
-{
-    Yes,
-    No
-};
+CPPTOOLS_EXPORT QStringList XclangArgs(const QStringList &args);
+CPPTOOLS_EXPORT QStringList clangArgsForCl(const QStringList &args);
 
 class CPPTOOLS_EXPORT CompilerOptionsBuilder
 {
 public:
-    enum class PchUsage {
-        None,
-        Use
-    };
+    CompilerOptionsBuilder(
+        const ProjectPart &projectPart,
+        UseSystemHeader useSystemHeader = UseSystemHeader::No,
+        UseTweakedHeaderPaths useTweakedHeaderPaths = UseTweakedHeaderPaths::No,
+        UseLanguageDefines useLanguageDefines = UseLanguageDefines::No,
+        UseBuildSystemWarnings useBuildSystemWarnings = UseBuildSystemWarnings::No,
+        const QString &clangVersion = QString(),
+        const QString &clangResourceDirectory = QString());
 
-    CompilerOptionsBuilder(const ProjectPart &projectPart,
-                           UseSystemHeader useSystemHeader = UseSystemHeader::No,
-                           SkipBuiltIn skipBuiltInHeaderPathsAndDefines = SkipBuiltIn::No,
-                           QString clangVersion = QString(),
-                           QString clangResourceDirectory = QString());
-    virtual ~CompilerOptionsBuilder() {}
-
-    virtual void addTargetTriple();
-    virtual void addExtraCodeModelFlags();
-    virtual void enableExceptions();
-    virtual void insertWrappedQtHeaders();
-    virtual void addOptionsForLanguage(bool checkForBorlandExtensions = true);
-    virtual void updateLanguageOption(ProjectFile::Kind fileKind);
-
-    virtual void addExtraOptions() {}
-
-    QStringList build(ProjectFile::Kind fileKind,
-                      PchUsage pchUsage);
-    QStringList options() const;
-
-    // Add custom options
-    void add(const QString &option);
-    void addDefine(const ProjectExplorer::Macro &marco);
+    QStringList build(ProjectFile::Kind fileKind, UsePrecompiledHeaders usePrecompiledHeaders);
+    QStringList options() const { return m_options; }
 
     // Add options based on project part
+    virtual void addProjectMacros();
+    void addSyntaxOnly();
     void addWordWidth();
-    void addToolchainFlags();
     void addHeaderPathOptions();
-    void addPrecompiledHeaderOptions(PchUsage pchUsage);
-    virtual void addToolchainAndProjectMacros();
+    void addPrecompiledHeaderOptions(UsePrecompiledHeaders usePrecompiledHeaders);
     void addMacros(const ProjectExplorer::Macros &macros);
+
+    void addTargetTriple();
+    void addExtraCodeModelFlags();
+    void addPicIfCompilerFlagsContainsIt();
+    void addCompilerFlags();
+    void insertWrappedQtHeaders();
+    void addLanguageVersionAndExtensions();
+    void updateFileLanguage(ProjectFile::Kind fileKind);
 
     void addMsvcCompatibilityVersion();
     void undefineCppLanguageFeatureMacrosForMsvc2015();
@@ -90,30 +79,41 @@ public:
     void addProjectConfigFileInclude();
     void undefineClangVersionMacrosForMsvc();
 
-protected:
-    virtual bool excludeDefineDirective(const ProjectExplorer::Macro &macro) const;
-    virtual bool excludeHeaderPath(const QString &headerPath) const;
+    // Add custom options
+    void add(const QString &arg, bool gccOnlyOption = false);
+    void add(const QStringList &args, bool gccOnlyOptions = false);
+    virtual void addExtraOptions() {}
 
-    virtual QString defineOption() const;
-    virtual QString undefineOption() const;
-    virtual QString includeOption() const;
-    QString includeDirOptionForPath(const QString &path) const;
-    const ProjectPart m_projectPart;
+    static UseToolchainMacros useToolChainMacros();
+    void reset();
+
+    void evaluateCompilerFlags();
+    bool isClStyle() const;
 
 private:
-    QByteArray macroOption(const ProjectExplorer::Macro &macro) const;
-    QByteArray toDefineOption(const ProjectExplorer::Macro &macro) const;
-    QString defineDirectiveToDefineOption(const ProjectExplorer::Macro &marco) const;
+    void addIncludeDirOptionForPath(const ProjectExplorer::HeaderPath &path);
+    bool excludeDefineDirective(const ProjectExplorer::Macro &macro) const;
+    void addWrappedQtHeadersIncludePath(QStringList &list) const;
+    QByteArray msvcVersion() const;
 
-    void addWrappedQtHeadersIncludePath(QStringList &list);
+private:
+    const ProjectPart &m_projectPart;
+
+    const UseSystemHeader m_useSystemHeader;
+    const UseTweakedHeaderPaths m_useTweakedHeaderPaths;
+    const UseLanguageDefines m_useLanguageDefines;
+    const UseBuildSystemWarnings m_useBuildSystemWarnings;
+
+    const QString m_clangVersion;
+    const QString m_clangResourceDirectory;
+
+    struct {
+        QStringList flags;
+        bool isLanguageVersionSpecified = false;
+    } m_compilerFlags;
 
     QStringList m_options;
-    UseSystemHeader m_useSystemHeader;
-
-    QString m_clangVersion;
-    QString m_clangResourceDirectory;
-
-    SkipBuiltIn m_skipBuiltInHeaderPathsAndDefines;
+    bool m_clStyle = false;
 };
 
 } // namespace CppTools

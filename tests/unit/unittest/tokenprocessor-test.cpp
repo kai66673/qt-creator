@@ -131,6 +131,7 @@ struct Data {
                       TestEnvironment::addPlatformArguments(
                           {Utf8StringLiteral("-std=c++14"),
                            Utf8StringLiteral("-I" TESTDATA_DIR)}),
+                      {},
                       documents};
     TranslationUnit translationUnit{filePath,
                                     filePath,
@@ -1485,8 +1486,7 @@ TEST_F(TokenProcessor, PreprocessorInclusionDirectiveWithKeyword)
     ASSERT_THAT(infos[3], HasOnlyType(HighlightingType::StringLiteral));
 }
 
-// CLANG-UPGRADE-CHECK: Enable once https://bugs.llvm.org//show_bug.cgi?id=12972 is resolved.
-TEST_F(TokenProcessor, DISABLED_VariableInOperatorFunctionCall)
+TEST_F(TokenProcessor, VariableInOperatorFunctionCall)
 {
     const auto infos = translationUnit.tokenInfosInRange(sourceRange(566, 12));
 
@@ -1677,6 +1677,31 @@ TEST_F(TokenProcessor, QtOldStyleSignalFunctionPointerType)
     ASSERT_THAT(infos[4], HasOnlyType(HighlightingType::Type));
     ASSERT_THAT(infos[7], HasOnlyType(HighlightingType::Type));
     ASSERT_THAT(infos[10], HasOnlyType(HighlightingType::Type));
+}
+
+TEST_F(TokenProcessor, NonConstParameterConstructor)
+{
+    const auto infos = translationUnit.tokenInfosInRange(sourceRange(681, 90));
+
+    infos[1];
+
+    ASSERT_THAT(infos[4], Not(HasMixin(HighlightingType::OutputArgument)));
+}
+
+TEST_F(TokenProcessor, DISABLED_NonConstArgumentConstructor)
+{
+    const auto infos = translationUnit.tokenInfosInRange(sourceRange(686, 47));
+
+    infos[2];
+
+    ASSERT_THAT(infos[3], HasMixin(HighlightingType::OutputArgument));
+}
+
+TEST_F(TokenProcessor, LambdaLocalVariableCapture)
+{
+    const auto infos = translationUnit.tokenInfosInRange(sourceRange(442, 47));
+
+    ASSERT_THAT(infos[4], HasOnlyType(HighlightingType::LocalVariable));
 }
 
 Data *TokenProcessor::d;

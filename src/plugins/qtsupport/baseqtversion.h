@@ -64,6 +64,7 @@ namespace QtSupport
 class QtConfigWidget;
 
 class BaseQtVersion;
+class QtVersionFactory;
 
 // Wrapper to make the std::unique_ptr<Utils::MacroExpander> "copyable":
 class MacroExpanderWrapper
@@ -113,7 +114,6 @@ public:
     virtual ~BaseQtVersion();
 
     virtual void fromMap(const QVariantMap &map);
-    virtual BaseQtVersion *clone() const = 0;
     virtual bool equals(BaseQtVersion *other);
 
     bool isAutodetected() const;
@@ -126,7 +126,7 @@ public:
     // All valid Ids are >= 0
     int uniqueId() const;
 
-    virtual QString type() const = 0;
+    QString type() const;
 
     virtual QVariantMap toMap() const;
     virtual bool isValid() const;
@@ -138,7 +138,7 @@ public:
     virtual QString toHtml(bool verbose) const;
 
     QList<ProjectExplorer::Abi> qtAbis() const;
-    virtual QList<ProjectExplorer::Abi> detectQtAbis() const = 0;
+    virtual QList<ProjectExplorer::Abi> detectQtAbis() const;
 
     enum PropertyVariant { PropertyVariantDev, PropertyVariantGet, PropertyVariantSrc };
     QString qmakeProperty(const QByteArray &name,
@@ -148,16 +148,16 @@ public:
     virtual Utils::Environment qmakeRunEnvironment() const;
 
     // source path defined by qmake property QT_INSTALL_PREFIX/src or by qmake.stash QT_SOURCE_TREE
-    virtual Utils::FileName sourcePath() const;
+    Utils::FileName sourcePath() const;
     // returns source path for installed qt packages and empty string for self build qt
     Utils::FileName qtPackageSourcePath() const;
     bool isInSourceDirectory(const Utils::FileName &filePath);
     bool isSubProject(const Utils::FileName &filePath) const;
 
     // used by UiCodeModelSupport
-    virtual QString uicCommand() const;
-    virtual QString designerCommand() const;
-    virtual QString linguistCommand() const;
+    QString uicCommand() const;
+    QString designerCommand() const;
+    QString linguistCommand() const;
     QString qscxmlcCommand() const;
 
     QString qtVersionString() const;
@@ -172,7 +172,7 @@ public:
     bool hasDemos() const;
     QString demosPath() const;
 
-    virtual QString frameworkInstallPath() const;
+    QString frameworkInstallPath() const;
 
     // former local functions
     Utils::FileName qmakeCommand() const;
@@ -208,11 +208,11 @@ public:
     static bool isQtQuickCompilerSupported(ProjectExplorer::Kit *k, QString *reason = nullptr);
     bool isQtQuickCompilerSupported(QString *reason = nullptr) const;
 
-    virtual QString qmlDumpTool(bool debugVersion) const;
+    QString qmlDumpTool(bool debugVersion) const;
 
-    virtual bool hasQmlDump() const;
-    virtual bool hasQmlDumpWithRelocatableFlag() const;
-    virtual bool needsQmlDump() const;
+    bool hasQmlDump() const;
+    bool hasQmlDumpWithRelocatableFlag() const;
+    bool needsQmlDump() const;
 
     virtual QtConfigWidget *createConfigurationWidget() const;
 
@@ -253,11 +253,13 @@ public:
                                       const ProjectExplorer::Target *target);
 
     QSet<Core::Id> features() const;
+    void setIsAutodetected(bool isAutodetected);
+
 protected:
     virtual QSet<Core::Id> availableFeatures() const;
+
     BaseQtVersion();
-    BaseQtVersion(const Utils::FileName &path, bool isAutodetected = false, const QString &autodetectionSource = QString());
-    BaseQtVersion(const BaseQtVersion &other);
+    BaseQtVersion(const BaseQtVersion &other) = delete;
 
     virtual QList<ProjectExplorer::Task> reportIssuesImpl(const QString &proFile, const QString &buildDir) const;
 
@@ -269,8 +271,8 @@ protected:
     virtual void parseMkSpec(ProFileEvaluator *) const;
 
 private:
+    void setupQmakePathAndId(const Utils::FileName &path);
     void setAutoDetectionSource(const QString &autodetectionSource);
-    void updateSourcePath() const;
     void updateVersionInfo() const;
     enum HostBinaries { Designer, Linguist, Uic, QScxmlc };
     QString findHostBinary(HostBinaries binary) const;
@@ -290,6 +292,7 @@ private:
                         // and by the qtoptionspage to replace Qt versions
 
     int m_id = -1;
+    const QtVersionFactory *m_factory = nullptr; // The factory that created us.
 
     bool m_isAutodetected = false;
     mutable bool m_hasQmlDump = false;         // controlled by m_versionInfoUpToDate

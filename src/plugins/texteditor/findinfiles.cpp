@@ -58,9 +58,7 @@ FindInFiles::FindInFiles()
             this, &FindInFiles::findOnFileSystem);
 }
 
-FindInFiles::~FindInFiles()
-{
-}
+FindInFiles::~FindInFiles() = default;
 
 bool FindInFiles::isValid() const
 {
@@ -81,7 +79,7 @@ FileIterator *FindInFiles::files(const QStringList &nameFilters,
                                  const QStringList &exclusionFilters,
                                  const QVariant &additionalParameters) const
 {
-    return new SubDirFileIterator(QStringList() << additionalParameters.toString(),
+    return new SubDirFileIterator({additionalParameters.toString()},
                                   nameFilters,
                                   exclusionFilters,
                                   EditorManager::defaultTextCodec());
@@ -220,7 +218,7 @@ void FindInFiles::writeSettings(QSettings *settings)
 void FindInFiles::readSettings(QSettings *settings)
 {
     settings->beginGroup(QLatin1String("FindInFiles"));
-    readCommonSettings(settings, "*.cpp,*.h", "*/.git/*,*/.cvs/*,*/.svn/*");
+    readCommonSettings(settings, "*.cpp,*.h", "*/.git/*,*/.cvs/*,*/.svn/*,*.autosave");
     settings->endGroup();
 }
 

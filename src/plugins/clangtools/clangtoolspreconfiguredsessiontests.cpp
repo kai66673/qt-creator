@@ -166,7 +166,7 @@ static QList<Target *> validTargets(Project *project)
             return false;
         }
 
-        const ToolChain * const toolchain = ToolChainKitInformation::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
+        const ToolChain * const toolchain = ToolChainKitAspect::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
         QTC_ASSERT(toolchain, return false);
 
         if (Core::ICore::clangExecutable(CLANG_BINDIR).isEmpty()) {
@@ -223,7 +223,7 @@ bool PreconfiguredSessionTests::switchToProjectAndTarget(Project *project,
         SessionManager::setActiveTarget(project, target, ProjectExplorer::SetActive::NoCascade);
         QTC_ASSERT(spyFinishedParsing.wait(30000), return false);
 
-        const QVariant projectArgument = spyFinishedParsing.takeFirst().takeFirst();
+        const QVariant projectArgument = spyFinishedParsing.takeFirst().constFirst();
         QTC_ASSERT(projectArgument.canConvert<ProjectExplorer::Project *>(), return false);
 
         return projectArgument.value<ProjectExplorer::Project *>() == project;

@@ -26,14 +26,15 @@
 #include "qbsprojectimporter.h"
 
 #include "qbsbuildconfiguration.h"
-#include "qbsbuildinfo.h"
 #include "qbspmlogging.h"
 
 #include <coreplugin/documentmanager.h>
 #include <projectexplorer/buildconfiguration.h>
+#include <projectexplorer/buildinfo.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/project.h>
+#include <projectexplorer/projectexplorer.h>
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/projectmacroexpander.h>
 #include <projectexplorer/toolchain.h>
@@ -93,7 +94,7 @@ static QString buildDir(const QString &projectFilePath, const Kit *k)
                                   BuildConfiguration::Unknown);
     const QString projectDir
             = Project::projectDirectory(FileName::fromString(projectFilePath)).toString();
-    const QString buildPath = expander.expand(Core::DocumentManager::buildDirectory());
+    const QString buildPath = expander.expand(ProjectExplorerPlugin::defaultBuildDirectoryTemplate());
     return FileUtils::resolvePath(projectDir, buildPath);
 }
 
@@ -162,14 +163,14 @@ bool QbsProjectImporter::matchKit(void *directoryData, const Kit *k) const
     const auto * const bgData = static_cast<BuildGraphData *>(directoryData);
     qCDebug(qbsPmLog) << "matching kit" << k->displayName() << "against imported build"
                       << bgData->bgFilePath.toUserOutput();
-    if (ToolChainKitInformation::toolChains(k).isEmpty() && bgData->cCompilerPath.isEmpty()
+    if (ToolChainKitAspect::toolChains(k).isEmpty() && bgData->cCompilerPath.isEmpty()
             && bgData->cxxCompilerPath.isEmpty()) {
         return true;
     }
     const ToolChain * const cToolchain
-            = ToolChainKitInformation::toolChain(k, Constants::C_LANGUAGE_ID);
+            = ToolChainKitAspect::toolChain(k, Constants::C_LANGUAGE_ID);
     const ToolChain * const cxxToolchain
-            = ToolChainKitInformation::toolChain(k, Constants::CXX_LANGUAGE_ID);
+            = ToolChainKitAspect::toolChain(k, Constants::CXX_LANGUAGE_ID);
     if (!bgData->cCompilerPath.isEmpty()) {
         if (!cToolchain)
             return false;
@@ -182,14 +183,14 @@ bool QbsProjectImporter::matchKit(void *directoryData, const Kit *k) const
         if (bgData->cxxCompilerPath != cxxToolchain->compilerCommand())
             return false;
     }
-    const QtSupport::BaseQtVersion * const qtVersion = QtSupport::QtKitInformation::qtVersion(k);
+    const QtSupport::BaseQtVersion * const qtVersion = QtSupport::QtKitAspect::qtVersion(k);
     if (!bgData->qtBinPath.isEmpty()) {
         if (!qtVersion)
             return false;
         if (bgData->qtBinPath != qtVersion->binPath())
             return false;
     }
-    if (bgData->sysroot != SysRootKitInformation::sysRoot(k))
+    if (bgData->sysroot != SysRootKitAspect::sysRoot(k))
         return false;
 
     qCDebug(qbsPmLog) << "Kit matches";
@@ -214,32 +215,32 @@ Kit *QbsProjectImporter::createKit(void *directoryData) const
             tcData << findOrCreateToolChains(bgData->cCompilerPath, Constants::C_LANGUAGE_ID);
         foreach (const ToolChainData &tc, tcData) {
             if (!tc.tcs.isEmpty())
-                ToolChainKitInformation::setToolChain(k, tc.tcs.first());
+                ToolChainKitAspect::setToolChain(k, tc.tcs.first());
         }
-        SysRootKitInformation::setSysRoot(k, bgData->sysroot);
+        SysRootKitAspect::setSysRoot(k, bgData->sysroot);
     });
 }
 
-QList<BuildInfo *> QbsProjectImporter::buildInfoListForKit(const Kit *k, void *directoryData) const
+const QList<BuildInfo> QbsProjectImporter::buildInfoListForKit(const Kit *k, void *directoryData) const
 {
     qCDebug(qbsPmLog) << "creating build info for kit" << k->displayName();
-    QList<BuildInfo *> result;
     const auto factory = qobject_cast<QbsBuildConfigurationFactory *>(
-                IBuildConfigurationFactory::find(k, projectFilePath().toString()));
+                BuildConfigurationFactory::find(k, projectFilePath().toString()));
     if (!factory) {
         qCDebug(qbsPmLog) << "no build config factory found";
-        return result;
+        return {};
     }
     const auto * const bgData = static_cast<BuildGraphData *>(directoryData);
-    auto * const buildInfo = new QbsBuildInfo(factory);
-    buildInfo->displayName = bgData->bgFilePath.toFileInfo().completeBaseName();
-    buildInfo->buildType = bgData->buildVariant == "debug"
+    BuildInfo info(factory);
+    info.displayName = bgData->bgFilePath.toFileInfo().completeBaseName();
+    info.buildType = bgData->buildVariant == "debug"
             ? BuildConfiguration::Debug : BuildConfiguration::Release;
-    buildInfo->kitId = k->id();
-    buildInfo->buildDirectory = bgData->bgFilePath.parentDir().parentDir();
-    buildInfo->config = bgData->overriddenProperties;
-    buildInfo->config.insert("configName", buildInfo->displayName);
-    return result << buildInfo;
+    info.kitId = k->id();
+    info.buildDirectory = bgData->bgFilePath.parentDir().parentDir();
+    QVariantMap config = bgData->overriddenProperties;
+    config.insert("configName", info.displayName);
+    info.extraInfo = config;
+    return {info};
 }
 
 void QbsProjectImporter::deleteDirectoryData(void *directoryData) const

@@ -336,20 +336,23 @@ SynchronousProcessResponse ShellCommand::runCommand(const FileName &binary,
     QSharedPointer<OutputProxy> proxy(d->m_proxyFactory());
 
     if (!(d->m_flags & SuppressCommandLogging))
-        proxy->appendCommand(dir, binary, arguments);
+        emit proxy->appendCommand(dir, binary, arguments);
 
-    if (d->m_flags & FullySynchronously || QThread::currentThread() == QCoreApplication::instance()->thread())
+    if ((d->m_flags & FullySynchronously)
+            || (!(d->m_flags & NoFullySync)
+                && QThread::currentThread() == QCoreApplication::instance()->thread())) {
         response = runFullySynchronous(binary, arguments, proxy, timeoutS, dir, interpreter);
-    else
+    } else {
         response = runSynchronous(binary, arguments, proxy, timeoutS, dir, interpreter);
+    }
 
     if (!d->m_aborted) {
         // Success/Fail message in appropriate window?
         if (response.result == SynchronousProcessResponse::Finished) {
             if (d->m_flags & ShowSuccessMessage)
-                proxy->appendMessage(response.exitMessage(binary.toUserOutput(), timeoutS));
+                emit proxy->appendMessage(response.exitMessage(binary.toUserOutput(), timeoutS));
         } else if (!(d->m_flags & SuppressFailMessage)) {
-            proxy->appendError(response.exitMessage(binary.toUserOutput(), timeoutS));
+            emit proxy->appendError(response.exitMessage(binary.toUserOutput(), timeoutS));
         }
     }
 
@@ -382,14 +385,14 @@ SynchronousProcessResponse ShellCommand::runFullySynchronous(const FileName &bin
     if (!d->m_aborted) {
         const QString stdErr = resp.stdErr();
         if (!stdErr.isEmpty() && !(d->m_flags & SuppressStdErr))
-            proxy->append(stdErr);
+            emit proxy->append(stdErr);
 
         const QString stdOut = resp.stdOut();
         if (!stdOut.isEmpty() && d->m_flags & ShowStdOut) {
             if (d->m_flags & SilentOutput)
-                proxy->appendSilently(stdOut);
+                emit proxy->appendSilently(stdOut);
             else
-                proxy->append(stdOut);
+                emit proxy->append(stdOut);
         }
     }
 
@@ -427,7 +430,7 @@ SynchronousProcessResponse ShellCommand::runSynchronous(const FileName &binary,
             if (d->m_progressParser)
                 d->m_progressParser->parseProgress(text);
             if (!(d->m_flags & SuppressStdErr))
-                proxy->appendError(text);
+                emit proxy->appendError(text);
             if (d->m_progressiveOutput)
                 emit stdErrText(text);
         });
@@ -442,7 +445,7 @@ SynchronousProcessResponse ShellCommand::runSynchronous(const FileName &binary,
             if (d->m_progressParser)
                 d->m_progressParser->parseProgress(text);
             if (d->m_flags & ShowStdOut)
-                proxy->append(text);
+                emit proxy->append(text);
             if (d->m_progressiveOutput) {
                 emit stdOutText(text);
                 d->m_hadOutput = true;

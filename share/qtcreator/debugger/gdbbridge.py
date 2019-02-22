@@ -246,17 +246,19 @@ class Dumper(DumperBase):
             #warn('TARGET TYPE: %s' % targetType)
             if targetType.code == gdb.TYPE_CODE_ARRAY:
                 val = self.Value(self)
-                val.laddress = toInteger(nativeValue.address)
-                val.nativeValue = nativeValue
             else:
-                # Cast may fail (e.g for arrays, see test for Bug5799)
-                val = self.fromNativeValue(nativeValue.cast(targetType))
-            val.type = self.fromNativeType(nativeType)
-            val.nativeValue = nativeValue
+                try:
+                    # Cast may fail for arrays, for typedefs to __uint128_t with
+                    # gdb.error: That operation is not available on integers
+                    # of more than 8 bytes.
+                    # See test for Bug5799, QTCREATORBUG-18450.
+                    val = self.fromNativeValue(nativeValue.cast(targetType))
+                except:
+                    val = self.Value(self)
             #warn('CREATED TYPEDEF: %s' % val)
-            return val
+        else:
+            val = self.Value(self)
 
-        val = self.Value(self)
         val.nativeValue = nativeValue
         if not nativeValue.address is None:
             val.laddress = toInteger(nativeValue.address)
@@ -306,6 +308,12 @@ class Dumper(DumperBase):
             #warn('REF')
             targetType = self.fromNativeType(nativeType.target().unqualified())
             return self.createReferenceType(targetType)
+
+        if hasattr(gdb, "TYPE_CODE_RVALUE_REF"):
+            if code == gdb.TYPE_CODE_RVALUE_REF:
+                #warn('RVALUEREF')
+                targetType = self.fromNativeType(nativeType.target())
+                return self.createRValueReferenceType(targetType)
 
         if code == gdb.TYPE_CODE_ARRAY:
             #warn('ARRAY')
@@ -409,7 +417,7 @@ class Dumper(DumperBase):
             if not found or v != 0:
                 # Leftover value
                 flags.append('unknown: %d' % v)
-            return " | ".join(flags) + ' (' + (form % intval) + ')'
+            return '(' + " | ".join(flags) + ') (' + (form % intval) + ')'
         except:
             pass
         return form % intval
@@ -708,14 +716,18 @@ class Dumper(DumperBase):
         self.reportResult(self.output)
 
     def parseAndEvaluate(self, exp):
+        val = self.nativeParseAndEvaluate(exp)
+        return None if val is None else self.fromNativeValue(val)
+
+    def nativeParseAndEvaluate(self, exp):
         #warn('EVALUATE "%s"' % exp)
         try:
             val = gdb.parse_and_eval(exp)
+            return val
         except RuntimeError as error:
             if self.passExceptions:
                 warn("Cannot evaluate '%s': %s" % (exp, error))
             return None
-        return self.fromNativeValue(val)
 
     def callHelper(self, rettype, value, function, args):
         # args is a tuple.

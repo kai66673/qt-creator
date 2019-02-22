@@ -27,9 +27,11 @@
 
 #include "projectpartartefactexception.h"
 
+#include <utils/cpplanguage_details.h>
 #include <utils/smallstringvector.h>
 
 #include <compilermacro.h>
+#include <includesearchpath.h>
 
 QT_FORWARD_DECLARE_CLASS(QJsonDocument)
 QT_FORWARD_DECLARE_STRUCT(QJsonParseError)
@@ -41,28 +43,58 @@ class ProjectPartArtefact
 public:
     ProjectPartArtefact(Utils::SmallStringView compilerArgumentsText,
                         Utils::SmallStringView compilerMacrosText,
-                        Utils::SmallStringView includeSearchPaths,
-                        int projectPartId);
+                        Utils::SmallStringView systemIncludeSearchPathsText,
+                        Utils::SmallStringView projectIncludeSearchPathsText,
+                        int projectPartId,
+                        int language,
+                        int languageVersion,
+                        int languageExtension)
+        : toolChainArguments(toStringVector(compilerArgumentsText))
+        , compilerMacros(toCompilerMacros(compilerMacrosText))
+        , systemIncludeSearchPaths(toIncludeSearchPaths(systemIncludeSearchPathsText))
+        , projectIncludeSearchPaths(toIncludeSearchPaths(projectIncludeSearchPathsText))
+        , projectPartId(projectPartId)
+        , language(static_cast<Utils::Language>(language))
+        , languageVersion(static_cast<Utils::LanguageVersion>(languageVersion))
+        , languageExtension(static_cast<Utils::LanguageExtension>(languageExtension))
+    {}
 
-    static
-    Utils::SmallStringVector toStringVector(Utils::SmallStringView jsonText);
-    static
-    CompilerMacros createCompilerMacrosFromDocument(const QJsonDocument &document);
-    static
-    CompilerMacros toCompilerMacros(Utils::SmallStringView jsonText);
-    static
-    QJsonDocument createJsonDocument(Utils::SmallStringView jsonText,
-                                     const char *whatError);
-    static
-    void checkError(const char *whatError, const QJsonParseError &error);
-    friend
-    bool operator==(const ProjectPartArtefact &first, const ProjectPartArtefact &second);
+    ProjectPartArtefact(Utils::SmallStringView compilerArgumentsText,
+                        Utils::SmallStringView compilerMacrosText,
+                        Utils::SmallStringView systemIncludeSearchPathsText,
+                        Utils::SmallStringView projectIncludeSearchPathsText,
+                        int projectPartId,
+                        Utils::Language language,
+                        Utils::LanguageVersion languageVersion,
+                        Utils::LanguageExtension languageExtension)
+        : toolChainArguments(toStringVector(compilerArgumentsText))
+        , compilerMacros(toCompilerMacros(compilerMacrosText))
+        , systemIncludeSearchPaths(toIncludeSearchPaths(systemIncludeSearchPathsText))
+        , projectIncludeSearchPaths(toIncludeSearchPaths(projectIncludeSearchPathsText))
+        , projectPartId(projectPartId)
+        , language(language)
+        , languageVersion(languageVersion)
+        , languageExtension(languageExtension)
+    {}
+
+    static Utils::SmallStringVector toStringVector(Utils::SmallStringView jsonText);
+    static CompilerMacros createCompilerMacrosFromDocument(const QJsonDocument &document);
+    static IncludeSearchPaths createIncludeSearchPathsFromDocument(const QJsonDocument &document);
+    static CompilerMacros toCompilerMacros(Utils::SmallStringView jsonText);
+    static QJsonDocument createJsonDocument(Utils::SmallStringView jsonText, const char *whatError);
+    static IncludeSearchPaths toIncludeSearchPaths(Utils::SmallStringView jsonText);
+    static void checkError(const char *whatError, const QJsonParseError &error);
+    friend bool operator==(const ProjectPartArtefact &first, const ProjectPartArtefact &second);
 
 public:
-    Utils::SmallStringVector compilerArguments;
+    Utils::SmallStringVector toolChainArguments;
     CompilerMacros compilerMacros;
-    Utils::SmallStringVector includeSearchPaths;
+    IncludeSearchPaths systemIncludeSearchPaths;
+    IncludeSearchPaths projectIncludeSearchPaths;
     int projectPartId = -1;
+    Utils::Language language = Utils::Language::Cxx;
+    Utils::LanguageVersion languageVersion = Utils::LanguageVersion::CXX98;
+    Utils::LanguageExtension languageExtension = Utils::LanguageExtension::None;
 };
 
 using ProjectPartArtefacts = std::vector<ProjectPartArtefact>;

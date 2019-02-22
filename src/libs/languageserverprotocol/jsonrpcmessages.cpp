@@ -123,9 +123,6 @@ QJsonObject JsonRpcMessageHandler::toJsonObject(const QByteArray &_content,
                                                 QTextCodec *codec,
                                                 QString &parseError)
 {
-    auto tr = [](const char *message){
-        return QCoreApplication::translate("JsonRpcMessageHandler", message);
-    };
     if (_content.isEmpty())
         return QJsonObject();
     QByteArray content;
@@ -141,9 +138,9 @@ QJsonObject JsonRpcMessageHandler::toJsonObject(const QByteArray &_content,
     if (doc.isObject())
         return doc.object();
     if (doc.isNull())
-        parseError = tr("Could not parse Json message '%1'").arg(error.errorString());
+        parseError = tr("Could not parse JSON message \"%1\".").arg(error.errorString());
     else
-        parseError = tr("Expected Json object, but got a json '%1'").arg(docTypeName(doc));
+        parseError = tr("Expected a JSON object, but got a JSON \"%1\".").arg(docTypeName(doc));
     return QJsonObject();
 }
 

@@ -26,34 +26,36 @@
 #pragma once
 
 #include <projectexplorer/devicesupport/idevice.h>
+#include <projectexplorer/devicesupport/idevicefactory.h>
 
 namespace Android {
-class AndroidConfigurations; // needed for friend declaration
-
 namespace Internal {
 
 class AndroidDevice : public ProjectExplorer::IDevice
 {
 public:
+    static IDevice::Ptr create() { return IDevice::Ptr(new AndroidDevice); };
+
+private:
+    AndroidDevice();
+
     ProjectExplorer::IDevice::DeviceInfo deviceInformation() const override;
 
     QString displayType() const override;
     ProjectExplorer::IDeviceWidget *createWidget() override;
-    QList<Core::Id> actionIds() const override;
-    QString displayNameForActionId(Core::Id actionId) const override;
-    void executeAction(Core::Id actionId, QWidget *parent = nullptr) override;
     bool canAutoDetectPorts() const override;
     ProjectExplorer::DeviceProcessSignalOperation::Ptr signalOperation() const override;
     Utils::OsType osType() const override;
 
     ProjectExplorer::IDevice::Ptr clone() const override;
     QUrl toolControlChannel(const ControlChannelHint &) const override;
+};
 
-protected:
-    friend class AndroidDeviceFactory;
-    friend class Android::AndroidConfigurations;
-    AndroidDevice();
-    AndroidDevice(const AndroidDevice &other);
+class AndroidDeviceFactory : public ProjectExplorer::IDeviceFactory
+{
+    Q_OBJECT
+public:
+    AndroidDeviceFactory();
 };
 
 } // namespace Internal

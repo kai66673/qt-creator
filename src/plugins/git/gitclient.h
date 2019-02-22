@@ -84,7 +84,7 @@ public:
     QString ignore;
 };
 
-typedef QMap<QString, SubmoduleData> SubmoduleDataMap;
+using SubmoduleDataMap = QMap<QString, SubmoduleData>;
 
 class GitClient : public VcsBase::VcsBaseClientImpl
 {
@@ -128,7 +128,7 @@ public:
                                           const QStringList &arguments,
                                           bool isRebase = false);
 
-    QString findRepositoryForDirectory(const QString &dir) const;
+    QString findRepositoryForDirectory(const QString &directory) const;
     QString findGitDirForRepository(const QString &repositoryDir) const;
     bool managesFile(const QString &workingDirectory, const QString &fileName) const;
 
@@ -173,10 +173,9 @@ public:
     bool synchronousCheckoutFiles(const QString &workingDirectory, QStringList files = QStringList(),
                                   QString revision = QString(), QString *errorMessage = nullptr,
                                   bool revertStaging = true);
-    // Checkout ref
-    bool stashAndCheckout(const QString &workingDirectory, const QString &ref);
-    bool synchronousCheckout(const QString &workingDirectory, const QString &ref,
-                             QString *errorMessage = nullptr);
+    enum class StashMode { NoStash, TryStash };
+    void checkout(const QString &workingDirectory, const QString &ref,
+                  StashMode stashMode = StashMode::TryStash);
 
     QStringList setupCheckoutArguments(const QString &workingDirectory, const QString &ref);
     void updateSubmodulesIfNeeded(const QString &workingDirectory, bool prompt);
@@ -235,7 +234,7 @@ public:
     QString synchronousTopic(const QString &workingDirectory) const;
     bool synchronousRevParseCmd(const QString &workingDirectory, const QString &ref,
                                 QString *output, QString *errorMessage = nullptr) const;
-    QString synchronousTopRevision(const QString &workingDirectory);
+    QString synchronousTopRevision(const QString &workingDirectory, QDateTime *dateTime = nullptr);
     void synchronousTagsForCommit(const QString &workingDirectory, const QString &revision,
                                   QString &precedes, QString &follows) const;
     bool isRemoteCommit(const QString &workingDirectory, const QString &commit);
@@ -264,6 +263,7 @@ public:
     // git svn support (asynchronous).
     void synchronousSubversionFetch(const QString &workingDirectory);
     void subversionLog(const QString &workingDirectory);
+    void subversionDeltaCommit(const QString &workingDirectory);
 
     void stashPop(const QString &workingDirectory, const QString &stash = QString());
     void revert(const QStringList &files, bool revertStaging);

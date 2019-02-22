@@ -90,12 +90,11 @@ void CodeGenSettingsPageWidget::setUiEmbedding(int v)
 
 // ---------- CodeGenSettingsPage
 CodeGenSettingsPage::CodeGenSettingsPage(QObject *parent) :
-    Core::IOptionsPage(parent),
-    m_widget(0)
+    Core::IOptionsPage(parent)
 {
     m_parameters.fromSettings(Core::ICore::settings());
     setId(Constants::CODEGEN_SETTINGS_PAGE_ID);
-    setDisplayName(QCoreApplication::translate("QtSupport", Constants::CODEGEN_SETTINGS_PAGE_NAME));
+    setDisplayName(QCoreApplication::translate("QtSupport", "Qt Class Generation"));
     setCategory(CppTools::Constants::CPP_SETTINGS_CATEGORY);
 }
 

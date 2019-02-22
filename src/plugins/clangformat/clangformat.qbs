@@ -1,5 +1,4 @@
 import qbs
-import qbs.FileInfo
 
 QtcPlugin {
     name: "ClangFormat"
@@ -8,7 +7,6 @@ QtcPlugin {
     Depends { name: "TextEditor" }
     Depends { name: "CppTools" }
     Depends { name: "ProjectExplorer" }
-    Depends { name: "ExtensionSystem" }
     Depends { name: "Utils" }
 
     Depends { name: "libclang"; required: false }
@@ -19,6 +17,12 @@ QtcPlugin {
     condition: libclang.present
                && (!qbs.targetOS.contains("windows") || libclang.llvmBuildModeMatches)
 
+    cpp.cxxFlags: {
+        var res = base.concat(libclang.llvmToolingCxxFlags);
+        if (qbs.toolchain.contains("gcc"))
+            res.push("-Wno-comment"); // clang/Format/Format.h has intentional multiline comments
+        return res;
+    }
     cpp.defines: base.concat("CLANGPCHMANAGER_LIB")
     cpp.includePaths: base.concat(libclang.llvmIncludeDir)
     cpp.libraryPaths: base.concat(libclang.llvmLibDir)
@@ -26,13 +30,19 @@ QtcPlugin {
     cpp.rpaths: base.concat(libclang.llvmLibDir)
 
     files: [
+        "clangformatbaseindenter.h",
+        "clangformatbaseindenter.cpp",
         "clangformatconfigwidget.cpp",
         "clangformatconfigwidget.h",
         "clangformatconfigwidget.ui",
+        "clangformatconstants.h",
         "clangformatindenter.cpp",
         "clangformatindenter.h",
         "clangformatplugin.cpp",
         "clangformatplugin.h",
-        "clangformatconstants.h",
+        "clangformatsettings.cpp",
+        "clangformatsettings.h",
+        "clangformatutils.h",
+        "clangformatutils.cpp",
     ]
 }

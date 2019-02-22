@@ -111,28 +111,36 @@ defineReplace(splitFlags) {
     return($$result)
 }
 
+defineReplace(extractWarnings) {
+    flags = $$1
+    result =
+    for (flag, flags) {
+        contains(flag, ^[-/][wW].*$) {
+            result += $$flag
+        }
+    }
+    return($$result)
+}
+
 CLANGTOOLING_LIBS=-lclangTooling -lclangIndex -lclangFrontend -lclangParse -lclangSerialization \
                   -lclangSema -lclangEdit -lclangAnalysis -lclangDriver -lclangDynamicASTMatchers \
                   -lclangASTMatchers -lclangToolingCore -lclangAST -lclangLex -lclangBasic
 win32:CLANGTOOLING_LIBS += -lversion
-
-CLANGFORMAT_LIBS=-lclangFormat -lclangToolingCore -lclangRewrite -lclangLex -lclangBasic
-win32:CLANGFORMAT_LIBS += -lversion
 
 BIN_EXTENSION =
 win32: BIN_EXTENSION = .exe
 
 isEmpty(LLVM_INSTALL_DIR) {
     unix {
-      llvm_config = $$system(which llvm-config-6.0)
+      llvm_config = $$system(which llvm-config-7)
     }
 
     isEmpty(llvm_config) {
         llvm_config = llvm-config
     }
 } else {
-    exists($$LLVM_INSTALL_DIR/bin/llvm-config-6.0$$BIN_EXTENSION) {
-      llvm_config = $$system_quote($$LLVM_INSTALL_DIR/bin/llvm-config-6.0)
+    exists($$LLVM_INSTALL_DIR/bin/llvm-config-7$$BIN_EXTENSION) {
+      llvm_config = $$system_quote($$LLVM_INSTALL_DIR/bin/llvm-config-7)
     } else {
       llvm_config = $$system_quote($$LLVM_INSTALL_DIR/bin/llvm-config)
       requires(exists($$llvm_config$$BIN_EXTENSION))
@@ -141,6 +149,26 @@ isEmpty(LLVM_INSTALL_DIR) {
 
 output = $$system($$llvm_config --version, lines)
 LLVM_VERSION = $$extractVersion($$output)
+
+!isEmpty(LLVM_VERSION) {
+    versionIsAtLeast($$LLVM_VERSION, 7, 0, 0): {
+        CLANGFORMAT_LIBS=-lclangFormat -lclangToolingInclusions -lclangToolingCore -lclangRewrite -lclangLex -lclangBasic
+        ALL_CLANG_LIBS=-lclangFormat -lclangToolingInclusions -lclangTooling -lclangToolingCore \
+                       -lclangRewrite -lclangIndex -lclangFrontend -lclangParse -lclangSerialization \
+                       -lclangSema -lclangEdit -lclangAnalysis -lclangDriver -lclangDynamicASTMatchers \
+                       -lclangASTMatchers -lclangAST -lclangLex -lclangBasic
+    } else:versionIsAtLeast($$LLVM_VERSION, 6, 0, 0): {
+        CLANGFORMAT_LIBS=-lclangFormat -lclangToolingCore -lclangRewrite -lclangLex -lclangBasic
+        ALL_CLANG_LIBS=-lclangFormat -lclangTooling -lclangToolingCore \
+                       -lclangRewrite -lclangIndex -lclangFrontend -lclangParse -lclangSerialization \
+                       -lclangSema -lclangEdit -lclangAnalysis -lclangDriver -lclangDynamicASTMatchers \
+                       -lclangASTMatchers -lclangAST -lclangLex -lclangBasic
+    }
+
+    win32:CLANGFORMAT_LIBS += -lversion
+    win32:ALL_CLANG_LIBS += -lversion
+}
+
 isEmpty(LLVM_VERSION) {
     $$llvmWarningOrError(\
         "Cannot determine clang version. Set LLVM_INSTALL_DIR to build the Clang Code Model",\
@@ -158,6 +186,7 @@ isEmpty(LLVM_VERSION) {
         GCC_MAJOR_VERSION = $$section(GCC_VERSION, ., 0, 0)
         # GCC8 warns about memset/memcpy for types with copy ctor. Clang has some of these.
         greaterThan(GCC_MAJOR_VERSION, 7):QMAKE_CXXFLAGS += -Wno-class-memaccess
+        QMAKE_CXXFLAGS += -Wno-unused-parameter
     }
 
     LLVM_LIBDIR = $$quote($$system($$llvm_config --libdir, lines))
@@ -203,12 +232,13 @@ isEmpty(LLVM_VERSION) {
     }
 
     CLANGFORMAT_LIBS = -L$${LLVM_LIBDIR} $$CLANGFORMAT_LIBS $$LLVM_STATIC_LIBS
+    ALL_CLANG_LIBS = -L$${LLVM_LIBDIR} $$ALL_CLANG_LIBS $$CLANG_LIB $$LLVM_STATIC_LIBS
 
     contains(QMAKE_DEFAULT_INCDIRS, $$LLVM_INCLUDEPATH): LLVM_INCLUDEPATH =
 
     # Remove unwanted flags. It is a workaround for linking.
     # It is not intended for cross compiler linking.
-    LLVM_CXXFLAGS = $$system($$llvm_config --cxxflags, lines)
+    LLVM_CXXFLAGS *= $$system($$llvm_config --cxxflags, lines)
     LLVM_CXXFLAGS ~= s,-fno-exceptions,
     LLVM_CXXFLAGS ~= s,-std=c++11,
     LLVM_CXXFLAGS ~= s,-std=c++0x,
@@ -218,8 +248,13 @@ isEmpty(LLVM_VERSION) {
     LLVM_CXXFLAGS ~= s,/EH\S*,
     LLVM_CXXFLAGS ~= s,/M\S*,
     LLVM_CXXFLAGS ~= s,/G\S*,
-    LLVM_CXXFLAGS ~= s,-Werror=date-time,
+    LLVM_CXXFLAGS ~= s,-Werror=\S*,
     LLVM_CXXFLAGS ~= s,-Wcovered-switch-default,
+    LLVM_CXXFLAGS ~= s,-Wnon-virtual-dtor,
+    LLVM_CXXFLAGS ~= s,-Woverloaded-virtual,
+    LLVM_CXXFLAGS ~= s,-Wmissing-field-initializers,
+    LLVM_CXXFLAGS ~= s,-Wno-unknown-warning,
+    LLVM_CXXFLAGS ~= s,-Wno-unused-command-line-argument,
     LLVM_CXXFLAGS ~= s,-fPIC,
     LLVM_CXXFLAGS ~= s,-pedantic,
     LLVM_CXXFLAGS ~= s,-Wstring-conversion,
@@ -227,6 +262,9 @@ isEmpty(LLVM_VERSION) {
     LLVM_CXXFLAGS ~= s,-gsplit-dwarf,
 
     LLVM_CXXFLAGS = $$splitFlags($$LLVM_CXXFLAGS)
+
+    LLVM_CXXFLAGS_WARNINGS = $$extractWarnings($$LLVM_CXXFLAGS)
+    LLVM_CXXFLAGS -= $$LLVM_CXXFLAGS_WARNINGS
 
     LLVM_IS_COMPILED_WITH_RTTI = $$system($$llvm_config --has-rtti, lines)
 

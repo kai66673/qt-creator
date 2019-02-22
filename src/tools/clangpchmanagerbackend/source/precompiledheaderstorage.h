@@ -47,51 +47,114 @@ public:
         m_transaction.commit();
     }
 
-    void insertPrecompiledHeader(Utils::SmallStringView projectPartName,
-                                 Utils::SmallStringView pchPath,
-                                 long long pchBuildTime) override
+    void insertProjectPrecompiledHeader(Utils::SmallStringView projectPartName,
+                                        Utils::SmallStringView pchPath,
+                                        long long pchBuildTime) override
     {
         try {
             Sqlite::ImmediateTransaction transaction{m_database};
 
             m_insertProjectPartStatement.write(projectPartName);
-            m_insertPrecompiledHeaderStatement .write(projectPartName, pchPath, pchBuildTime);
+            m_insertProjectPrecompiledHeaderStatement.write(projectPartName, pchPath, pchBuildTime);
 
             transaction.commit();
         } catch (const Sqlite::StatementIsBusy) {
-            insertPrecompiledHeader(projectPartName, pchPath, pchBuildTime);
+            insertProjectPrecompiledHeader(projectPartName, pchPath, pchBuildTime);
         }
     }
 
-    void deletePrecompiledHeader(Utils::SmallStringView projectPartName) override
+    void deleteProjectPrecompiledHeader(Utils::SmallStringView projectPartName) override
     {
         try {
             Sqlite::ImmediateTransaction transaction{m_database};
 
-            m_deletePrecompiledHeaderStatement.write(projectPartName);
+            m_deleteProjectPrecompiledHeaderStatement.write(projectPartName);
 
             transaction.commit();
         } catch (const Sqlite::StatementIsBusy) {
-            deletePrecompiledHeader(projectPartName);
+            deleteProjectPrecompiledHeader(projectPartName);
         }
     }
 
+    void insertSystemPrecompiledHeaders(const Utils::SmallStringVector &projectPartNames,
+                                        Utils::SmallStringView pchPath,
+                                        long long pchBuildTime) override
+    {
+        try {
+            Sqlite::ImmediateTransaction transaction{m_database};
+
+            for (Utils::SmallStringView projectPartName : projectPartNames) {
+                m_insertProjectPartStatement.write(projectPartName);
+                m_insertSystemPrecompiledHeaderStatement.write(projectPartName, pchPath, pchBuildTime);
+            }
+            transaction.commit();
+        } catch (const Sqlite::StatementIsBusy) {
+            insertSystemPrecompiledHeaders(projectPartNames, pchPath, pchBuildTime);
+        }
+    }
+
+    void deleteSystemPrecompiledHeaders(const Utils::SmallStringVector &projectPartNames) override
+    {
+        try {
+            Sqlite::ImmediateTransaction transaction{m_database};
+
+            for (Utils::SmallStringView projectPartName : projectPartNames)
+                m_deleteSystemPrecompiledHeaderStatement.write(projectPartName);
+
+            transaction.commit();
+        } catch (const Sqlite::StatementIsBusy) {
+            deleteSystemPrecompiledHeaders(projectPartNames);
+        }
+    }
+
+    FilePath fetchSystemPrecompiledHeaderPath(Utils::SmallStringView projectPartName) override
+    {
+        try {
+            Sqlite::DeferredTransaction transaction{m_database};
+
+            auto value = m_fetchSystemPrecompiledHeaderPathStatement.template value<FilePath>(
+                projectPartName);
+
+            if (value)
+                return value.value();
+
+            transaction.commit();
+        } catch (const Sqlite::StatementIsBusy) {
+            return fetchSystemPrecompiledHeaderPath(projectPartName);
+        }
+
+        return FilePath("");
+    }
 
 public:
     Sqlite::ImmediateNonThrowingDestructorTransaction m_transaction;
     Database &m_database;
-    WriteStatement m_insertPrecompiledHeaderStatement {
-        "INSERT OR REPLACE INTO precompiledHeaders(projectPartId, pchPath, pchBuildTime) VALUES((SELECT projectPartId FROM projectParts WHERE projectPartName = ?),?,?)",
-        m_database
-    };
+    WriteStatement m_insertProjectPrecompiledHeaderStatement{
+        "INSERT INTO precompiledHeaders(projectPartId, projectPchPath, projectPchBuildTime) "
+        "VALUES((SELECT projectPartId FROM projectParts WHERE projectPartName = ?001),?002,?003) "
+        "ON CONFLICT (projectPartId) DO UPDATE SET projectPchPath=?002,projectPchBuildTime=?003",
+        m_database};
+    WriteStatement m_insertSystemPrecompiledHeaderStatement{
+        "INSERT INTO precompiledHeaders(projectPartId, systemPchPath, systemPchBuildTime) "
+        "VALUES((SELECT projectPartId FROM projectParts WHERE projectPartName = ?001),?002,?003) "
+        "ON CONFLICT (projectPartId) DO UPDATE SET systemPchPath=?002,systemPchBuildTime=?003",
+        m_database};
     WriteStatement m_insertProjectPartStatement{
-        "INSERT OR IGNORE INTO projectParts(projectPartName) VALUES (?)",
-        m_database
-    };
-    WriteStatement m_deletePrecompiledHeaderStatement{
-        "DELETE FROM precompiledHeaders WHERE projectPartId = (SELECT projectPartId FROM projectParts WHERE projectPartName = ?)",
-        m_database
-    };
+        "INSERT OR IGNORE INTO projectParts(projectPartName) VALUES (?)", m_database};
+    WriteStatement m_deleteProjectPrecompiledHeaderStatement{
+        "UPDATE OR IGNORE precompiledHeaders SET projectPchPath=NULL,projectPchBuildTime=NULL "
+        "WHERE projectPartId = (SELECT projectPartId FROM "
+        "projectParts WHERE projectPartName = ?)",
+        m_database};
+    WriteStatement m_deleteSystemPrecompiledHeaderStatement{
+        "UPDATE OR IGNORE precompiledHeaders SET systemPchPath=NULL,systemPchBuildTime=NULL "
+        "WHERE projectPartId = (SELECT projectPartId FROM "
+        "projectParts WHERE projectPartName = ?)",
+        m_database};
+    ReadStatement m_fetchSystemPrecompiledHeaderPathStatement{
+        "SELECT systemPchPath FROM precompiledHeaders WHERE projectPartId = (SELECT projectPartId "
+        "FROM projectParts WHERE projectPartName = ?)",
+        m_database};
 };
 
 }

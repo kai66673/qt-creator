@@ -29,6 +29,7 @@
 #include "qnxqtversion.h"
 
 #include <qtsupport/baseqtversion.h>
+#include <qtsupport/qtversionfactory.h>
 
 #include <utils/environment.h>
 
@@ -39,12 +40,6 @@ class QnxQtVersion : public QtSupport::BaseQtVersion
 {
 public:
     QnxQtVersion();
-    QnxQtVersion(const Utils::FileName &path,
-                 bool isAutoDetected = false,
-                 const QString &autoDetectionSource = QString());
-    QnxQtVersion *clone() const override;
-
-    QString type() const override;
 
     QString description() const override;
 
@@ -85,6 +80,12 @@ private:
     mutable QString m_cpuDir;
     mutable bool m_environmentUpToDate = false;
     mutable QList<Utils::EnvironmentItem> m_qnxEnv;
+};
+
+class QnxQtVersionFactory : public QtSupport::QtVersionFactory
+{
+public:
+    QnxQtVersionFactory();
 };
 
 } // namespace Internal

@@ -37,30 +37,26 @@
 
 namespace ProjectExplorer {
 
-class KitConfigWidget;
+class KitAspectWidget;
 
 // --------------------------------------------------------------------------
 // SysRootInformation:
 // --------------------------------------------------------------------------
 
-class PROJECTEXPLORER_EXPORT SysRootKitInformation : public KitInformation
+class PROJECTEXPLORER_EXPORT SysRootKitAspect : public KitAspect
 {
     Q_OBJECT
 
 public:
-    SysRootKitInformation();
+    SysRootKitAspect();
 
     QVariant defaultValue(const Kit *k) const override;
-
     QList<Task> validate(const Kit *k) const override;
-
-    KitConfigWidget *createConfigWidget(Kit *k) const override;
-
+    KitAspectWidget *createConfigWidget(Kit *k) const override;
     ItemList toUserOutput(const Kit *k) const override;
     void addToMacroExpander(Kit *kit, Utils::MacroExpander *expander) const override;
 
     static Core::Id id();
-    static bool hasSysRoot(const Kit *k);
     static Utils::FileName sysRoot(const Kit *k);
     static void setSysRoot(Kit *k, const Utils::FileName &v);
 };
@@ -69,21 +65,20 @@ public:
 // ToolChainInformation:
 // --------------------------------------------------------------------------
 
-class PROJECTEXPLORER_EXPORT ToolChainKitInformation : public KitInformation
+class PROJECTEXPLORER_EXPORT ToolChainKitAspect : public KitAspect
 {
     Q_OBJECT
 
 public:
-    ToolChainKitInformation();
+    ToolChainKitAspect();
 
     QVariant defaultValue(const Kit *k) const override;
-
     QList<Task> validate(const Kit *k) const override;
     void upgrade(Kit *k) override;
     void fix(Kit *k) override;
     void setup(Kit *k) override;
 
-    KitConfigWidget *createConfigWidget(Kit *k) const override;
+    KitAspectWidget *createConfigWidget(Kit *k) const override;
 
     QString displayNamePostfix(const Kit *k) const override;
 
@@ -115,26 +110,21 @@ private:
 // DeviceTypeInformation:
 // --------------------------------------------------------------------------
 
-class PROJECTEXPLORER_EXPORT DeviceTypeKitInformation : public KitInformation
+class PROJECTEXPLORER_EXPORT DeviceTypeKitAspect : public KitAspect
 {
     Q_OBJECT
 
 public:
-    DeviceTypeKitInformation();
+    DeviceTypeKitAspect();
 
     QVariant defaultValue(const Kit *k) const override;
-
     QList<Task> validate(const Kit *k) const override;
-
-    KitConfigWidget *createConfigWidget(Kit *k) const override;
-
+    KitAspectWidget *createConfigWidget(Kit *k) const override;
     ItemList toUserOutput(const Kit *k) const override;
 
     static const Core::Id id();
     static const Core::Id deviceTypeId(const Kit *k);
     static void setDeviceTypeId(Kit *k, Core::Id type);
-
-    static Kit::Predicate deviceTypePredicate(Core::Id type);
 
     QSet<Core::Id> supportedPlatforms(const Kit *k) const override;
     QSet<Core::Id> availableFeatures(const Kit *k) const override;
@@ -144,20 +134,19 @@ public:
 // DeviceInformation:
 // --------------------------------------------------------------------------
 
-class PROJECTEXPLORER_EXPORT DeviceKitInformation : public KitInformation
+class PROJECTEXPLORER_EXPORT DeviceKitAspect : public KitAspect
 {
     Q_OBJECT
 
 public:
-    DeviceKitInformation();
+    DeviceKitAspect();
 
     QVariant defaultValue(const Kit *k) const override;
-
     QList<Task> validate(const Kit *k) const override;
     void fix(Kit *k) override;
     void setup(Kit *k) override;
 
-    KitConfigWidget *createConfigWidget(Kit *k) const override;
+    KitAspectWidget *createConfigWidget(Kit *k) const override;
 
     QString displayNamePostfix(const Kit *k) const override;
 
@@ -179,23 +168,22 @@ private:
 };
 
 // --------------------------------------------------------------------------
-// EnvironmentKitInformation:
+// EnvironmentKitAspect:
 // --------------------------------------------------------------------------
 
-class PROJECTEXPLORER_EXPORT EnvironmentKitInformation : public KitInformation
+class PROJECTEXPLORER_EXPORT EnvironmentKitAspect : public KitAspect
 {
     Q_OBJECT
 
 public:
-    EnvironmentKitInformation();
+    EnvironmentKitAspect();
 
     QVariant defaultValue(const Kit *k) const override;
-
     QList<Task> validate(const Kit *k) const override;
     void fix(Kit *k) override;
 
     void addToEnvironment(const Kit *k, Utils::Environment &env) const override;
-    KitConfigWidget *createConfigWidget(Kit *k) const override;
+    KitAspectWidget *createConfigWidget(Kit *k) const override;
 
     ItemList toUserOutput(const Kit *k) const override;
 

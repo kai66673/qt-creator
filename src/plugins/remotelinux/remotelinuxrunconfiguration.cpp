@@ -26,6 +26,7 @@
 #include "remotelinuxrunconfiguration.h"
 
 #include "remotelinux_constants.h"
+#include "remotelinuxx11forwardingaspect.h"
 #include "remotelinuxenvironmentaspect.h"
 
 #include <projectexplorer/buildtargetinfo.h>
@@ -36,6 +37,8 @@
 #include <projectexplorer/target.h>
 
 #include <qtsupport/qtoutputformatter.h>
+
+#include <utils/hostosinfo.h>
 
 using namespace ProjectExplorer;
 using namespace Utils;
@@ -59,7 +62,11 @@ RemoteLinuxRunConfiguration::RemoteLinuxRunConfiguration(Target *target, Core::I
 
     addAspect<ArgumentsAspect>();
     addAspect<WorkingDirectoryAspect>();
+    if (HostOsInfo::isAnyUnixHost())
+        addAspect<TerminalAspect>();
     addAspect<RemoteLinuxEnvironmentAspect>(target);
+    if (id == IdPrefix && Utils::HostOsInfo::isAnyUnixHost())
+        addAspect<X11ForwardingAspect>();
 
     setOutputFormatter<QtSupport::QtOutputFormatter>();
 
@@ -73,14 +80,13 @@ RemoteLinuxRunConfiguration::RemoteLinuxRunConfiguration(Target *target, Core::I
             this, &RemoteLinuxRunConfiguration::updateTargetInformation);
 }
 
-void RemoteLinuxRunConfiguration::doAdditionalSetup(const RunConfigurationCreationInfo &)
+Runnable RemoteLinuxRunConfiguration::runnable() const
 {
-    setDefaultDisplayName(defaultDisplayName());
-}
-
-QString RemoteLinuxRunConfiguration::defaultDisplayName() const
-{
-    return RunConfigurationFactory::decoratedTargetName(buildKey(), target());
+    Runnable r = RunConfiguration::runnable();
+    const auto * const forwardingAspect = aspect<X11ForwardingAspect>();
+    if (forwardingAspect)
+        r.extraData.insert("Ssh.X11ForwardToDisplay", forwardingAspect->display(macroExpander()));
+    return r;
 }
 
 void RemoteLinuxRunConfiguration::updateTargetInformation()
@@ -89,8 +95,8 @@ void RemoteLinuxRunConfiguration::updateTargetInformation()
     QString localExecutable = bti.targetFilePath.toString();
     DeployableFile depFile = target()->deploymentData().deployableForLocalFile(localExecutable);
 
-    extraAspect<ExecutableAspect>()->setExecutable(FileName::fromString(depFile.remoteFilePath()));
-    extraAspect<SymbolFileAspect>()->setValue(localExecutable);
+    aspect<ExecutableAspect>()->setExecutable(FileName::fromString(depFile.remoteFilePath()));
+    aspect<SymbolFileAspect>()->setValue(localExecutable);
 
     emit enabledChanged();
 }
@@ -103,6 +109,7 @@ const char *RemoteLinuxRunConfiguration::IdPrefix = "RemoteLinuxRunConfiguration
 RemoteLinuxRunConfigurationFactory::RemoteLinuxRunConfigurationFactory()
 {
     registerRunConfiguration<RemoteLinuxRunConfiguration>(RemoteLinuxRunConfiguration::IdPrefix);
+    setDecorateDisplayNames(true);
     addSupportedTargetDeviceType(RemoteLinux::Constants::GenericLinuxOsType);
 }
 

@@ -56,7 +56,7 @@ ConsoleItemDelegate::ConsoleItemDelegate(ConsoleItemModel *model, QObject *paren
     m_errorIcon(Utils::Icons::CRITICAL.icon()),
     m_expandIcon(Utils::Icons::EXPAND.icon()),
     m_collapseIcon(Utils::Icons::COLLAPSE.icon()),
-    m_prompt(Utils::Icon({{QLatin1String(":/utils/images/next.png"),
+    m_prompt(Utils::Icon({{":/utils/images/next.png",
                           Utils::Theme::TextColorNormal}}, Utils::Icon::Tint).icon())
 {
 }
@@ -183,10 +183,10 @@ void ConsoleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
         if (!file.isEmpty()) {
             QFontMetrics fm(option.font);
             // Paint FileArea
-            const int pos = file.lastIndexOf(QLatin1Char('/'));
+            const int pos = file.lastIndexOf('/');
             if (pos != -1)
                 file = file.mid(pos +1);
-            const int realFileWidth = fm.width(file);
+            const int realFileWidth = fm.horizontalAdvance(file);
             painter->setClipRect(positions.fileArea());
             painter->drawText(positions.fileAreaLeft(), positions.adjustedTop() + fm.ascent(),
                               file);
@@ -203,7 +203,7 @@ void ConsoleItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
             // Paint LineArea
             QString lineText  = index.data(ConsoleItem::LineRole).toString();
             painter->setClipRect(positions.lineArea());
-            const int realLineWidth = fm.width(lineText);
+            const int realLineWidth = fm.horizontalAdvance(lineText);
             painter->drawText(positions.lineAreaRight() - realLineWidth,
                               positions.adjustedTop() + fm.ascent(), lineText);
         }
@@ -269,11 +269,11 @@ QWidget *ConsoleItemDelegate::createEditor(QWidget *parent,
 {
     auto editor = new ConsoleEdit(index, parent);
     // Make the background transparent so that the prompt shines through
-    editor->setStyleSheet(QLatin1String("QTextEdit {"
-                                        "margin-left: 24px;"
-                                        "margin-top: 4px;"
-                                        "background-color: transparent;"
-                                        "}"));
+    editor->setStyleSheet("QTextEdit {"
+                          "margin-left: 24px;"
+                          "margin-top: 4px;"
+                          "background-color: transparent;"
+                          "}");
     connect(editor, &ConsoleEdit::editingFinished, this, [this, editor] {
         auto delegate = const_cast<ConsoleItemDelegate*>(this);
         emit delegate->commitData(editor);

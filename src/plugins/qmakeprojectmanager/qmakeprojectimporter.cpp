@@ -32,10 +32,12 @@
 #include "makefileparse.h"
 #include "qmakestep.h"
 
+#include <projectexplorer/buildinfo.h>
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/toolchain.h>
 #include <projectexplorer/toolchainmanager.h>
+
 #include <qtsupport/qtkitinformation.h>
 #include <qtsupport/qtsupportconstants.h>
 #include <qtsupport/qtversionfactory.h>
@@ -201,9 +203,9 @@ bool QmakeProjectImporter::matchKit(void *directoryData, const Kit *k) const
     auto *data = static_cast<DirectoryData *>(directoryData);
     const QLoggingCategory &logs = MakeFileParse::logging();
 
-    BaseQtVersion *kitVersion = QtKitInformation::qtVersion(k);
-    FileName kitSpec = QmakeKitInformation::mkspec(k);
-    ToolChain *tc = ToolChainKitInformation::toolChain(k, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
+    BaseQtVersion *kitVersion = QtKitAspect::qtVersion(k);
+    FileName kitSpec = QmakeKitAspect::mkspec(k);
+    ToolChain *tc = ToolChainKitAspect::toolChain(k, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
     if (kitSpec.isEmpty() && kitVersion)
         kitSpec = kitVersion->mkspecFor(tc);
     QMakeStepConfig::TargetArchConfig kitTargetArch = QMakeStepConfig::NoArch;
@@ -229,41 +231,33 @@ Kit *QmakeProjectImporter::createKit(void *directoryData) const
     return createTemporaryKit(data->qtVersionData, data->parsedSpec, data->archConfig, data->osType);
 }
 
-QList<BuildInfo *> QmakeProjectImporter::buildInfoListForKit(const Kit *k, void *directoryData) const
+const QList<BuildInfo> QmakeProjectImporter::buildInfoListForKit(const Kit *k, void *directoryData) const
 {
-    QList<BuildInfo *> result;
     auto *data = static_cast<DirectoryData *>(directoryData);
     auto factory = qobject_cast<QmakeBuildConfigurationFactory *>(
-                IBuildConfigurationFactory::find(k, projectFilePath().toString()));
+                BuildConfigurationFactory::find(k, projectFilePath().toString()));
     if (!factory)
-        return result;
+        return {};
 
     // create info:
-    std::unique_ptr<QmakeBuildInfo> info(new QmakeBuildInfo(factory));
+    BuildInfo info(factory);
     if (data->buildConfig & BaseQtVersion::DebugBuild) {
-        info->buildType = BuildConfiguration::Debug;
-        info->displayName = QCoreApplication::translate("QmakeProjectManager::Internal::QmakeProjectImporter", "Debug");
+        info.buildType = BuildConfiguration::Debug;
+        info.displayName = QCoreApplication::translate("QmakeProjectManager::Internal::QmakeProjectImporter", "Debug");
     } else {
-        info->buildType = BuildConfiguration::Release;
-        info->displayName = QCoreApplication::translate("QmakeProjectManager::Internal::QmakeProjectImporter", "Release");
+        info.buildType = BuildConfiguration::Release;
+        info.displayName = QCoreApplication::translate("QmakeProjectManager::Internal::QmakeProjectImporter", "Release");
     }
-    info->kitId = k->id();
-    info->buildDirectory = data->buildDirectory;
-    info->additionalArguments = data->additionalArguments;
-    info->config = data->config;
-    info->makefile = data->makefile;
+    info.kitId = k->id();
+    info.buildDirectory = data->buildDirectory;
 
-    bool found = false;
-    foreach (BuildInfo *bInfo, result) {
-        if (*static_cast<QmakeBuildInfo *>(bInfo) == *info) {
-            found = true;
-            break;
-        }
-    }
-    if (!found)
-        result << info.release();
+    QmakeExtraBuildInfo extra;
+    extra.additionalArguments = data->additionalArguments;
+    extra.config = data->config;
+    extra.makefile = data->makefile;
+    info.extraInfo = QVariant::fromValue(extra);
 
-    return result;
+    return {info};
 }
 
 void QmakeProjectImporter::deleteDirectoryData(void *directoryData) const
@@ -294,9 +288,9 @@ Kit *QmakeProjectImporter::createTemporaryKit(const QtProjectImporter::QtVersion
     Q_UNUSED(osType); // TODO use this to select the right toolchain?
     return QtProjectImporter::createTemporaryKit(data,
                                                  [&data, parsedSpec, archConfig](Kit *k) -> void {
-        ToolChainKitInformation::setToolChain(k, preferredToolChain(data.qt, parsedSpec, archConfig));
+        ToolChainKitAspect::setToolChain(k, preferredToolChain(data.qt, parsedSpec, archConfig));
         if (parsedSpec != data.qt->mkspec())
-            QmakeKitInformation::setMkspec(k, parsedSpec);
+            QmakeKitAspect::setMkspec(k, parsedSpec);
     });
 }
 

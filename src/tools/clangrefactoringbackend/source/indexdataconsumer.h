@@ -55,8 +55,7 @@ public:
     bool handleDeclOccurence(const clang::Decl *declaration,
                              clang::index::SymbolRoleSet symbolRoles,
                              llvm::ArrayRef<clang::index::SymbolRelation> symbolRelations,
-                             clang::FileID fileId,
-                             unsigned offset,
+                             clang::SourceLocation sourceLocation,
                              ASTNodeInfo astNodeInfo) override;
 
 private:

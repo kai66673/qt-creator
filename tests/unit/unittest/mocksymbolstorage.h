@@ -37,26 +37,22 @@ public:
    MOCK_METHOD2(addSymbolsAndSourceLocations,
                 void(const ClangBackEnd::SymbolEntries &symbolEentries,
                      const ClangBackEnd::SourceLocationEntries &sourceLocations));
-   MOCK_METHOD4(insertOrUpdateProjectPart,
+   MOCK_METHOD8(insertOrUpdateProjectPart,
                 int(Utils::SmallStringView projectPartName,
                     const Utils::SmallStringVector &commandLineArgument,
                     const ClangBackEnd::CompilerMacros &compilerMacros,
-                    const Utils::SmallStringVector &includeSearchPaths));
+                    const ClangBackEnd::IncludeSearchPaths &systemIncludeSearchPaths,
+                    const ClangBackEnd::IncludeSearchPaths &projectIncludeSearchPaths,
+                    Utils::Language language,
+                    Utils::LanguageVersion languageVersion,
+                    Utils::LanguageExtension languageExtension));
    MOCK_METHOD2(updateProjectPartSources,
                 void(int projectPartId,
                      const ClangBackEnd::FilePathIds &sourceFilePathIds));
-   MOCK_METHOD1(insertOrUpdateUsedMacros,
-                void (const ClangBackEnd::UsedMacros &usedMacros));
-   MOCK_METHOD1(insertFileStatuses,
-                void (const ClangBackEnd::FileStatuses &fileStatuses));
-   MOCK_METHOD1(insertOrUpdateSourceDependencies,
-                void (const ClangBackEnd::SourceDependencies &sourceDependencies));
    MOCK_CONST_METHOD1(fetchProjectPartArtefact,
                       Utils::optional<ClangBackEnd::ProjectPartArtefact> (ClangBackEnd::FilePathId sourceId));
    MOCK_CONST_METHOD1(fetchProjectPartArtefact,
                       Utils::optional<ClangBackEnd::ProjectPartArtefact> (Utils::SmallStringView projectPartName));
-   MOCK_CONST_METHOD1(fetchLowestLastModifiedTime,
-                      long long (ClangBackEnd::FilePathId sourceId));
    MOCK_CONST_METHOD1(fetchPrecompiledHeader,
                       Utils::optional<ClangBackEnd::ProjectPartPch> (int projectPartId));
 };

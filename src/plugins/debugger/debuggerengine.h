@@ -56,6 +56,36 @@ namespace Debugger {
 
 class DebuggerRunTool;
 
+enum DebuggerState
+{
+    DebuggerNotReady,          // Debugger not started
+
+    EngineSetupRequested,      // Engine starts
+    EngineSetupFailed,
+    EngineSetupOk,
+
+    EngineRunRequested,
+    EngineRunFailed,
+
+    InferiorUnrunnable,        // Used in the core dump adapter
+
+    InferiorRunRequested,      // Debuggee requested to run
+    InferiorRunOk,             // Debuggee running
+    InferiorRunFailed,         // Debuggee not running
+
+    InferiorStopRequested,     // Debuggee running, stop requested
+    InferiorStopOk,            // Debuggee stopped
+    InferiorStopFailed,        // Debuggee not stopped, will kill debugger
+
+    InferiorShutdownRequested,
+    InferiorShutdownFinished,
+
+    EngineShutdownRequested,
+    EngineShutdownFinished,
+
+    DebuggerFinished
+};
+
 DEBUGGER_EXPORT QDebug operator<<(QDebug str, DebuggerState state);
 
 namespace Internal {
@@ -264,7 +294,7 @@ public:
     void updateWatchData(const QString &iname); // FIXME: Merge with above.
     virtual void selectWatchData(const QString &iname);
 
-    virtual void validateExecutable() {}
+    virtual void validateRunParameters(DebuggerRunParameters &) {}
     virtual void prepareForRestart() {}
     virtual void abortDebuggerProcess() {} // second attempt
 
@@ -304,6 +334,7 @@ public:
     virtual void updateAll();
     virtual void updateLocals();
 
+    Core::Context debuggerContext() const;
     virtual Core::Context languageContext() const { return {}; }
     QString displayName() const;
 
@@ -338,6 +369,9 @@ public:
     bool debuggerActionsEnabled() const;
     virtual bool companionPreventsActions() const;
 
+    bool operatesByInstruction() const;
+    virtual void operateByInstructionTriggered(bool on); // FIXME: Remove.
+
     DebuggerState state() const;
     bool isDying() const;
 
@@ -352,8 +386,6 @@ public:
     void handleRecordReverse(bool);
     void handleReverseDirection(bool);
 
-    void handleCommand(int role, const QVariant &value);
-
     // Convenience
     Q_SLOT virtual void showMessage(const QString &msg, int channel = LogDebug,
         int timeout = -1) const;
@@ -364,6 +396,7 @@ public:
     void gotoCurrentLocation();
     virtual void quitDebugger(); // called when pressing the stop button
     void abortDebugger();
+    void updateUi(bool isCurrentEngine);
 
     bool isPrimaryEngine() const;
 
@@ -431,8 +464,8 @@ public:
     void handleUserStop();
     void handleAbort();
     void handleReset();
-    void handleExecStep();
-    void handleExecNext();
+    void handleExecStepIn();
+    void handleExecStepOver();
     void handleExecStepOut();
     void handleExecReturn();
     void handleExecJumpToLine();
@@ -441,7 +474,6 @@ public:
     void handleAddToWatchWindow();
     void handleFrameDown();
     void handleFrameUp();
-    void handleOperateByInstructionTriggered(bool operateByInstructionTriggered);
 
     // Breakpoint state transitions
     void notifyBreakpointInsertProceeding(const Breakpoint &bp);
@@ -477,11 +509,9 @@ protected:
     virtual void resetInferior() {}
 
     virtual void detachDebugger() {}
-    virtual void executeStep() {}
+    virtual void executeStepOver(bool /*byInstruction*/ = false) {}
+    virtual void executeStepIn(bool /*byInstruction*/ = false) {}
     virtual void executeStepOut() {}
-    virtual void executeNext() {}
-    virtual void executeStepI() {}
-    virtual void executeNextI() {}
     virtual void executeReturn() {}
 
     virtual void continueInferior() {}
@@ -515,7 +545,6 @@ protected:
     void startDying() const;
 
 protected:
-    DebuggerRunParameters &mutableRunParameters() const;
     ProjectExplorer::IDevice::ConstPtr device() const;
     DebuggerEngine *companionEngine() const;
 
@@ -532,7 +561,7 @@ public:
     CppDebuggerEngine() {}
     ~CppDebuggerEngine() override {}
 
-    void validateExecutable() override;
+    void validateRunParameters(DebuggerRunParameters &rp) override;
     Core::Context languageContext() const override;
 };
 

@@ -27,7 +27,7 @@
 #include "gtestresult.h"
 #include "../testtreemodel.h"
 #include "../testtreeitem.h"
-#include "utils/hostosinfo.h"
+#include <utils/hostosinfo.h>
 
 #include <QDir>
 #include <QFileInfo>
@@ -62,7 +62,7 @@ GTestOutputReader::GTestOutputReader(const QFutureInterface<TestResultPtr> &futu
     }
 }
 
-void GTestOutputReader::processOutput(const QByteArray &outputLine)
+void GTestOutputReader::processOutputLine(const QByteArray &outputLineWithNewLine)
 {
     static QRegExp newTestStarts("^\\[-{10}\\] \\d+ tests? from (.*)$");
     static QRegExp testEnds("^\\[-{10}\\] \\d+ tests? from (.*) \\((.*)\\)$");
@@ -74,7 +74,7 @@ void GTestOutputReader::processOutput(const QByteArray &outputLine)
     static QRegExp errorLocation("^(.*)\\((\\d+)\\): error:.*$");
     static QRegExp iterations("^Repeating all tests \\(iteration (\\d+)\\) \\. \\. \\.$");
 
-    const QString line = QString::fromLatin1(outputLine);
+    const QString line = QString::fromLatin1(chopLineBreak(outputLineWithNewLine));
     if (line.trimmed().isEmpty())
         return;
 

@@ -29,6 +29,7 @@
 
 #include <coreplugin/documentmanager.h>
 #include <coreplugin/vcsmanager.h>
+#include <utils/globalfilechangeblocker.h>
 #include <utils/synchronousprocess.h>
 
 #include <QProcessEnvironment>
@@ -42,7 +43,7 @@ VcsCommand::VcsCommand(const QString &workingDirectory,
     Core::ShellCommand(workingDirectory, environment),
     m_preventRepositoryChanged(false)
 {
-    setOutputProxyFactory([this]() -> OutputProxy * {
+    setOutputProxyFactory([this] {
         auto proxy = new OutputProxy;
         VcsOutputWindow *outputWindow = VcsOutputWindow::instance();
 
@@ -61,11 +62,11 @@ VcsCommand::VcsCommand(const QString &workingDirectory,
     });
     connect(this, &VcsCommand::started, this, [this] {
         if (flags() & ExpectRepoChanges)
-            Core::DocumentManager::setAutoReloadPostponed(true);
+            Utils::GlobalFileChangeBlocker::instance()->forceBlocked(true);
     });
     connect(this, &VcsCommand::finished, this, [this] {
         if (flags() & ExpectRepoChanges)
-            Core::DocumentManager::setAutoReloadPostponed(false);
+            Utils::GlobalFileChangeBlocker::instance()->forceBlocked(false);
     });
 }
 

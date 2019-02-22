@@ -98,7 +98,7 @@ QSize FancyTabBar::tabSizeHint(bool minimum) const
     const int width = 60 + spacing + 2;
     int maxLabelwidth = 0;
     for (auto tab : qAsConst(m_tabs)) {
-        const int width = fm.width(tab->text);
+        const int width = fm.horizontalAdvance(tab->text);
         if (width > maxLabelwidth)
             maxLabelwidth = width;
     }
@@ -288,6 +288,13 @@ static void paintIcon(QPainter *painter, const QRect &rect,
     if (!enabled && !creatorTheme()->flag(Theme::FlatToolBars))
         painter->setOpacity(0.7);
     StyleHelper::drawIconWithShadow(icon, iconRect, painter, iconMode);
+
+    if (selected && creatorTheme()->flag(Theme::FlatToolBars)) {
+        painter->setOpacity(1.0);
+        QRect accentRect = rect;
+        accentRect.setWidth(2);
+        painter->fillRect(accentRect, creatorTheme()->color(Theme::IconsBaseColor));
+    }
 }
 
 static void paintIconAndText(QPainter *painter, const QRect &rect,
@@ -315,6 +322,11 @@ static void paintIconAndText(QPainter *painter, const QRect &rect,
     }
 
     painter->setOpacity(1.0); //FIXME: was 0.7 before?
+    if (selected && creatorTheme()->flag(Theme::FlatToolBars)) {
+        QRect accentRect = rect;
+        accentRect.setWidth(2);
+        painter->fillRect(accentRect, creatorTheme()->color(Theme::IconsBaseColor));
+    }
     if (enabled) {
         painter->setPen(
             selected ? creatorTheme()->color(Theme::FancyTabWidgetEnabledSelectedTextColor)
@@ -349,7 +361,7 @@ void FancyTabBar::paintTab(QPainter *painter, int tabIndex) const
     if (selected) {
         if (creatorTheme()->flag(Theme::FlatToolBars)) {
             // background color of a fancy tab that is active
-            painter->fillRect(rect, creatorTheme()->color(Theme::FancyToolButtonSelectedColor));
+            painter->fillRect(rect, creatorTheme()->color(Theme::FancyTabBarSelectedBackgroundColor));
         } else {
             paintSelectedTabBackground(painter, rect);
         }
@@ -458,6 +470,7 @@ FancyTabWidget::FancyTabWidget(QWidget *parent)
     : QWidget(parent)
 {
     m_tabBar = new FancyTabBar(this);
+    m_tabBar->setObjectName("ModeSelector"); // used for UI introduction
 
     m_selectionWidget = new QWidget(this);
     auto selectionLayout = new QVBoxLayout;
@@ -473,7 +486,8 @@ FancyTabWidget::FancyTabWidget(QWidget *parent)
     layout->addWidget(fancyButton);
     selectionLayout->addWidget(bar);
 
-    selectionLayout->addWidget(m_tabBar, 1);
+    selectionLayout->addWidget(m_tabBar);
+    selectionLayout->addStretch(1);
     m_selectionWidget->setLayout(selectionLayout);
     m_selectionWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 
@@ -551,6 +565,7 @@ void FancyTabWidget::paintEvent(QPaintEvent *event)
         const QRectF boderRect = QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5);
 
         if (creatorTheme()->flag(Theme::FlatToolBars)) {
+            painter.fillRect(rect, StyleHelper::baseColor());
             painter.setPen(StyleHelper::toolBarBorderColor());
             painter.drawLine(boderRect.topRight(), boderRect.bottomRight());
         } else {

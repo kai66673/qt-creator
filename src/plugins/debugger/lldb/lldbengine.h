@@ -60,11 +60,9 @@ signals:
     void outputReady(const QString &data);
 
 private:
-    void executeStep() override;
+    void executeStepIn(bool byInstruction) override;
     void executeStepOut() override;
-    void executeNext() override;
-    void executeStepI() override;
-    void executeNextI() override;
+    void executeStepOver(bool byInstruction) override;
 
     void setupEngine() override;
     void runEngine() override;
@@ -91,6 +89,7 @@ private:
     void insertBreakpoint(const Breakpoint &bp) override;
     void removeBreakpoint(const Breakpoint &bp) override;
     void updateBreakpoint(const Breakpoint &bp) override;
+    void enableSubBreakpoint(const SubBreakpoint &sbp, bool on) override;
 
     void assignValueInDebugger(WatchItem *item, const QString &expr, const QVariant &value) override;
     void executeDebuggerCommand(const QString &command) override;
@@ -118,7 +117,7 @@ private:
     void readLldbStandardOutput();
     void readLldbStandardError();
 
-    void handleStateNotification(const GdbMi &state);
+    void handleStateNotification(const GdbMi &item);
     void handleLocationNotification(const GdbMi &location);
     void handleOutputNotification(const GdbMi &output);
 

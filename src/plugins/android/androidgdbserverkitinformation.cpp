@@ -50,65 +50,83 @@ using namespace Utils;
 namespace Android {
 namespace Internal {
 
-AndroidGdbServerKitInformation::AndroidGdbServerKitInformation()
+class AndroidGdbServerKitAspectWidget : public KitAspectWidget
 {
-    setId(AndroidGdbServerKitInformation::id());
+    Q_DECLARE_TR_FUNCTIONS(Android::Internal::AndroidGdbServerKitAspect)
+public:
+    AndroidGdbServerKitAspectWidget(Kit *kit, const KitAspect *ki);
+    ~AndroidGdbServerKitAspectWidget() override;
+
+    void makeReadOnly() override;
+    void refresh() override;
+
+    QWidget *mainWidget() const override;
+    QWidget *buttonWidget() const override;
+
+private:
+    void autoDetectDebugger();
+    void showDialog();
+
+    QLabel *m_label;
+    QPushButton *m_button;
+};
+
+
+AndroidGdbServerKitAspect::AndroidGdbServerKitAspect()
+{
+    setId(AndroidGdbServerKitAspect::id());
+    setDisplayName(tr("Android GDB server"));
+    setDescription(tr("The GDB server to use for this kit."));
     setPriority(27999); // Just one less than Debugger!
 }
 
-QVariant AndroidGdbServerKitInformation::defaultValue(const Kit *kit) const
+QVariant AndroidGdbServerKitAspect::defaultValue(const Kit *kit) const
 {
     return autoDetect(kit).toString();
 }
 
-QList<Task> AndroidGdbServerKitInformation::validate(const Kit *) const
+QList<Task> AndroidGdbServerKitAspect::validate(const Kit *) const
 {
     return QList<Task>();
 }
 
-KitInformation::ItemList AndroidGdbServerKitInformation::toUserOutput(const Kit *kit) const
+bool AndroidGdbServerKitAspect::isApplicableToKit(const Kit *k) const
 {
-    return KitInformation::ItemList()
-            << qMakePair(tr("GDB server"), AndroidGdbServerKitInformation::gdbServer(kit).toUserOutput());
+    return DeviceKitAspect::deviceId(k) == Constants::ANDROID_DEVICE_ID;
 }
 
-KitConfigWidget *AndroidGdbServerKitInformation::createConfigWidget(Kit *kit) const
+KitAspect::ItemList AndroidGdbServerKitAspect::toUserOutput(const Kit *kit) const
+{
+    return KitAspect::ItemList()
+            << qMakePair(tr("GDB server"), AndroidGdbServerKitAspect::gdbServer(kit).toUserOutput());
+}
+
+KitAspectWidget *AndroidGdbServerKitAspect::createConfigWidget(Kit *kit) const
 {
     QTC_ASSERT(kit, return nullptr);
-    return new AndroidGdbServerKitInformationWidget(kit, this);
+    return new AndroidGdbServerKitAspectWidget(kit, this);
 }
 
-Core::Id AndroidGdbServerKitInformation::id()
+Core::Id AndroidGdbServerKitAspect::id()
 {
     return "Android.GdbServer.Information";
 }
 
-bool AndroidGdbServerKitInformation::isAndroidKit(const Kit *kit)
-{
-    QtSupport::BaseQtVersion *qt = QtSupport::QtKitInformation::qtVersion(kit);
-    ToolChain *tc = ToolChainKitInformation::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
-    if (qt && tc)
-        return qt->type() == QLatin1String(Constants::ANDROIDQT)
-                && tc->typeId() == Constants::ANDROID_TOOLCHAIN_ID;
-    return false;
-
-}
-
-FileName AndroidGdbServerKitInformation::gdbServer(const Kit *kit)
+FileName AndroidGdbServerKitAspect::gdbServer(const Kit *kit)
 {
     QTC_ASSERT(kit, return FileName());
-    return FileName::fromString(kit->value(AndroidGdbServerKitInformation::id()).toString());
+    return FileName::fromString(kit->value(AndroidGdbServerKitAspect::id()).toString());
 }
 
-void AndroidGdbServerKitInformation::setGdbSever(Kit *kit, const FileName &gdbServerCommand)
+void AndroidGdbServerKitAspect::setGdbSever(Kit *kit, const FileName &gdbServerCommand)
 {
     QTC_ASSERT(kit, return);
-    kit->setValue(AndroidGdbServerKitInformation::id(), gdbServerCommand.toString());
+    kit->setValue(AndroidGdbServerKitAspect::id(), gdbServerCommand.toString());
 }
 
-FileName AndroidGdbServerKitInformation::autoDetect(const Kit *kit)
+FileName AndroidGdbServerKitAspect::autoDetect(const Kit *kit)
 {
-    ToolChain *tc = ToolChainKitInformation::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
+    ToolChain *tc = ToolChainKitAspect::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
     if (!tc || tc->typeId() != Constants::ANDROID_TOOLCHAIN_ID)
         return FileName();
     auto atc = static_cast<AndroidToolChain *>(tc);
@@ -116,12 +134,12 @@ FileName AndroidGdbServerKitInformation::autoDetect(const Kit *kit)
 }
 
 ///////////////
-// AndroidGdbServerKitInformationWidget
+// AndroidGdbServerKitAspectWidget
 ///////////////
 
 
-AndroidGdbServerKitInformationWidget::AndroidGdbServerKitInformationWidget(Kit *kit, const KitInformation *ki) :
-    KitConfigWidget(kit, ki),
+AndroidGdbServerKitAspectWidget::AndroidGdbServerKitAspectWidget(Kit *kit, const KitAspect *ki) :
+    KitAspectWidget(kit, ki),
     m_label(new ElidingLabel),
     m_button(new QPushButton(tr("Manage...")))
 {
@@ -129,62 +147,47 @@ AndroidGdbServerKitInformationWidget::AndroidGdbServerKitInformationWidget(Kit *
     auto buttonMenu = new QMenu(m_button);
     QAction *autoDetectAction = buttonMenu->addAction(tr("Auto-detect"));
     connect(autoDetectAction, &QAction::triggered,
-            this, &AndroidGdbServerKitInformationWidget::autoDetectDebugger);
+            this, &AndroidGdbServerKitAspectWidget::autoDetectDebugger);
     QAction *changeAction = buttonMenu->addAction(tr("Edit..."));
     connect(changeAction, &QAction::triggered,
-            this, &AndroidGdbServerKitInformationWidget::showDialog);
+            this, &AndroidGdbServerKitAspectWidget::showDialog);
     m_button->setMenu(buttonMenu);
 
     refresh();
 }
 
-AndroidGdbServerKitInformationWidget::~AndroidGdbServerKitInformationWidget()
+AndroidGdbServerKitAspectWidget::~AndroidGdbServerKitAspectWidget()
 {
     delete m_button;
     delete m_label;
 }
 
-QString AndroidGdbServerKitInformationWidget::displayName() const
-{
-    return tr("Android GDB server");
-}
-
-QString AndroidGdbServerKitInformationWidget::toolTip() const
-{
-    return tr("The GDB server to use for this kit.");
-}
-
-void AndroidGdbServerKitInformationWidget::makeReadOnly()
+void AndroidGdbServerKitAspectWidget::makeReadOnly()
 {
     m_button->setEnabled(false);
 }
 
-void AndroidGdbServerKitInformationWidget::refresh()
+void AndroidGdbServerKitAspectWidget::refresh()
 {
-    m_label->setText(AndroidGdbServerKitInformation::gdbServer(m_kit).toString());
+    m_label->setText(AndroidGdbServerKitAspect::gdbServer(m_kit).toString());
 }
 
-bool AndroidGdbServerKitInformationWidget::visibleInKit()
-{
-    return DeviceKitInformation::deviceId(m_kit) == Constants::ANDROID_DEVICE_ID;
-}
-
-QWidget *AndroidGdbServerKitInformationWidget::mainWidget() const
+QWidget *AndroidGdbServerKitAspectWidget::mainWidget() const
 {
     return m_label;
 }
 
-QWidget *AndroidGdbServerKitInformationWidget::buttonWidget() const
+QWidget *AndroidGdbServerKitAspectWidget::buttonWidget() const
 {
     return m_button;
 }
 
-void AndroidGdbServerKitInformationWidget::autoDetectDebugger()
+void AndroidGdbServerKitAspectWidget::autoDetectDebugger()
 {
-    AndroidGdbServerKitInformation::setGdbSever(m_kit, AndroidGdbServerKitInformation::autoDetect(m_kit));
+    AndroidGdbServerKitAspect::setGdbSever(m_kit, AndroidGdbServerKitAspect::autoDetect(m_kit));
 }
 
-void AndroidGdbServerKitInformationWidget::showDialog()
+void AndroidGdbServerKitAspectWidget::showDialog()
 {
     QDialog dialog;
     auto layout = new QVBoxLayout(&dialog);
@@ -194,7 +197,7 @@ void AndroidGdbServerKitInformationWidget::showDialog()
     auto binaryLabel = new QLabel(tr("&Binary:"));
     auto chooser = new PathChooser;
     chooser->setExpectedKind(PathChooser::ExistingCommand);
-    chooser->setPath(AndroidGdbServerKitInformation::gdbServer(m_kit).toString());
+    chooser->setPath(AndroidGdbServerKitAspect::gdbServer(m_kit).toString());
     binaryLabel->setBuddy(chooser);
     formLayout->addRow(binaryLabel, chooser);
     layout->addLayout(formLayout);
@@ -207,7 +210,7 @@ void AndroidGdbServerKitInformationWidget::showDialog()
     dialog.setWindowTitle(tr("GDB Server for \"%1\"").arg(m_kit->displayName()));
 
     if (dialog.exec() == QDialog::Accepted)
-        AndroidGdbServerKitInformation::setGdbSever(m_kit, chooser->fileName());
+        AndroidGdbServerKitAspect::setGdbSever(m_kit, chooser->fileName());
 }
 
 } // namespace Internal

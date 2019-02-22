@@ -485,19 +485,16 @@ void TargetSetupPage::import(const Utils::FileName &path, bool silent)
     if (!m_importer)
         return;
 
-    QList<BuildInfo *> toImport = m_importer->import(path, silent);
-    foreach (BuildInfo *info, toImport) {
-        TargetSetupWidget *w = widget(info->kitId);
+    for (const BuildInfo &info : m_importer->import(path, silent)) {
+        TargetSetupWidget *w = widget(info.kitId);
         if (!w) {
-            Kit *k = KitManager::kit(info->kitId);
+            Kit *k = KitManager::kit(info.kitId);
             Q_ASSERT(k);
             addWidget(k);
         }
-        w = widget(info->kitId);
-        if (!w) {
-            delete info;
+        w = widget(info.kitId);
+        if (!w)
             continue;
-        }
 
         w->addBuildInfo(info, true);
         w->setKitSelected(true);
@@ -522,17 +519,6 @@ TargetSetupWidget *TargetSetupPage::addWidget(Kit *k)
 {
     if (!k || (m_requiredPredicate && !m_requiredPredicate(k)))
         return nullptr;
-
-    const IBuildConfigurationFactory *const factory
-            = IBuildConfigurationFactory::find(k, m_projectPath);
-    const QList<BuildInfo *> infoList = [this, k, factory]() {
-        if (factory)
-            return factory->availableSetups(k, m_projectPath);
-
-        auto *info = new BuildInfo(nullptr);
-        info->kitId = k->id();
-        return QList<BuildInfo *>({info});
-    }();
 
     // Not all projects have BuildConfigurations, that is perfectly fine.
     auto *widget = new TargetSetupWidget(k, m_projectPath);
@@ -563,7 +549,7 @@ TargetSetupWidget *TargetSetupPage::addWidget(Kit *k)
 
 bool TargetSetupPage::setupProject(Project *project)
 {
-    QList<const BuildInfo *> toSetUp; // Pointers are managed by the widgets!
+    QList<BuildInfo> toSetUp;
     for (TargetSetupWidget *widget : m_widgets) {
         if (!widget->isKitSelected())
             continue;

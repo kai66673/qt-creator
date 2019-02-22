@@ -27,7 +27,7 @@
 
 #include <projectparts.h>
 
-#include <projectpartcontainerv2.h>
+#include <projectpartcontainer.h>
 
 namespace {
 
@@ -35,36 +35,51 @@ using testing::ElementsAre;
 using testing::UnorderedElementsAre;
 using testing::IsEmpty;
 
-using ClangBackEnd::V2::ProjectPartContainer;
+using ClangBackEnd::ProjectPartContainer;
 using ClangBackEnd::FilePathId;
 
 class ProjectParts : public testing::Test
 {
 protected:
     ClangBackEnd::ProjectParts projectParts;
-    FilePathId firstHeader{1, 1};
-    FilePathId secondHeader{1, 2};
-    FilePathId firstSource{1, 11};
-    FilePathId secondSource{1, 12};
-    FilePathId thirdSource{1, 13};
-    ProjectPartContainer projectPartContainer1{"id",
-                                              {"-DUNIX", "-O2"},
-                                              {{"DEFINE", "1"}},
-                                              {"/includes"},
-                                              {firstHeader, secondHeader},
-                                              {firstSource, secondSource}};
-    ProjectPartContainer updatedProjectPartContainer1{"id",
-                                                      {"-DUNIX", "-O2"},
-                                                      {{"DEFINE", "1"}},
-                                                      {"/includes"},
-                                                      {firstHeader, secondHeader},
-                                                      {firstSource, secondSource, thirdSource}};
-    ProjectPartContainer projectPartContainer2{"id2",
-                                              {"-DUNIX", "-O2"},
-                                              {{"DEFINE", "1"}},
-                                              {"/includes"},
-                                              {firstHeader, secondHeader},
-                                              {firstSource, secondSource}};
+    FilePathId firstHeader{1};
+    FilePathId secondHeader{2};
+    FilePathId firstSource{11};
+    FilePathId secondSource{12};
+    FilePathId thirdSource{13};
+    ProjectPartContainer projectPartContainer1{
+        "id",
+        {"-DUNIX", "-O2"},
+        {{"DEFINE", "1", 1}},
+        {{"/includes", 1, ClangBackEnd::IncludeSearchPathType::BuiltIn}},
+        {{"/project/includes", 1, ClangBackEnd::IncludeSearchPathType::User}},
+        {firstHeader, secondHeader},
+        {firstSource, secondSource},
+        Utils::Language::C,
+        Utils::LanguageVersion::C11,
+        Utils::LanguageExtension::All};
+    ProjectPartContainer updatedProjectPartContainer1{
+        "id",
+        {"-DUNIX", "-O2"},
+        {{"DEFINE", "1", 1}},
+        {{"/includes", 1, ClangBackEnd::IncludeSearchPathType::BuiltIn}},
+        {{"/project/includes", 1, ClangBackEnd::IncludeSearchPathType::User}},
+        {firstHeader, secondHeader},
+        {firstSource, secondSource, thirdSource},
+        Utils::Language::C,
+        Utils::LanguageVersion::C11,
+        Utils::LanguageExtension::All};
+    ProjectPartContainer projectPartContainer2{
+        "id2",
+        {"-DUNIX", "-O2"},
+        {{"DEFINE", "1", 1}},
+        {{"/includes", 1, ClangBackEnd::IncludeSearchPathType::BuiltIn}},
+        {{"/project/includes", 1, ClangBackEnd::IncludeSearchPathType::User}},
+        {firstHeader, secondHeader},
+        {firstSource, secondSource},
+        Utils::Language::C,
+        Utils::LanguageVersion::C11,
+        Utils::LanguageExtension::All};
 };
 
 TEST_F(ProjectParts, GetNoProjectPartsForAddingEmptyProjectParts)
@@ -176,7 +191,6 @@ TEST_F(ProjectParts, GetProjectById)
     ASSERT_THAT(projectPartContainers, ElementsAre(projectPartContainer1));
 }
 
-
 TEST_F(ProjectParts, GetProjectsByIds)
 {
     projectParts.update({projectPartContainer1, projectPartContainer2});
@@ -186,4 +200,31 @@ TEST_F(ProjectParts, GetProjectsByIds)
     ASSERT_THAT(projectPartContainers, UnorderedElementsAre(projectPartContainer1, projectPartContainer2));
 }
 
+TEST_F(ProjectParts, UpdateDeferred)
+{
+    auto projectPartContainers = projectParts.update({projectPartContainer1, projectPartContainer2});
+
+    projectParts.updateDeferred({projectPartContainer1});
+
+    ASSERT_THAT(projectParts.deferredUpdates(), ElementsAre(projectPartContainer1));
+
+}
+
+TEST_F(ProjectParts, NotUpdateDeferred)
+{
+    auto projectPartContainers = projectParts.update({projectPartContainer1, projectPartContainer2});
+
+    ASSERT_THAT(projectParts.deferredUpdates(), IsEmpty());
+}
+
+TEST_F(ProjectParts, UpdateDeferredCleansDeferredUpdates)
+{
+    auto projectPartContainers = projectParts.update({projectPartContainer1, projectPartContainer2});
+    projectParts.updateDeferred({projectPartContainer1});
+
+    projectParts.deferredUpdates();
+
+    ASSERT_THAT(projectParts.deferredUpdates(), IsEmpty());
+
+}
 }

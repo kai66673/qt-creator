@@ -160,6 +160,7 @@ public:
     Core::Id m_id;
     bool m_isParsing = false;
     bool m_hasParsingData = false;
+    bool m_needsInitialExpansion = false;
     std::unique_ptr<Core::IDocument> m_document;
     std::unique_ptr<ProjectNode> m_rootProjectNode;
     std::unique_ptr<ContainerNode> m_containerNode;
@@ -236,7 +237,7 @@ Utils::FileName Project::projectFilePath() const
 
 bool Project::hasActiveBuildSettings() const
 {
-    return activeTarget() && IBuildConfigurationFactory::find(activeTarget());
+    return activeTarget() && BuildConfigurationFactory::find(activeTarget());
 }
 
 void Project::addTarget(std::unique_ptr<Target> &&t)
@@ -306,6 +307,16 @@ void Project::setActiveTarget(Target *target)
     }
 }
 
+bool Project::needsInitialExpansion() const
+{
+    return d->m_needsInitialExpansion;
+}
+
+void Project::setNeedsInitialExpansion(bool needsExpansion)
+{
+    d->m_needsInitialExpansion = needsExpansion;
+}
+
 Target *Project::target(Core::Id id) const
 {
     return Utils::findOrDefault(d->m_targets, Utils::equal(&Target::id, id));
@@ -344,7 +355,7 @@ bool Project::copySteps(Target *sourceTarget, Target *newTarget)
     QStringList runconfigurationError;
 
     foreach (BuildConfiguration *sourceBc, sourceTarget->buildConfigurations()) {
-        BuildConfiguration *newBc = IBuildConfigurationFactory::clone(newTarget, sourceBc);
+        BuildConfiguration *newBc = BuildConfigurationFactory::clone(newTarget, sourceBc);
         if (!newBc) {
             buildconfigurationError << sourceBc->displayName();
             continue;
@@ -361,7 +372,7 @@ bool Project::copySteps(Target *sourceTarget, Target *newTarget)
     }
 
     foreach (DeployConfiguration *sourceDc, sourceTarget->deployConfigurations()) {
-        DeployConfiguration *newDc = DefaultDeployConfigurationFactory::clone(newTarget, sourceDc);
+        DeployConfiguration *newDc = DeployConfigurationFactory::clone(newTarget, sourceDc);
         if (!newDc) {
             deployconfigurationError << sourceDc->displayName();
             continue;
@@ -722,10 +733,9 @@ bool Project::isKnownFile(const Utils::FileName &filename) const
 {
     if (d->m_sortedNodeList.empty())
         return filename == projectFilePath();
-    const auto end = std::end(d->m_sortedNodeList);
     const FileNode element(filename, FileType::Unknown, false);
-    const auto it = std::lower_bound(std::begin(d->m_sortedNodeList), end, &element, &nodeLessThan);
-    return (it == end) ? false : (*it)->filePath() == filename;
+    return std::binary_search(std::begin(d->m_sortedNodeList), std::end(d->m_sortedNodeList),
+                              &element, nodeLessThan);
 }
 
 void Project::setProjectLanguages(Core::Context language)
@@ -809,21 +819,16 @@ void Project::configureAsExampleProject(const QSet<Core::Id> &platforms)
     Q_UNUSED(platforms);
 }
 
-bool Project::needsSpecialDeployment() const
-{
-    return false;
-}
-
 bool Project::knowsAllBuildExecutables() const
 {
     return true;
 }
 
-void Project::setup(const QList<const BuildInfo *> &infoList)
+void Project::setup(const QList<BuildInfo> &infoList)
 {
     std::vector<std::unique_ptr<Target>> toRegister;
-    for (const BuildInfo *info : infoList) {
-        Kit *k = KitManager::kit(info->kitId);
+    for (const BuildInfo &info : infoList) {
+        Kit *k = KitManager::kit(info.kitId);
         if (!k)
             continue;
         Target *t = target(k);
@@ -835,13 +840,11 @@ void Project::setup(const QList<const BuildInfo *> &infoList)
             toRegister.emplace_back(std::move(newTarget));
         }
 
-        if (!info->factory())
+        if (!info.factory())
             continue;
 
-        BuildConfiguration *bc = info->factory()->create(t, info);
-        if (!bc)
-            continue;
-        t->addBuildConfiguration(bc);
+        if (BuildConfiguration *bc = info.factory()->create(t, info))
+            t->addBuildConfiguration(bc);
     }
     for (std::unique_ptr<Target> &t : toRegister) {
         t->updateDefaultDeployConfigurations();
@@ -870,6 +873,16 @@ bool Project::isParsing() const
 bool Project::hasParsingData() const
 {
     return d->m_hasParsingData;
+}
+
+ProjectNode *Project::findNodeForBuildKey(const QString &buildKey) const
+{
+    if (!d->m_rootProjectNode)
+        return nullptr;
+
+    return d->m_rootProjectNode->findProjectNode([buildKey](const ProjectNode *node) {
+        return node->buildKey() == buildKey;
+    });
 }
 
 ProjectImporter *Project::projectImporter() const
@@ -901,15 +914,25 @@ void Project::setPreferredKitPredicate(const Kit::Predicate &predicate)
 
 } // namespace ProjectExplorer
 
+#include <utils/hostosinfo.h>
+
 #include <QTest>
 #include <QSignalSpy>
 
 namespace ProjectExplorer {
 
-const Utils::FileName TEST_PROJECT_PATH = Utils::FileName::fromString("/tmp/foobar/baz.project");
-const Utils::FileName TEST_PROJECT_NONEXISTING_FILE = Utils::FileName::fromString("/tmp/foobar/nothing.cpp");
-const Utils::FileName TEST_PROJECT_CPP_FILE = Utils::FileName::fromString("/tmp/foobar/main.cpp");
-const Utils::FileName TEST_PROJECT_GENERATED_FILE = Utils::FileName::fromString("/tmp/foobar/generated.foo");
+static Utils::FileName constructTestPath(const char *basePath)
+{
+    Utils::FileName drive;
+    if (Utils::HostOsInfo::isWindowsHost())
+        drive = Utils::FileName::fromString("C:");
+    return drive + QLatin1String(basePath);
+}
+
+const Utils::FileName TEST_PROJECT_PATH = constructTestPath("/tmp/foobar/baz.project");
+const Utils::FileName TEST_PROJECT_NONEXISTING_FILE = constructTestPath("/tmp/foobar/nothing.cpp");
+const Utils::FileName TEST_PROJECT_CPP_FILE = constructTestPath("/tmp/foobar/main.cpp");
+const Utils::FileName TEST_PROJECT_GENERATED_FILE = constructTestPath("/tmp/foobar/generated.foo");
 const QString TEST_PROJECT_MIMETYPE = "application/vnd.test.qmakeprofile";
 const QString TEST_PROJECT_DISPLAYNAME = "testProjectFoo";
 const char TEST_PROJECT_ID[] = "Test.Project.Id";

@@ -2,8 +2,6 @@ include(../../qtcreator.pri)
 
 TEMPLATE  = subdirs
 
-!use_system_botan: SUBDIRS += botan
-
 SUBDIRS   += \
     aggregation \
     extensionsystem \
@@ -32,10 +30,10 @@ for(l, SUBDIRS) {
     $$lv = $$QTC_LIB_DEPENDS
 }
 
-!use_system_botan: ssh.depends += botan
-
 SUBDIRS += \
-    utils/process_stub.pro
+    utils/process_stub.pro \
+    3rdparty/syntax-highlighting \
+    3rdparty/syntax-highlighting/data
 
 win32:SUBDIRS += utils/process_ctrlc_stub.pro
 
@@ -50,3 +48,5 @@ win32: isEmpty(QTC_SKIP_CDBEXT) {
         message("environment variable pointing to your CDB installation.")
     }
 }
+
+QMAKE_EXTRA_TARGETS += deployqt # dummy

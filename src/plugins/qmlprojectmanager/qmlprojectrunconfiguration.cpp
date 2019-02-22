@@ -72,7 +72,7 @@ class MainQmlFileAspect : public ProjectConfigurationAspect
 {
 public:
     explicit MainQmlFileAspect(QmlProject *project);
-    ~MainQmlFileAspect() { delete m_fileListCombo; }
+    ~MainQmlFileAspect() override { delete m_fileListCombo; }
 
     enum MainScriptSource {
         FileInEditor,
@@ -107,9 +107,8 @@ public:
 
 MainQmlFileAspect::MainQmlFileAspect(QmlProject *project)
     : m_project(project)
+    , m_scriptFile(M_CURRENT_FILE)
 {
-    m_scriptFile = M_CURRENT_FILE;
-
     connect(EditorManager::instance(), &EditorManager::currentEditorChanged,
             this, &MainQmlFileAspect::changeCurrentFile);
     connect(EditorManager::instance(), &EditorManager::currentDocumentStateChanged,
@@ -189,7 +188,7 @@ void MainQmlFileAspect::updateFileComboBox()
         if (fileInfo.suffix() != QLatin1String("qml"))
             continue;
 
-        QStandardItem *item = new QStandardItem(fn);
+        auto item = new QStandardItem(fn);
         m_fileListModel.appendRow(item);
 
         if (mainScriptPath == fn)
@@ -278,7 +277,7 @@ QmlProjectRunConfiguration::QmlProjectRunConfiguration(Target *target, Id id)
 {
     addAspect<QmlProjectEnvironmentAspect>(target);
     m_qmlViewerAspect = addAspect<BaseStringAspect>();
-    m_qmlViewerAspect->setLabelText(tr("QML viewer:"));
+    m_qmlViewerAspect->setLabelText(tr("QML Viewer:"));
     m_qmlViewerAspect->setPlaceHolderText(executable());
     m_qmlViewerAspect->setDisplayStyle(BaseStringAspect::LineEditDisplay);
 
@@ -305,7 +304,7 @@ Runnable QmlProjectRunConfiguration::runnable() const
     Runnable r;
     r.executable = executable();
     r.commandLineArguments = commandLineArguments();
-    r.environment = extraAspect<QmlProjectEnvironmentAspect>()->environment();
+    r.environment = aspect<QmlProjectEnvironmentAspect>()->environment();
     r.workingDirectory = static_cast<QmlProject *>(project())->targetDirectory(target()).toString();
     return r;
 }
@@ -314,7 +313,7 @@ QString QmlProjectRunConfiguration::disabledReason() const
 {
     if (mainScript().isEmpty())
         return tr("No script file to execute.");
-    if (DeviceTypeKitInformation::deviceTypeId(target()->kit())
+    if (DeviceTypeKitAspect::deviceTypeId(target()->kit())
             == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE
             && !QFileInfo::exists(executable())) {
         return tr("No qmlscene found.");
@@ -330,11 +329,11 @@ QString QmlProjectRunConfiguration::executable() const
     if (!qmlViewer.isEmpty())
         return qmlViewer;
 
-    BaseQtVersion *version = QtKitInformation::qtVersion(target()->kit());
+    BaseQtVersion *version = QtKitAspect::qtVersion(target()->kit());
     if (!version) // No Qt version in Kit. Don't try to run qmlscene.
         return QString();
 
-    const Id deviceType = DeviceTypeKitInformation::deviceTypeId(target()->kit());
+    const Id deviceType = DeviceTypeKitAspect::deviceTypeId(target()->kit());
     if (deviceType == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE) {
         // If not given explicitly by Qt Version, try to pick it from $PATH.
         return version->type() == QtSupport::Constants::DESKTOPQT
@@ -342,7 +341,7 @@ QString QmlProjectRunConfiguration::executable() const
                 : QString("qmlscene");
     }
 
-    IDevice::ConstPtr dev = DeviceKitInformation::device(target()->kit());
+    IDevice::ConstPtr dev = DeviceKitAspect::device(target()->kit());
     if (dev.isNull()) // No device set. We don't know where to run qmlscene.
         return QString();
 
@@ -354,9 +353,9 @@ QString QmlProjectRunConfiguration::executable() const
 QString QmlProjectRunConfiguration::commandLineArguments() const
 {
     // arguments in .user file
-    QString args = extraAspect<ArgumentsAspect>()->arguments(macroExpander());
+    QString args = aspect<ArgumentsAspect>()->arguments(macroExpander());
     const Target *currentTarget = target();
-    const IDevice::ConstPtr device = DeviceKitInformation::device(currentTarget->kit());
+    const IDevice::ConstPtr device = DeviceKitAspect::device(currentTarget->kit());
     const Utils::OsType osType = device ? device->osType() : Utils::HostOsInfo::hostOs();
 
     // arguments from .qmlproject file
@@ -372,13 +371,6 @@ QString QmlProjectRunConfiguration::commandLineArguments() const
     if (!main.isEmpty())
         Utils::QtcProcess::addArg(&args, main, osType);
     return args;
-}
-
-Abi QmlProjectRunConfiguration::abi() const
-{
-    Abi hostAbi = Abi::hostAbi();
-    return Abi(hostAbi.architecture(), hostAbi.os(), hostAbi.osFlavor(),
-               Abi::RuntimeQmlFormat, hostAbi.wordWidth());
 }
 
 void QmlProjectRunConfiguration::updateEnabledState()
@@ -418,7 +410,7 @@ bool MainQmlFileAspect::isQmlFilePresent()
             for (const Utils::FileName &filename : files) {
                 const QFileInfo fi = filename.toFileInfo();
 
-                if (!filename.isEmpty() && fi.baseName()[0].isLower()) {
+                if (!filename.isEmpty() && fi.baseName().at(0).isLower()) {
                     Utils::MimeType type = Utils::mimeTypeForFile(fi);
                     if (type.matchesName(QLatin1String(ProjectExplorer::Constants::QML_MIMETYPE))
                             || type.matchesName(

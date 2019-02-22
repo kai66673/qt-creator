@@ -50,6 +50,7 @@ extern const Utils::Icon DEBUG_CONTINUE_SMALL;
 extern const Utils::Icon DEBUG_CONTINUE_SMALL_TOOLBAR;
 extern const Utils::Icon INTERRUPT;
 extern const Utils::Icon INTERRUPT_FLAT;
+extern const Utils::Icon STOP_FLAT;
 extern const Utils::Icon DEBUG_INTERRUPT_SMALL;
 extern const Utils::Icon DEBUG_INTERRUPT_SMALL_TOOLBAR;
 extern const Utils::Icon DEBUG_EXIT_SMALL;
@@ -78,6 +79,14 @@ extern const Utils::Icon SINGLE_INSTRUCTION_MODE;
 extern const Utils::Icon MODE_DEBUGGER_CLASSIC;
 extern const Utils::Icon MODE_DEBUGGER_FLAT;
 extern const Utils::Icon MODE_DEBUGGER_FLAT_ACTIVE;
+
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG;
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG_EXIT;
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG_INTERRUPT;
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG_CONTINUE;
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG_STEP_OVER;
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG_STEP_INTO;
+extern const Utils::Icon MACOS_TOUCHBAR_DEBUG_STEP_OUT;
 
 } // namespace Icons
 } // namespace Debugger

@@ -54,8 +54,6 @@ using namespace Utils;
 namespace QmakeProjectManager {
 namespace Internal {
 
-const char PRO_FILE_KEY[] = "Qt4ProjectManager.Qt4RunConfiguration.ProFile";
-
 //
 // DesktopQmakeRunConfiguration
 //
@@ -91,37 +89,26 @@ DesktopQmakeRunConfiguration::DesktopQmakeRunConfiguration(Target *target, Core:
 void DesktopQmakeRunConfiguration::updateTargetInformation()
 {
     setDefaultDisplayName(defaultDisplayName());
-    extraAspect<LocalEnvironmentAspect>()->buildEnvironmentHasChanged();
+    aspect<LocalEnvironmentAspect>()->buildEnvironmentHasChanged();
 
     BuildTargetInfo bti = buildTargetInfo();
 
-    auto wda = extraAspect<WorkingDirectoryAspect>();
+    auto wda = aspect<WorkingDirectoryAspect>();
     wda->setDefaultWorkingDirectory(bti.workingDirectory);
     if (wda->pathChooser())
         wda->pathChooser()->setBaseFileName(target()->project()->projectDirectory());
 
-    auto terminalAspect = extraAspect<TerminalAspect>();
+    auto terminalAspect = aspect<TerminalAspect>();
     if (!terminalAspect->isUserSet())
         terminalAspect->setUseTerminal(bti.usesTerminal);
 
-    extraAspect<ExecutableAspect>()->setExecutable(bti.targetFilePath);
-}
-
-QVariantMap DesktopQmakeRunConfiguration::toMap() const
-{
-    // FIXME: For compatibility purposes in the 4.7 dev cycle only.
-    const QDir projectDir = QDir(target()->project()->projectDirectory().toString());
-    QVariantMap map(RunConfiguration::toMap());
-    map.insert(QLatin1String(PRO_FILE_KEY), projectDir.relativeFilePath(proFilePath().toString()));
-    return map;
+    aspect<ExecutableAspect>()->setExecutable(bti.targetFilePath);
 }
 
 bool DesktopQmakeRunConfiguration::fromMap(const QVariantMap &map)
 {
-    const bool res = RunConfiguration::fromMap(map);
-    if (!res)
+    if (!RunConfiguration::fromMap(map))
         return false;
-
     updateTargetInformation();
     return true;
 }
@@ -135,9 +122,9 @@ void DesktopQmakeRunConfiguration::addToBaseEnvironment(Environment &env) const
 {
     BuildTargetInfo bti = buildTargetInfo();
     if (bti.runEnvModifier)
-        bti.runEnvModifier(env, extraAspect<UseLibraryPathsAspect>()->value());
+        bti.runEnvModifier(env, aspect<UseLibraryPathsAspect>()->value());
 
-    if (auto dyldAspect = extraAspect<UseDyldSuffixAspect>()) {
+    if (auto dyldAspect = aspect<UseDyldSuffixAspect>()) {
         if (dyldAspect->value())
             env.set(QLatin1String("DYLD_IMAGE_SUFFIX"), QLatin1String("_debug"));
     }

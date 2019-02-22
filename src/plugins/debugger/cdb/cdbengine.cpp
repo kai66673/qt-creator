@@ -201,11 +201,9 @@ CdbEngine::CdbEngine() :
     wh->addTypeFormats("QImage", imageFormats);
     wh->addTypeFormats("QImage *", imageFormats);
 
-    connect(action(OperateByInstruction), &QAction::triggered,
-            this, &CdbEngine::operateByInstructionTriggered);
     connect(action(CreateFullBacktrace), &QAction::triggered,
             this, &CdbEngine::createFullBacktrace);
-    connect(&m_process, static_cast<void(QProcess::*)(int)>(&QProcess::finished),
+    connect(&m_process, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
             this, &CdbEngine::processFinished);
     connect(&m_process, &QProcess::errorOccurred, this, &CdbEngine::processError);
     connect(&m_process, &QProcess::readyReadStandardOutput,
@@ -226,7 +224,7 @@ void CdbEngine::init()
     m_stopMode = NoStopRequested;
     m_nextCommandToken  = 0;
     m_currentBuiltinResponseToken = -1;
-    m_operateByInstruction = true; // Default CDB setting.
+    m_lastOperateByInstruction = true; // Default CDB setting.
     m_hasDebuggee = false;
     m_sourceStepInto = false;
     m_watchPointX = m_watchPointY = 0;
@@ -268,13 +266,13 @@ void CdbEngine::init()
 
 CdbEngine::~CdbEngine() = default;
 
-void CdbEngine::operateByInstructionTriggered(bool operateByInstruction)
+void CdbEngine::adjustOperateByInstruction(bool operateByInstruction)
 {
-    if (m_operateByInstruction == operateByInstruction)
+    if (m_lastOperateByInstruction == operateByInstruction)
         return;
-    m_operateByInstruction = operateByInstruction;
-    runCommand({QLatin1String(m_operateByInstruction ? "l-t" : "l+t"), NoFlags});
-    runCommand({QLatin1String(m_operateByInstruction ? "l-s" : "l+s"), NoFlags});
+    m_lastOperateByInstruction = operateByInstruction;
+    runCommand({QLatin1String(m_lastOperateByInstruction ? "l-t" : "l+t"), NoFlags});
+    runCommand({QLatin1String(m_lastOperateByInstruction ? "l-s" : "l+s"), NoFlags});
 }
 
 bool CdbEngine::canHandleToolTip(const DebuggerToolTipContext &context) const
@@ -312,7 +310,7 @@ static QStringList mergeEnvironment(QStringList runConfigEnvironment,
     // We do not assume someone sets _NT_DEBUGGER_EXTENSION_PATH in the run
     // config, just to make sure, delete any existing entries
     const QString cdbExtensionPathVariableAssign =
-            QLatin1String(cdbExtensionPathVariableC) + QLatin1Char('=');
+            QLatin1String(cdbExtensionPathVariableC) + '=';
     for (QStringList::iterator it = runConfigEnvironment.begin(); it != runConfigEnvironment.end() ; ) {
         if (it->startsWith(cdbExtensionPathVariableAssign)) {
             it = runConfigEnvironment.erase(it);
@@ -486,7 +484,7 @@ void CdbEngine::setupEngine()
     // Make sure that QTestLib uses OutputDebugString for logging.
     const QString qtLoggingToConsoleKey = QStringLiteral("QT_LOGGING_TO_CONSOLE");
     if (!sp.useTerminal && !inferiorEnvironment.hasKey(qtLoggingToConsoleKey))
-        inferiorEnvironment.set(qtLoggingToConsoleKey, QString(QLatin1Char('0')));
+        inferiorEnvironment.set(qtLoggingToConsoleKey, "0");
 
     m_process.setEnvironment(mergeEnvironment(inferiorEnvironment.toStringList(),
                                               extensionFi.absolutePath()));
@@ -522,7 +520,7 @@ void CdbEngine::handleInitialSessionIdle()
     const DebuggerRunParameters &rp = runParameters();
     if (!rp.commandsAfterConnect.isEmpty())
         runCommand({rp.commandsAfterConnect, NoFlags});
-    operateByInstructionTriggered(action(OperateByInstruction)->isChecked());
+    //operateByInstructionTriggered(operatesByInstruction());
     // QmlCppEngine expects the QML engine to be connected before any breakpoints are hit
     // (attemptBreakpointSynchronization() will be directly called then)
     if (rp.breakOnMain) {
@@ -612,7 +610,7 @@ void CdbEngine::runEngine()
     const auto cb = [this](const DebuggerResponse &r) { handleBreakInsert(r, Breakpoint()); };
     if (boolSetting(CdbBreakOnCrtDbgReport)) {
         Abi::OSFlavor flavor = runParameters().toolChainAbi.osFlavor();
-        // CrtDebugReport can not be safely resolved for vc 19
+        // CrtDebugReport cannot be safely resolved for vc 19
         if ((flavor > Abi::WindowsMsvc2005Flavor && flavor <= Abi::WindowsMsvc2013Flavor) ||
                 flavor > Abi::WindowsMSysFlavor || flavor <= Abi::WindowsCEFlavor) {
             const QString module = msvcRunTime(flavor);
@@ -745,23 +743,29 @@ static inline bool isWatchIName(const QString &iname)
 
 bool CdbEngine::hasCapability(unsigned cap) const
 {
-    return cap & (DisassemblerCapability | RegisterCapability
-           | ShowMemoryCapability
-           |WatchpointByAddressCapability|JumpToLineCapability|AddWatcherCapability|WatchWidgetsCapability
-           |ReloadModuleCapability
-           |BreakOnThrowAndCatchCapability // Sort-of: Can break on throw().
-           |BreakConditionCapability|TracePointCapability
-           |BreakModuleCapability
-           |CreateFullBacktraceCapability
-           |OperateByInstructionCapability
-           |RunToLineCapability
-           |MemoryAddressCapability
-           |AdditionalQmlStackCapability);
+    return cap & (DisassemblerCapability
+                  | RegisterCapability
+                  | ShowMemoryCapability
+                  | WatchpointByAddressCapability
+                  | JumpToLineCapability
+                  | AddWatcherCapability
+                  | WatchWidgetsCapability
+                  | ReloadModuleCapability
+                  | BreakOnThrowAndCatchCapability // Sort-of: Can break on throw().
+                  | BreakConditionCapability|TracePointCapability
+                  | BreakIndividualLocationsCapability
+                  | BreakModuleCapability
+                  | CreateFullBacktraceCapability
+                  | OperateByInstructionCapability
+                  | RunToLineCapability
+                  | MemoryAddressCapability
+                  | AdditionalQmlStackCapability);
 }
 
-void CdbEngine::executeStep()
+void CdbEngine::executeStepIn(bool byInstruction)
 {
-    if (!m_operateByInstruction)
+    adjustOperateByInstruction(byInstruction);
+    if (!m_lastOperateByInstruction)
         m_sourceStepInto = true; // See explanation at handleStackTrace().
     runCommand({"t", NoFlags}); // Step into-> t (trace)
     STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorRunRequested")
@@ -775,21 +779,12 @@ void CdbEngine::executeStepOut()
     notifyInferiorRunRequested();
 }
 
-void CdbEngine::executeNext()
+void CdbEngine::executeStepOver(bool byInstruction)
 {
+    adjustOperateByInstruction(byInstruction);
     runCommand({"p", NoFlags}); // Step over -> p
     STATE_DEBUG(state(), Q_FUNC_INFO, __LINE__, "notifyInferiorRunRequested")
     notifyInferiorRunRequested();
-}
-
-void CdbEngine::executeStepI()
-{
-    executeStep();
-}
-
-void CdbEngine::executeNextI()
-{
-    executeNext();
 }
 
 void CdbEngine::continueInferior()
@@ -842,6 +837,7 @@ void CdbEngine::handleDoInterruptInferior(const QString &errorMessage)
 
 void CdbEngine::doInterruptInferior(const InterruptCallback &callback)
 {
+    const bool requestInterrupt = m_stopMode == NoStopRequested;
     if (callback) {
         m_interrupCallbacks.push_back(callback);
         if (!m_initialSessionIdleHandled)
@@ -852,6 +848,8 @@ void CdbEngine::doInterruptInferior(const InterruptCallback &callback)
         m_stopMode = Interrupt;
     }
 
+    if (!requestInterrupt)
+        return; // we already requested a stop no need to interrupt twice
     showMessage(QString("Interrupting process %1...").arg(inferiorPid()), LogMisc);
     QTC_ASSERT(!m_signalOperation, notifyInferiorStopFailed(); return);
     QTC_ASSERT(device(), notifyInferiorRunFailed(); return);
@@ -1454,7 +1452,7 @@ void CdbEngine::fetchMemory(MemoryAgent *agent, quint64 address, quint64 length)
     StringInputStream str(args);
     str << address << ' ' << length;
     cmd.args = args;
-    cmd.callback = [&](const DebuggerResponse &response) {
+    cmd.callback = [=] (const DebuggerResponse &response) {
         if (!agent)
             return;
         if (response.resultClass == ResultDone) {
@@ -1757,8 +1755,9 @@ unsigned CdbEngine::examineStopReason(const GdbMi &stopReason,
                 *message = bp->msgWatchpointByExpressionTriggered(bp->expression(), tid);
             else
                 *message = bp->msgBreakpointTriggered(tid);
-            rc |= StopReportStatusMessage|StopNotifyStop;
+            rc |= StopReportStatusMessage;
         }
+        rc |= StopNotifyStop;
         return rc;
     }
     if (reason == "exception") {
@@ -1849,7 +1848,7 @@ void CdbEngine::processStop(const GdbMi &stopReason, bool conditionalBreakPointT
             if (stack.isValid()) {
                 switch (parseStackTrace(stack, sourceStepInto)) {
                 case ParseStackStepInto: // Hit on a frame while step into, see parseStackTrace().
-                    executeStep();
+                    executeStepIn(operatesByInstruction());
                     return;
                 case ParseStackStepOut: // Hit on a frame with no source while step into.
                     executeStepOut();
@@ -1970,7 +1969,7 @@ void CdbEngine::ensureUsing32BitStackInWow64(const DebuggerResponse &response, c
 {
     // Parsing the header of the stack output to check which bitness
     // the cdb is currently using.
-    foreach (const QStringRef &line, response.data.data().splitRef(QLatin1Char('\n'))) {
+    foreach (const QStringRef &line, response.data.data().splitRef('\n')) {
         if (!line.startsWith("Child"))
             continue;
         if (line.startsWith("ChildEBP")) {
@@ -2246,7 +2245,7 @@ static inline bool checkCommandToken(const QString &tokenPrefix, const QString &
     if (!c.startsWith(tokenPrefix))
         return false;
     bool ok;
-    *token = c.mid(tokenPrefixSize, size - tokenPrefixSize - 1).toInt(&ok);
+    *token = c.midRef(tokenPrefixSize, size - tokenPrefixSize - 1).toInt(&ok);
     return ok;
 }
 
@@ -2267,19 +2266,19 @@ void CdbEngine::parseOutputLine(QString line)
         const int tokenPos = creatorExtPrefix.size() + 2;
         const int tokenEndPos = line.indexOf('|', tokenPos);
         QTC_ASSERT(tokenEndPos != -1, return);
-        const int token = line.mid(tokenPos, tokenEndPos - tokenPos).toInt();
+        const int token = line.midRef(tokenPos, tokenEndPos - tokenPos).toInt();
         // remainingChunks
         const int remainingChunksPos = tokenEndPos + 1;
         const int remainingChunksEndPos = line.indexOf('|', remainingChunksPos);
         QTC_ASSERT(remainingChunksEndPos != -1, return);
-        const int remainingChunks = line.mid(remainingChunksPos, remainingChunksEndPos - remainingChunksPos).toInt();
+        const int remainingChunks = line.midRef(remainingChunksPos, remainingChunksEndPos - remainingChunksPos).toInt();
         // const char 'serviceName'
         const int whatPos = remainingChunksEndPos + 1;
         const int whatEndPos = line.indexOf('|', whatPos);
         QTC_ASSERT(whatEndPos != -1, return);
         const QString what = line.mid(whatPos, whatEndPos - whatPos);
         // Build up buffer, call handler once last chunk was encountered
-        m_extensionMessageBuffer += line.mid(whatEndPos + 1);
+        m_extensionMessageBuffer += line.midRef(whatEndPos + 1);
         if (remainingChunks == 0) {
             handleExtensionMessage(type, token, what, m_extensionMessageBuffer);
             m_extensionMessageBuffer.clear();
@@ -2345,9 +2344,9 @@ void CdbEngine::parseOutputLine(QString line)
                 // for some incomprehensible reasons Microsoft cdb version 6.2 is newer than 6.12
                 m_autoBreakPointCorrection = major > 6 || (major == 6 && minor >= 2 && minor < 10);
                 showMessage(line, LogMisc);
-                showMessage(QString::fromLatin1("Using ")
+                showMessage("Using "
                             + QLatin1String(m_autoBreakPointCorrection ? "CDB " : "codemodel ")
-                            + QString::fromLatin1("based breakpoint correction."), LogMisc);
+                            + "based breakpoint correction.", LogMisc);
             }
         }
     } else if (line.startsWith("ModLoad: ")) {
@@ -2498,7 +2497,7 @@ void CdbEngine::insertBreakpoint(const Breakpoint &bp)
     BreakpointParameters parameters = bp->requestedParameters();
     const auto handleBreakInsertCB = [this, bp](const DebuggerResponse &r) { handleBreakInsert(r, bp); };
     BreakpointParameters response = parameters;
-    auto responseId = QString::number(breakPointIdToCdbId(bp));
+    const QString responseId = breakPointCdbId(bp);
     QScopedPointer<BreakpointCorrectionContext> lineCorrection(
                 new BreakpointCorrectionContext(m_codeModelSnapshot, CppTools::CppModelManager::instance()->workingCopy()));
     if (!m_autoBreakPointCorrection
@@ -2545,7 +2544,7 @@ void CdbEngine::updateBreakpoint(const Breakpoint &bp)
     BreakpointParameters parameters = bp->requestedParameters();
     const auto handleBreakInsertCB = [this, bp](const DebuggerResponse &r) { handleBreakInsert(r, bp); };
     BreakpointParameters response = parameters;
-    auto responseId = QString::number(breakPointIdToCdbId(bp));
+    const QString responseId = breakPointCdbId(bp);
     notifyBreakpointChangeProceeding(bp);
     if (debugBreakpoints)
         qDebug("Changing %d:\n    %s\nTo %s\n", bp->modelId(),
@@ -2737,8 +2736,8 @@ void CdbEngine::setupScripting(const DebuggerResponse &response)
     }
 
     const QString &verOutput = data.childAt(0).data();
-    const QString firstToken = verOutput.split(QLatin1Char(' ')).constFirst();
-    const QVector<QStringRef> pythonVersion = firstToken.splitRef(QLatin1Char('.'));
+    const QString firstToken = verOutput.split(' ').constFirst();
+    const QVector<QStringRef> pythonVersion = firstToken.splitRef('.');
 
     bool ok = false;
     if (pythonVersion.size() == 3) {
@@ -2754,7 +2753,7 @@ void CdbEngine::setupScripting(const DebuggerResponse &response)
     }
     if (!ok) {
         m_pythonVersion = 0;
-        showMessage(QString("Can not parse sys.version:\n%1").arg(verOutput), LogWarning);
+        showMessage(QString("Cannot parse sys.version:\n%1").arg(verOutput), LogWarning);
         return;
     }
 
@@ -2777,7 +2776,7 @@ void CdbEngine::setupScripting(const DebuggerResponse &response)
     }
     const QString commands = stringSetting(ExtraDumperCommands);
     if (!commands.isEmpty()) {
-        for (auto command : commands.split('\n', QString::SkipEmptyParts))
+        for (const auto &command : commands.split('\n', QString::SkipEmptyParts))
             runCommand({command, ScriptCommand});
     }
 }
@@ -2844,7 +2843,7 @@ void CdbEngine::handleWidgetAt(const DebuggerResponse &response)
             break;
         }
         // 0x000 -> nothing found
-        if (!watchExp.mid(sepPos + 1).toULongLong(nullptr, 0)) {
+        if (!watchExp.midRef(sepPos + 1).toULongLong(nullptr, 0)) {
             message = QString("No widget could be found at %1, %2.").arg(m_watchPointX).arg(m_watchPointY);
             break;
         }

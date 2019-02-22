@@ -59,7 +59,7 @@ static bool isLocal(RunConfiguration *runConfiguration)
 {
     Target *target = runConfiguration ? runConfiguration->target() : nullptr;
     Kit *kit = target ? target->kit() : nullptr;
-    return DeviceTypeKitInformation::deviceTypeId(kit) == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE;
+    return DeviceTypeKitAspect::deviceTypeId(kit) == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE;
 }
 
 /*!
@@ -105,7 +105,7 @@ UnstartedAppWatcherDialog::UnstartedAppWatcherDialog(QWidget *parent)
     auto pathLayout = new QHBoxLayout;
     m_pathChooser = new Utils::PathChooser(this);
     m_pathChooser->setExpectedKind(Utils::PathChooser::ExistingCommand);
-    m_pathChooser->setHistoryCompleter(QLatin1String("LocalExecutable"), true);
+    m_pathChooser->setHistoryCompleter("LocalExecutable", true);
     m_pathChooser->setMinimumWidth(400);
 
     auto resetExecutable = new QPushButton(tr("Reset"));
@@ -239,8 +239,7 @@ void UnstartedAppWatcherDialog::pidFound(const DeviceProcessItem &p)
 void UnstartedAppWatcherDialog::startStopWatching(bool start)
 {
     setWaitingState(start ? WatchingState : NotWatchingState);
-    m_watchingPushButton->setText(start ? QLatin1String("Stop Watching")
-                                        : QLatin1String("Start Watching"));
+    m_watchingPushButton->setText(start ? tr("Stop Watching") : tr("Start Watching"));
     startStopTimer(start);
 }
 
@@ -276,7 +275,7 @@ void UnstartedAppWatcherDialog::stopAndCheckExecutable()
 
 void UnstartedAppWatcherDialog::kitChanged()
 {
-    const DebuggerItem *debugger = DebuggerKitInformation::debugger(m_kitChooser->currentKit());
+    const DebuggerItem *debugger = DebuggerKitAspect::debugger(m_kitChooser->currentKit());
     if (!debugger)
         return;
     if (debugger->engineType() == Debugger::CdbEngineType) {

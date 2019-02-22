@@ -78,6 +78,9 @@ public:
     static bool returnOnClose();
     static void setReturnOnClose(bool returnOnClose);
 
+    static bool isScrollWheelZoomingEnabled();
+    static void setScrollWheelZoomingEnabled(bool enabled);
+
     static QStringList lastShownPages();
     static void setLastShownPages(const QStringList &pages);
 
@@ -93,8 +96,6 @@ public:
     static QHelpEngine& helpEngine();
     static BookmarkManager& bookmarkManager();
 
-    static bool isValidUrl(const QString &link);
-
     static QByteArray loadErrorMessage(const QUrl &url, const QString &errorString);
     Q_INVOKABLE static Help::Internal::LocalHelpManager::HelpData helpData(const QUrl &url);
 
@@ -108,6 +109,7 @@ signals:
     void filterIndexChanged(int index);
     void fallbackFontChanged(const QFont &font);
     void returnOnCloseChanged();
+    void scrollWheelZoomingEnabledChanged(bool enabled);
 
 private:
     static bool m_guiNeedsSetup;

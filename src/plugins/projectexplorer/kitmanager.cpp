@@ -41,6 +41,7 @@
 #include <utils/stringutils.h>
 
 #include <QSettings>
+#include <QStyle>
 
 using namespace Core;
 using namespace Utils;
@@ -53,6 +54,7 @@ const char KIT_DATA_KEY[] = "Profile.";
 const char KIT_COUNT_KEY[] = "Profile.Count";
 const char KIT_FILE_VERSION_KEY[] = "Version";
 const char KIT_DEFAULT_KEY[] = "Profile.Default";
+const char KIT_IRRELEVANT_ASPECTS_KEY[] = "Kit.IrrelevantAspects";
 const char KIT_FILENAME[] = "/profiles.xml";
 
 static FileName settingsFileName()
@@ -69,9 +71,10 @@ class KitManagerPrivate
 public:
     Kit *m_defaultKit = nullptr;
     bool m_initialized = false;
-    std::vector<std::unique_ptr<KitInformation>> m_informationList;
+    std::vector<std::unique_ptr<KitAspect>> m_informationList;
     std::vector<std::unique_ptr<Kit>> m_kitList;
     std::unique_ptr<PersistentSettingsWriter> m_writer;
+    QSet<Id> m_irrelevantAspects;
 };
 
 } // namespace Internal
@@ -151,11 +154,11 @@ void KitManager::restoreKits()
                 Kit *ptr = i->get();
 
                 // Overwrite settings that the SDK sets to those values:
-                foreach (const KitInformation *ki, KitManager::kitInformation()) {
+                for (const KitAspect *aspect : KitManager::kitAspects()) {
                     // Copy sticky settings over:
-                    if (ptr->isSticky(ki->id())) {
-                        ptr->setValue(ki->id(), toStore->value(ki->id()));
-                        ptr->setSticky(ki->id(), true);
+                    if (ptr->isSticky(aspect->id())) {
+                        ptr->setValue(aspect->id(), toStore->value(aspect->id()));
+                        ptr->setSticky(aspect->id(), true);
                     }
                 }
                 toStore = std::move(*i);
@@ -219,6 +222,8 @@ void KitManager::saveKits()
     data.insert(QLatin1String(KIT_COUNT_KEY), count);
     data.insert(QLatin1String(KIT_DEFAULT_KEY),
                 d->m_defaultKit ? QString::fromLatin1(d->m_defaultKit->id().name()) : QString());
+    data.insert(KIT_IRRELEVANT_ASPECTS_KEY,
+                transform<QVariantList>(d->m_irrelevantAspects, &Id::toSetting));
     d->m_writer->save(data, ICore::mainWindow());
 }
 
@@ -227,7 +232,7 @@ bool KitManager::isLoaded()
     return d->m_initialized;
 }
 
-void KitManager::registerKitInformation(std::unique_ptr<KitInformation> &&ki)
+void KitManager::registerKitAspect(std::unique_ptr<KitAspect> &&ki)
 {
     QTC_ASSERT(ki->id().isValid(), return );
     QTC_ASSERT(!Utils::contains(d->m_informationList, ki.get()), return );
@@ -235,8 +240,8 @@ void KitManager::registerKitInformation(std::unique_ptr<KitInformation> &&ki)
     auto it = std::lower_bound(std::begin(d->m_informationList),
                                std::end(d->m_informationList),
                                ki,
-                               [](const std::unique_ptr<KitInformation> &a,
-                                  const std::unique_ptr<KitInformation> &b) {
+                               [](const std::unique_ptr<KitAspect> &a,
+                                  const std::unique_ptr<KitAspect> &b) {
                                    return a->priority() > b->priority();
                                });
     d->m_informationList.insert(it, std::move(ki));
@@ -270,7 +275,7 @@ QSet<Id> KitManager::availableFeatures(Core::Id platformId)
     return features;
 }
 
-QList<Kit *> KitManager::sortKits(const QList<Kit *> kits)
+QList<Kit *> KitManager::sortKits(const QList<Kit *> &kits)
 {
     // This method was added to delay the sorting of kits as long as possible.
     // Since the displayName can contain variables it can be costly (e.g. involve
@@ -334,6 +339,9 @@ KitManager::KitList KitManager::restoreKits(const FileName &fileName)
 
     if (Utils::contains(result.kits, [id](const std::unique_ptr<Kit> &k) { return k->id() == id; }))
         result.defaultKit = id;
+    const auto it = data.constFind(KIT_IRRELEVANT_ASPECTS_KEY);
+    if (it != data.constEnd())
+        d->m_irrelevantAspects = transform<QSet<Id>>(it.value().toList(), &Id::fromSetting);
 
     return result;
 }
@@ -364,20 +372,19 @@ Kit *KitManager::defaultKit()
     return d->m_defaultKit;
 }
 
-QList<KitInformation *> KitManager::kitInformation()
+const QList<KitAspect *> KitManager::kitAspects()
 {
     return Utils::toRawPointer<QList>(d->m_informationList);
 }
 
-KitManagerConfigWidget *KitManager::createConfigWidget(Kit *k)
+const QSet<Id> KitManager::irrelevantAspects()
 {
-    auto *result = new KitManagerConfigWidget(k);
-    foreach (KitInformation *ki, kitInformation())
-        result->addConfigWidget(ki->createConfigWidget(result->workingCopy()));
+    return d->m_irrelevantAspects;
+}
 
-    result->updateVisibility();
-
-    return result;
+void KitManager::setIrrelevantAspects(const QSet<Id> &aspects)
+{
+    d->m_irrelevantAspects = aspects;
 }
 
 void KitManager::notifyAboutUpdate(Kit *k)
@@ -442,7 +449,7 @@ void KitManager::completeKit(Kit *k)
 {
     QTC_ASSERT(k, return);
     KitGuard g(k);
-    for (const std::unique_ptr<KitInformation> &ki : d->m_informationList) {
+    for (const std::unique_ptr<KitAspect> &ki : d->m_informationList) {
         ki->upgrade(k);
         if (!k->hasValue(ki->id()))
             k->setValue(ki->id(), ki->defaultValue(k));
@@ -452,49 +459,79 @@ void KitManager::completeKit(Kit *k)
 }
 
 // --------------------------------------------------------------------
-// KitInformation:
+// KitAspect:
 // --------------------------------------------------------------------
 
-void KitInformation::addToEnvironment(const Kit *k, Environment &env) const
+void KitAspect::addToEnvironment(const Kit *k, Environment &env) const
 {
     Q_UNUSED(k);
     Q_UNUSED(env);
 }
 
-IOutputParser *KitInformation::createOutputParser(const Kit *k) const
+IOutputParser *KitAspect::createOutputParser(const Kit *k) const
 {
     Q_UNUSED(k);
     return nullptr;
 }
 
-QString KitInformation::displayNamePostfix(const Kit *k) const
+QString KitAspect::displayNamePostfix(const Kit *k) const
 {
     Q_UNUSED(k);
     return QString();
 }
 
-QSet<Id> KitInformation::supportedPlatforms(const Kit *k) const
+QSet<Id> KitAspect::supportedPlatforms(const Kit *k) const
 {
     Q_UNUSED(k);
     return QSet<Id>();
 }
 
-QSet<Id> KitInformation::availableFeatures(const Kit *k) const
+QSet<Id> KitAspect::availableFeatures(const Kit *k) const
 {
     Q_UNUSED(k);
     return QSet<Id>();
 }
 
-void KitInformation::addToMacroExpander(Kit *k, MacroExpander *expander) const
+void KitAspect::addToMacroExpander(Kit *k, MacroExpander *expander) const
 {
     Q_UNUSED(k);
     Q_UNUSED(expander);
 }
 
-void KitInformation::notifyAboutUpdate(Kit *k)
+void KitAspect::notifyAboutUpdate(Kit *k)
 {
     if (k)
         k->kitUpdated();
+}
+
+KitAspectWidget::KitAspectWidget(Kit *kit, const KitAspect *ki) : m_kit(kit),
+    m_kitInformation(ki), m_isSticky(kit->isSticky(ki->id()))
+{ }
+
+Core::Id KitAspectWidget::kitInformationId() const
+{
+    return m_kitInformation->id();
+}
+
+QString KitAspectWidget::msgManage()
+{
+    return tr("Manage...");
+}
+
+void KitAspectWidget::setPalette(const QPalette &p)
+{
+    if (mainWidget())
+        mainWidget()->setPalette(p);
+    if (buttonWidget())
+        buttonWidget()->setPalette(p);
+}
+
+void KitAspectWidget::setStyle(QStyle *s)
+{
+    if (mainWidget())
+        mainWidget()->setStyle(s);
+    if (buttonWidget())
+        buttonWidget()->setStyle(s);
 }
 
 // --------------------------------------------------------------------
@@ -515,12 +552,10 @@ QSet<Id> KitFeatureProvider::availablePlatforms() const
 
 QString KitFeatureProvider::displayNameForPlatform(Id id) const
 {
-    for (IDeviceFactory *f : IDeviceFactory::allDeviceFactories()) {
-        if (f->availableCreationIds().contains(id)) {
-            const QString dn = f->displayNameForId(id);
-            QTC_ASSERT(!dn.isEmpty(), continue);
-            return dn;
-        }
+    if (IDeviceFactory *f = IDeviceFactory::find(id)) {
+        const QString dn = f->displayName();
+        QTC_CHECK(!dn.isEmpty());
+        return dn;
     }
     return QString();
 }

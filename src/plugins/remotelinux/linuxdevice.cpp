@@ -26,6 +26,7 @@
 #include "linuxdevice.h"
 
 #include "genericlinuxdeviceconfigurationwidget.h"
+#include "genericlinuxdeviceconfigurationwizard.h"
 #include "linuxdeviceprocess.h"
 #include "linuxdevicetester.h"
 #include "publickeydeploymentdialog.h"
@@ -33,11 +34,14 @@
 #include "remotelinuxsignaloperation.h"
 #include "remotelinuxenvironmentreader.h"
 
+#include <coreplugin/icore.h>
 #include <coreplugin/id.h>
+#include <coreplugin/messagemanager.h>
 #include <projectexplorer/devicesupport/sshdeviceprocesslist.h>
 #include <projectexplorer/runconfiguration.h>
 #include <ssh/sshremoteprocessrunner.h>
 #include <utils/algorithm.h>
+#include <utils/hostosinfo.h>
 #include <utils/port.h>
 #include <utils/qtcassert.h>
 
@@ -64,7 +68,7 @@ public:
     }
 
 private:
-    QString listProcessesCommandLine() const
+    QString listProcessesCommandLine() const override
     {
         return QString::fromLatin1(
             "for dir in `ls -d /proc/[0123456789]*`; do "
@@ -77,7 +81,7 @@ private:
             "done").arg(QLatin1String(Delimiter0)).arg(QLatin1String(Delimiter1));
     }
 
-    QList<DeviceProcessItem> buildProcessList(const QString &listProcessesReply) const
+    QList<DeviceProcessItem> buildProcessList(const QString &listProcessesReply) const override
     {
         QList<DeviceProcessItem> processes;
         const QStringList lines = listProcessesReply.split(QString::fromLatin1(Delimiter0)
@@ -123,7 +127,7 @@ private:
 
 class LinuxPortsGatheringMethod : public PortsGatheringMethod
 {
-    Runnable runnable(QAbstractSocket::NetworkLayerProtocol protocol) const
+    Runnable runnable(QAbstractSocket::NetworkLayerProtocol protocol) const override
     {
         // We might encounter the situation that protocol is given IPv6
         // but the consumer of the free port information decides to open
@@ -138,11 +142,12 @@ class LinuxPortsGatheringMethod : public PortsGatheringMethod
         // /proc/net/tcp* covers /proc/net/tcp and /proc/net/tcp6
         Runnable runnable;
         runnable.executable = "sed";
-        runnable.commandLineArguments = "-e 's/.*: [[:xdigit:]]*:\\([[:xdigit:]]\\{4\\}\\).*/\\1/g' /proc/net/tcp*";
+        runnable.commandLineArguments
+                = "-e 's/.*: [[:xdigit:]]*:\\([[:xdigit:]]\\{4\\}\\).*/\\1/g' /proc/net/tcp*";
         return runnable;
     }
 
-    QList<Utils::Port> usedPorts(const QByteArray &output) const
+    QList<Utils::Port> usedPorts(const QByteArray &output) const override
     {
         QList<Utils::Port> ports;
         QList<QByteArray> portStrings = output.split('\n');
@@ -163,13 +168,6 @@ class LinuxPortsGatheringMethod : public PortsGatheringMethod
     }
 };
 
-
-LinuxDevice::Ptr LinuxDevice::create(const QString &name,
-       Core::Id type, MachineType machineType, Origin origin, Core::Id id)
-{
-    return Ptr(new LinuxDevice(name, type, machineType, origin, id));
-}
-
 QString LinuxDevice::displayType() const
 {
     return tr("Generic Linux");
@@ -180,53 +178,42 @@ IDeviceWidget *LinuxDevice::createWidget()
     return new GenericLinuxDeviceConfigurationWidget(sharedFromThis());
 }
 
-QList<Core::Id> LinuxDevice::actionIds() const
-{
-    return QList<Core::Id>() << Core::Id(Constants::GenericDeployKeyToDeviceActionId);
-}
-
-QString LinuxDevice::displayNameForActionId(Core::Id actionId) const
-{
-    QTC_ASSERT(actionIds().contains(actionId), return QString());
-
-    if (actionId == Constants::GenericDeployKeyToDeviceActionId)
-        return tr("Deploy Public Key...");
-    return QString(); // Can't happen.
-}
-
-void LinuxDevice::executeAction(Core::Id actionId, QWidget *parent)
-{
-    QTC_ASSERT(actionIds().contains(actionId), return);
-
-    QDialog *d = 0;
-    const LinuxDevice::ConstPtr device = sharedFromThis().staticCast<const LinuxDevice>();
-    if (actionId == Constants::GenericDeployKeyToDeviceActionId)
-        d = PublicKeyDeploymentDialog::createDialog(device, parent);
-    if (d)
-        d->exec();
-    delete d;
-}
-
 Utils::OsType LinuxDevice::osType() const
 {
     return Utils::OsTypeLinux;
 }
 
-LinuxDevice::LinuxDevice(const QString &name, Core::Id type, MachineType machineType,
-        Origin origin, Core::Id id)
-    : IDevice(type, origin, machineType, id)
+LinuxDevice::LinuxDevice()
 {
-    setDisplayName(name);
-}
+    addDeviceAction({tr("Deploy Public Key..."), [](const IDevice::Ptr &device, QWidget *parent) {
+        if (auto d = PublicKeyDeploymentDialog::createDialog(device, parent)) {
+            d->exec();
+            delete d;
+        }
+    }});
 
-LinuxDevice::LinuxDevice(const LinuxDevice &other)
-    : IDevice(other)
-{
-}
-
-LinuxDevice::Ptr LinuxDevice::create()
-{
-    return Ptr(new LinuxDevice);
+    if (Utils::HostOsInfo::isAnyUnixHost()) {
+        addDeviceAction({tr("Open Remote Shell"), [](const IDevice::Ptr &device, QWidget *) {
+            DeviceProcess * const proc = device->createProcess(nullptr);
+            QObject::connect(proc, &DeviceProcess::finished, [proc] {
+                if (!proc->errorString().isEmpty()) {
+                    Core::MessageManager::write(tr("Error running remote shell: %1")
+                                                .arg(proc->errorString()),
+                                                Core::MessageManager::ModeSwitch);
+                }
+                proc->deleteLater();
+            });
+            QObject::connect(proc, &DeviceProcess::error, [proc] {
+                Core::MessageManager::write(tr("Error starting remote shell."),
+                                            Core::MessageManager::ModeSwitch);
+                proc->deleteLater();
+            });
+            Runnable runnable;
+            runnable.device = device;
+            proc->setRunInTerminal(true);
+            proc->start(runnable);
+        }});
+    }
 }
 
 IDevice::Ptr LinuxDevice::clone() const
@@ -289,4 +276,37 @@ DeviceEnvironmentFetcher::Ptr LinuxDevice::environmentFetcher() const
     return DeviceEnvironmentFetcher::Ptr(new LinuxDeviceEnvironmentFetcher(sharedFromThis()));
 }
 
+void LinuxDevice::setSupportsRsync(bool supportsRsync)
+{
+    setExtraData("RemoteLinux.SupportsRSync", supportsRsync);
+}
+
+bool LinuxDevice::supportsRSync() const
+{
+    return extraData("RemoteLinux.SupportsRSync").toBool();
+}
+
+
+namespace Internal {
+
+// Factory
+
+LinuxDeviceFactory::LinuxDeviceFactory()
+    : IDeviceFactory(Constants::GenericLinuxOsType)
+{
+    setDisplayName(tr("Generic Linux Device"));
+    setIcon(QIcon());
+    setCanCreate(true);
+    setConstructionFunction(&LinuxDevice::create);
+}
+
+IDevice::Ptr LinuxDeviceFactory::create() const
+{
+    GenericLinuxDeviceConfigurationWizard wizard(Core::ICore::mainWindow());
+    if (wizard.exec() != QDialog::Accepted)
+        return IDevice::Ptr();
+    return wizard.device();
+}
+
+}
 } // namespace RemoteLinux

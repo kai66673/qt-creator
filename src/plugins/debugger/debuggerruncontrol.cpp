@@ -31,6 +31,7 @@
 #include "debuggeractions.h"
 #include "debuggercore.h"
 #include "debuggerengine.h"
+#include "debuggerinternalconstants.h"
 #include "debuggerkitinformation.h"
 #include "debuggerplugin.h"
 #include "debuggerrunconfigurationaspect.h"
@@ -105,7 +106,7 @@ public:
                 this, &LocalProcessRunner::handleStandardOutput);
         connect(&m_proc, &QProcess::readyReadStandardError,
                 this, &LocalProcessRunner::handleStandardError);
-        connect(&m_proc, static_cast<void (QProcess::*)(int)>(&QProcess::finished),
+        connect(&m_proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 this, &LocalProcessRunner::handleFinished);
     }
 
@@ -213,7 +214,7 @@ private:
         }
 
         m_coreUnpackProcess.setWorkingDirectory(TemporaryDirectory::masterDirectoryPath());
-        connect(&m_coreUnpackProcess, static_cast<void (QProcess::*)(int)>(&QProcess::finished),
+        connect(&m_coreUnpackProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 this, &CoreUnpacker::reportStarted);
 
         const QString msg = DebuggerRunTool::tr("Unpacking core file to %1");
@@ -522,8 +523,8 @@ void DebuggerRunTool::addSearchDirectory(const Utils::FileName &dir)
 
 void DebuggerRunTool::start()
 {
-    TaskHub::clearTasks(Debugger::Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
-    TaskHub::clearTasks(Debugger::Constants::TASK_CATEGORY_DEBUGGER_RUNTIME);
+    TaskHub::clearTasks(Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
+    TaskHub::clearTasks(Constants::TASK_CATEGORY_DEBUGGER_RUNTIME);
 
     if (d->portsGatherer) {
         setRemoteChannel(d->portsGatherer->gdbServer());
@@ -676,7 +677,7 @@ void DebuggerRunTool::start()
                     DebuggerPlugin::tr("Some breakpoints cannot be handled by the debugger "
                                        "languages currently active, and will be ignored.\n"
                                        "Affected are breakpoints %1")
-                    .arg(unhandledIds.join(QLatin1String(", ")));
+                    .arg(unhandledIds.join(", "));
 
             showMessage(warningMessage, LogWarning);
 
@@ -774,11 +775,6 @@ void DebuggerRunTool::setSolibSearchPath(const QStringList &list)
     m_runParameters.solibSearchPath = list;
 }
 
-void DebuggerRunTool::quitDebugger()
-{
-    initiateStop();
-}
-
 bool DebuggerRunTool::fixupParameters()
 {
     DebuggerRunParameters &rp = m_runParameters;
@@ -786,7 +782,8 @@ bool DebuggerRunTool::fixupParameters()
         rp.symbolFile = rp.inferior.executable;
 
     // Copy over DYLD_IMAGE_SUFFIX etc
-    for (auto var : QStringList({"DYLD_IMAGE_SUFFIX", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH"}))
+    for (const auto &var :
+         QStringList({"DYLD_IMAGE_SUFFIX", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH"}))
         if (rp.inferior.environment.hasKey(var))
             rp.debugger.environment.set(var, rp.inferior.environment.value(var));
 
@@ -906,9 +903,9 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
 
     if (runConfig) {
         m_runParameters.displayName = runConfig->displayName();
-        if (auto symbolsAspect = runConfig->extraAspect<SymbolFileAspect>())
+        if (auto symbolsAspect = runConfig->aspect<SymbolFileAspect>())
             m_runParameters.symbolFile = symbolsAspect->value();
-        if (auto terminalAspect = runConfig->extraAspect<TerminalAspect>())
+        if (auto terminalAspect = runConfig->aspect<TerminalAspect>())
             m_runParameters.useTerminal = terminalAspect->useTerminal();
     }
 
@@ -916,15 +913,15 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
         kit = runConfig->target()->kit();
     QTC_ASSERT(kit, return);
 
-    m_runParameters.sysRoot = SysRootKitInformation::sysRoot(kit);
+    m_runParameters.sysRoot = SysRootKitAspect::sysRoot(kit);
     m_runParameters.macroExpander = kit->macroExpander();
-    m_runParameters.debugger = DebuggerKitInformation::runnable(kit);
-    m_runParameters.cppEngineType = DebuggerKitInformation::engineType(kit);
+    m_runParameters.debugger = DebuggerKitAspect::runnable(kit);
+    m_runParameters.cppEngineType = DebuggerKitAspect::engineType(kit);
 
-    if (QtSupport::BaseQtVersion *qtVersion = QtSupport::QtKitInformation::qtVersion(kit))
+    if (QtSupport::BaseQtVersion *qtVersion = QtSupport::QtKitAspect::qtVersion(kit))
         m_runParameters.qtPackageSourceLocation = qtVersion->qtPackageSourcePath().toString();
 
-    if (auto aspect = runConfig ? runConfig->extraAspect<DebuggerRunConfigurationAspect>() : nullptr) {
+    if (auto aspect = runConfig ? runConfig->aspect<DebuggerRunConfigurationAspect>() : nullptr) {
         if (!aspect->useCppDebugger())
             m_runParameters.cppEngineType = NoEngineType;
         m_runParameters.isQmlDebugging = aspect->useQmlDebugger();
@@ -947,7 +944,7 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
         m_runParameters.projectSourceFiles = project->files(Project::SourceFiles);
     }
 
-    m_runParameters.toolChainAbi = ToolChainKitInformation::targetAbi(kit);
+    m_runParameters.toolChainAbi = ToolChainKitAspect::targetAbi(kit);
 
     bool ok = false;
     int nativeMixedOverride = qgetenv("QTC_DEBUGGER_NATIVE_MIXED").toInt(&ok);
@@ -956,7 +953,7 @@ DebuggerRunTool::DebuggerRunTool(RunControl *runControl, Kit *kit, bool allowTer
 
     // This will only be shown in some cases, but we don't want to access
     // the kit at that time anymore.
-    const QList<Task> tasks = DebuggerKitInformation::validateDebugger(kit);
+    const QList<Task> tasks = DebuggerKitAspect::validateDebugger(kit);
     for (const Task &t : tasks) {
         if (t.type != Task::Warning)
             m_runParameters.validationErrors.append(t.description);

@@ -59,7 +59,7 @@ public:
 
 public:
     BackendCommunicator();
-    ~BackendCommunicator();
+    ~BackendCommunicator() override;
 
     void documentsOpened(const FileContainers &fileContainers);
     void documentsChanged(Core::IDocument *document);
@@ -108,6 +108,8 @@ public:
     void updateChangeContentStartPosition(const QString &filePath, int position);
     bool isNotWaitingForCompletion() const;
 
+    void setBackendJobsPostponed(bool postponed);
+
 private:
     void initializeBackend();
     void initializeBackendWithCurrentData();
@@ -134,6 +136,7 @@ private:
     QTimer m_backendStartTimeOut;
     QScopedPointer<ClangBackEnd::ClangCodeModelServerInterface> m_sender;
     int m_connectedCount = 0;
+    bool m_postponeBackendJobs = false;
 };
 
 } // namespace Internal

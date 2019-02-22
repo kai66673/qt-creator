@@ -33,74 +33,10 @@ namespace Constants {
 // Debug mode
 const char MODE_DEBUG[]             = "Mode.Debug";
 
-// Contexts
+// Debug mode context
 const char C_DEBUGMODE[]            = "Debugger.DebugMode";
-const char C_CPPDEBUGGER[]          = "Gdb Debugger";
-const char C_QMLDEBUGGER[]          = "Qml/JavaScript Debugger";
-
-const char PRESET_PERSPECTIVE_ID[]  = "Debugger.Perspective.Preset";
-
-// Menu Groups
-const char G_GENERAL[]              = "Debugger.Group.General";
-const char G_SPECIAL[]              = "Debugger.Group.Special";
-const char G_START_QML[]            = "Debugger.Group.Start.Qml";
-
-// Common actions
-const char INTERRUPT[]              = "Debugger.Interrupt";
-const char CONTINUE[]               = "Debugger.Continue";
-const char STOP[]                   = "Debugger.Stop";
-const char HIDDEN_STOP[]            = "Debugger.HiddenStop";
-const char ABORT[]                  = "Debugger.Abort";
-const char STEP[]                   = "Debugger.StepLine";
-const char STEPOUT[]                = "Debugger.StepOut";
-const char NEXT[]                   = "Debugger.NextLine";
-const char REVERSE[]                = "Debugger.ReverseDirection";
-const char RESET[]                  = "Debugger.Reset";
-const char OPERATE_BY_INSTRUCTION[] = "Debugger.OperateByInstruction";
-const char QML_SHOW_APP_ON_TOP[]    = "Debugger.QmlShowAppOnTop";
-const char QML_SELECTTOOL[]         = "Debugger.QmlSelectTool";
-const char QML_ZOOMTOOL[]           = "Debugger.QmlZoomTool";
-
-const char TASK_CATEGORY_DEBUGGER_DEBUGINFO[] = "Debuginfo";
-const char TASK_CATEGORY_DEBUGGER_RUNTIME[]   = "DebugRuntime";
-
-const char TEXT_MARK_CATEGORY_BREAKPOINT[] = "Debugger.Mark.Breakpoint";
-const char TEXT_MARK_CATEGORY_LOCATION[] = "Debugger.Mark.Location";
-
-// Run Configuration Aspect defaults:
-const int QML_DEFAULT_DEBUG_SERVER_PORT = 3768;
 
 } // namespace Constants
-
-enum DebuggerState
-{
-    DebuggerNotReady,          // Debugger not started
-
-    EngineSetupRequested,      // Engine starts
-    EngineSetupFailed,
-    EngineSetupOk,
-
-    EngineRunRequested,
-    EngineRunFailed,
-
-    InferiorUnrunnable,        // Used in the core dump adapter
-
-    InferiorRunRequested,      // Debuggee requested to run
-    InferiorRunOk,             // Debuggee running
-    InferiorRunFailed,         // Debuggee running
-
-    InferiorStopRequested,     // Debuggee running, stop requested
-    InferiorStopOk,            // Debuggee stopped
-    InferiorStopFailed,        // Debuggee not stopped, will kill debugger
-
-    InferiorShutdownRequested,
-    InferiorShutdownFinished,
-
-    EngineShutdownRequested,
-    EngineShutdownFinished,
-
-    DebuggerFinished
-};
 
 // Keep in sync with dumper.py
 enum DebuggerStartMode
@@ -155,8 +91,7 @@ enum DebuggerCapabilities
     WatchComplexExpressionsCapability = 1 << 26, // Used to filter out challenges for cdb.
     AdditionalQmlStackCapability      = 1 << 27, //!< C++ debugger engine is able to retrieve QML stack as well.
     ResetInferiorCapability           = 1 << 28, //!< restart program while debugging
-    NativeMixedCapability             = 1 << 29,
-    BreakIndividualLocationsCapability= 1 << 30  //!< Allows to enable/disable individual location for multi-location bps
+    BreakIndividualLocationsCapability= 1 << 29  //!< Allows to enable/disable individual location for multi-location bps
 };
 
 enum LogChannel

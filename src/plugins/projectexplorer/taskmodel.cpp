@@ -294,7 +294,7 @@ int TaskModel::sizeOfFile(const QFont &font)
         if (pos != -1)
             filename = filename.mid(pos +1);
 
-        m_maxSizeOfFileName = qMax(m_maxSizeOfFileName, fm.width(filename));
+        m_maxSizeOfFileName = qMax(m_maxSizeOfFileName, fm.horizontalAdvance(filename));
     }
     m_lastMaxSizeIndex = count - 1;
     return m_maxSizeOfFileName;
@@ -305,7 +305,7 @@ int TaskModel::sizeOfLineNumber(const QFont &font)
     if (m_sizeOfLineNumber == 0 || font != m_lineMeasurementFont) {
         QFontMetrics fm(font);
         m_lineMeasurementFont = font;
-        m_sizeOfLineNumber = fm.width(QLatin1String("88888"));
+        m_sizeOfLineNumber = fm.horizontalAdvance(QLatin1String("88888"));
     }
     return m_sizeOfLineNumber;
 }
@@ -437,12 +437,12 @@ void TaskFilterModel::handleRowsAboutToBeRemoved(const QModelIndex &index, int f
     QTC_ASSERT(!index.isValid(), return);
 
     const QPair<int, int> range = findFilteredRange(first, last, m_mapping);
-    if (range.first > range.second) // rows to be removed are filtered out
-        return;
-
-    beginRemoveRows(QModelIndex(), range.first, range.second);
-    m_beginRemoveRowsSent = true;
-    m_mapping.erase(m_mapping.begin() + range.first, m_mapping.begin() + range.second + 1);
+    if (range.first <= range.second) { // remove corresponding rows in filtermodel
+        beginRemoveRows(QModelIndex(), range.first, range.second);
+        m_beginRemoveRowsSent = true;
+        m_mapping.erase(m_mapping.begin() + range.first, m_mapping.begin() + range.second + 1);
+    }
+    // adapt existing mapping to removed source indices
     const int sourceRemovedCount = (last - first) + 1;
     for (int i = range.first; i < m_mapping.count(); ++i)
         m_mapping[i] = m_mapping.at(i) - sourceRemovedCount;

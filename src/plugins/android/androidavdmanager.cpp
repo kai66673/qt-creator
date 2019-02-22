@@ -26,11 +26,11 @@
 
 #include "androidtoolmanager.h"
 
-#include "coreplugin/icore.h"
-#include "utils/algorithm.h"
-#include "utils/qtcassert.h"
-#include "utils/runextensions.h"
-#include "utils/synchronousprocess.h"
+#include <coreplugin/icore.h>
+#include <utils/algorithm.h>
+#include <utils/qtcassert.h>
+#include <utils/runextensions.h>
+#include <utils/synchronousprocess.h>
 
 #include <QApplication>
 #include <QFileInfo>
@@ -42,7 +42,7 @@
 #include <functional>
 
 namespace {
-Q_LOGGING_CATEGORY(avdManagerLog, "qtc.android.avdManager")
+Q_LOGGING_CATEGORY(avdManagerLog, "qtc.android.avdManager", QtWarningMsg)
 }
 
 namespace Android {
@@ -294,7 +294,7 @@ bool AndroidAvdManager::startAvdAsync(const QString &avdName) const
         return false;
     }
     auto avdProcess = new QProcess();
-    avdProcess->setReadChannelMode(QProcess::MergedChannels);
+    avdProcess->setProcessChannelMode(QProcess::MergedChannels);
     QObject::connect(avdProcess,
                      static_cast<void (QProcess::*)(int)>(&QProcess::finished),
                      avdProcess,
@@ -327,17 +327,18 @@ QString AndroidAvdManager::findAvd(const QString &avdName) const
     return QString();
 }
 
-QString AndroidAvdManager::waitForAvd(const QString &avdName, const QFutureInterface<bool> &fi) const
+QString AndroidAvdManager::waitForAvd(const QString &avdName,
+                                      const std::function<bool()> &cancelChecker) const
 {
     // we cannot use adb -e wait-for-device, since that doesn't work if a emulator is already running
     // 60 rounds of 2s sleeping, two minutes for the avd to start
     QString serialNumber;
     for (int i = 0; i < 60; ++i) {
-        if (fi.isCanceled())
+        if (cancelChecker())
             return QString();
         serialNumber = findAvd(avdName);
         if (!serialNumber.isEmpty())
-            return waitForBooted(serialNumber, fi) ?  serialNumber : QString();
+            return waitForBooted(serialNumber, cancelChecker) ?  serialNumber : QString();
         QThread::sleep(2);
     }
     return QString();
@@ -358,11 +359,12 @@ bool AndroidAvdManager::isAvdBooted(const QString &device) const
     return value == "stopped";
 }
 
-bool AndroidAvdManager::waitForBooted(const QString &serialNumber, const QFutureInterface<bool> &fi) const
+bool AndroidAvdManager::waitForBooted(const QString &serialNumber,
+                                      const std::function<bool()> &cancelChecker) const
 {
     // found a serial number, now wait until it's done booting...
     for (int i = 0; i < 60; ++i) {
-        if (fi.isCanceled())
+        if (cancelChecker())
             return false;
         if (isAvdBooted(serialNumber)) {
             return true;

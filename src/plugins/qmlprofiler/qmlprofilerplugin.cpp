@@ -91,11 +91,7 @@ public:
 bool QmlProfilerPlugin::initialize(const QStringList &arguments, QString *errorString)
 {
     Q_UNUSED(arguments)
-
-    if (!Utils::HostOsInfo::canCreateOpenGLContext(errorString))
-        return false;
-
-    return true;
+    return Utils::HostOsInfo::canCreateOpenGLContext(errorString);
 }
 
 void QmlProfilerPlugin::extensionsInitialized()
@@ -109,13 +105,13 @@ void QmlProfilerPlugin::extensionsInitialized()
     auto constraint = [](RunConfiguration *runConfiguration) {
         Target *target = runConfiguration ? runConfiguration->target() : nullptr;
         Kit *kit = target ? target->kit() : nullptr;
-        return DeviceTypeKitInformation::deviceTypeId(kit)
+        return DeviceTypeKitAspect::deviceTypeId(kit)
                 == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE;
     };
 
     RunControl::registerWorkerCreator(ProjectExplorer::Constants::QML_PROFILER_RUN_MODE,
                                       [this](RunControl *runControl) {
-        QmlProfilerRunner *runner = new QmlProfilerRunner(runControl);
+        auto runner = new QmlProfilerRunner(runControl);
         connect(runner, &QmlProfilerRunner::starting,
                 &d->m_profilerTool, &QmlProfilerTool::finalizeRunControl);
         return runner;

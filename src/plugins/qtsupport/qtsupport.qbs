@@ -19,6 +19,10 @@ Project {
             "QMAKE_LIBRARY",
             "QMAKE_BUILTIN_PRFS",
         ])
+        Properties {
+            condition: qbs.targetOS.contains("windows")
+            cpp.dynamicLibraries: "advapi32"
+        }
 
         Export {
             Depends { name: "ProParser" }
@@ -48,6 +52,8 @@ Project {
                 "qmakeparser.h",
                 "qmakevfs.cpp",
                 "qmakevfs.h",
+                "registry.cpp",
+                "registry_p.h",
             ]
         }
 
@@ -63,6 +69,8 @@ Project {
             "codegensettingspagewidget.ui",
             "qtconfigwidget.cpp",
             "qtconfigwidget.h",
+            "qtcppkitinfo.cpp",
+            "qtcppkitinfo.h",
             "qtprojectimporter.cpp",
             "qtprojectimporter.h",
             "qtsupport.qrc",
@@ -74,8 +82,6 @@ Project {
             "qmldumptool.h",
             "qscxmlcgenerator.cpp",
             "qscxmlcgenerator.h",
-            "qtkitconfigwidget.cpp",
-            "qtkitconfigwidget.h",
             "qtkitinformation.cpp",
             "qtkitinformation.h",
             "qtoptionspage.cpp",
@@ -104,8 +110,8 @@ Project {
         Group {
             name: "QtVersion"
             files: [
-                "desktopqtversion.cpp", "desktopqtversion.h",
-                "desktopqtversionfactory.cpp", "desktopqtversionfactory.h",
+                "desktopqtversion.cpp",
+                "desktopqtversion.h",
             ]
         }
 

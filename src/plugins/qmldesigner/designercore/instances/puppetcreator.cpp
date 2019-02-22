@@ -65,8 +65,8 @@
 #include <QThread>
 #include <QSettings>
 
-static Q_LOGGING_CATEGORY(puppetStart, "qtc.puppet.start")
-static Q_LOGGING_CATEGORY(puppetBuild, "qtc.puppet.build")
+static Q_LOGGING_CATEGORY(puppetStart, "qtc.puppet.start", QtWarningMsg)
+static Q_LOGGING_CATEGORY(puppetBuild, "qtc.puppet.build", QtWarningMsg)
 
 namespace QmlDesigner {
 
@@ -90,7 +90,7 @@ QHash<Core::Id, PuppetCreator::PuppetType> PuppetCreator::m_qml2PuppetForKitPupp
 
 QByteArray PuppetCreator::qtHash() const
 {
-    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitInformation::qtVersion(m_kit);
+    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitAspect::qtVersion(m_kit);
     if (currentQtVersion) {
         return QCryptographicHash::hash(currentQtVersion->qmakeProperty("QT_INSTALL_DATA").toUtf8(),
                                         QCryptographicHash::Sha1)
@@ -102,7 +102,7 @@ QByteArray PuppetCreator::qtHash() const
 
 QDateTime PuppetCreator::qtLastModified() const
 {
-    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitInformation::qtVersion(m_kit);
+    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitAspect::qtVersion(m_kit);
     if (currentQtVersion)
         return QFileInfo(currentQtVersion->qmakeProperty("QT_INSTALL_LIBS")).lastModified();
 
@@ -142,7 +142,7 @@ bool PuppetCreator::useOnlyFallbackPuppet() const
 #ifndef QMLDESIGNER_TEST
     if (!m_kit || !m_kit->isValid())
         qWarning() << "Invalid kit for QML puppet";
-    return m_designerSettings.value(DesignerSettingsKey::USE_ONLY_FALLBACK_PUPPET
+    return m_designerSettings.value(DesignerSettingsKey::USE_DEFAULT_PUPPET
                                     ).toBool() || m_kit == nullptr || !m_kit->isValid();
 #else
     return true;
@@ -371,7 +371,11 @@ QString PuppetCreator::qmlPuppetDirectory(PuppetType puppetType) const
         return qmlPuppetToplevelBuildDirectory() + '/' + QCoreApplication::applicationVersion()
                 + '/' + QString::fromLatin1(qtHash());
 
-    return qmlPuppetFallbackDirectory();
+#ifndef QMLDESIGNER_TEST
+    return qmlPuppetFallbackDirectory(m_designerSettings);
+#else
+    return QString();
+#endif
 }
 
 QString PuppetCreator::defaultPuppetFallbackDirectory()
@@ -382,15 +386,16 @@ QString PuppetCreator::defaultPuppetFallbackDirectory()
         return Core::ICore::libexecPath();
 }
 
-QString PuppetCreator::qmlPuppetFallbackDirectory() const
+QString PuppetCreator::qmlPuppetFallbackDirectory(const DesignerSettings &settings)
 {
 #ifndef QMLDESIGNER_TEST
-    QString puppetFallbackDirectory = m_designerSettings.value(
-        DesignerSettingsKey::PUPPET_FALLBACK_DIRECTORY).toString();
-    if (puppetFallbackDirectory.isEmpty())
+    QString puppetFallbackDirectory = settings.value(
+        DesignerSettingsKey::PUPPET_DEFAULT_DIRECTORY).toString();
+    if (puppetFallbackDirectory.isEmpty() || !QFileInfo::exists(puppetFallbackDirectory))
         return defaultPuppetFallbackDirectory();
     return puppetFallbackDirectory;
 #else
+    Q_UNUSED(settings);
     return QString();
 #endif
 }
@@ -414,7 +419,7 @@ QProcessEnvironment PuppetCreator::processEnvironment() const
     Utils::Environment environment = Utils::Environment::systemEnvironment();
     if (!useOnlyFallbackPuppet())
         m_kit->addToEnvironment(environment);
-    const QtSupport::BaseQtVersion *qt = QtSupport::QtKitInformation::qtVersion(m_kit);
+    const QtSupport::BaseQtVersion *qt = QtSupport::QtKitAspect::qtVersion(m_kit);
     if (QTC_GUARD(qt)) { // Kits without a Qt version should not have a puppet!
         // Update PATH to include QT_HOST_BINS
         const Utils::FileName qtBinPath = qt->binPath();
@@ -492,7 +497,7 @@ QString PuppetCreator::buildCommand() const
     m_kit->addToEnvironment(environment);
 
     ProjectExplorer::ToolChain *toolChain
-            = ProjectExplorer::ToolChainKitInformation::toolChain(m_kit,
+            = ProjectExplorer::ToolChainKitAspect::toolChain(m_kit,
                                                                   ProjectExplorer::Constants::CXX_LANGUAGE_ID);
 
     if (toolChain)
@@ -503,7 +508,7 @@ QString PuppetCreator::buildCommand() const
 
 QString PuppetCreator::qmakeCommand() const
 {
-    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitInformation::qtVersion(m_kit);
+    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitAspect::qtVersion(m_kit);
     if (currentQtVersion)
         return currentQtVersion->qmakeCommand().toString();
 
@@ -590,7 +595,7 @@ static bool nonEarlyQt5Version(const QtSupport::QtVersionNumber &currentQtVersio
 
 bool PuppetCreator::qtIsSupported() const
 {
-    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitInformation::qtVersion(m_kit);
+    QtSupport::BaseQtVersion *currentQtVersion = QtSupport::QtKitAspect::qtVersion(m_kit);
 
     return currentQtVersion
             && currentQtVersion->isValid()

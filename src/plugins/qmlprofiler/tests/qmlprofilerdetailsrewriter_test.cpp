@@ -25,6 +25,7 @@
 
 #include "qmlprofilerdetailsrewriter_test.h"
 
+#include <projectexplorer/buildinfo.h>
 #include <projectexplorer/customexecutablerunconfiguration.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/target.h>
@@ -71,23 +72,18 @@ public:
     bool needsConfiguration() const final { return false; }
 };
 
-class DummyBuildConfigurationFactory : public ProjectExplorer::IBuildConfigurationFactory
+class DummyBuildConfigurationFactory : public ProjectExplorer::BuildConfigurationFactory
 {
 public:
-    QList<ProjectExplorer::BuildInfo *> availableBuilds(const ProjectExplorer::Target *) const final
+    QList<ProjectExplorer::BuildInfo> availableBuilds(const ProjectExplorer::Target *) const final
     {
-        return QList<ProjectExplorer::BuildInfo *>();
+        return {};
     }
 
-    QList<ProjectExplorer::BuildInfo *> availableSetups(const ProjectExplorer::Kit *,
-                                                        const QString &) const final
+    QList<ProjectExplorer::BuildInfo> availableSetups(const ProjectExplorer::Kit *,
+                                                      const QString &) const final
     {
-        return QList<ProjectExplorer::BuildInfo *>();
-    }
-
-    int priority(const ProjectExplorer::Kit *, const QString &) const final
-    {
-        return 0;
+        return {};
     }
 };
 
@@ -230,7 +226,7 @@ void QmlProfilerDetailsRewriterTest::seedRewriter()
     QVERIFY(!doc->source().isEmpty());
 
     auto kit = std::make_unique<ProjectExplorer::Kit>();
-    ProjectExplorer::SysRootKitInformation::setSysRoot(
+    ProjectExplorer::SysRootKitAspect::setSysRoot(
                 kit.get(), Utils::FileName::fromLatin1("/nowhere"));
 
     DummyProject *project = new DummyProject(Utils::FileName::fromString(filename));

@@ -47,7 +47,7 @@ Environment QmlProjectEnvironmentAspect::baseEnvironment() const
             ? Environment::systemEnvironment()
             : Environment();
 
-    if (QmlProject *project = qobject_cast<QmlProject *>(m_target->project()))
+    if (auto project = qobject_cast<const QmlProject *>(m_target->project()))
         env.modify(project->environment());
 
     return env;
@@ -56,7 +56,7 @@ Environment QmlProjectEnvironmentAspect::baseEnvironment() const
 QmlProjectEnvironmentAspect::QmlProjectEnvironmentAspect(Target *target)
     : m_target(target)
 {
-    if (DeviceTypeKitInformation::deviceTypeId(target->kit())
+    if (DeviceTypeKitAspect::deviceTypeId(target->kit())
             == Constants::DESKTOP_DEVICE_TYPE)
         addPreferredBaseEnvironment(SystemEnvironmentBase, tr("System Environment"));
 

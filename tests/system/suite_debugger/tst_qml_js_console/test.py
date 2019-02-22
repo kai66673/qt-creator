@@ -55,10 +55,15 @@ def useDebuggerConsole(expression, expectedOutput, check=None, checkOutp=None):
         useDebuggerConsole(check, checkOutp)
 
 def debuggerHasStopped():
-    stopDebugger = findObject(":Debugger Toolbar.Exit Debugger_QToolButton")
+    debuggerPresetCombo = waitForObject("{type='QComboBox' unnamed='1' visible='1' "
+                                        "window=':Qt Creator_Core::Internal::MainWindow'}")
+    waitFor('dumpItems(debuggerPresetCombo.model()) == ["Debugger Preset"]', 5000)
+    if not test.compare(dumpItems(debuggerPresetCombo.model()), ["Debugger Preset"],
+                        "Verifying whether all debugger engines have quit."):
+        return False
     fancyDebugButton = waitForObject(":*Qt Creator.Start Debugging_Core::Internal::FancyToolButton")
-    result = test.verify(not stopDebugger.enabled and fancyDebugButton.enabled,
-                         "Verifying whether debugger buttons are in correct state.")
+    result = test.verify(fancyDebugButton.enabled,
+                         "Verifying whether main debugger button is in correct state.")
     ensureChecked(":Qt Creator_AppOutput_Core::Internal::OutputPaneToggleButton")
     output = waitForObject("{type='Core::OutputWindow' visible='1' "
                            "windowTitle='Application Output Window'}")
@@ -135,10 +140,11 @@ def main():
         # start debugging
         clickButton(fancyDebugButton)
         waitForObject(":Locals and Expressions_Debugger::Internal::WatchTreeView")
-        rootIndex = getQModelIndexStr("text='Rectangle'",
+        rootIndex = getQModelIndexStr("text='QQmlEngine'",
                                       ":Locals and Expressions_Debugger::Internal::WatchTreeView")
-        # make sure the items inside the root item are visible
-        doubleClick(waitForObject(rootIndex))
+        # make sure the items inside the QQmlEngine's root are visible
+        mainRect = getQModelIndexStr("text='Rectangle'", rootIndex)
+        doubleClick(waitForObject(mainRect))
         if not object.exists(":DebugModeWidget_Debugger::Internal::ConsoleView"):
             invokeMenuItem("Window", "Output Panes", "Debugger Console")
         progressBarWait()
@@ -149,19 +155,19 @@ def main():
                   ("width=66", "66", "width"), ("anchors.centerIn", "<unnamed object>"),
                   ("opacity", "1"), ("opacity = .1875", u"0.\u200b1875", "opacity")]
         # check red inner Rectangle
-        runChecks("text='Rectangle' occurrence='2'", rootIndex, checks)
+        runChecks("text='Rectangle' occurrence='2'", mainRect, checks)
 
         checks = [("color", u"#\u200bff0000"), ("width", "100"), ("height", "100"),
                   ("radius = Math.min(width, height) / 2", "50", "radius"),
                   ("parent.objectName= 'mainRect'", "mainRect")]
         # check green inner Rectangle
-        runChecks("text='Rectangle'", rootIndex, checks)
+        runChecks("text='Rectangle'", mainRect, checks)
 
         checks = [("color", u"#\u200b000000"), ("font.pointSize=14", "14", "font.pointSize"),
                   ("font.bold", "false"), ("font.weight=Font.Bold", "75", "font.bold", "true"),
                   ("rotation", "0"), ("rotation = 180", "180", "rotation")]
         # check Text element
-        runChecks("text='Text'", rootIndex, checks)
+        runChecks("text='Text'", mainRect, checks)
         # extended check must be done separately
         originalVal = useDebuggerConsole("x", None)
         if originalVal:

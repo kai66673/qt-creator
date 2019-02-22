@@ -51,9 +51,9 @@ public:
     bool showInSimpleTree() const override { return false; }
 
     bool canAddSubProject(const QString &proFilePath) const override;
-
     bool addSubProject(const QString &proFilePath) override;
     bool removeSubProject(const QString &proFilePath) override;
+    QStringList subProjectFileNamePatterns() const override;
 
     bool addFiles(const QStringList &filePaths, QStringList *notAdded = nullptr) override;
     bool removeFiles(const QStringList &filePaths, QStringList *notRemoved = nullptr) override;
@@ -82,17 +82,33 @@ public:
 
     QmakeProFile *proFile() const;
 
+    QString makefile() const;
+    QString objectsDirectory() const;
+    QString objectExtension() const;
+
+    bool isDebugAndRelease() const;
+    bool isQtcRunnable() const;
+    bool includedInExactParse() const;
+
     bool showInSimpleTree() const override;
 
+    QString buildKey() const override;
+    bool parseInProgress() const override;
+    bool validParse() const override;
+
+    QStringList targetApplications() const override;
     AddNewInformation addNewInformation(const QStringList &files, Node *context) const override;
+    QVariant data(Core::Id role) const override;
+    bool setData(Core::Id role, const QVariant &value) const override;
 
     QmakeProjectManager::ProjectType projectType() const;
     QString buildDir() const;
+    Utils::FileName buildDir(QmakeBuildConfiguration *bc) const;
 
     QStringList variableValue(const Variable var) const;
     QString singleVariableValue(const Variable var) const;
 
-    QmakeProFileNode *findProFileFor(const Utils::FileName &string) const;
+    TargetInformation targetInformation() const;
 
     bool showInSimpleTree(ProjectType projectType) const;
 };

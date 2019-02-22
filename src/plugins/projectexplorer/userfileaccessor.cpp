@@ -133,6 +133,18 @@ public:
     static QVariant process(const QVariant &entry, const QStringList &path);
 };
 
+// Version 20 renames "Qbs.Deploy" to "ProjectExplorer.DefaultDeployConfiguration"
+// to account for the merging of the respective factories
+// run configuration fields use the same key in the settings file.
+class UserFileVersion20Upgrader : public VersionUpgrader
+{
+public:
+    UserFileVersion20Upgrader() : VersionUpgrader(20, "4.9-pre1") { }
+    QVariantMap upgrade(const QVariantMap &map) final;
+
+    static QVariant process(const QVariant &entry);
+};
+
 } // namespace
 
 //
@@ -151,47 +163,6 @@ public:
 Q_DECLARE_TYPEINFO(HandlerNode, Q_MOVABLE_TYPE);
 
 QT_END_NAMESPACE
-
-static HandlerNode buildHandlerNodes(const char * const **keys)
-{
-    HandlerNode ret;
-    while (const char *rname = *(*keys)++) {
-        QString name = QLatin1String(rname);
-        if (name.endsWith('.')) {
-            HandlerNode sub = buildHandlerNodes(keys);
-            foreach (const QString &key, name.split('|'))
-                ret.children.insert(key, sub);
-        } else {
-            ret.strings.insert(name);
-        }
-    }
-    return ret;
-}
-
-static QVariantMap processHandlerNodes(const HandlerNode &node, const QVariantMap &map,
-                                       QVariant (*handler)(const QVariant &var))
-{
-    QVariantMap result;
-    QMapIterator<QString, QVariant> it(map);
-    while (it.hasNext()) {
-        it.next();
-        const QString &key = it.key();
-        if (node.strings.contains(key)) {
-            result.insert(key, handler(it.value()));
-            goto handled;
-        }
-        if (it.value().type() == QVariant::Map)
-            for (QHash<QString, HandlerNode>::ConstIterator subit = node.children.constBegin();
-                 subit != node.children.constEnd(); ++subit)
-                if (key.startsWith(subit.key())) {
-                    result.insert(key, processHandlerNodes(subit.value(), it.value().toMap(), handler));
-                    goto handled;
-                }
-        result.insert(key, it.value());
-      handled: ;
-    }
-    return result;
-}
 
 // --------------------------------------------------------------------
 // Helpers:
@@ -334,6 +305,7 @@ UserFileAccessor::UserFileAccessor(Project *project) :
     addVersionUpgrader(std::make_unique<UserFileVersion17Upgrader>());
     addVersionUpgrader(std::make_unique<UserFileVersion18Upgrader>());
     addVersionUpgrader(std::make_unique<UserFileVersion19Upgrader>());
+    addVersionUpgrader(std::make_unique<UserFileVersion20Upgrader>());
 }
 
 Project *UserFileAccessor::project() const
@@ -439,7 +411,7 @@ QVariantMap UserFileAccessor::preprocessReadSettings(const QVariantMap &data) co
     QVariantMap tmp = MergingSettingsAccessor::preprocessReadSettings(data);
 
     // Move from old Version field to new one:
-    // This can not be done in a normal upgrader since the version information is needed
+    // This cannot be done in a normal upgrader since the version information is needed
     // to decide which upgraders to run
     const QString obsoleteKey = OBSOLETE_VERSION_KEY;
     const int obsoleteVersion = tmp.value(obsoleteKey, -1).toInt();
@@ -844,6 +816,32 @@ QVariant UserFileVersion19Upgrader::process(const QVariant &entry, const QString
                 QStringList newPath = path;
                 newPath.append(item.first);
                 return qMakePair(item.first, UserFileVersion19Upgrader::process(item.second, newPath));
+            });
+    default:
+        return entry;
+    }
+}
+
+QVariantMap UserFileVersion20Upgrader::upgrade(const QVariantMap &map)
+{
+    return process(map).toMap();
+}
+
+QVariant UserFileVersion20Upgrader::process(const QVariant &entry)
+{
+    switch (entry.type()) {
+    case QVariant::List:
+        return Utils::transform(entry.toList(), &UserFileVersion20Upgrader::process);
+    case QVariant::Map:
+        return Utils::transform<QMap<QString, QVariant>>(
+            entry.toMap().toStdMap(), [](const std::pair<const QString, QVariant> &item) {
+                auto res = qMakePair(item.first, item.second);
+                if (item.first == "ProjectExplorer.ProjectConfiguration.Id"
+                        && item.second == "Qbs.Deploy")
+                    res.second = QVariant("ProjectExplorer.DefaultDeployConfiguration");
+                else
+                    res.second = UserFileVersion20Upgrader::process(item.second);
+                return res;
             });
     default:
         return entry;

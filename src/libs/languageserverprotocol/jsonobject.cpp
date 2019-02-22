@@ -61,11 +61,7 @@ JsonObject &JsonObject::operator=(const JsonObject &other) = default;
 
 JsonObject &JsonObject::operator=(JsonObject &&other)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
     m_jsonObject.swap(other.m_jsonObject);
-#else
-    m_jsonObject = other.m_jsonObject; // NOTE use QJsonObject::swap when minimum required Qt version >= 5.10
-#endif
     return *this;
 }
 
@@ -104,7 +100,7 @@ QString JsonObject::valueTypeString(QJsonValue::Type type)
 
 QString JsonObject::errorString(QJsonValue::Type expected, QJsonValue::Type actual)
 {
-    return tr("Expected Type %1 but value contained %2")
+    return tr("Expected type %1 but value contained %2")
             .arg(valueTypeString(expected), valueTypeString(actual));
 }
 

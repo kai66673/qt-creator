@@ -27,8 +27,6 @@
 
 #include <utils/treemodel.h>
 
-#include <QAbstractTableModel>
-#include <QComboBox>
 #include <QPointer>
 
 namespace Debugger {
@@ -51,12 +49,11 @@ public:
     static void unregisterEngine(DebuggerEngine *engine);
     static void activateEngine(DebuggerEngine *engine);
     static void activateDebugMode();
+    static void deactivateDebugMode();
     static bool isLastOf(const QString &type);
 
     static QList<QPointer<DebuggerEngine> > engines();
     static QPointer<DebuggerEngine> currentEngine();
-
-    static void selectUiForCurrentEngine();
 
     static QWidget *engineChooser();
 

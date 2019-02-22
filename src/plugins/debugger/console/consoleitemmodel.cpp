@@ -87,12 +87,12 @@ int ConsoleItemModel::sizeOfFile(const QFont &font)
     if (lastReadOnlyRow < 0)
         return 0;
     QString filename = static_cast<ConsoleItem *>(rootItem()->childAt(lastReadOnlyRow))->file();
-    const int pos = filename.lastIndexOf(QLatin1Char('/'));
+    const int pos = filename.lastIndexOf('/');
     if (pos != -1)
         filename = filename.mid(pos + 1);
 
     QFontMetrics fm(font);
-    m_maxSizeOfFileName = qMax(m_maxSizeOfFileName, fm.width(filename));
+    m_maxSizeOfFileName = qMax(m_maxSizeOfFileName, fm.horizontalAdvance(filename));
 
     return m_maxSizeOfFileName;
 }
@@ -100,7 +100,7 @@ int ConsoleItemModel::sizeOfFile(const QFont &font)
 int ConsoleItemModel::sizeOfLineNumber(const QFont &font)
 {
     QFontMetrics fm(font);
-    return fm.width(QLatin1String("88888"));
+    return fm.horizontalAdvance("88888");
 }
 
 } // Internal

@@ -23,6 +23,10 @@
 #
 ############################################################################
 
+def jumpToFirstLine(editor):
+    home = "<Home>" if platform.system() == 'Darwin' else "<Ctrl+Home>"
+    type(editor, home)
+
 # places the cursor inside the given editor into the given line
 # (leading and trailing whitespaces are ignored!)
 # and goes to the end of the line
@@ -36,10 +40,7 @@ def placeCursorToLine(editor, line, isRegex=False):
     if not isinstance(editor, (str, unicode)):
         editor = objectMap.realName(editor)
     oldPosition = 0
-    if isDarwin:
-        type(getEditor(), "<Home>")
-    else:
-        type(getEditor(), "<Ctrl+Home>")
+    jumpToFirstLine(getEditor())
     found = False
     if isRegex:
         regex = re.compile(line)
@@ -146,7 +147,7 @@ def verifyHoveringOnEditor(editor, lines, additionalKeyPresses, expectedTypes, e
         for ty in additionalKeyPresses:
             type(editor, ty)
         rect = editor.cursorRect(editor.textCursor())
-        expectedToolTip = "{type='QTipLabel' visible='1'}"
+        expectedToolTip = "{type='QLabel' objectName='qcToolTip' visible='1'}"
         # wait for similar tooltips to disappear
         checkIfObjectExists(expectedToolTip, False, 1000, True)
         sendEvent("QMouseEvent", editor, QEvent.MouseMove, rect.x+rect.width/2, rect.y+rect.height/2, Qt.NoButton, 0)
@@ -360,7 +361,7 @@ def invokeFindUsage(editor, line, typeOperation, n=1):
     for _ in range(n):
         type(editor, typeOperation)
     snooze(1)
-    invokeContextMenuItem(editor, "Find Usages")
+    invokeContextMenuItem(editor, "Find References to Symbol Under Cursor")
     return True
 
 def addBranchWildcardToRoot(rootNode):

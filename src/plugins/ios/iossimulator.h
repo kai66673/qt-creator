@@ -26,11 +26,11 @@
 #pragma once
 
 #include <projectexplorer/devicesupport/idevice.h>
+#include <projectexplorer/devicesupport/idevicefactory.h>
+
 #include <utils/fileutils.h>
 
-#include <QMutex>
 #include <QDebug>
-#include <QSharedPointer>
 
 namespace ProjectExplorer { class Kit; }
 namespace Ios {
@@ -63,15 +63,12 @@ QDebug operator <<(QDebug debug, const IosDeviceType &deviceType);
 class IosSimulator : public ProjectExplorer::IDevice
 {
 public:
-    typedef QSharedPointer<const IosSimulator> ConstPtr;
-    typedef QSharedPointer<IosSimulator> Ptr;
+    using ConstPtr = QSharedPointer<const IosSimulator>;
+    using Ptr = QSharedPointer<IosSimulator>;
     ProjectExplorer::IDevice::DeviceInfo deviceInformation() const override;
 
     QString displayType() const override;
     ProjectExplorer::IDeviceWidget *createWidget() override;
-    QList<Core::Id> actionIds() const override;
-    QString displayNameForActionId(Core::Id actionId) const override;
-    void executeAction(Core::Id actionId, QWidget *parent = 0) override;
     ProjectExplorer::DeviceProcessSignalOperation::Ptr signalOperation() const override;
     void fromMap(const QVariantMap &map) override;
     QVariantMap toMap() const override;
@@ -88,6 +85,13 @@ protected:
     IosSimulator(const IosSimulator &other);
 private:
     mutable quint16 m_lastPort;
+};
+
+class IosSimulatorFactory : public ProjectExplorer::IDeviceFactory
+{
+    Q_OBJECT
+public:
+    IosSimulatorFactory();
 };
 
 namespace IosKitInformation {

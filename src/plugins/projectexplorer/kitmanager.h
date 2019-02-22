@@ -34,8 +34,13 @@
 
 #include <QObject>
 #include <QPair>
+#include <QSet>
 
 #include <functional>
+
+QT_BEGIN_NAMESPACE
+class QStyle;
+QT_END_NAMESPACE
 
 namespace Utils {
 class Environment;
@@ -46,31 +51,33 @@ class MacroExpander;
 namespace ProjectExplorer {
 class Task;
 class IOutputParser;
-class KitConfigWidget;
+class KitAspectWidget;
 class KitManager;
 
 namespace Internal {
-class KitManagerConfigWidget;
 class KitModel;
 } // namespace Internal
 
 /**
- * @brief The KitInformation class
+ * @brief The KitAspect class
  *
  * One piece of information stored in the kit.
  *
  * This needs to get registered with the \a KitManager.
  */
-class PROJECTEXPLORER_EXPORT KitInformation : public QObject
+class PROJECTEXPLORER_EXPORT KitAspect : public QObject
 {
     Q_OBJECT
 
 public:
-    typedef QPair<QString, QString> Item;
-    typedef QList<Item> ItemList;
+    using Item = QPair<QString, QString>;
+    using ItemList = QList<Item>;
 
     Core::Id id() const { return m_id; }
     int priority() const { return m_priority; }
+    QString displayName() const { return m_displayName; }
+    QString description() const { return m_description; }
+    bool isEssential() const { return m_essential; }
 
     virtual QVariant defaultValue(const Kit *) const = 0;
 
@@ -85,7 +92,7 @@ public:
 
     virtual ItemList toUserOutput(const Kit *) const = 0;
 
-    virtual KitConfigWidget *createConfigWidget(Kit *) const = 0;
+    virtual KitAspectWidget *createConfigWidget(Kit *) const = 0;
 
     virtual void addToEnvironment(const Kit *k, Utils::Environment &env) const;
     virtual IOutputParser *createOutputParser(const Kit *k) const;
@@ -97,14 +104,56 @@ public:
 
     virtual void addToMacroExpander(ProjectExplorer::Kit *kit, Utils::MacroExpander *expander) const;
 
+    virtual bool isApplicableToKit(const Kit *) const { return true; }
+
 protected:
     void setId(Core::Id id) { m_id = id; }
+    void setDisplayName(const QString &name) { m_displayName = name; }
+    void setDescription(const QString &desc) { m_description = desc; }
+    void makeEssential() { m_essential = true; }
     void setPriority(int priority) { m_priority = priority; }
     void notifyAboutUpdate(Kit *k);
 
 private:
+    QString m_displayName;
+    QString m_description;
     Core::Id m_id;
     int m_priority = 0; // The higher the closer to the top.
+    bool m_essential = false;
+};
+
+class PROJECTEXPLORER_EXPORT KitAspectWidget : public QObject
+{
+    Q_OBJECT
+
+public:
+    KitAspectWidget(Kit *kit, const KitAspect *ki);
+
+    Core::Id kitInformationId() const;
+
+    virtual void makeReadOnly() = 0;
+    virtual void refresh() = 0;
+    bool visibleInKit() { return m_kitInformation->isApplicableToKit(m_kit); }
+
+    virtual QWidget *mainWidget() const = 0;
+    virtual QWidget *buttonWidget() const { return nullptr; }
+
+    bool isSticky() const { return m_isSticky; }
+
+    static QString msgManage();
+
+    Kit *kit() const { return m_kit; }
+
+    virtual void setPalette(const QPalette &p);
+    virtual void setStyle(QStyle *s);
+
+signals:
+    void dirty();
+
+protected:
+    Kit *m_kit;
+    const KitAspect *m_kitInformation;
+    bool m_isSticky;
 };
 
 class PROJECTEXPLORER_EXPORT KitManager : public QObject
@@ -120,23 +169,23 @@ public:
     static Kit *kit(Core::Id id);
     static Kit *defaultKit();
 
-    static QList<KitInformation *> kitInformation();
-
-    static Internal::KitManagerConfigWidget *createConfigWidget(Kit *k);
+    static const QList<KitAspect *> kitAspects();
+    static const QSet<Core::Id> irrelevantAspects();
+    static void setIrrelevantAspects(const QSet<Core::Id> &aspects);
 
     static bool registerKit(std::unique_ptr<Kit> &&k);
     static void deregisterKit(Kit *k);
     static void setDefaultKit(Kit *k);
 
     template<typename KI, typename... Args>
-    static void registerKitInformation(Args&&... args) {
-        registerKitInformation(std::make_unique<KI>(std::forward<Args>(args)...));
+    static void registerKitAspect(Args&&... args) {
+        registerKitAspect(std::make_unique<KI>(std::forward<Args>(args)...));
     }
 
     static QSet<Core::Id> supportedPlatforms();
     static QSet<Core::Id> availableFeatures(Core::Id platformId);
 
-    static QList<Kit *> sortKits(const QList<Kit *> kits); // Avoid sorting whenever possible!
+    static QList<Kit *> sortKits(const QList<Kit *> &kits); // Avoid sorting whenever possible!
 
     static void saveKits();
 
@@ -159,15 +208,14 @@ signals:
 private:
     explicit KitManager(QObject *parent = nullptr);
 
-    static void registerKitInformation(std::unique_ptr<KitInformation> &&ki);
+    static void registerKitAspect(std::unique_ptr<KitAspect> &&ki);
 
     // Make sure the this is only called after all
-    // KitInformation are registered!
+    // KitAspects are registered!
     void restoreKits();
     class KitList
     {
     public:
-        KitList() {}
         Core::Id defaultKit;
         std::vector<std::unique_ptr<Kit>> kits;
     };
@@ -179,7 +227,7 @@ private:
     friend class ProjectExplorerPlugin; // for constructor
     friend class Kit;
     friend class Internal::KitModel;
-    friend class KitInformation; // for notifyAbutUpdate
+    friend class KitAspect; // for notifyAbutUpdate
 };
 
 } // namespace ProjectExplorer

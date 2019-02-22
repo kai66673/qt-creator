@@ -116,12 +116,13 @@ bool CustomToolChain::isValid() const
     return true;
 }
 
-ToolChain::PredefinedMacrosRunner CustomToolChain::createPredefinedMacrosRunner() const
+ToolChain::MacroInspectionRunner CustomToolChain::createMacroInspectionRunner() const
 {
     const Macros theMacros = m_predefinedMacros;
+    const Core::Id lang = language();
 
     // This runner must be thread-safe!
-    return [theMacros](const QStringList &cxxflags){
+    return [theMacros, lang](const QStringList &cxxflags){
         Macros macros = theMacros;
         for (const QString &cxxFlag : cxxflags) {
             if (cxxFlag.startsWith(QLatin1String("-D")))
@@ -130,21 +131,18 @@ ToolChain::PredefinedMacrosRunner CustomToolChain::createPredefinedMacrosRunner(
                 macros.append({cxxFlag.mid(2).trimmed().toUtf8(), MacroType::Undefine});
 
         }
-        return macros;
+        return MacroInspectionReport{macros, ToolChain::languageVersion(lang, macros)};
     };
 }
 
 Macros CustomToolChain::predefinedMacros(const QStringList &cxxflags) const
 {
-    return createPredefinedMacrosRunner()(cxxflags);
+    return createMacroInspectionRunner()(cxxflags).macros;
 }
 
-ToolChain::CompilerFlags CustomToolChain::compilerFlags(const QStringList &cxxflags) const
+Utils::LanguageExtensions CustomToolChain::languageExtensions(const QStringList &) const
 {
-    for (const QString &cxx11Flag : m_cxx11Flags)
-        if (cxxflags.contains(cxx11Flag))
-            return StandardCxx11;
-    return NoFlags;
+    return LanguageExtension::None;
 }
 
 WarningFlags CustomToolChain::warningFlags(const QStringList &cxxflags) const
@@ -526,7 +524,7 @@ CustomToolChainConfigWidget::CustomToolChainConfigWidget(CustomToolChain *tc) :
     Q_ASSERT(tc);
 
     const QList<CustomToolChain::Parser> parsers = CustomToolChain::parsers();
-    for (auto parser : parsers)
+    for (const auto &parser : parsers)
         m_errorParserComboBox->addItem(parser.displayName, parser.parserId.toString());
 
     auto parserLayoutWidget = new QWidget;

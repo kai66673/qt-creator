@@ -65,7 +65,7 @@ class BranchDialog;
 class BranchViewFactory;
 class RemoteDialog;
 
-typedef void (GitClient::*GitClientMemberFunc)(const QString &);
+using GitClientMemberFunc = void (GitClient::*)(const QString &);
 
 class GitPlugin : public VcsBase::VcsBasePlugin
 {
@@ -106,6 +106,8 @@ private slots:
     void testDiffFileResolving_data();
     void testDiffFileResolving();
     void testLogResolving();
+    void testGitRemote_data();
+    void testGitRemote();
 #endif
 
 private:

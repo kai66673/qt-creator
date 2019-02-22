@@ -26,10 +26,10 @@
 #include "simulatorcontrol.h"
 #include "iosconfigurations.h"
 
-#include "utils/algorithm.h"
-#include "utils/runextensions.h"
-#include "utils/qtcassert.h"
-#include "utils/synchronousprocess.h"
+#include <utils/algorithm.h>
+#include <utils/runextensions.h>
+#include <utils/qtcassert.h>
+#include <utils/synchronousprocess.h>
 
 #ifdef Q_OS_MAC
 #include <CoreFoundation/CoreFoundation.h>
@@ -47,7 +47,7 @@
 using namespace std;
 
 namespace {
-Q_LOGGING_CATEGORY(simulatorLog, "qtc.ios.simulator")
+Q_LOGGING_CATEGORY(simulatorLog, "qtc.ios.simulator", QtWarningMsg)
 }
 
 namespace Ios {
@@ -107,7 +107,7 @@ static bool launchSimulator(const QString &simUdid) {
                     return runSimCtlCommand(QStringList({"boot", simUdid}), nullptr);
             }
         } else {
-            qCDebug(simulatorLog) << "Can not start Simulator device."
+            qCDebug(simulatorLog) << "Cannot start Simulator device."
                                   << "Error probing Simulator.app instance";
             return false;
         }
@@ -356,14 +356,9 @@ QList<SimulatorInfo> SimulatorControlPrivate::availableDevices;
 QList<DeviceTypeInfo> SimulatorControlPrivate::availableDeviceTypes;
 QList<RuntimeInfo> SimulatorControlPrivate::availableRuntimes;
 
-SimulatorControlPrivate::SimulatorControlPrivate()
-{
-}
+SimulatorControlPrivate::SimulatorControlPrivate() = default;
 
-SimulatorControlPrivate::~SimulatorControlPrivate()
-{
-
-}
+SimulatorControlPrivate::~SimulatorControlPrivate() = default;
 
 SimulatorInfo SimulatorControlPrivate::deviceInfo(const QString &simUdid)
 {
@@ -438,7 +433,7 @@ void SimulatorControlPrivate::startSimulator(QFutureInterface<SimulatorControl::
     }
 
     if (simInfo.isShuttingDown()) {
-        qCDebug(simulatorLog) << "Can not start Simulator device. "
+        qCDebug(simulatorLog) << "Cannot start Simulator device. "
                               << "Previous instance taking too long to shutdown." << simInfo;
         return;
     }
@@ -465,7 +460,7 @@ void SimulatorControlPrivate::startSimulator(QFutureInterface<SimulatorControl::
             qCDebug(simulatorLog) << "Error starting simulator.";
         }
     } else {
-       qCDebug(simulatorLog) << "Can not start Simulator device. Simulator not in shutdown state."
+       qCDebug(simulatorLog) << "Cannot start Simulator device. Simulator not in shutdown state."
                              << simInfo;
     }
 

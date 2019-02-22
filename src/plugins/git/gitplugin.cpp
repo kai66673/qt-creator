@@ -193,6 +193,7 @@ QString GitPlugin::invalidBranchAndRemoteNamePattern()
         "|^[/-]"  // no leading slash or dash
         "|\""     // no quotes
         "|\\*"    // no asterisk
+        "|(^|[A-Z]+_)HEAD" // no HEAD, FETCH_HEAD etc.
     );
 }
 
@@ -569,6 +570,9 @@ bool GitPlugin::initialize(const QStringList &arguments, QString *errorMessage)
     createRepositoryAction(subversionMenu, tr("Fetch"), "Git.Subversion.Fetch",
                            context, false, &GitClient::synchronousSubversionFetch);
 
+    createRepositoryAction(subversionMenu, tr("DCommit"), "Git.Subversion.DCommit",
+                           context, false, &GitClient::subversionDeltaCommit);
+
     // --------------
     remoteRepositoryMenu->addSeparator(context);
 
@@ -793,7 +797,7 @@ void GitPlugin::resetRepository()
     QTC_ASSERT(state.hasTopLevel(), return);
     QString topLevel = state.topLevel();
 
-    LogChangeDialog dialog(true, ICore::mainWindow());
+    LogChangeDialog dialog(true, ICore::dialogParent());
     ResetItemDelegate delegate(dialog.widget());
     dialog.setWindowTitle(tr("Undo Changes to %1").arg(QDir::toNativeSeparators(topLevel)));
     if (dialog.runDialog(topLevel, QString(), LogChangeWidget::IncludeRemotes))
@@ -818,7 +822,7 @@ void GitPlugin::startRebase()
     const QString topLevel = state.topLevel();
     if (topLevel.isEmpty() || !m_gitClient->canRebase(topLevel))
         return;
-    LogChangeDialog dialog(false, ICore::mainWindow());
+    LogChangeDialog dialog(false, ICore::dialogParent());
     RebaseItemDelegate delegate(dialog.widget());
     dialog.setWindowTitle(tr("Interactive Rebase"));
     if (!dialog.runDialog(topLevel))
@@ -832,7 +836,7 @@ void GitPlugin::startChangeRelatedAction(const Id &id)
     const VcsBasePluginState state = currentState();
 
     ChangeSelectionDialog dialog(state.hasTopLevel() ? state.topLevel() : PathChooser::homePath(),
-                                 id, ICore::mainWindow());
+                                 id, ICore::dialogParent());
 
     int result = dialog.exec();
 
@@ -861,7 +865,7 @@ void GitPlugin::startChangeRelatedAction(const Id &id)
         m_gitClient->synchronousRevert(workingDirectory, change);
         break;
     case Checkout:
-        m_gitClient->stashAndCheckout(workingDirectory, change);
+        m_gitClient->checkout(workingDirectory, change);
         break;
     default:
         return;
@@ -1033,12 +1037,8 @@ bool GitPlugin::submitEditorAboutToClose()
         return true;
     // Prompt user. Force a prompt unless submit was actually invoked (that
     // is, the editor was closed or shutdown).
-    bool promptData = false;
     const VcsBaseSubmitEditor::PromptSubmitResult answer
-            = editor->promptSubmit(tr("Closing Git Editor"),
-                 tr("Do you want to commit the change?"),
-                 tr("Git will not accept this commit. Do you want to continue to edit it?"),
-                 &promptData, !m_submitActionTriggered, false);
+            = editor->promptSubmit(this, nullptr, !m_submitActionTriggered, false);
     m_submitActionTriggered = false;
     switch (answer) {
     case VcsBaseSubmitEditor::SubmitCanceled:
@@ -1234,7 +1234,7 @@ void GitPlugin::applyPatch(const QString &workingDirectory, QString file)
     // Prompt for file
     if (file.isEmpty()) {
         const QString filter = tr("Patches (*.patch *.diff)");
-        file = QFileDialog::getOpenFileName(ICore::mainWindow(), tr("Choose Patch"), QString(), filter);
+        file = QFileDialog::getOpenFileName(ICore::dialogParent(), tr("Choose Patch"), QString(), filter);
         if (file.isEmpty()) {
             m_gitClient->endStashScope(workingDirectory);
             return;
@@ -1302,7 +1302,7 @@ template <class NonModalDialog>
         dialog->show();
         dialog->raise();
     } else {
-        dialog = new NonModalDialog(ICore::mainWindow());
+        dialog = new NonModalDialog(ICore::dialogParent());
         dialog->refresh(topLevel, true);
         dialog->show();
     }
@@ -1552,6 +1552,118 @@ void GitPlugin::testLogResolving()
                             "50a6b54c - Merge branch 'for-junio' of git://bogomips.org/git-svn",
                             "3587b513 - Update draft release notes to 1.8.2");
 }
+
+class RemoteTest {
+public:
+    RemoteTest() = default;
+    explicit RemoteTest(const QString &url): m_url(url) {}
+
+    inline RemoteTest &protocol(const QString &p) { m_protocol = p; return *this; }
+    inline RemoteTest &userName(const QString &u) { m_userName = u; return *this; }
+    inline RemoteTest &host(const QString &h) { m_host = h; return *this; }
+    inline RemoteTest &port(quint16 p) { m_port = p; return *this; }
+    inline RemoteTest &path(const QString &p) { m_path = p; return *this; }
+    inline RemoteTest &isLocal(bool l) { m_isLocal = l; return *this; }
+    inline RemoteTest &isValid(bool v) { m_isValid = v; return *this; }
+
+    const QString m_url;
+    QString m_protocol;
+    QString m_userName;
+    QString m_host;
+    QString m_path;
+    quint16 m_port = 0;
+    bool    m_isLocal = false;
+    bool    m_isValid = true;
+};
+
+} // namespace Internal
+} // namespace Git
+
+Q_DECLARE_METATYPE(Git::Internal::RemoteTest)
+
+namespace Git {
+namespace Internal {
+
+void GitPlugin::testGitRemote_data()
+{
+    QTest::addColumn<RemoteTest>("rt");
+
+    QTest::newRow("http-no-user")
+            << RemoteTest("http://code.qt.io/qt-creator/qt-creator.git")
+               .protocol("http")
+               .host("code.qt.io")
+               .path("/qt-creator/qt-creator.git");
+    QTest::newRow("https-with-port")
+            << RemoteTest("https://code.qt.io:80/qt-creator/qt-creator.git")
+               .protocol("https")
+               .host("code.qt.io")
+               .port(80)
+               .path("/qt-creator/qt-creator.git");
+    QTest::newRow("invalid-port")
+            << RemoteTest("https://code.qt.io:99999/qt-creator/qt-creator.git")
+               .protocol("https")
+               .host("code.qt.io")
+               .path("/qt-creator/qt-creator.git")
+               .isValid(false);
+    QTest::newRow("ssh-user-foo")
+            << RemoteTest("ssh://foo@codereview.qt-project.org:29418/qt-creator/qt-creator.git")
+               .protocol("ssh")
+               .userName("foo")
+               .host("codereview.qt-project.org")
+               .port(29418)
+               .path("/qt-creator/qt-creator.git");
+    QTest::newRow("ssh-github")
+            << RemoteTest("git@github.com:qt-creator/qt-creator.git")
+               .userName("git")
+               .host("github.com")
+               .path("qt-creator/qt-creator.git");
+    QTest::newRow("local-file-protocol")
+            << RemoteTest("file:///tmp/myrepo.git")
+               .protocol("file")
+               .path("/tmp/myrepo.git")
+               .isLocal(true);
+    QTest::newRow("local-absolute-path-unix")
+            << RemoteTest("/tmp/myrepo.git")
+               .protocol("file")
+               .path("/tmp/myrepo.git")
+               .isLocal(true);
+    if (Utils::HostOsInfo::isWindowsHost()) {
+        QTest::newRow("local-absolute-path-unix")
+                << RemoteTest("c:/git/myrepo.git")
+                   .protocol("file")
+                   .path("c:/git/myrepo.git")
+                   .isLocal(true);
+    }
+    QTest::newRow("local-relative-path-children")
+            << RemoteTest("./git/myrepo.git")
+               .protocol("file")
+               .path("./git/myrepo.git")
+               .isLocal(true);
+    QTest::newRow("local-relative-path-parent")
+            << RemoteTest("../myrepo.git")
+               .protocol("file")
+               .path("../myrepo.git")
+               .isLocal(true);
+}
+
+void GitPlugin::testGitRemote()
+{
+    QFETCH(RemoteTest, rt);
+
+    const GitRemote remote = GitRemote(rt.m_url);
+
+    if (!rt.m_isLocal) {
+        // local repositories must exist to be valid, so skip the test
+        QCOMPARE(remote.isValid, rt.m_isValid);
+    }
+
+    QCOMPARE(remote.protocol, rt.m_protocol);
+    QCOMPARE(remote.userName, rt.m_userName);
+    QCOMPARE(remote.host,     rt.m_host);
+    QCOMPARE(remote.port,     rt.m_port);
+    QCOMPARE(remote.path,     rt.m_path);
+}
+
 #endif
 
 } // namespace Internal

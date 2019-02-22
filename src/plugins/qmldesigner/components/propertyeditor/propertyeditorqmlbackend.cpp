@@ -49,7 +49,7 @@
 
 #include <QLoggingCategory>
 
-static Q_LOGGING_CATEGORY(propertyEditorBenchmark, "qtc.propertyeditor.load")
+static Q_LOGGING_CATEGORY(propertyEditorBenchmark, "qtc.propertyeditor.load", QtWarningMsg)
 
 static QmlJS::SimpleReaderNode::Ptr s_templateConfiguration = QmlJS::SimpleReaderNode::Ptr();
 
@@ -152,6 +152,12 @@ QVariant properDefaultLayoutAttachedProperties(const QmlObjectNode &qmlObjectNod
      if ("columnSpan" == propertyName || "rowSpan" == propertyName)
          return 1;
 
+     if ("topMargin" == propertyName || "bottomMargin" == propertyName)
+         return 0;
+
+     if ("leftMargin" == propertyName || "rightMargin" == propertyName)
+         return 0;
+
     return QVariant();
 }
 
@@ -161,7 +167,8 @@ void PropertyEditorQmlBackend::setupLayoutAttachedProperties(const QmlObjectNode
 
         static const PropertyNameList propertyNames =
             {"alignment", "column", "columnSpan", "fillHeight", "fillWidth", "maximumHeight", "maximumWidth",
-             "minimumHeight", "minimumWidth", "preferredHeight", "preferredWidth", "row", "rowSpan"};
+                "minimumHeight", "minimumWidth", "preferredHeight", "preferredWidth", "row", "rowSpan",
+                "topMargin", "bottomMargin", "leftMargin", "rightMargin"};
 
         foreach (const PropertyName &propertyName, propertyNames) {
             createPropertyEditorValue(qmlObjectNode, "Layout." + propertyName, properDefaultLayoutAttachedProperties(qmlObjectNode, propertyName), propertyEditor);
@@ -554,21 +561,25 @@ QString PropertyEditorQmlBackend::locateQmlFile(const NodeMetaInfo &info, const 
 
     const QString withoutDirWithVersion = relativePathWithVersion.split(QStringLiteral("/")).constLast();
 
-    const QStringList possiblePaths = {
-        importDir.absoluteFilePath(relativePathWithVersion),
-        //Since we are in a subfolder of the import we do not require the directory
-        importDir.absoluteFilePath(withoutDirWithVersion),
+    QStringList possiblePaths = {
         fileSystemDir.absoluteFilePath(relativePathWithVersion),
         resourcesDir.absoluteFilePath(relativePathWithVersion),
-
-        importDir.absoluteFilePath(relativePath),
-        //Since we are in a subfolder of the import we do not require the directory
-        importDir.absoluteFilePath(withoutDir),
         fileSystemDir.absoluteFilePath(relativePath),
         resourcesDir.absoluteFilePath(relativePath)
     };
+
+    if (!importDir.isEmpty())
+        possiblePaths.append({
+            importDir.absoluteFilePath(relativePathWithVersion),
+            //Since we are in a subfolder of the import we do not require the directory
+            importDir.absoluteFilePath(withoutDirWithVersion),
+            importDir.absoluteFilePath(relativePath),
+            //Since we are in a subfolder of the import we do not require the directory
+            importDir.absoluteFilePath(withoutDir),
+        });
+
     return Utils::findOrDefault(possiblePaths, [](const QString &possibleFilePath) {
-        return QFile::exists(possibleFilePath);
+        return QFileInfo::exists(possibleFilePath);
     });
 }
 

@@ -26,9 +26,9 @@
 #include "winrtplugin.h"
 #include "winrtconstants.h"
 #include "winrtdevice.h"
-#include "winrtdevicefactory.h"
 #include "winrtdeployconfiguration.h"
-#include "winrtqtversionfactory.h"
+#include "winrtqtversion.h"
+#include "winrtphoneqtversion.h"
 #include "winrtrunconfiguration.h"
 #include "winrtruncontrol.h"
 #include "winrtdebugsupport.h"
@@ -48,11 +48,14 @@ class WinRtPluginRunData
 public:
     WinRtRunConfigurationFactory runConfigFactory;
     WinRtQtVersionFactory qtVersionFactory;
+    WinRtPhoneQtVersionFactory phoneQtVersionFactory;
     WinRtAppDeployConfigurationFactory appDeployConfigFactory;
     WinRtPhoneDeployConfigurationFactory phoneDeployConfigFactory;
     WinRtEmulatorDeployConfigurationFactory emulatorDeployFactory;
     WinRtDeployStepFactory deployStepFactory;
-    WinRtDeviceFactory deviceFactory;
+    WinRtDeviceFactory localDeviceFactory{Constants::WINRT_DEVICE_TYPE_LOCAL};
+    WinRtDeviceFactory phoneDeviceFactory{Constants::WINRT_DEVICE_TYPE_PHONE};
+    WinRtDeviceFactory emulatorDeviceFactory{Constants::WINRT_DEVICE_TYPE_EMULATOR};
 };
 
 WinRtPlugin::WinRtPlugin()
@@ -73,14 +76,14 @@ bool WinRtPlugin::initialize(const QStringList &arguments, QString *errorMessage
     m_runData = new WinRtPluginRunData;
 
     auto runConstraint = [](RunConfiguration *runConfig) {
-        IDevice::ConstPtr device = DeviceKitInformation::device(runConfig->target()->kit());
+        IDevice::ConstPtr device = DeviceKitAspect::device(runConfig->target()->kit());
         if (!device)
             return false;
         return qobject_cast<WinRtRunConfiguration *>(runConfig) != nullptr;
     };
 
     auto debugConstraint = [](RunConfiguration *runConfig) {
-        IDevice::ConstPtr device = DeviceKitInformation::device(runConfig->target()->kit());
+        IDevice::ConstPtr device = DeviceKitAspect::device(runConfig->target()->kit());
         if (!device)
             return false;
         if (device->type() != Internal::Constants::WINRT_DEVICE_TYPE_LOCAL)

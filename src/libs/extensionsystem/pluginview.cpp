@@ -180,7 +180,7 @@ public:
     bool setData(int column, const QVariant &data, int role) override
     {
         if (column == LoadedColumn && role == Qt::CheckStateRole)
-            return m_view->setPluginsEnabled(QSet<PluginSpec *>() << m_spec, data.toBool());
+            return m_view->setPluginsEnabled({m_spec}, data.toBool());
         return false;
     }
 
@@ -228,15 +228,6 @@ public:
         if (column == NameColumn) {
             if (role == Qt::DisplayRole || role == SortRole)
                 return m_name;
-            if (role == Qt::DecorationRole) {
-                foreach (PluginSpec *spec, m_plugins) {
-                    if (spec->hasError())
-                        return icon(ErrorIcon);
-                    if (!spec->isEnabledBySettings())
-                        return icon(NotLoadedIcon);
-                }
-                return icon(OkIcon);
-            }
         }
 
         if (column == LoadedColumn) {

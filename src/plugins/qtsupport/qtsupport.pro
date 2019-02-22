@@ -11,10 +11,10 @@ HEADERS += \
     codegensettings.h \
     codegensettingspage.h \
     gettingstartedwelcomepage.h \
+    qtcppkitinfo.h \
     qtprojectimporter.h \
     qtsupportplugin.h \
     qtsupport_global.h \
-    qtkitconfigwidget.h \
     qtkitinformation.h \
     qtoutputformatter.h \
     qtversionmanager.h \
@@ -28,7 +28,6 @@ HEADERS += \
     exampleslistmodel.h \
     screenshotcropper.h \
     qtconfigwidget.h \
-    desktopqtversionfactory.h \
     desktopqtversion.h \
     uicgenerator.h \
     qscxmlcgenerator.h
@@ -38,9 +37,9 @@ SOURCES += \
     codegensettings.cpp \
     codegensettingspage.cpp \
     gettingstartedwelcomepage.cpp \
+    qtcppkitinfo.cpp \
     qtprojectimporter.cpp \
     qtsupportplugin.cpp \
-    qtkitconfigwidget.cpp \
     qtkitinformation.cpp \
     qtoutputformatter.cpp \
     qtversionmanager.cpp \
@@ -53,7 +52,6 @@ SOURCES += \
     exampleslistmodel.cpp \
     screenshotcropper.cpp \
     qtconfigwidget.cpp \
-    desktopqtversionfactory.cpp \
     desktopqtversion.cpp \
     uicgenerator.cpp \
     qscxmlcgenerator.cpp

@@ -52,7 +52,7 @@
 
 namespace QmlDesigner {
 
-static Q_LOGGING_CATEGORY(viewBenchmark, "qtc.viewmanager.attach")
+static Q_LOGGING_CATEGORY(viewBenchmark, "qtc.viewmanager.attach", QtWarningMsg)
 
 class ViewManagerData
 {
@@ -424,9 +424,9 @@ void ViewManager::toggleStatesViewExpanded()
     d->statesEditorView.toggleStatesViewExpanded();
 }
 
-void ViewManager::qmlJSEditorHelpId(const Core::IContext::HelpIdCallback &callback) const
+void ViewManager::qmlJSEditorContextHelp(const Core::IContext::HelpCallback &callback) const
 {
-    d->textEditorView.qmlJSEditorHelpId(callback);
+    d->textEditorView.qmlJSEditorContextHelp(callback);
 }
 
 Model *ViewManager::currentModel() const

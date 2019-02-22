@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2017 The Qt Company Ltd.
+** Copyright (C) 2019 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Creator documentation.
@@ -107,6 +107,7 @@
                 \li \l {Browsing ISO 7000 Icons}
                 \li \l {Exporting Designs from Graphics Software}
                 \li \l {Using QML Modules with Plugins}
+                \li \l {Converting UI Projects to Applications}
             \endlist
             \li \l{Developing Widget Based Applications}
             \list
@@ -141,6 +142,7 @@
                 \li \l{Specifying Text Editor Settings}
                 \li \l{Using FakeVim Mode}
             \endlist
+            \li \l{Using Language Servers}
             \li \l{Editing MIME Types}
             \li \l{Modeling}
             \li \l{Editing State Charts}
@@ -191,6 +193,7 @@
                 \li \l{Using Clang Tools}
                 \li \l{Detecting Memory Leaks with Heob}
                 \li \l{Analyzing CPU Usage}
+                \li \l{Analyzing Code with Cppcheck}
             \endlist
             \li \l{Running Autotests}
         \endlist

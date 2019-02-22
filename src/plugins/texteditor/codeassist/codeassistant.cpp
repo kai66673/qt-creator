@@ -26,7 +26,6 @@
 #include "codeassistant.h"
 #include "completionassistprovider.h"
 #include "iassistprocessor.h"
-#include "textdocument.h"
 #include "iassistproposal.h"
 #include "iassistproposalmodel.h"
 #include "iassistproposalwidget.h"
@@ -35,6 +34,7 @@
 #include "runner.h"
 #include "textdocumentmanipulator.h"
 
+#include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
 #include <texteditor/texteditorsettings.h>
 #include <texteditor/completionsettings.h>
@@ -104,6 +104,7 @@ private:
     IAssistProposalWidget *m_proposalWidget = nullptr;
     QScopedPointer<IAssistProposal> m_proposal;
     bool m_receivedContentWhileWaiting = false;
+    bool m_proposalItemProcessed = false;
     QTimer m_automaticProposalTimer;
     CompletionSettings m_settings;
     int m_abortedBasePosition = -1;
@@ -192,6 +193,13 @@ void CodeAssistantPrivate::requestProposal(AssistReason reason,
     if (m_editorWidget->hasBlockSelection())
         return; // TODO
 
+    if (m_proposalItemProcessed
+            && reason == IdleEditor
+            && m_assistKind == TextEditor::Completion
+            && !identifyActivationSequence()) {
+        return;
+    }
+
     if (!provider) {
         if (kind == Completion)
             provider = m_editorWidget->textDocument()->completionAssistProvider();
@@ -245,10 +253,17 @@ void CodeAssistantPrivate::requestProposal(AssistReason reason,
     case IAssistProvider::Asynchronous: {
         processor->setAsyncCompletionAvailableHandler(
             [this, reason](IAssistProposal *newProposal){
-                invalidateCurrentRequestData();
-                displayProposal(newProposal, reason);
+                if (m_asyncProcessor && m_asyncProcessor->needsRestart() && m_receivedContentWhileWaiting) {
+                    delete newProposal;
+                    m_receivedContentWhileWaiting = false;
+                    invalidateCurrentRequestData();
+                    requestProposal(reason, m_assistKind, m_requestProvider);
+                } else {
+                    invalidateCurrentRequestData();
+                    displayProposal(newProposal, reason);
 
-                emit q->finished();
+                    emit q->finished();
+                }
         });
 
         // If there is a proposal, nothing asynchronous happened...
@@ -351,6 +366,15 @@ void CodeAssistantPrivate::processProposalItem(AssistProposalItemInterface *prop
     if (!proposalItem->isSnippet())
         process();
     m_editorWidget->encourageApply();
+    m_proposalItemProcessed = true;
+
+    auto connection = std::make_shared<QMetaObject::Connection>();
+    *connection = connect(m_editorWidget->textDocument(),
+                          &Core::IDocument::contentsChanged,
+                          this, [this, connection] {
+        m_proposalItemProcessed = false;
+        disconnect(*connection);
+    });
 }
 
 void CodeAssistantPrivate::handlePrefixExpansion(const QString &newPrefix)
@@ -433,7 +457,7 @@ void CodeAssistantPrivate::notifyChange()
         QTC_ASSERT(m_proposal, return);
         if (m_editorWidget->position() < m_proposal->basePosition()) {
             destroyContext();
-        } else if (!m_proposal->isFragile()) {
+        } else if (m_proposal->supportsPrefix()) {
             m_proposalWidget->updateProposal(
                 m_editorWidget->textAt(m_proposal->basePosition(),
                                      m_editorWidget->position() - m_proposal->basePosition()));

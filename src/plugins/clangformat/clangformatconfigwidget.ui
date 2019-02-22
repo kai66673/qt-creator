@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>ClangFormat::Internal::ClangFormatConfigWidget</class>
- <widget class="QWidget" name="ClangFormat::Internal::ClangFormatConfigWidget">
+ <class>ClangFormat::ClangFormatConfigWidget</class>
+ <widget class="QWidget" name="ClangFormat::ClangFormatConfigWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string/>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="leftMargin">
@@ -27,9 +27,30 @@
     <number>8</number>
    </property>
    <item>
+    <widget class="QCheckBox" name="formatAlways">
+     <property name="text">
+      <string>Format instead of indenting</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="formatWhileTyping">
+     <property name="text">
+      <string>Format while typing</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="formatOnSave">
+     <property name="text">
+      <string>Format edited code on file save</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QLabel" name="projectHasClangFormat">
      <property name="text">
-      <string> Current project has its own .clang-format file and can be configured in Projects -&gt; ClangFormat.</string>
+      <string/>
      </property>
     </widget>
    </item>
@@ -38,6 +59,13 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QPushButton" name="createFileButton">
+       <property name="text">
+        <string>Create Clang Format Configuration File</string>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QPushButton" name="applyButton">
        <property name="text">

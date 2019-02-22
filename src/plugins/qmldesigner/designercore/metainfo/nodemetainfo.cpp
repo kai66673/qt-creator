@@ -85,8 +85,8 @@ static TypeName resolveTypeName(const ASTPropertyReference *ref, const ContextPt
 {
     TypeName type = "unknown";
 
-    if (ref->ast()->isValid()) {
-        type = ref->ast()->memberTypeName().toUtf8();
+    if (ref->ast()->defaultToken.isValid()) {
+        type = ref->ast()->memberType->name.toUtf8();
 
         if (type == "alias") {
             const Value *value = context->lookupReference(ref);
@@ -1519,7 +1519,7 @@ bool NodeMetaInfo::availableInVersion(int majorVersion, int minorVersion) const
 bool NodeMetaInfo::isSubclassOf(const TypeName &type, int majorVersion, int minorVersion) const
 {
     if (!isValid()) {
-        qWarning() << "NodeMetaInfo is invalid";
+        qWarning() << "NodeMetaInfo is invalid" << type;
         return false;
     }
 

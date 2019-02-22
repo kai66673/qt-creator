@@ -25,9 +25,7 @@
 
 #include "buildconfiguration.h"
 #include "deployconfiguration.h"
-#include "kitconfigwidget.h"
 #include "kit.h"
-#include "kitmanager.h"
 #include "kitmanager.h"
 #include "miniprojecttargetselector.h"
 #include "projectexplorer.h"
@@ -298,7 +296,7 @@ void ProjectListWidget::addProject(Project *project)
         setCurrentItem(item);
 
     QFontMetrics fn(font());
-    int width = fn.width(displayName) + padding();
+    int width = fn.horizontalAdvance(displayName) + padding();
     if (width > optimalWidth())
         setOptimalWidth(width);
 
@@ -333,7 +331,7 @@ void ProjectListWidget::removeProject(Project *project)
     // recheck optimal width
     int width = 0;
     for (int i = 0; i < count(); ++i)
-        width = qMax(fn.width(item(i)->text()) + padding(), width);
+        width = qMax(fn.horizontalAdvance(item(i)->text()) + padding(), width);
     setOptimalWidth(width);
 
     m_ignoreIndexChange = false;
@@ -377,7 +375,7 @@ void ProjectListWidget::projectDisplayNameChanged(Project *project)
     QFontMetrics fn(font());
     int width = 0;
     for (int i = 0; i < count(); ++i)
-        width = qMax(fn.width(item(i)->text()) + padding(), width);
+        width = qMax(fn.horizontalAdvance(item(i)->text()) + padding(), width);
     setOptimalWidth(width);
 
     m_ignoreIndexChange = false;
@@ -424,7 +422,7 @@ void GenericListWidget::setProjectConfigurations(const QList<ProjectConfiguratio
     int width = 0;
     foreach (ProjectConfiguration *pc, list) {
         addProjectConfiguration(pc);
-        width = qMax(width, fn.width(pc->displayName()) + padding());
+        width = qMax(width, fn.horizontalAdvance(pc->displayName()) + padding());
     }
     setOptimalWidth(width);
     setActiveProjectConfiguration(active);
@@ -463,7 +461,7 @@ void GenericListWidget::addProjectConfiguration(ProjectConfiguration *pc)
     connect(pc, &ProjectConfiguration::toolTipChanged, this, &GenericListWidget::toolTipChanged);
 
     QFontMetrics fn(font());
-    int width = fn.width(pc->displayName()) + padding();
+    int width = fn.horizontalAdvance(pc->displayName()) + padding();
     if (width > optimalWidth())
         setOptimalWidth(width);
 
@@ -481,7 +479,7 @@ void GenericListWidget::removeProjectConfiguration(ProjectConfiguration *pc)
     int width = 0;
     for (int i = 0; i < count(); ++i) {
         auto *p = item(i)->data(Qt::UserRole).value<ProjectConfiguration *>();
-        width = qMax(width, fn.width(p->displayName()) + padding());
+        width = qMax(width, fn.horizontalAdvance(p->displayName()) + padding());
     }
     setOptimalWidth(width);
 
@@ -534,7 +532,7 @@ void GenericListWidget::displayNameChanged()
     int width = 0;
     for (int i = 0; i < count(); ++i) {
         auto *p = item(i)->data(Qt::UserRole).value<ProjectConfiguration *>();
-        width = qMax(width, fn.width(p->displayName()) + padding());
+        width = qMax(width, fn.horizontalAdvance(p->displayName()) + padding());
     }
     setOptimalWidth(width);
 
@@ -579,7 +577,7 @@ KitAreaWidget::~KitAreaWidget()
 
 void KitAreaWidget::setKit(Kit *k)
 {
-    foreach (KitConfigWidget *w, m_widgets)
+    foreach (KitAspectWidget *w, m_widgets)
         delete(w);
     m_widgets.clear();
 
@@ -591,11 +589,11 @@ void KitAreaWidget::setKit(Kit *k)
     m_labels.clear();
 
     int row = 0;
-    foreach (KitInformation *ki, KitManager::kitInformation()) {
-        if (k && k->isMutable(ki->id())) {
-            KitConfigWidget *widget = ki->createConfigWidget(k);
+    for (KitAspect *aspect : KitManager::kitAspects()) {
+        if (k && k->isMutable(aspect->id())) {
+            KitAspectWidget *widget = aspect->createConfigWidget(k);
             m_widgets << widget;
-            QLabel *label = new QLabel(widget->displayName());
+            QLabel *label = new QLabel(aspect->displayName());
             m_labels << label;
 
             widget->setStyle(QStyleFactory::create(QLatin1String("fusion")));
@@ -619,10 +617,10 @@ void KitAreaWidget::updateKit(Kit *k)
         return;
 
     bool addedMutables = false;
-    QList<Core::Id> knownIdList = Utils::transform(m_widgets, &KitConfigWidget::kitInformationId);
+    QList<Core::Id> knownIdList = Utils::transform(m_widgets, &KitAspectWidget::kitInformationId);
 
-    foreach (KitInformation *ki, KitManager::kitInformation()) {
-        Core::Id currentId = ki->id();
+    for (KitAspect *aspect : KitManager::kitAspects()) {
+        const Core::Id currentId = aspect->id();
         if (m_kit->isMutable(currentId) && !knownIdList.removeOne(currentId)) {
             addedMutables = true;
             break;
@@ -635,7 +633,7 @@ void KitAreaWidget::updateKit(Kit *k)
         setKit(m_kit);
     } else {
         // Refresh all widgets if the number of mutable settings did not change
-        foreach (KitConfigWidget *w, m_widgets)
+        foreach (KitAspectWidget *w, m_widgets)
             w->refresh();
     }
 }
@@ -1530,7 +1528,7 @@ void MiniProjectTargetSelector::updateActionAndSummary()
         lines << tr("<b>Run:</b> %1").arg(runConfig);
     if (!targetToolTipText.isEmpty())
         lines << tr("%1").arg(targetToolTipText);
-    QString toolTip = tr("<html><nobr>%1</html>")
+    QString toolTip = QString("<html><nobr>%1</html>")
             .arg(lines.join(QLatin1String("<br/>")));
     m_projectAction->setToolTip(toolTip);
     updateSummary();

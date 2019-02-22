@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <qtsupport/qtversionfactory.h>
+
 #include "baseqtversion.h"
 
 namespace QtSupport {
@@ -33,14 +35,8 @@ class QTSUPPORT_EXPORT DesktopQtVersion : public BaseQtVersion
 {
 public:
     DesktopQtVersion();
-    DesktopQtVersion(const Utils::FileName &path, bool isAutodetected = false, const QString &autodetectionSource = QString());
-    DesktopQtVersion *clone() const override;
-
-    QString type() const override;
 
     QStringList warningReason() const override;
-
-    QList<ProjectExplorer::Abi> detectQtAbis() const override;
 
     QString description() const override;
 
@@ -51,15 +47,17 @@ public:
 
     QString qmlsceneCommand() const;
 
-protected:
-    DesktopQtVersion(const DesktopQtVersion &other);
-
 private:
-
-    enum TargetBinaries { QmlScene };
-    QString findTargetBinary(TargetBinaries binary) const;
-
     mutable QString m_qmlsceneCommand;
 };
 
+namespace Internal {
+
+class DesktopQtVersionFactory : public QtVersionFactory
+{
+public:
+    DesktopQtVersionFactory();
+};
+
+} // Internal
 } // QtSupport

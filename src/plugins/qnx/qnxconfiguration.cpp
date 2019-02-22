@@ -67,8 +67,7 @@ const QLatin1String QNXVersionKey("QNXVersion");
 // For backward compatibility
 const QLatin1String SdpEnvFileKey("NDKEnvFile");
 
-QnxConfiguration::QnxConfiguration()
-{ }
+QnxConfiguration::QnxConfiguration() = default;
 
 QnxConfiguration::QnxConfiguration(const FileName &sdpEnvFile)
 {
@@ -178,8 +177,8 @@ void QnxConfiguration::deactivate()
 
     foreach (Kit *kit, KitManager::kits()) {
         if (kit->isAutoDetected()
-                && DeviceTypeKitInformation::deviceTypeId(kit) == Constants::QNX_QNX_OS_TYPE
-                && toolChainsToRemove.contains(ToolChainKitInformation::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID)))
+                && DeviceTypeKitAspect::deviceTypeId(kit) == Constants::QNX_QNX_OS_TYPE
+                && toolChainsToRemove.contains(ToolChainKitAspect::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID)))
             KitManager::deregisterKit(kit);
     }
 
@@ -220,7 +219,7 @@ QnxQtVersion *QnxConfiguration::qnxQtVersion(const Target &target) const
     foreach (BaseQtVersion *version,
              QtVersionManager::instance()->versions(Utils::equal(&BaseQtVersion::type,
                                                                          QString::fromLatin1(Constants::QNX_QNX_QT)))) {
-        QnxQtVersion *qnxQt = dynamic_cast<QnxQtVersion *>(version);
+        auto qnxQt = dynamic_cast<QnxQtVersion *>(version);
         if (qnxQt && FileName::fromString(qnxQt->sdpPath()) == sdpPath()) {
             foreach (const Abi &qtAbi, version->qtAbis()) {
                 if ((qtAbi == target.m_abi) && (qnxQt->cpuDir() == target.cpuDir()))
@@ -266,7 +265,7 @@ QVariant QnxConfiguration::createDebugger(const Target &target)
 
 QnxToolChain *QnxConfiguration::createToolChain(const Target &target)
 {
-    QnxToolChain *toolChain = new QnxToolChain(ToolChain::AutoDetection);
+    auto toolChain = new QnxToolChain(ToolChain::AutoDetection);
     toolChain->setLanguage(ProjectExplorer::Constants::CXX_LANGUAGE_ID);
     toolChain->setTargetAbi(target.m_abi);
     toolChain->setDisplayName(
@@ -305,14 +304,14 @@ ProjectExplorer::Kit *QnxConfiguration::createKit(
     auto kit = std::make_unique<Kit>();
     Kit *kptr = kit.get();
 
-    QtKitInformation::setQtVersion(kptr, qnxQt);
-    ToolChainKitInformation::setToolChain(kptr, toolChain);
-    ToolChainKitInformation::clearToolChain(kptr, ProjectExplorer::Constants::C_LANGUAGE_ID);
+    QtKitAspect::setQtVersion(kptr, qnxQt);
+    ToolChainKitAspect::setToolChain(kptr, toolChain);
+    ToolChainKitAspect::clearToolChain(kptr, ProjectExplorer::Constants::C_LANGUAGE_ID);
 
     if (debugger.isValid())
-        DebuggerKitInformation::setDebugger(kptr, debugger);
+        DebuggerKitAspect::setDebugger(kptr, debugger);
 
-    DeviceTypeKitInformation::setDeviceTypeId(kptr, Constants::QNX_QNX_OS_TYPE);
+    DeviceTypeKitAspect::setDeviceTypeId(kptr, Constants::QNX_QNX_OS_TYPE);
     // TODO: Add sysroot?
 
     kit->setUnexpandedDisplayName(
@@ -324,12 +323,12 @@ ProjectExplorer::Kit *QnxConfiguration::createKit(
 
     kit->setAutoDetected(true);
     kit->setAutoDetectionSource(envFile().toString());
-    kit->setMutable(DeviceKitInformation::id(), true);
+    kit->setMutable(DeviceKitAspect::id(), true);
 
-    kit->setSticky(ToolChainKitInformation::id(), true);
-    kit->setSticky(DeviceTypeKitInformation::id(), true);
-    kit->setSticky(SysRootKitInformation::id(), true);
-    kit->setSticky(DebuggerKitInformation::id(), true);
+    kit->setSticky(ToolChainKitAspect::id(), true);
+    kit->setSticky(DeviceTypeKitAspect::id(), true);
+    kit->setSticky(SysRootKitAspect::id(), true);
+    kit->setSticky(DebuggerKitAspect::id(), true);
     kit->setSticky(QmakeProjectManager::Constants::KIT_INFORMATION_ID, true);
 
     // add kit with device and qt version not sticky

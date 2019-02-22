@@ -35,8 +35,8 @@ def __platformToBeRunToday__():
 skipPastingToPastebinCom = platform.system() not in __platformToBeRunToday__()
 
 NAME_KDE = "Paste.KDE.Org"
-NAME_PBCA = "Pastebin.Ca"
 NAME_PBCOM = "Pastebin.Com"
+NAME_PCXYZ = "Pastecode.Xyz"
 
 serverProblems = "Server side problems."
 
@@ -75,7 +75,7 @@ def pasteFile(sourceFile, protocol):
     invokeMenuItem("File", "Open File or Project...")
     selectFromFileDialog(sourceFile)
     editor = waitForObject(":Qt Creator_CppEditor::Internal::CPPEditorWidget")
-    type(editor, "<Up>")
+    jumpToFirstLine(editor)
     typeLines(editor, "// tst_codepasting %s" % datetime.utcnow())
     sourceText = editor.plainText
     invokeMenuItem("Tools", "Code Pasting", "Paste Snippet...")
@@ -133,16 +133,13 @@ def fetchSnippet(protocol, description, pasteId, skippedPasting):
         closeHTTPStatusAndPasterDialog(protocol, ':PasteSelectDialog_CodePaster::PasteSelectDialog')
         return -1
     waitFor("pasteModel.rowCount() > 1", 20000)
-    if (not skippedPasting and not protocol == NAME_PBCA
-        and not any(map(lambda str:pasteId in str, dumpItems(pasteModel)))):
+    if (not skippedPasting and not any(map(lambda str:pasteId in str, dumpItems(pasteModel)))):
         test.warning("Fetching too fast for server of %s - waiting 3s and trying to refresh." % protocol)
         snooze(3)
         clickButton("{text='Refresh' type='QPushButton' unnamed='1' visible='1' "
             "window=':PasteSelectDialog_CodePaster::PasteSelectDialog'}")
         waitFor("pasteModel.rowCount() == 1", 1000)
         waitFor("pasteModel.rowCount() > 1", 20000)
-    if protocol == NAME_PBCA:
-        description = description[:32]
     if pasteId == -1:
         try:
             pasteLine = filter(lambda str:description in str, dumpItems(pasteModel))[0]
@@ -154,13 +151,11 @@ def fetchSnippet(protocol, description, pasteId, skippedPasting):
     else:
         try:
             pasteLine = filter(lambda str:pasteId in str, dumpItems(pasteModel))[0]
-            if protocol in (NAME_PBCA, NAME_PBCOM):
+            if protocol == NAME_PBCOM:
                 test.verify(description in pasteLine,
                             "Verify that line in list of pastes contains the description")
         except:
-            if protocol == NAME_PBCA:
-                test.xfail("%s does not list the pasted snippet on time" % NAME_PBCA)
-            elif not skippedPasting:
+            if not skippedPasting:
                 test.fail("Could not find id '%s' in list of pastes from %s" % (pasteId, protocol))
             foundSnippet = False
             replaceEditorContent(waitForObject(":PasteSelectDialog.pasteEdit_QLineEdit"), pasteId)
@@ -175,7 +170,7 @@ def main():
     startQC()
     if not startedWithoutPluginError():
         return
-    protocolsToTest = [NAME_KDE, NAME_PBCA, NAME_PBCOM]
+    protocolsToTest = [NAME_KDE, NAME_PBCOM, NAME_PCXYZ]
     sourceFile = os.path.join(os.getcwd(), "testdata", "main.cpp")
     # make sure General Messages is open
     openGeneralMessages()
@@ -231,6 +226,7 @@ def main():
     invokeMenuItem("File", "Open File or Project...")
     selectFromFileDialog(sourceFile)
     editor = waitForObject(":Qt Creator_CppEditor::Internal::CPPEditorWidget")
+    jumpToFirstLine(editor)
     markText(editor, "Down", 7)
     # QString QTextCursor::selectedText () const:
     # "Note: If the selection obtained from an editor spans a line break, the text will contain a

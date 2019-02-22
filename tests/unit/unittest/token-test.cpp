@@ -56,7 +56,7 @@ struct Data {
     Utf8String filePath{Utf8StringLiteral(TESTDATA_DIR"/token.cpp")};
     Utf8StringVector compilationArguments{
         TestEnvironment::addPlatformArguments({Utf8StringLiteral("-std=c++11")})};
-    Document document{filePath, compilationArguments, documents};
+    Document document{filePath, compilationArguments, {}, documents};
     TranslationUnit translationUnit{filePath,
                                     filePath,
                                     document.translationUnit().cxIndex(),
@@ -76,8 +76,16 @@ protected:
     static std::unique_ptr<const Data> d;
     const Document &document = d->document;
     const TranslationUnit &translationUnit = d->translationUnit;
-    const SourceRange range{{translationUnit.cxTranslationUnit(), d->filePath, 1, 1},
-                            {translationUnit.cxTranslationUnit(), d->filePath, 3, 2}};
+    const SourceRange range{{translationUnit.cxTranslationUnit(),
+                             clang_getLocation(translationUnit.cxTranslationUnit(),
+                                               clang_getFile(translationUnit.cxTranslationUnit(),
+                                                             d->filePath.constData()),
+                                               1, 1)},
+                            {translationUnit.cxTranslationUnit(),
+                             clang_getLocation(translationUnit.cxTranslationUnit(),
+                                               clang_getFile(translationUnit.cxTranslationUnit(),
+                                                             d->filePath.constData()),
+                                               3, 2)}};
     const Tokens tokens{range};
 };
 
@@ -120,7 +128,11 @@ TEST_F(Token, TokenSpelling)
 
 TEST_F(Token, TokenExtent)
 {
-    ::SourceRange tokenRange(range.start(), ::SourceLocation(translationUnit.cxTranslationUnit(), d->filePath, 1, 5));
+    ::SourceRange tokenRange(range.start(), ::SourceLocation(translationUnit.cxTranslationUnit(),
+                                                             clang_getLocation(translationUnit.cxTranslationUnit(),
+                                                                               clang_getFile(translationUnit.cxTranslationUnit(),
+                                                                                             d->filePath.constData()),
+                                                                               1, 5)));
 
     auto extent = tokens[0].extent();
 

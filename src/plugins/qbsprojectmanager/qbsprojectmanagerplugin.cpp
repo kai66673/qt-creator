@@ -28,7 +28,6 @@
 #include "qbsbuildconfiguration.h"
 #include "qbsbuildstep.h"
 #include "qbscleanstep.h"
-#include "qbsdeployconfigurationfactory.h"
 #include "qbsinstallstep.h"
 #include "qbskitinformation.h"
 #include "qbsnodes.h"
@@ -91,7 +90,6 @@ public:
     QbsBuildStepFactory buildStepFactory;
     QbsCleanStepFactory cleanStepFactory;
     QbsInstallStepFactory installStepFactory;
-    QbsDeployConfigurationFactory deployConfigFactory;
     QbsRunConfigurationFactory runConfigFactory;
     QbsProfilesSettingsPage profilesSetttingsPage;
 };
@@ -114,7 +112,7 @@ bool QbsProjectManagerPlugin::initialize(const QStringList &arguments, QString *
     Core::HelpManager::registerDocumentation({Core::HelpManager::documentationPath() + "/qbs.qch"});
 
     ProjectManager::registerProjectType<QbsProject>(QmlJSTools::Constants::QBS_MIMETYPE);
-    KitManager::registerKitInformation<QbsKitInformation>();
+    KitManager::registerKitAspect<QbsKitAspect>();
 
     //menus
     // Build Menu:

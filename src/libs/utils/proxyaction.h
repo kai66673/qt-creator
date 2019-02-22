@@ -60,6 +60,9 @@ public:
     static QString stringWithAppendedShortcut(const QString &str, const QKeySequence &shortcut);
     static ProxyAction *proxyActionWithIcon(QAction *original, const QIcon &newIcon);
 
+signals:
+    void currentActionChanged(QAction *action);
+
 private:
     void actionChanged();
     void updateState();
@@ -68,8 +71,8 @@ private:
     void connectAction();
     void update(QAction *action, bool initialize);
 
-    QPointer<QAction> m_action = nullptr;
-    Attributes m_attributes = {};
+    QPointer<QAction> m_action;
+    Attributes m_attributes;
     bool m_showShortcut = false;
     QString m_toolTip;
     bool m_block = false;

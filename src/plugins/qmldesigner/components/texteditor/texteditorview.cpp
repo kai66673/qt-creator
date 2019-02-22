@@ -152,17 +152,17 @@ WidgetInfo TextEditorView::widgetInfo()
     return createWidgetInfo(m_widget, nullptr, "TextEditor", WidgetInfo::CentralPane, 0, tr("Text Editor"), DesignerWidgetFlags::IgnoreErrors);
 }
 
-void TextEditorView::contextHelpId(const Core::IContext::HelpIdCallback &callback) const
+void TextEditorView::contextHelp(const Core::IContext::HelpCallback &callback) const
 {
-    AbstractView::contextHelpId(callback);
+    AbstractView::contextHelp(callback);
 }
 
-void TextEditorView::qmlJSEditorHelpId(const Core::IContext::HelpIdCallback &callback) const
+void TextEditorView::qmlJSEditorContextHelp(const Core::IContext::HelpCallback &callback) const
 {
     if (m_widget->textEditor())
-        m_widget->textEditor()->contextHelpId(callback);
+        m_widget->textEditor()->contextHelp(callback);
     else
-        callback(QString());
+        callback({});
 }
 
 void TextEditorView::nodeIdChanged(const ModelNode& /*node*/, const QString &/*newId*/, const QString &/*oldId*/)

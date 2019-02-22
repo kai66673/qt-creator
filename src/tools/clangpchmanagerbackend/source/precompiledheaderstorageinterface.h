@@ -25,7 +25,9 @@
 
 #pragma once
 
-#include <utils/smallstringview.h>
+#include <filepath.h>
+
+#include <utils/smallstringvector.h>
 
 namespace ClangBackEnd {
 
@@ -34,14 +36,20 @@ class PrecompiledHeaderStorageInterface
 public:
     PrecompiledHeaderStorageInterface() = default;
 
-    PrecompiledHeaderStorageInterface(const PrecompiledHeaderStorageInterface&) = delete;
-    PrecompiledHeaderStorageInterface &operator=(const PrecompiledHeaderStorageInterface&) = delete;
+    PrecompiledHeaderStorageInterface(const PrecompiledHeaderStorageInterface &) = delete;
+    PrecompiledHeaderStorageInterface &operator=(const PrecompiledHeaderStorageInterface &) = delete;
 
-    virtual void insertPrecompiledHeader(Utils::SmallStringView projectPartName,
-                                         Utils::SmallStringView pchPath,
-                                         long long pchBuildTime) = 0;
-
-    virtual void deletePrecompiledHeader(Utils::SmallStringView projectPartName) = 0;
+    virtual void insertProjectPrecompiledHeader(Utils::SmallStringView projectPartName,
+                                                Utils::SmallStringView pchPath,
+                                                long long pchBuildTime)
+        = 0;
+    virtual void deleteProjectPrecompiledHeader(Utils::SmallStringView projectPartName) = 0;
+    virtual void insertSystemPrecompiledHeaders(const Utils::SmallStringVector &projectPartNames,
+                                                Utils::SmallStringView pchPath,
+                                                long long pchBuildTime)
+        = 0;
+    virtual void deleteSystemPrecompiledHeaders(const Utils::SmallStringVector &projectPartNames) = 0;
+    virtual FilePath fetchSystemPrecompiledHeaderPath(Utils::SmallStringView projectPartName) = 0;
 
 protected:
     ~PrecompiledHeaderStorageInterface() = default;

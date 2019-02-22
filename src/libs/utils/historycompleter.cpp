@@ -56,7 +56,7 @@ public:
     QStringList list;
     QString historyKey;
     QString historyKeyIsLastItemEmpty;
-    int maxLines = 30;
+    int maxLines = 6;
     bool isLastItemEmpty = false;
 };
 
@@ -117,8 +117,11 @@ private:
             if (layoutDirection() == Qt::LeftToRight)
                 rr = viewport()->width() - event->x();
             if (rr < clearButtonSize.width()) {
-                model->removeRow(indexAt(event->pos()).row());
-                return;
+                const QModelIndex index = indexAt(event->pos());
+                if (index.isValid()) {
+                    model->removeRow(indexAt(event->pos()).row());
+                    return;
+                }
             }
         }
         QListView::mousePressEvent(event);

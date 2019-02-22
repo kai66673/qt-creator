@@ -4,7 +4,6 @@ include(../../qtcreatorplugin.pri)
 
 HEADERS += \
     embeddedlinuxqtversion.h \
-    embeddedlinuxqtversionfactory.h \
     remotelinuxenvironmentaspect.h \
     remotelinuxenvironmentaspectwidget.h \
     remotelinuxplugin.h \
@@ -13,7 +12,6 @@ HEADERS += \
     remotelinuxrunconfiguration.h \
     publickeydeploymentdialog.h \
     genericlinuxdeviceconfigurationwizard.h \
-    genericlinuxdeviceconfigurationfactory.h \
     remotelinuxdebugsupport.h \
     genericlinuxdeviceconfigurationwizardpages.h \
     abstractremotelinuxdeploystep.h \
@@ -32,7 +30,6 @@ HEADERS += \
     remotelinuxenvironmentreader.h \
     sshkeydeployer.h \
     typespecificdeviceconfigurationlistmodel.h \
-    remotelinuxutils.h \
     remotelinuxcustomcommanddeployservice.h \
     remotelinuxcustomcommanddeploymentstep.h \
     genericlinuxdeviceconfigurationwidget.h \
@@ -41,14 +38,15 @@ HEADERS += \
     remotelinuxkillappservice.h \
     remotelinuxkillappstep.h \
     remotelinuxqmltoolingsupport.h \
+    rsyncdeploystep.h \
     linuxdeviceprocess.h \
     remotelinuxcustomrunconfiguration.h \
     remotelinuxsignaloperation.h \
+    remotelinuxx11forwardingaspect.h \
     deploymenttimeinfo.h
 
 SOURCES += \
     embeddedlinuxqtversion.cpp \
-    embeddedlinuxqtversionfactory.cpp \
     remotelinuxenvironmentaspect.cpp \
     remotelinuxenvironmentaspectwidget.cpp \
     remotelinuxplugin.cpp \
@@ -56,7 +54,6 @@ SOURCES += \
     remotelinuxrunconfiguration.cpp \
     publickeydeploymentdialog.cpp \
     genericlinuxdeviceconfigurationwizard.cpp \
-    genericlinuxdeviceconfigurationfactory.cpp \
     remotelinuxdebugsupport.cpp \
     genericlinuxdeviceconfigurationwizardpages.cpp \
     abstractremotelinuxdeploystep.cpp \
@@ -74,7 +71,6 @@ SOURCES += \
     remotelinuxenvironmentreader.cpp \
     sshkeydeployer.cpp \
     typespecificdeviceconfigurationlistmodel.cpp \
-    remotelinuxutils.cpp \
     remotelinuxcustomcommanddeployservice.cpp \
     remotelinuxcustomcommanddeploymentstep.cpp \
     genericlinuxdeviceconfigurationwidget.cpp \
@@ -83,9 +79,11 @@ SOURCES += \
     remotelinuxkillappservice.cpp \
     remotelinuxkillappstep.cpp \
     remotelinuxqmltoolingsupport.cpp \
+    rsyncdeploystep.cpp \
     linuxdeviceprocess.cpp \
     remotelinuxcustomrunconfiguration.cpp \
     remotelinuxsignaloperation.cpp \
+    remotelinuxx11forwardingaspect.cpp \
     deploymenttimeinfo.cpp
 
 FORMS += \

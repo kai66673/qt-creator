@@ -41,7 +41,7 @@
 
 #include <QLoggingCategory>
 
-static Q_LOGGING_CATEGORY(LOG, "qtc.autotest.testconfiguration")
+static Q_LOGGING_CATEGORY(LOG, "qtc.autotest.testconfiguration", QtWarningMsg)
 
 using namespace ProjectExplorer;
 
@@ -57,7 +57,7 @@ static bool isLocal(RunConfiguration *runConfiguration)
 {
     Target *target = runConfiguration ? runConfiguration->target() : nullptr;
     Kit *kit = target ? target->kit() : nullptr;
-    return DeviceTypeKitInformation::deviceTypeId(kit) == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE;
+    return DeviceTypeKitAspect::deviceTypeId(kit) == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE;
 }
 
 static QString ensureExeEnding(const QString& file)
@@ -93,8 +93,7 @@ void TestConfiguration::completeTestInformation(ProjectExplorer::RunConfiguratio
     m_runnable = rc->runnable();
     m_displayName = rc->displayName();
 
-    const QString buildKey = rc->buildKey();
-    BuildTargetInfo targetInfo = target->applicationTargets().buildTargetInfo(buildKey);
+    BuildTargetInfo targetInfo = rc->buildTargetInfo();
     if (!targetInfo.targetFilePath.isEmpty())
         m_runnable.executable = ensureExeEnding(targetInfo.targetFilePath.toString());
 

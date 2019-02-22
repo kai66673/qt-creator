@@ -36,6 +36,7 @@
 #include <sourcetool/sourcetool.h>
 #include <colortool/colortool.h>
 #include <texttool/texttool.h>
+#include <timelineeditor/timelineview.h>
 #include <pathtool/pathtool.h>
 
 #include <qmljseditor/qmljseditorconstants.h>
@@ -70,7 +71,7 @@
 #include <QScreen>
 #include <QWindow>
 
-Q_LOGGING_CATEGORY(qmldesignerLog, "qtc.qmldesigner")
+Q_LOGGING_CATEGORY(qmldesignerLog, "qtc.qmldesigner", QtWarningMsg)
 
 using namespace QmlDesigner::Internal;
 
@@ -192,7 +193,9 @@ bool QmlDesignerPlugin::delayedInitialize()
 
     d->settings.fromSettings(Core::ICore::settings());
 
-    d->viewManager.registerViewTakingOwnership(new QmlDesigner::Internal::ConnectionView());
+    d->viewManager.registerViewTakingOwnership(new QmlDesigner::Internal::ConnectionView);
+    if (DesignerSettings::getValue(DesignerSettingsKey::ENABLE_TIMELINEVIEW).toBool())
+        d->viewManager.registerViewTakingOwnership(new QmlDesigner::TimelineView);
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::SourceTool);
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::ColorTool);
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::TextTool);
@@ -374,7 +377,8 @@ void QmlDesignerPlugin::jumpTextCursorToSelectedModelNode()
             if (currentSelectedNode != selectedNode) {
                 int line, column;
                 currentDesignDocument()->textEditor()->convertPosition(nodeOffset, &line, &column);
-                currentDesignDocument()->textEditor()->gotoLine(line, column);
+                // line has to be 1 based, column 0 based!
+                currentDesignDocument()->textEditor()->gotoLine(line, column - 1);
             }
         }
     }
@@ -473,7 +477,7 @@ void QmlDesignerPlugin::switchToTextModeDeferred()
 void QmlDesignerPlugin::emitCurrentTextEditorChanged(Core::IEditor *editor)
 {
     d->blockEditorChange = true;
-    Core::EditorManager::instance()->currentEditorChanged(editor);
+    emit Core::EditorManager::instance()->currentEditorChanged(editor);
     d->blockEditorChange = false;
 }
 

@@ -65,6 +65,7 @@ static const char kFontSizeKey[] = "Help/FallbackFontSize";
 static const char kStartOptionKey[] = "Help/StartOption";
 static const char kContextHelpOptionKey[] = "Help/ContextHelpOption";
 static const char kReturnOnCloseKey[] = "Help/ReturnOnClose";
+static const char kUseScrollWheelZooming[] = "Help/UseScrollWheelZooming";
 static const char kLastShownPagesKey[] = "Help/LastShownPages";
 static const char kLastShownPagesZoomKey[] = "Help/LastShownPagesZoom";
 static const char kLastSelectedTabKey[] = "Help/LastSelectedTab";
@@ -225,6 +226,17 @@ void LocalHelpManager::setReturnOnClose(bool returnOnClose)
     emit m_instance->returnOnCloseChanged();
 }
 
+bool LocalHelpManager::isScrollWheelZoomingEnabled()
+{
+    return Core::ICore::settings()->value(kUseScrollWheelZooming, true).toBool();
+}
+
+void LocalHelpManager::setScrollWheelZoomingEnabled(bool enabled)
+{
+    Core::ICore::settings()->setValue(kUseScrollWheelZooming, enabled);
+    emit m_instance->scrollWheelZoomingEnabledChanged(enabled);
+}
+
 QStringList LocalHelpManager::lastShownPages()
 {
     const QVariant value = Core::ICore::settings()->value(kLastShownPagesKey, QVariant());
@@ -300,24 +312,6 @@ BookmarkManager& LocalHelpManager::bookmarkManager()
             m_bookmarkManager = new BookmarkManager;
     }
     return *m_bookmarkManager;
-}
-
-/*!
- * Checks if the string does contain a scheme, and if that scheme is a "sensible" scheme for
- * opening in a internal or external browser (qthelp, about, file, http, https).
- * This is necessary to avoid trying to open e.g. "Foo::bar" in a external browser.
- */
-bool LocalHelpManager::isValidUrl(const QString &link)
-{
-    QUrl url(link);
-    if (!url.isValid())
-        return false;
-    const QString scheme = url.scheme();
-    return (scheme == "qthelp"
-            || scheme == "about"
-            || scheme == "file"
-            || scheme == "http"
-            || scheme == "https");
 }
 
 QByteArray LocalHelpManager::loadErrorMessage(const QUrl &url, const QString &errorString)

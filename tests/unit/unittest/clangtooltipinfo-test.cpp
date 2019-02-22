@@ -85,6 +85,7 @@ struct Data {
     ClangBackEnd::Documents documents{unsavedFiles};
     Document document{Utf8StringLiteral(TESTDATA_DIR "/tooltipinfo.cpp"),
                       {Utf8StringLiteral("-std=c++14")},
+                      {},
                       documents};
     UnitTest::RunDocumentParse _1{document};
 };
@@ -581,6 +582,18 @@ TEST_F(ToolTipInfo, AutoTypeBuiltin)
     const ::ToolTipInfo actual = tooltip(176, 5);
 
     ASSERT_THAT(actual.text, Utf8StringLiteral("int"));
+}
+
+TEST_F(ToolTipInfo, PointerToPointerToClass)
+{
+    ::ToolTipInfo expected(Utf8StringLiteral("Nuu **"));
+    expected.qdocIdCandidates = {Utf8StringLiteral("Nuu")};
+    expected.qdocMark = Utf8StringLiteral("Nuu");
+    expected.qdocCategory = ::ToolTipInfo::ClassOrNamespace;
+
+    const ::ToolTipInfo actual = tooltip(200, 12);
+
+    ASSERT_THAT(actual, IsToolTip(expected));
 }
 
 // TODO: Test for qdoc entries, too.

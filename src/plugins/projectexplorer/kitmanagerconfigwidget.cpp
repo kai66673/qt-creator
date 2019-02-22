@@ -45,6 +45,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QPushButton>
 #include <QToolButton>
 #include <QScrollArea>
 #include <QSizePolicy>
@@ -121,6 +122,15 @@ KitManagerConfigWidget::KitManagerConfigWidget(Kit *k) :
     auto chooser = new Core::VariableChooser(this);
     chooser->addSupportedWidget(m_nameEdit);
     chooser->addMacroExpanderProvider([this]() { return m_modifiedKit->macroExpander(); });
+
+    for (KitAspect *aspect : KitManager::kitAspects())
+        addAspectToWorkingCopy(aspect);
+
+    updateVisibility();
+
+    if (k && k->isAutoDetected())
+        makeStickySubWidgetsReadOnly();
+    setVisible(false);
 }
 
 KitManagerConfigWidget::~KitManagerConfigWidget()
@@ -211,22 +221,25 @@ QString KitManagerConfigWidget::validityMessage() const
     return m_modifiedKit->toHtml(tmp);
 }
 
-void KitManagerConfigWidget::addConfigWidget(KitConfigWidget *widget)
+void KitManagerConfigWidget::addAspectToWorkingCopy(KitAspect *aspect)
 {
+    QTC_ASSERT(aspect, return);
+    KitAspectWidget *widget = aspect->createConfigWidget(workingCopy());
     QTC_ASSERT(widget, return);
     QTC_ASSERT(!m_widgets.contains(widget), return);
 
-    QString name = widget->displayName();
-    QString toolTip = widget->toolTip();
+    const QString name = aspect->displayName() + ':';
+    QString toolTip = aspect->description();
 
     auto action = new QAction(tr("Mark as Mutable"), nullptr);
     action->setCheckable(true);
-    action->setChecked(widget->isMutable());
+    action->setChecked(workingCopy()->isMutable(aspect->id()));
+
     action->setEnabled(!widget->isSticky());
     widget->mainWidget()->addAction(action);
     widget->mainWidget()->setContextMenuPolicy(Qt::ActionsContextMenu);
-    connect(action, &QAction::toggled, this, [this, widget, action] {
-        widget->setMutable(action->isChecked());
+    connect(action, &QAction::toggled, this, [this, aspect, action] {
+        workingCopy()->setMutable(aspect->id(), action->isChecked());
         emit dirty();
     });
 
@@ -249,8 +262,9 @@ void KitManagerConfigWidget::updateVisibility()
 {
     int count = m_widgets.count();
     for (int i = 0; i < count; ++i) {
-        KitConfigWidget *widget = m_widgets.at(i);
-        bool visible = widget->visibleInKit();
+        KitAspectWidget *widget = m_widgets.at(i);
+        const bool visible = widget->visibleInKit()
+                && !m_modifiedKit->irrelevantAspects().contains(widget->kitInformationId());
         widget->mainWidget()->setVisible(visible);
         if (widget->buttonWidget())
             widget->buttonWidget()->setVisible(visible);
@@ -265,7 +279,7 @@ void KitManagerConfigWidget::setHasUniqueName(bool unique)
 
 void KitManagerConfigWidget::makeStickySubWidgetsReadOnly()
 {
-    foreach (KitConfigWidget *w, m_widgets) {
+    foreach (KitAspectWidget *w, m_widgets) {
         if (w->isSticky())
             w->makeReadOnly();
     }
@@ -348,7 +362,7 @@ void KitManagerConfigWidget::workingCopyWasUpdated(Kit *k)
     k->fix();
     m_fixingKit = false;
 
-    foreach (KitConfigWidget *w, m_widgets)
+    foreach (KitAspectWidget *w, m_widgets)
         w->refresh();
 
     m_cachedDisplayName.clear();
@@ -376,7 +390,7 @@ void KitManagerConfigWidget::kitWasUpdated(Kit *k)
 void KitManagerConfigWidget::showEvent(QShowEvent *event)
 {
     Q_UNUSED(event);
-    foreach (KitConfigWidget *widget, m_widgets)
+    foreach (KitAspectWidget *widget, m_widgets)
         widget->refresh();
 }
 

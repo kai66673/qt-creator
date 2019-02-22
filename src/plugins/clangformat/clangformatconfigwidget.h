@@ -25,20 +25,19 @@
 
 #pragma once
 
-#include <QWidget>
+#include <texteditor/icodestylepreferencesfactory.h>
 
 #include <memory>
 
 namespace ProjectExplorer { class Project; }
 
 namespace ClangFormat {
-namespace Internal {
 
 namespace Ui {
 class ClangFormatConfigWidget;
 }
 
-class ClangFormatConfigWidget : public QWidget
+class ClangFormatConfigWidget : public TextEditor::CodeStyleEditorWidget
 {
     Q_OBJECT
 
@@ -46,12 +45,17 @@ public:
     explicit ClangFormatConfigWidget(ProjectExplorer::Project *project = nullptr,
                                      QWidget *parent = nullptr);
     ~ClangFormatConfigWidget() override;
-    void apply();
+    void apply() override;
 
 private:
+    void initialize();
+    void fillTable();
+
+    void hideGlobalCheckboxes();
+    void showGlobalCheckboxes();
+
     ProjectExplorer::Project *m_project;
     std::unique_ptr<Ui::ClangFormatConfigWidget> m_ui;
 };
 
-} // namespace Internal
 } // namespace ClangFormat
