@@ -103,7 +103,7 @@ void BaseGoCompilerStep::doRun()
 
     env.set(QStringLiteral("GOPATH"), goPath);
     parameters->setEnvironment(env);
-    AbstractProcessStep::run();
+    AbstractProcessStep::doRun();
 }
 
 bool BaseGoCompilerStep::fromMap(const QVariantMap &map)
