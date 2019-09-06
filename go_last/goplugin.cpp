@@ -44,7 +44,6 @@
 #include "gooutlinewidgetfactory.h"
 #include "goeditorconstants.h"
 #include "gorunconfiguration.h"
-#include "goconfigurations.h"
 
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
@@ -55,6 +54,7 @@
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/projectmanager.h>
 #include <projectexplorer/runconfiguration.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/toolchainmanager.h>
 #include <texteditor/texteditorconstants.h>
 #include <texteditor/snippets/snippetprovider.h>
@@ -130,19 +130,17 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 
     d = new GoPluginPrivate;
 
-    GoLang::GoConfigurations::initialize();
-
     qRegisterMetaType<GoTools::GoSource::Ptr>("GoTools::GoSource::Ptr");
 
     ProjectExplorer::ToolChainManager::registerLanguage(GoLang::Constants::C_GOLANGUAGE_ID,
                                                         GoLang::Constants::C_GOLANGUAGE_NAME);
 
-//    auto constraint = [](ProjectExplorer::RunConfiguration *runConfig) {
-//        return qobject_cast<GoLang::GoRunConfiguration *>(runConfig) != nullptr;
-//    };
+    auto constraint = [](ProjectExplorer::RunConfiguration *runConfig) {
+        return qobject_cast<GoLang::GoRunConfiguration *>(runConfig) != nullptr;
+    };
 
-//    ProjectExplorer::RunControl::registerWorker<ProjectExplorer::SimpleTargetRunner>
-//            (ProjectExplorer::Constants::NORMAL_RUN_MODE, constraint);
+    ProjectExplorer::RunControl::registerWorker<ProjectExplorer::SimpleTargetRunner>
+            (ProjectExplorer::Constants::NORMAL_RUN_MODE, constraint);
 
     TextEditor::SnippetProvider::registerGroup(Go::Constants::GO_SNIPPETS_GROUP_ID,
                                                tr("Go", "GoEditor::GoSnippetProvider"),
@@ -171,8 +169,6 @@ bool GoPlugin::initialize(const QStringList &arguments, QString *errorMessage)
 void GoPlugin::extensionsInitialized()
 {
     GoTools::GoCodeModelManager::instance()->indexPackageDirs();
-    connect(ProjectExplorer::KitManager::instance(), &ProjectExplorer::KitManager::kitsLoaded,
-            this, &GoPlugin::kitsRestored);
 }
 
 ExtensionSystem::IPlugin::ShutdownFlag GoPlugin::aboutToShutdown()
@@ -252,13 +248,6 @@ void GoPlugin::createActions()
     connect(d->m_renameSymbolUnderCursorAction, &QAction::triggered, this, &GoPlugin::renameSymbolUnderCursor);
     contextMenu->addAction(cmd);
     goToolsMenu->addAction(cmd);
-}
-
-void GoPlugin::kitsRestored()
-{
-    disconnect(ProjectExplorer::KitManager::instance(), &ProjectExplorer::KitManager::kitsLoaded,
-               this, &GoPlugin::kitsRestored);
-    GoLang::GoConfigurations::updateAutomaticKitList();
 }
 
 }   // namespace Internal

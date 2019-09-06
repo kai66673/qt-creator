@@ -36,7 +36,7 @@ GoIndenter::GoIndenter(QTextDocument *doc)
 { }
 
 void GoIndenter::indentBlock(const QTextBlock &block,
-                             const QChar &typedChar, const TextEditor::TabSettings &tabSettings, int cursorPositionInEditor)
+                             const QChar &typedChar, const TextEditor::TabSettings &tabSettings, int)
 {
     GoCodeFormatter codeFormatter(tabSettings);
 

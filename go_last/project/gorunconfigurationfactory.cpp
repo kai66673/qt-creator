@@ -35,7 +35,7 @@
 namespace GoLang {
 
 GoRunConfigurationFactory::GoRunConfigurationFactory()
-    : FixedRunConfigurationFactory("-TempRunConf")
+    : FixedRunConfigurationFactory(QString())
 {
     registerRunConfiguration<GoRunConfiguration>(Constants::C_GORUNCONFIGURATION_ID);
     addSupportedProjectType(Constants::C_GOPROJECT_ID);
