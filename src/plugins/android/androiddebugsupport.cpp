@@ -82,21 +82,19 @@ static QStringList qtSoPaths(QtSupport::BaseQtVersion *qtVersion)
             paths.insert(it.fileInfo().absolutePath());
         }
     }
-    return paths.toList();
+    return Utils::toList(paths);
 }
 
 static QStringList uniquePaths(const QStringList &files)
 {
     QSet<QString> paths;
-    foreach (const QString &file, files)
-        paths<<QFileInfo(file).absolutePath();
-    return paths.toList();
+    for (const QString &file : files)
+        paths << QFileInfo(file).absolutePath();
+    return Utils::toList(paths);
 }
 
-static QStringList getSoLibSearchPath(const RunConfiguration *rc)
+static QStringList getSoLibSearchPath(const ProjectNode *node)
 {
-    Target *target = rc->target();
-    const ProjectNode *node = target->project()->findNodeForBuildKey(rc->buildKey());
     if (!node)
         return {};
 
@@ -122,12 +120,10 @@ static QStringList getSoLibSearchPath(const RunConfiguration *rc)
     return res;
 }
 
-static QStringList getExtraLibs(const RunConfiguration *rc)
+static QStringList getExtraLibs(const ProjectNode *node)
 {
-    const ProjectNode *node = rc->target()->project()->findNodeForBuildKey(rc->buildKey());
     if (!node)
         return {};
-
     return node->data(Android::Constants::AndroidExtraLibs).toStringList();
 }
 
@@ -150,8 +146,7 @@ AndroidDebugSupport::AndroidDebugSupport(RunControl *runControl, const QString &
 
 void AndroidDebugSupport::start()
 {
-    auto runConfig = runControl()->runConfiguration();
-    Target *target = runConfig->target();
+    Target *target = runControl()->target();
     Kit *kit = target->kit();
 
     setStartMode(AttachToRemoteServer);
@@ -172,10 +167,13 @@ void AndroidDebugSupport::start()
 
     if (isCppDebugging()) {
         qCDebug(androidDebugSupportLog) << "C++ debugging enabled";
-        QStringList solibSearchPath = getSoLibSearchPath(runConfig);
-        QStringList extraLibs = getExtraLibs(runConfig);
+        const ProjectNode *node = target->project()->findNodeForBuildKey(runControl()->buildKey());
+        QStringList solibSearchPath = getSoLibSearchPath(node);
+        QStringList extraLibs = getExtraLibs(node);
         solibSearchPath.append(qtSoPaths(qtVersion));
         solibSearchPath.append(uniquePaths(extraLibs));
+        solibSearchPath.append(target->activeBuildConfiguration()->buildDirectory().toString());
+        solibSearchPath.removeDuplicates();
         setSolibSearchPath(solibSearchPath);
         qCDebug(androidDebugSupportLog) << "SoLibSearchPath: "<<solibSearchPath;
         setSymbolFile(target->activeBuildConfiguration()->buildDirectory().toString()
@@ -191,11 +189,11 @@ void AndroidDebugSupport::start()
         QTC_CHECK(qt);
         const int minimumNdk = qt ? qt->minimumNDK() : 0;
 
-        int sdkVersion = qMax(AndroidManager::minimumSDK(target->kit()), minimumNdk);
-        Utils::FileName sysRoot = AndroidConfigurations::currentConfig().ndkLocation()
-                .appendPath("platforms")
-                .appendPath(QString("android-%1").arg(sdkVersion))
-                .appendPath(toNdkArch(AndroidManager::targetArch(target)));
+        int sdkVersion = qMax(AndroidManager::minimumSDK(kit), minimumNdk);
+        Utils::FilePath sysRoot = AndroidConfigurations::currentConfig().ndkLocation()
+                .pathAppended("platforms")
+                .pathAppended(QString("android-%1").arg(sdkVersion))
+                .pathAppended(toNdkArch(AndroidManager::targetArch(target)));
         setSysRoot(sysRoot);
         qCDebug(androidDebugSupportLog) << "Sysroot: " << sysRoot;
     }

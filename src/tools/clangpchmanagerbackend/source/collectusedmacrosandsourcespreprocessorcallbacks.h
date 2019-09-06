@@ -54,17 +54,16 @@ public:
     CollectUsedMacrosAndSourcesPreprocessorCallbacksBase(UsedMacros &usedMacros,
                                                          const FilePathCachingInterface &filePathCache,
                                                          const clang::SourceManager &sourceManager,
-                                                         SourcesManager &sourcesManager,
                                                          std::shared_ptr<clang::Preprocessor> preprocessor,
                                                          SourceDependencies &sourceDependencies,
                                                          FilePathIds &sourceFiles,
                                                          FileStatuses &fileStatuses)
-        : SymbolsVisitorBase(filePathCache, &sourceManager, sourcesManager),
-          m_usedMacros(usedMacros),
-          m_preprocessor(preprocessor),
-          m_sourceDependencies(sourceDependencies),
-          m_sourceFiles(sourceFiles),
-          m_fileStatuses(fileStatuses)
+        : SymbolsVisitorBase(filePathCache, &sourceManager, m_filePathIndices)
+        , m_usedMacros(usedMacros)
+        , m_preprocessor(preprocessor)
+        , m_sourceDependencies(sourceDependencies)
+        , m_sourceFiles(sourceFiles)
+        , m_fileStatuses(fileStatuses)
     {}
 
     void addSourceFile(const clang::FileEntry *fileEntry)
@@ -92,8 +91,7 @@ public:
             m_fileStatuses.emplace(found,
                                    id,
                                    fileEntry->getSize(),
-                                   fileEntry->getModificationTime(),
-                                   fileEntry->isInPCH());
+                                   fileEntry->getModificationTime());
         }
     }
 
@@ -167,6 +165,7 @@ public:
 
 private:
     UsedMacros m_maybeUsedMacros;
+    FilePathIds m_filePathIndices;
     UsedMacros &m_usedMacros;
     std::shared_ptr<clang::Preprocessor> m_preprocessor;
     SourceDependencies &m_sourceDependencies;
@@ -249,7 +248,6 @@ public:
     {
         filterOutHeaderGuards();
         mergeUsedMacros();
-        m_sourcesManager.updateModifiedTimeStamps();
     }
 
 private:

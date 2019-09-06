@@ -30,6 +30,7 @@
 #include "qmakenodes.h"
 #include "qmakeparsernodes.h"
 
+#include <projectexplorer/deploymentdata.h>
 #include <projectexplorer/project.h>
 
 #include <QStringList>
@@ -55,18 +56,18 @@ class  QMAKEPROJECTMANAGER_EXPORT QmakeProject : public ProjectExplorer::Project
     Q_OBJECT
 
 public:
-    explicit QmakeProject(const Utils::FileName &proFile);
+    explicit QmakeProject(const Utils::FilePath &proFile);
     ~QmakeProject() final;
 
     QmakeProFile *rootProFile() const;
 
-    QList<ProjectExplorer::Task> projectIssues(const ProjectExplorer::Kit *k) const final;
+    ProjectExplorer::Tasks projectIssues(const ProjectExplorer::Kit *k) const final;
 
     QmakeProFileNode *rootProjectNode() const final;
 
     QStringList filesGeneratedFrom(const QString &file) const final;
 
-    static void notifyChanged(const Utils::FileName &name);
+    static void notifyChanged(const Utils::FilePath &name);
 
     /// \internal
     QtSupport::ProFileReader *createProFileReader(const QmakeProFile *qmakeProFile);
@@ -104,7 +105,7 @@ public:
     enum AsyncUpdateState { Base, AsyncFullUpdatePending, AsyncPartialUpdatePending, AsyncUpdateInProgress, ShuttingDown };
     AsyncUpdateState asyncUpdateState() const;
 
-    QString mapProFilePathToTarget(const Utils::FileName &proFilePath);
+    QString mapProFilePathToTarget(const Utils::FilePath &proFilePath);
 
     QVariant additionalData(Core::Id id, const ProjectExplorer::Target *target) const final;
 
@@ -120,13 +121,16 @@ protected:
     RestoreResult fromMap(const QVariantMap &map, QString *errorMessage) final;
 
 private:
+    ProjectExplorer::DeploymentKnowledge deploymentKnowledge() const override;
+    bool hasMakeInstallEquivalent() const override { return true; }
+
     void asyncUpdate();
     void buildFinished(bool success);
     void activeTargetWasChanged();
 
     void setAllBuildConfigurationsEnabled(bool enabled);
 
-    QString executableFor(const QmakeProFileNode *node);
+    QString executableFor(const QmakeProFile *file);
     void updateRunConfigurations();
 
     void updateCppCodeModel();
@@ -135,8 +139,8 @@ private:
     static bool equalFileList(const QStringList &a, const QStringList &b);
 
     void updateBuildSystemData();
-    void collectData(const QmakeProFileNode *node, ProjectExplorer::DeploymentData &deploymentData);
-    void collectApplicationData(const QmakeProFileNode *file,
+    void collectData(const QmakeProFile *file, ProjectExplorer::DeploymentData &deploymentData);
+    void collectApplicationData(const QmakeProFile *file,
                                 ProjectExplorer::DeploymentData &deploymentData);
     void collectLibraryData(const QmakeProFile *file,
             ProjectExplorer::DeploymentData &deploymentData);
@@ -144,9 +148,9 @@ private:
     bool matchesKit(const ProjectExplorer::Kit *kit);
 
     void warnOnToolChainMismatch(const QmakeProFile *pro) const;
-    void testToolChain(ProjectExplorer::ToolChain *tc, const Utils::FileName &path) const;
+    void testToolChain(ProjectExplorer::ToolChain *tc, const Utils::FilePath &path) const;
 
-    mutable QSet<const QPair<Utils::FileName, Utils::FileName>> m_toolChainWarnings;
+    mutable QSet<const QPair<Utils::FilePath, Utils::FilePath>> m_toolChainWarnings;
 
     // Current configuration
     QString m_oldQtIncludePath;

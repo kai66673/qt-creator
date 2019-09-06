@@ -54,7 +54,7 @@ class QbsProject : public ProjectExplorer::Project
     Q_OBJECT
 
 public:
-    explicit QbsProject(const Utils::FileName &filename);
+    explicit QbsProject(const Utils::FilePath &filename);
     ~QbsProject() override;
 
     QStringList filesGeneratedFrom(const QString &sourceFile) const override;
@@ -128,11 +128,13 @@ private:
     void updateAfterParse();
     void delayedUpdateAfterParse();
     void updateProjectNodes();
-    Utils::FileName installRoot();
+    Utils::FilePath installRoot();
 
     void projectLoaded() override;
     ProjectExplorer::ProjectImporter *projectImporter() const override;
     QVariant additionalData(Core::Id id, const ProjectExplorer::Target *target) const final;
+
+    ProjectExplorer::DeploymentKnowledge deploymentKnowledge() const override;
 
     static bool ensureWriteableQbsFile(const QString &file);
 
@@ -162,6 +164,8 @@ private:
     QTimer m_parsingDelay;
     QList<ProjectExplorer::ExtraCompiler *> m_extraCompilers;
     bool m_extraCompilersPending = false;
+
+    QHash<QString, Utils::Environment> m_envCache;
 };
 
 } // namespace Internal

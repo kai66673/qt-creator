@@ -25,10 +25,13 @@
 
 #pragma once
 
+#include "documentsymbolcache.h"
 #include "dynamiccapabilities.h"
 #include "languageclientcompletionassist.h"
+#include "languageclientfunctionhint.h"
 #include "languageclientquickfix.h"
 #include "languageclientsettings.h"
+#include "languageclienthoverhandler.h"
 
 #include <coreplugin/id.h>
 #include <coreplugin/messagemanager.h>
@@ -90,12 +93,15 @@ public:
     bool reachable() const { return m_state == Initialized; }
 
     // document synchronization
-    void openDocument(Core::IDocument *document);
+    bool openDocument(Core::IDocument *document);
     void closeDocument(const LanguageServerProtocol::DidCloseTextDocumentParams &params);
-    bool documentOpen(const LanguageServerProtocol::DocumentUri &uri) const;
+    bool documentOpen(const Core::IDocument *document) const;
     void documentContentsSaved(Core::IDocument *document);
     void documentWillSave(Core::IDocument *document);
-    void documentContentsChanged(Core::IDocument *document);
+    void documentContentsChanged(TextEditor::TextDocument *document,
+                                 int position,
+                                 int charsRemoved,
+                                 int charsAdded);
     void registerCapabilities(const QList<LanguageServerProtocol::Registration> &registrations);
     void unregisterCapabilities(const QList<LanguageServerProtocol::Unregistration> &unregistrations);
     bool findLinkAt(LanguageServerProtocol::GotoDefinitionRequest &request);
@@ -111,6 +117,8 @@ public:
     void executeCommand(const LanguageServerProtocol::Command &command);
 
     // workspace control
+    void setCurrentProject(ProjectExplorer::Project *project);
+    const ProjectExplorer::Project *project() const;
     void projectOpened(ProjectExplorer::Project *project);
     void projectClosed(ProjectExplorer::Project *project);
 
@@ -121,7 +129,7 @@ public:
 
     void setSupportedLanguage(const LanguageFilter &filter);
     bool isSupportedDocument(const Core::IDocument *document) const;
-    bool isSupportedFile(const Utils::FileName &filePath, const QString &mimeType) const;
+    bool isSupportedFile(const Utils::FilePath &filePath, const QString &mimeType) const;
     bool isSupportedUri(const LanguageServerProtocol::DocumentUri &uri) const;
 
     void setName(const QString &name) { m_displayName = name; }
@@ -147,6 +155,9 @@ public:
 
     const LanguageServerProtocol::ServerCapabilities &capabilities() const;
     const DynamicCapabilities &dynamicCapabilities() const;
+    const BaseClientInterface *clientInterface() const;
+    DocumentSymbolCache *documentSymbolCache();
+    HoverHandler *hoverHandler();
 
 signals:
     void initialized(LanguageServerProtocol::ServerCapabilities capabilities);
@@ -185,17 +196,21 @@ private:
     QHash<QByteArray, ContentHandler> m_contentHandler;
     QString m_displayName;
     LanguageFilter m_languagFilter;
-    QList<Utils::FileName> m_openedDocument;
+    QMap<Utils::FilePath, QString> m_openedDocument;
     Core::Id m_id;
     LanguageServerProtocol::ServerCapabilities m_serverCapabilities;
     DynamicCapabilities m_dynamicCapabilities;
     LanguageClientCompletionAssistProvider m_completionProvider;
+    FunctionHintAssistProvider m_functionHintProvider;
     LanguageClientQuickFixProvider m_quickFixProvider;
-    QSet<TextEditor::TextDocument *> m_resetAssistProvider;
+    QMap<TextEditor::TextDocument *, QPointer<TextEditor::CompletionAssistProvider>> m_resetAssistProvider;
     QHash<LanguageServerProtocol::DocumentUri, LanguageServerProtocol::MessageId> m_highlightRequests;
     int m_restartsLeft = 5;
     QScopedPointer<BaseClientInterface> m_clientInterface;
     QMap<LanguageServerProtocol::DocumentUri, QList<TextMark *>> m_diagnostics;
+    DocumentSymbolCache m_documentSymbolCache;
+    HoverHandler m_hoverHandler;
+    const ProjectExplorer::Project *m_project = nullptr;
 };
 
 } // namespace LanguageClient

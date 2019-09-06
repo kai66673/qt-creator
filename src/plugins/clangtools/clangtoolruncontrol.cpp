@@ -288,6 +288,7 @@ void ClangToolRunControl::start()
     }
 
     m_projectInfo = CppTools::CppModelManager::instance()->projectInfo(m_target->project());
+    m_projectFiles = Utils::toSet(m_target->project()->files(Project::AllFiles));
 
     // Some projects provides CompilerCallData once a build is finished,
     if (m_projectInfo.configurationOrFilesChanged(m_projectInfoBeforeBuild)) {
@@ -299,7 +300,7 @@ void ClangToolRunControl::start()
         return;
     }
 
-    const Utils::FileName projectFile = m_projectInfo.project()->projectFilePath();
+    const Utils::FilePath projectFile = m_projectInfo.project()->projectFilePath();
     appendMessage(tr("Running %1 on %2").arg(toolName).arg(projectFile.toUserOutput()),
                   Utils::NormalMessageFormat);
 
@@ -360,6 +361,7 @@ void ClangToolRunControl::stop()
         QObject::disconnect(runner, nullptr, this, nullptr);
         delete runner;
     }
+    m_projectFiles.clear();
     m_runners.clear();
     m_unitsToProcess.clear();
     m_progress.reportFinished();
@@ -386,13 +388,8 @@ void ClangToolRunControl::analyzeNextFile()
     QTC_ASSERT(runner->run(unit.file, unit.arguments), return);
 
     appendMessage(tr("Analyzing \"%1\".").arg(
-                      Utils::FileName::fromString(unit.file).toUserOutput()),
+                      Utils::FilePath::fromString(unit.file).toUserOutput()),
                   Utils::StdOutFormat);
-}
-
-static Utils::FileName cleanPath(const Utils::FileName &filePath)
-{
-    return Utils::FileName::fromString(QDir::cleanPath(filePath.toString()));
 }
 
 void ClangToolRunControl::onRunnerFinishedWithSuccess(const QString &filePath)
@@ -400,12 +397,9 @@ void ClangToolRunControl::onRunnerFinishedWithSuccess(const QString &filePath)
     const QString logFilePath = qobject_cast<ClangToolRunner *>(sender())->logFilePath();
     qCDebug(LOG) << "onRunnerFinishedWithSuccess:" << logFilePath;
 
-    QTC_ASSERT(m_projectInfo.project(), return);
-    const Utils::FileName projectRootDir = cleanPath(m_projectInfo.project()->projectDirectory());
-
     QString errorMessage;
     const QList<Diagnostic> diagnostics = tool()->read(filePath,
-                                                       projectRootDir,
+                                                       m_projectFiles,
                                                        logFilePath,
                                                        &errorMessage);
     QFile::remove(logFilePath); // Clean-up.
@@ -477,6 +471,16 @@ void ClangToolRunControl::finalize()
     if (m_filesNotAnalyzed != 0) {
         QString msg = tr("%1: Not all files could be analyzed.").arg(toolName);
         TaskHub::addTask(Task::Error, msg, Debugger::Constants::ANALYZERTASK_ID);
+        if (m_target && !m_target->activeBuildConfiguration()->buildDirectory().exists()
+            && !ClangToolsProjectSettingsManager::getSettings(m_target->project())
+                    ->buildBeforeAnalysis()) {
+            msg = tr("%1: You might need to build the project to generate or update source "
+                     "files. To build automatically, enable \"Build the project before starting "
+                     "analysis\".")
+                      .arg(toolName);
+            TaskHub::addTask(Task::Error, msg, Debugger::Constants::ANALYZERTASK_ID);
+        }
+
         TaskHub::requestPopup();
     }
 

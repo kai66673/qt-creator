@@ -51,8 +51,8 @@ public:
     QVariantMap toMap() const override;
 
     // signing
-    Utils::FileName keystorePath();
-    void setKeystorePath(const Utils::FileName &path);
+    Utils::FilePath keystorePath();
+    void setKeystorePath(const Utils::FilePath &path);
     void setKeystorePassword(const QString &pwd);
     void setCertificateAlias(const QString &alias);
     void setCertificatePassword(const QString &pwd);
@@ -76,6 +76,7 @@ public:
     QString buildTargetSdk() const;
     void setBuildTargetSdk(const QString &sdk);
 
+    QVariant data(Core::Id id) const override;
 private:
     Q_INVOKABLE void showInGraphicalShell();
 
@@ -96,7 +97,7 @@ private:
     bool m_addDebugger = true;
     QString m_buildTargetSdk;
 
-    Utils::FileName m_keystorePath;
+    Utils::FilePath m_keystorePath;
     QString m_keystorePasswd;
     QString m_certificateAlias;
     QString m_certificatePasswd;

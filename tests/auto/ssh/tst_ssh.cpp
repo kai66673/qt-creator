@@ -27,6 +27,7 @@
 #include <ssh/sftptransfer.h>
 #include <ssh/sshconnection.h>
 #include <ssh/sshremoteprocessrunner.h>
+#include <ssh/sshsettings.h>
 #include <utils/environment.h>
 #include <utils/temporarydirectory.h>
 
@@ -142,6 +143,9 @@ void tst_Ssh::errorHandling_data()
 
 void tst_Ssh::errorHandling()
 {
+    if (SshSettings::sshFilePath().isEmpty())
+        QSKIP("No ssh found in PATH - skipping this test.");
+
     QFETCH(QString, host);
     QFETCH(quint16, port);
     QFETCH(SshConnectionParameters::AuthenticationType, authType);
@@ -171,8 +175,10 @@ void tst_Ssh::errorHandling()
     connection.connectToHost();
     loop.exec();
     QVERIFY(timer.isActive());
-    QCOMPARE(connection.state(), SshConnection::Unconnected);
-    QVERIFY(!connection.errorString().isEmpty());
+    const bool expectConnected = !SshSettings::connectionSharingEnabled();
+    QCOMPARE(connection.state(), expectConnected ? SshConnection::Connected
+                                                 : SshConnection::Unconnected);
+    QCOMPARE(connection.errorString().isEmpty(), expectConnected);
     QVERIFY(!disconnected);
     QVERIFY2(dataReceived.isEmpty(), qPrintable(dataReceived));
 }
@@ -313,8 +319,7 @@ void tst_Ssh::remoteProcessInput()
     SshConnection connection(params);
     QVERIFY(waitForConnection(connection));
 
-    SshRemoteProcessPtr catProcess
-            = connection.createRemoteProcess(QString::fromLatin1("/bin/cat").toUtf8());
+    SshRemoteProcessPtr catProcess = connection.createRemoteProcess("/bin/cat");
     QEventLoop loop;
     connect(catProcess.get(), &SshRemoteProcess::started, &loop, &QEventLoop::quit);
     connect(catProcess.get(), &SshRemoteProcess::done, &loop, &QEventLoop::quit);
@@ -375,7 +380,7 @@ void tst_Ssh::sftp()
     };
     FilesToTransfer filesToUpload;
     std::srand(QDateTime::currentDateTime().toSecsSinceEpoch());
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 100; ++i) {
         const QString fileName = "sftptestfile" + QString::number(i + 1);
         QFile file(dirForFilesToUpload.path() + '/' + fileName);
         QVERIFY2(file.open(QIODevice::WriteOnly), qPrintable(file.errorString()));
@@ -414,7 +419,7 @@ void tst_Ssh::sftp()
     QTimer timer;
     QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
     timer.setSingleShot(true);
-    timer.setInterval((params.timeout + 5) * 1000);
+    timer.setInterval(30 * 1000);
     timer.start();
     upload->start();
     loop.exec();
@@ -454,7 +459,7 @@ void tst_Ssh::sftp()
     // Download the uploaded files to a different location
     const QStringList allUploadedFileNames
             = QDir(dirForFilesToUpload.path()).entryList(QDir::Files);
-    QCOMPARE(allUploadedFileNames.size(), 1001);
+    QCOMPARE(allUploadedFileNames.size(), 101);
     for (const QString &fileName : allUploadedFileNames) {
         const QString localFilePath = dirForFilesToUpload.path() + '/' + fileName;
         const QString remoteFilePath = getRemoteFilePath(fileName);
@@ -463,7 +468,7 @@ void tst_Ssh::sftp()
         QVERIFY(downloadJob != SftpInvalidJob);
         jobs << downloadJob;
     }
-    QCOMPARE(jobs.size(), 1001);
+    QCOMPARE(jobs.size(), 101);
     loop.exec();
     QVERIFY(!invalidFinishedSignal);
     QVERIFY2(jobError.isEmpty(), qPrintable(jobError));
@@ -491,6 +496,7 @@ void tst_Ssh::sftp()
     }
 
     // Remove the uploaded files on the remote system
+    timer.setInterval((params.timeout + 5) * 1000);
     for (const QString &fileName : allUploadedFileNames) {
         const QString remoteFilePath = getRemoteFilePath(fileName);
         const SftpJobId removeJob = sftpChannel->removeFile(remoteFilePath);

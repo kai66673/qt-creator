@@ -91,14 +91,8 @@ CMakeBuildStep::CMakeBuildStep(BuildStepList *bsl) :
     }
 
     // Set a good default build target:
-    if (m_buildTarget.isEmpty()) {
-        if (bsl->id() == ProjectExplorer::Constants::BUILDSTEPS_CLEAN)
-            setBuildTarget(cleanTarget());
-        else if (bsl->id() == ProjectExplorer::Constants::BUILDSTEPS_DEPLOY)
-            setBuildTarget(installTarget());
-        else
-            setBuildTarget(allTarget());
-    }
+    if (m_buildTarget.isEmpty())
+        setBuildTarget(defaultBuildTarget());
 
     connect(target(), &Target::kitChanged, this, &CMakeBuildStep::cmakeCommandChanged);
     connect(project(), &Project::parsingFinished,
@@ -119,10 +113,10 @@ void CMakeBuildStep::handleBuildTargetChanges(bool success)
 {
     if (!success)
         return; // Do not change when parsing failed.
-    if (isCurrentExecutableTarget(m_buildTarget))
-        return; // Do not change just because a different set of build targets is there...
-    if (!static_cast<CMakeProject *>(project())->buildTargetTitles().contains(m_buildTarget))
-        setBuildTarget(allTarget());
+    if (!isCurrentExecutableTarget(m_buildTarget)
+        && !static_cast<CMakeProject *>(project())->buildTargetTitles().contains(m_buildTarget)) {
+        setBuildTarget(defaultBuildTarget());
+    }
     emit buildTargetsChanged();
 }
 
@@ -160,7 +154,7 @@ bool CMakeBuildStep::init()
         emit addTask(Task(Task::Error,
                           QCoreApplication::translate("CMakeProjectManager::CMakeBuildStep",
                                                       "The build configuration is currently disabled."),
-                          Utils::FileName(), -1, ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
+                          Utils::FilePath(), -1, ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
         canInit = false;
     }
 
@@ -169,7 +163,7 @@ bool CMakeBuildStep::init()
         emit addTask(Task(Task::Error,
                           tr("A CMake tool must be set up for building. "
                              "Configure a CMake tool in the kit options."),
-                          Utils::FileName(), -1,
+                          Utils::FilePath(), -1,
                           ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
         canInit = false;
     }
@@ -181,7 +175,7 @@ bool CMakeBuildStep::init()
                                     "You asked to build the current Run Configuration's build target only, "
                                     "but it is not associated with a build target. "
                                     "Update the Make Step in your build settings."),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
         canInit = false;
     }
@@ -192,22 +186,18 @@ bool CMakeBuildStep::init()
     }
 
     // Warn if doing out-of-source builds with a CMakeCache.txt is the source directory
-    const Utils::FileName projectDirectory = bc->target()->project()->projectDirectory();
+    const Utils::FilePath projectDirectory = bc->target()->project()->projectDirectory();
     if (bc->buildDirectory() != projectDirectory) {
-        Utils::FileName cmc = projectDirectory;
-        cmc.appendPath("CMakeCache.txt");
-        if (cmc.exists()) {
+        if (projectDirectory.pathAppended("CMakeCache.txt").exists()) {
             emit addTask(Task(Task::Warning,
                               tr("There is a CMakeCache.txt file in \"%1\", which suggest an "
                                  "in-source build was done before. You are now building in \"%2\", "
                                  "and the CMakeCache.txt file might confuse CMake.")
                               .arg(projectDirectory.toUserOutput(), bc->buildDirectory().toUserOutput()),
-                              Utils::FileName(), -1,
+                              Utils::FilePath(), -1,
                               ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
         }
     }
-
-    QString arguments = allArguments(rc);
 
     setIgnoreReturnValue(m_buildTarget == CMakeBuildStep::cleanTarget());
 
@@ -218,9 +208,8 @@ bool CMakeBuildStep::init()
     if (!env.value("NINJA_STATUS").startsWith(m_ninjaProgressString))
         env.set("NINJA_STATUS", m_ninjaProgressString + "%o/sec] ");
     pp->setEnvironment(env);
-    pp->setWorkingDirectory(bc->buildDirectory().toString());
-    pp->setCommand(cmakeCommand());
-    pp->setArguments(arguments);
+    pp->setWorkingDirectory(bc->buildDirectory());
+    pp->setCommandLine(cmakeCommand(rc));
     pp->resolveAll();
 
     setOutputParser(new CMakeParser);
@@ -280,6 +269,17 @@ void CMakeBuildStep::handleProjectWasParsed(bool success)
 BuildStepConfigWidget *CMakeBuildStep::createConfigWidget()
 {
     return new CMakeBuildStepConfigWidget(this);
+}
+
+QString CMakeBuildStep::defaultBuildTarget() const
+{
+    const ProjectConfiguration *const pc = qobject_cast<ProjectConfiguration *>(parent());
+    const Core::Id parentId = pc ? pc->id() : Core::Id();
+    if (parentId == ProjectExplorer::Constants::BUILDSTEPS_CLEAN)
+        return cleanTarget();
+    if (parentId == ProjectExplorer::Constants::BUILDSTEPS_DEPLOY)
+        return installTarget();
+    return allTarget();
 }
 
 void CMakeBuildStep::stdOutput(const QString &line)
@@ -344,39 +344,37 @@ void CMakeBuildStep::setToolArguments(const QString &list)
     m_toolArguments = list;
 }
 
-QString CMakeBuildStep::allArguments(const CMakeRunConfiguration *rc) const
+Utils::CommandLine CMakeBuildStep::cmakeCommand(CMakeRunConfiguration *rc) const
 {
-    QString arguments;
+    CMakeTool *tool = CMakeKitAspect::cmakeTool(target()->kit());
 
-    Utils::QtcProcess::addArg(&arguments, "--build");
-    Utils::QtcProcess::addArg(&arguments, ".");
+    Utils::CommandLine cmd(tool ? tool->cmakeExecutable() : Utils::FilePath(), {});
+    cmd.addArgs({"--build", "."});
 
     QString target;
 
     if (isCurrentExecutableTarget(m_buildTarget)) {
-        if (rc)
-            target = rc->buildKey().section('\n', 0, 0);
-        else
+        if (rc) {
+            target = rc->buildKey();
+            const int pos = target.indexOf("///::///");
+            if (pos >= 0) {
+                target = target.mid(pos + 8);
+            }
+        } else {
             target = "<i>&lt;" + tr(ADD_RUNCONFIGURATION_TEXT) + "&gt;</i>";
+        }
     } else {
         target = m_buildTarget;
     }
 
-    Utils::QtcProcess::addArg(&arguments, "--target");
-    Utils::QtcProcess::addArg(&arguments, target);
+    cmd.addArgs({"--target", target});
 
     if (!m_toolArguments.isEmpty()) {
-        Utils::QtcProcess::addArg(&arguments, "--");
-        arguments += ' ' + m_toolArguments;
+        cmd.addArg("--");
+        cmd.addArgs(m_toolArguments);
     }
 
-    return arguments;
-}
-
-QString CMakeBuildStep::cmakeCommand() const
-{
-    CMakeTool *tool = CMakeKitAspect::cmakeTool(target()->kit());
-    return tool ? tool->cmakeExecutable().toString() : QString();
+    return cmd;
 }
 
 QString CMakeBuildStep::cleanTarget()
@@ -531,9 +529,8 @@ void CMakeBuildStepConfigWidget::updateDetails()
     ProcessParameters param;
     param.setMacroExpander(bc->macroExpander());
     param.setEnvironment(bc->environment());
-    param.setWorkingDirectory(bc->buildDirectory().toString());
-    param.setCommand(m_buildStep->cmakeCommand());
-    param.setArguments(m_buildStep->allArguments(nullptr));
+    param.setWorkingDirectory(bc->buildDirectory());
+    param.setCommandLine(m_buildStep->cmakeCommand(nullptr));
 
     setSummaryText(param.summary(displayName()));
 }

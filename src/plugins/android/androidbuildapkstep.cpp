@@ -54,10 +54,11 @@
 #include <utils/synchronousprocess.h>
 #include <utils/utilsicons.h>
 
-#include <qmakeprojectmanager/qmakeprojectmanagerconstants.h>
-
+#include <QDateTime>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLoggingCategory>
@@ -69,6 +70,7 @@
 #include <memory>
 
 using namespace ProjectExplorer;
+using namespace Utils;
 using namespace Android::Internal;
 
 namespace {
@@ -89,10 +91,10 @@ static void setupProcessParameters(ProcessParameters *pp,
                                    const QString &command)
 {
     pp->setMacroExpander(bc->macroExpander());
-    pp->setWorkingDirectory(bc->buildDirectory().toString());
+    pp->setWorkingDirectory(bc->buildDirectory());
     Utils::Environment env = bc->environment();
     pp->setEnvironment(env);
-    pp->setCommand(command);
+    pp->setCommand(FilePath::fromString(command));
     pp->setArguments(Utils::QtcProcess::joinArgs(arguments));
     pp->resolveAll();
 }
@@ -166,7 +168,7 @@ bool AndroidBuildApkStep::init()
 
     const QVersionNumber sdkToolsVersion = AndroidConfigurations::currentConfig().sdkToolsVersion();
     if (sdkToolsVersion >= gradleScriptRevokedSdkVersion) {
-        if (!version->sourcePath().appendPath("src/3rdparty/gradle").exists()) {
+        if (!version->sourcePath().pathAppended("src/3rdparty/gradle").exists()) {
             emit addOutput(tr("The installed SDK tools version (%1) does not include Gradle "
                               "scripts. The minimum Qt version required for Gradle build to work "
                               "is %2").arg(sdkToolsVersion.toString()).arg("5.9.0/5.6.3"),
@@ -189,14 +191,19 @@ bool AndroidBuildApkStep::init()
 
     auto parser = new JavaParser;
     parser->setProjectFileList(Utils::transform(target()->project()->files(ProjectExplorer::Project::AllFiles),
-                                                &Utils::FileName::toString));
+                                                &Utils::FilePath::toString));
 
     RunConfiguration *rc = target()->activeRunConfiguration();
-    const ProjectNode *node = rc ? target()->project()->findNodeForBuildKey(rc->buildKey()) : nullptr;
+    const QString buildKey = rc ? rc->buildKey() : QString();
+    const ProjectNode *node = rc ? target()->project()->findNodeForBuildKey(buildKey) : nullptr;
 
-    QFileInfo sourceDirInfo(node ? node->data(Constants::AndroidPackageSourceDir).toString() : QString());
-    parser->setSourceDirectory(Utils::FileName::fromString(sourceDirInfo.canonicalFilePath()));
-    parser->setBuildDirectory(Utils::FileName::fromString(bc->buildDirectory().appendPath(Constants::ANDROID_BUILDDIRECTORY).toString()));
+    QString sourceDirName;
+    if (node)
+        sourceDirName = node->data(Constants::AndroidPackageSourceDir).toString();
+
+    QFileInfo sourceDirInfo(sourceDirName);
+    parser->setSourceDirectory(Utils::FilePath::fromString(sourceDirInfo.canonicalFilePath()));
+    parser->setBuildDirectory(bc->buildDirectory().pathAppended(Constants::ANDROID_BUILDDIRECTORY));
     setOutputParser(parser);
 
     m_openPackageLocationForRun = m_openPackageLocation;
@@ -213,7 +220,7 @@ bool AndroidBuildApkStep::init()
     if (Utils::HostOsInfo::isWindowsHost())
         command += ".exe";
 
-    QString outputDir = bc->buildDirectory().appendPath(Constants::ANDROID_BUILDDIRECTORY).toString();
+    QString outputDir = bc->buildDirectory().pathAppended(Constants::ANDROID_BUILDDIRECTORY).toString();
 
     QString inputFile;
     if (node)
@@ -273,7 +280,7 @@ bool AndroidBuildApkStep::init()
     // Generate arguments with keystore password concealed
     ProjectExplorer::ProcessParameters pp2;
     setupProcessParameters(&pp2, bc, argumentsPasswordConcealed, command);
-    m_command = pp2.effectiveCommand();
+    m_command = pp2.effectiveCommand().toString();
     m_argumentsPasswordConcealed = pp2.prettyArguments();
 
     return true;
@@ -340,13 +347,89 @@ bool AndroidBuildApkStep::verifyCertificatePassword()
     return success;
 }
 
+
+static bool copyFileIfNewer(const QString &sourceFileName,
+                            const QString &destinationFileName)
+{
+    if (QFile::exists(destinationFileName)) {
+        QFileInfo destinationFileInfo(destinationFileName);
+        QFileInfo sourceFileInfo(sourceFileName);
+        if (sourceFileInfo.lastModified() <= destinationFileInfo.lastModified())
+            return true;
+        if (!QFile(destinationFileName).remove())
+            return false;
+    }
+
+    if (!QDir().mkpath(QFileInfo(destinationFileName).path()))
+        return false;
+    return QFile::copy(sourceFileName, destinationFileName);
+}
+
 void AndroidBuildApkStep::doRun()
 {
     if (m_skipBuilding) {
-        emit addOutput(tr("No application .pro file found, not building an APK."), BuildStep::OutputFormat::ErrorMessage);
+        emit addOutput(tr("Android deploy settings file not found, not building an APK."), BuildStep::OutputFormat::ErrorMessage);
         emit finished(true);
         return;
     }
+
+    auto setup = [this] {
+        auto bc = target()->activeBuildConfiguration();
+        Utils::FilePath androidLibsDir = bc->buildDirectory()
+                .pathAppended("android-build/libs")
+                .pathAppended(AndroidManager::targetArch(target()));
+        if (!androidLibsDir.exists() && !QDir{bc->buildDirectory().toString()}.mkpath(androidLibsDir.toString()))
+            return false;
+
+
+        QJsonObject deploySettings = Android::AndroidManager::deploymentSettings(target());
+        RunConfiguration *rc = target()->activeRunConfiguration();
+        const QString buildKey = rc ? rc->buildKey() : QString();
+        const ProjectNode *node = rc ? target()->project()->findNodeForBuildKey(buildKey) : nullptr;
+
+        if (!node)
+            return false;
+
+        auto targets = node->data(Android::Constants::AndroidTargets).toStringList();
+        if (targets.isEmpty())
+            return true; // qmake does this job for us
+
+        // Copy targets to android build folder
+        for (const auto &target : targets) {
+            if (!copyFileIfNewer(target, androidLibsDir.pathAppended(QFileInfo{target}.fileName()).toString()))
+                return false;
+        }
+
+        QString extraLibs = node->data(Android::Constants::AndroidExtraLibs).toString();
+        if (!extraLibs.isEmpty())
+            deploySettings["android-extra-libs"] = extraLibs;
+
+        QString androidSrcs = node->data(Android::Constants::AndroidPackageSourceDir).toString();
+        if (!androidSrcs.isEmpty())
+            deploySettings["android-package-source-directory"] = androidSrcs;
+
+        QString qmlImportPath = node->data("QML_IMPORT_PATH").toString();
+        if (!qmlImportPath.isEmpty())
+            deploySettings["qml-import-paths"] = qmlImportPath;
+
+        QString qmlRootPath = node->data("QML_ROOT_PATH").toString();
+        if (qmlRootPath.isEmpty())
+            qmlRootPath = target()->project()->rootProjectDirectory().toString();
+         deploySettings["qml-root-path"] = qmlRootPath;
+
+        QFile f{bc->buildDirectory().pathAppended("android_deployment_settings.json").toString()};
+        if (!f.open(QIODevice::WriteOnly))
+            return false;
+        f.write(QJsonDocument{deploySettings}.toJson());
+        return true;
+    };
+
+    if (!setup()) {
+        emit addOutput(tr("Cannot set up Android, not building an APK."), BuildStep::OutputFormat::ErrorMessage);
+        emit finished(false);
+        return;
+    }
+
     AbstractProcessStep::doRun();
 }
 
@@ -360,7 +443,7 @@ void AndroidBuildApkStep::processStarted()
 
 bool AndroidBuildApkStep::fromMap(const QVariantMap &map)
 {
-    m_keystorePath = Utils::FileName::fromString(map.value(KeystoreLocationKey).toString());
+    m_keystorePath = Utils::FilePath::fromString(map.value(KeystoreLocationKey).toString());
     m_signPackage = false; // don't restore this
     m_buildTargetSdk = map.value(BuildTargetSdkKey).toString();
     if (m_buildTargetSdk.isEmpty()) {
@@ -382,7 +465,7 @@ QVariantMap AndroidBuildApkStep::toMap() const
     return map;
 }
 
-Utils::FileName AndroidBuildApkStep::keystorePath()
+Utils::FilePath AndroidBuildApkStep::keystorePath()
 {
     return m_keystorePath;
 }
@@ -398,7 +481,19 @@ void AndroidBuildApkStep::setBuildTargetSdk(const QString &sdk)
     AndroidManager::updateGradleProperties(target());
 }
 
-void AndroidBuildApkStep::setKeystorePath(const Utils::FileName &path)
+QVariant AndroidBuildApkStep::data(Core::Id id) const
+{
+    if (id == Constants::AndroidNdkPlatform)
+        return AndroidConfigurations::currentConfig().bestNdkPlatformMatch(AndroidManager::minimumSDK(target())).mid(8);
+    if (id == Constants::NdkLocation)
+        return QVariant::fromValue(AndroidConfigurations::currentConfig().ndkLocation());
+    if (id == Constants::AndroidABI)
+        return AndroidManager::targetArch(target());
+
+    return AbstractProcessStep::data(id);
+}
+
+void AndroidBuildApkStep::setKeystorePath(const Utils::FilePath &path)
 {
     m_keystorePath = path;
     m_certificatePasswd.clear();
@@ -568,7 +663,6 @@ namespace Internal {
 AndroidBuildApkStepFactory::AndroidBuildApkStepFactory()
 {
     registerStep<AndroidBuildApkStep>(Constants::ANDROID_BUILD_APK_ID);
-    setSupportedProjectType(QmakeProjectManager::Constants::QMAKEPROJECT_ID);
     setSupportedDeviceType(Constants::ANDROID_DEVICE_TYPE);
     setSupportedStepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD);
     setDisplayName(AndroidBuildApkStep::tr("Build Android APK"));

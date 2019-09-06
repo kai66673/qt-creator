@@ -71,7 +71,7 @@ static bool hasOtherUsers(Core::Id id, const QVariant &v, Kit *k)
     });
 }
 
-ProjectImporter::ProjectImporter(const Utils::FileName &path) : m_projectPath(path)
+ProjectImporter::ProjectImporter(const Utils::FilePath &path) : m_projectPath(path)
 {
     useTemporaryKitAspect(ToolChainKitAspect::id(),
                                [this](Kit *k, const QVariantList &vl) { cleanupTemporaryToolChains(k, vl); },
@@ -84,7 +84,7 @@ ProjectImporter::~ProjectImporter()
         removeProject(k);
 }
 
-const QList<BuildInfo> ProjectImporter::import(const Utils::FileName &importPath, bool silent)
+const QList<BuildInfo> ProjectImporter::import(const Utils::FilePath &importPath, bool silent)
 {
     QList<BuildInfo> result;
 
@@ -97,12 +97,20 @@ const QList<BuildInfo> ProjectImporter::import(const Utils::FileName &importPath
         return result;
     }
 
-    const Utils::FileName absoluteImportPath = Utils::FileName::fromString(fi.absoluteFilePath());
+    const Utils::FilePath absoluteImportPath = Utils::FilePath::fromString(fi.absoluteFilePath());
 
+    const auto handleFailure = [this, importPath, silent] {
+        if (silent)
+            return;
+        QMessageBox::critical(Core::ICore::mainWindow(), tr("No Build Found"),
+                              tr("No build found in %1 matching project %2.")
+                              .arg(importPath.toUserOutput(), projectFilePath().toUserOutput()));
+    };
     qCDebug(log) << "Examining directory" << absoluteImportPath.toString();
     QList<void *> dataList = examineDirectory(absoluteImportPath);
     if (dataList.isEmpty()) {
         qCDebug(log) << "Nothing to import found in" << absoluteImportPath.toString();
+        handleFailure();
         return result;
     }
 
@@ -141,11 +149,8 @@ const QList<BuildInfo> ProjectImporter::import(const Utils::FileName &importPath
         deleteDirectoryData(dd);
     dataList.clear();
 
-    if (result.isEmpty() && !silent)
-        QMessageBox::critical(Core::ICore::mainWindow(),
-                              QCoreApplication::translate("ProjectExplorer::ProjectImporter", "No Build Found"),
-                              QCoreApplication::translate("ProjectExplorer::ProjectImporter", "No build found in %1 matching project %2.")
-                .arg(importPath.toUserOutput()).arg(projectFilePath().toUserOutput()));
+    if (result.isEmpty())
+        handleFailure();
 
     return result;
 }
@@ -286,27 +291,18 @@ bool ProjectImporter::isTemporaryKit(Kit *k) const
 
 Kit *ProjectImporter::createTemporaryKit(const KitSetupFunction &setup) const
 {
-    auto k = std::make_unique<Kit>();
-    Kit *kptr = k.get();
     UpdateGuard guard(*this);
-    {
-        KitGuard kitGuard(kptr);
-        k->setUnexpandedDisplayName(QCoreApplication::translate("ProjectExplorer::ProjectImporter", "Imported Kit"));;
-
-        // Set up values:
-        for (KitAspect *aspect : KitManager::kitAspects())
-            aspect->setup(kptr);
-
-        setup(kptr);
-
-        for (KitAspect *aspect : KitManager::kitAspects())
-            aspect->fix(kptr);
-
-        markKitAsTemporary(kptr);
-        addProject(kptr);
-    } // ~KitGuard, sending kitUpdated
-    KitManager::registerKit(std::move(k)); // potentially adds kits to other targetsetuppages
-    return kptr;
+    const auto init = [&](Kit *k) {
+        KitGuard kitGuard(k);
+        k->setUnexpandedDisplayName(QCoreApplication::translate("ProjectExplorer::ProjectImporter",
+                                                                "Imported Kit"));
+        k->setup();
+        setup(k);
+        k->fix();
+        markKitAsTemporary(k);
+        addProject(k);
+    }; // ~KitGuard, sending kitUpdated
+    return KitManager::registerKit(init); // potentially adds kits to other targetsetuppages
 }
 
 bool ProjectImporter::findTemporaryHandler(Core::Id id) const
@@ -371,7 +367,7 @@ bool ProjectImporter::hasKitWithTemporaryData(Core::Id id, const QVariant &data)
 }
 
 static ProjectImporter::ToolChainData
-createToolChains(const Utils::FileName &toolChainPath, const Core::Id &language)
+createToolChains(const Utils::FilePath &toolChainPath, const Core::Id &language)
 {
     ProjectImporter::ToolChainData data;
 
@@ -391,7 +387,7 @@ createToolChains(const Utils::FileName &toolChainPath, const Core::Id &language)
 }
 
 ProjectImporter::ToolChainData
-ProjectImporter::findOrCreateToolChains(const Utils::FileName &toolChainPath,
+ProjectImporter::findOrCreateToolChains(const Utils::FilePath &toolChainPath,
                                         const Core::Id &language) const
 {
     ToolChainData result;

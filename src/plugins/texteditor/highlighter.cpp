@@ -25,16 +25,19 @@
 
 #include "highlighter.h"
 
-#include "definitiondownloader.h"
 #include "highlightersettings.h"
 #include "textdocumentlayout.h"
+#include "tabsettings.h"
 #include "texteditorsettings.h"
 
 #include <coreplugin/icore.h>
 #include <coreplugin/messagemanager.h>
 #include <utils/mimetypes/mimedatabase.h>
+#include <utils/qtcassert.h>
 
+#include <DefinitionDownloader>
 #include <Format>
+#include <FoldingRegion>
 #include <Repository>
 #include <SyntaxHighlighter>
 
@@ -42,6 +45,10 @@
 #include <QMetaEnum>
 
 using namespace TextEditor;
+
+static const char kDefinitionForMimeType[] = "definitionForMimeType";
+static const char kDefinitionForExtension[] = "definitionForExtension";
+static const char kDefinitionForFilePath[] = "definitionForFilePath";
 
 KSyntaxHighlighting::Repository *highlightRepository()
 {
@@ -107,18 +114,26 @@ Highlighter::Definition Highlighter::definitionForDocument(const TextDocument *d
     if (mimeType.isValid())
         definition = Highlighter::definitionForMimeType(mimeType.name());
     if (!definition.isValid())
-        definition = Highlighter::definitionForFileName(document->filePath().fileName());
+        definition = Highlighter::definitionForFilePath(document->filePath());
     return definition;
 }
 
 Highlighter::Definition Highlighter::definitionForMimeType(const QString &mimeType)
 {
+    if (mimeType.isEmpty())
+        return {};
+    const Definitions definitions = definitionsForMimeType(mimeType);
+    if (definitions.size() == 1)
+        return definitions.first();
     return highlightRepository()->definitionForMimeType(mimeType);
 }
 
-Highlighter::Definition Highlighter::definitionForFileName(const QString &fileName)
+Highlighter::Definition Highlighter::definitionForFilePath(const Utils::FilePath &fileName)
 {
-    return highlightRepository()->definitionForFileName(fileName);
+    const Definitions definitions = definitionsForFileName(fileName);
+    if (definitions.size() == 1)
+        return definitions.first();
+    return highlightRepository()->definitionForFileName(fileName.fileName());
 }
 
 Highlighter::Definition Highlighter::definitionForName(const QString &name)
@@ -128,26 +143,107 @@ Highlighter::Definition Highlighter::definitionForName(const QString &name)
 
 Highlighter::Definitions Highlighter::definitionsForDocument(const TextDocument *document)
 {
-    const Utils::MimeType mimeType = Utils::mimeTypeForName(document->mimeType());
-    Definitions definitions;
-    if (mimeType.isValid())
-        definitions = Highlighter::definitionsForMimeType(mimeType.name());
-    if (definitions.isEmpty())
-        definitions = Highlighter::definitionsForFileName(document->filePath().fileName());
-    return definitions;
+    QTC_ASSERT(document, return {});
+    const Utils::MimeType &mimeType = Utils::mimeTypeForName(document->mimeType());
+    if (mimeType.isValid()) {
+        if (mimeType.name() == "text/plain") {
+            // text/plain is the base mime type for all text types so ignore it and try matching the
+            // file name against the pattern and only if no definition can be found for the
+            // file name try matching the mime type
+            const Definitions &fileNameDefinitions = definitionsForFileName(document->filePath());
+            if (!fileNameDefinitions.isEmpty())
+                return fileNameDefinitions;
+            return definitionsForMimeType(mimeType.name());
+        }
+        const Definitions &mimeTypeDefinitions = definitionsForMimeType(mimeType.name());
+        if (!mimeTypeDefinitions.isEmpty())
+            return mimeTypeDefinitions;
+    }
+    return definitionsForFileName(document->filePath());
+}
+
+static Highlighter::Definition definitionForSetting(const QString &settingsKey,
+                                                    const QString &mapKey)
+{
+    QSettings *settings = Core::ICore::settings();
+    settings->beginGroup(Constants::HIGHLIGHTER_SETTINGS_CATEGORY);
+    const QString &definitionName = settings->value(settingsKey).toMap().value(mapKey).toString();
+    settings->endGroup();
+    return Highlighter::definitionForName(definitionName);
 }
 
 Highlighter::Definitions Highlighter::definitionsForMimeType(const QString &mimeType)
 {
-    return highlightRepository()->definitionsForMimeType(mimeType).toList();
+    Definitions definitions = highlightRepository()->definitionsForMimeType(mimeType).toList();
+    if (definitions.size() > 1) {
+        const Definition &rememberedDefinition = definitionForSetting(kDefinitionForMimeType,
+                                                                      mimeType);
+        if (rememberedDefinition.isValid() && definitions.contains(rememberedDefinition))
+            definitions = {rememberedDefinition};
+    }
+    return definitions;
 }
 
-Highlighter::Definitions Highlighter::definitionsForFileName(const QString &fileName)
+Highlighter::Definitions Highlighter::definitionsForFileName(const Utils::FilePath &fileName)
 {
-    return highlightRepository()->definitionsForFileName(fileName).toList();
+    Definitions definitions
+        = highlightRepository()->definitionsForFileName(fileName.fileName()).toList();
+
+    if (definitions.size() > 1) {
+        const QString &fileExtension = fileName.toFileInfo().completeSuffix();
+        const Definition &rememberedDefinition
+            = fileExtension.isEmpty()
+                  ? definitionForSetting(kDefinitionForFilePath,
+                                         fileName.toFileInfo().canonicalFilePath())
+                  : definitionForSetting(kDefinitionForExtension, fileExtension);
+        if (rememberedDefinition.isValid() && definitions.contains(rememberedDefinition))
+            definitions = {rememberedDefinition};
+    }
+
+    return definitions;
 }
 
-void Highlighter::addCustomHighlighterPath(const Utils::FileName &path)
+void Highlighter::rememberDefintionForDocument(const Highlighter::Definition &definition,
+                                               const TextDocument *document)
+{
+    QTC_ASSERT(document, return );
+    if (!definition.isValid())
+        return;
+    const QString &mimeType = document->mimeType();
+    const QString &fileExtension = document->filePath().toFileInfo().completeSuffix();
+    const QString &path = document->filePath().toFileInfo().canonicalFilePath();
+    QSettings *settings = Core::ICore::settings();
+    settings->beginGroup(Constants::HIGHLIGHTER_SETTINGS_CATEGORY);
+    if (!mimeType.isEmpty()) {
+        const QString id(kDefinitionForMimeType);
+        QMap<QString, QVariant> map = settings->value(id).toMap();
+        map.insert(mimeType, definition.name());
+        settings->setValue(id, map);
+    } else if (!fileExtension.isEmpty()) {
+        const QString id(kDefinitionForExtension);
+        QMap<QString, QVariant> map = settings->value(id).toMap();
+        map.insert(fileExtension, definition.name());
+        settings->setValue(id, map);
+    } else if (!path.isEmpty()) {
+        const QString id(kDefinitionForFilePath);
+        QMap<QString, QVariant> map = settings->value(id).toMap();
+        map.insert(document->filePath().toFileInfo().absoluteFilePath(), definition.name());
+        settings->setValue(id, map);
+    }
+    settings->endGroup();
+}
+
+void Highlighter::clearDefintionForDocumentCache()
+{
+    QSettings *settings = Core::ICore::settings();
+    settings->beginGroup(Constants::HIGHLIGHTER_SETTINGS_CATEGORY);
+    settings->remove(kDefinitionForMimeType);
+    settings->remove(kDefinitionForExtension);
+    settings->remove(kDefinitionForFilePath);
+    settings->endGroup();
+}
+
+void Highlighter::addCustomHighlighterPath(const Utils::FilePath &path)
 {
     highlightRepository()->addCustomSearchPath(path.toString());
 }
@@ -178,19 +274,83 @@ void Highlighter::handleShutdown()
     delete highlightRepository();
 }
 
+static bool isOpeningParenthesis(QChar c)
+{
+    return c == QLatin1Char('{') || c == QLatin1Char('[') || c == QLatin1Char('(');
+}
+
+static bool isClosingParenthesis(QChar c)
+{
+    return c == QLatin1Char('}') || c == QLatin1Char(']') || c == QLatin1Char(')');
+}
+
 void Highlighter::highlightBlock(const QString &text)
 {
     if (!definition().isValid())
         return;
     QTextBlock block = currentBlock();
-    KSyntaxHighlighting::State state = TextDocumentLayout::userData(block)->syntaxState();
+    KSyntaxHighlighting::State state;
+    TextDocumentLayout::setBraceDepth(block, TextDocumentLayout::braceDepth(block.previous()));
+    if (TextBlockUserData *data = TextDocumentLayout::testUserData(block)) {
+        state = data->syntaxState();
+        data->setFoldingStartIncluded(false);
+        data->setFoldingEndIncluded(false);
+    }
     state = highlightLine(text, state);
-    block = block.next();
-    if (block.isValid())
-        TextDocumentLayout::userData(block)->setSyntaxState(state);
+    const QTextBlock nextBlock = block.next();
+
+    Parentheses parentheses;
+    int pos = 0;
+    for (const QChar &c : text) {
+        if (isOpeningParenthesis(c))
+            parentheses.push_back(Parenthesis(Parenthesis::Opened, c, pos));
+        else if (isClosingParenthesis(c))
+            parentheses.push_back(Parenthesis(Parenthesis::Closed, c, pos));
+        pos++;
+    }
+    TextDocumentLayout::setParentheses(currentBlock(), parentheses);
+
+    if (nextBlock.isValid()) {
+        TextBlockUserData *data = TextDocumentLayout::userData(nextBlock);
+        if (data->syntaxState() != state) {
+            data->setSyntaxState(state);
+            setCurrentBlockState(currentBlockState() ^ 1); // force rehighlight of next block
+        }
+        data->setFoldingIndent(TextDocumentLayout::braceDepth(block));
+    }
+
+    formatSpaces(text);
 }
 
 void Highlighter::applyFormat(int offset, int length, const KSyntaxHighlighting::Format &format)
 {
     setFormat(offset, length, formatForCategory(format.textStyle()));
+}
+
+void Highlighter::applyFolding(int offset,
+                               int length,
+                               KSyntaxHighlighting::FoldingRegion region)
+{
+    if (!region.isValid())
+        return;
+    QTextBlock block = currentBlock();
+    const QString &text = block.text();
+    TextBlockUserData *data = TextDocumentLayout::userData(currentBlock());
+    const bool fromStart = TabSettings::firstNonSpace(text) == offset;
+    const bool toEnd = (offset + length) == (text.length() - TabSettings::trailingWhitespaces(text));
+    if (region.type() == KSyntaxHighlighting::FoldingRegion::Begin) {
+        TextDocumentLayout::changeBraceDepth(block, 1);
+        // if there is only a folding begin in the line move the current block into the fold
+        if (fromStart && toEnd) {
+            data->setFoldingIndent(TextDocumentLayout::braceDepth(block));
+            data->setFoldingStartIncluded(true);
+        }
+    } else if (region.type() == KSyntaxHighlighting::FoldingRegion::End) {
+        TextDocumentLayout::changeBraceDepth(block, -1);
+        // if the folding end is at the end of the line move the current block into the fold
+        if (toEnd)
+            data->setFoldingEndIncluded(true);
+        else
+            data->setFoldingIndent(TextDocumentLayout::braceDepth(block));
+    }
 }

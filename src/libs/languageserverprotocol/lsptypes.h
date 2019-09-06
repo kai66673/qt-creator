@@ -45,16 +45,16 @@ class LANGUAGESERVERPROTOCOL_EXPORT DocumentUri : public QUrl
 {
 public:
     DocumentUri() = default;
-    Utils::FileName toFileName() const;
+    Utils::FilePath toFileName() const;
 
     static DocumentUri fromProtocol(const QString &uri) { return DocumentUri(uri); }
-    static DocumentUri fromFileName(const Utils::FileName &file) { return DocumentUri(file); }
+    static DocumentUri fromFileName(const Utils::FilePath &file) { return DocumentUri(file); }
 
     operator QJsonValue() const { return QJsonValue(toString()); }
 
 private:
     DocumentUri(const QString &other);
-    DocumentUri(const Utils::FileName &other);
+    DocumentUri(const Utils::FilePath &other);
 
     friend class LanguageClientValue<QString>;
 };
@@ -372,16 +372,30 @@ public:
     void setPattern(const QString &pattern) { insert(patternKey, pattern); }
     void clearPattern() { remove(patternKey); }
 
-    bool applies(const Utils::FileName &fileName,
+    bool applies(const Utils::FilePath &fileName,
                  const Utils::MimeType &mimeType = Utils::MimeType()) const;
 
     bool isValid(QStringList *error) const override;
 };
 
-enum class MarkupKind
+class LANGUAGESERVERPROTOCOL_EXPORT MarkupKind
 {
-    plaintext,
-    markdown,
+public:
+    enum Value { plaintext, markdown };
+    MarkupKind() = default;
+    MarkupKind(const Value value)
+        : m_value(value)
+    {}
+    MarkupKind(const QJsonValue &value);
+
+    operator QJsonValue() const;
+    Value value() const { return m_value; }
+
+    bool operator==(const Value &value) const { return m_value == value; }
+
+    bool isValid(void *) const { return true; }
+private:
+    Value m_value = plaintext;
 };
 
 class LANGUAGESERVERPROTOCOL_EXPORT MarkupContent : public JsonObject
@@ -390,15 +404,15 @@ public:
     using JsonObject::JsonObject;
 
     // The type of the Markup
-    MarkupKind kind() const { return static_cast<MarkupKind>(typedValue<int>(kindKey)); }
-    void setKind(MarkupKind kind) { insert(kindKey, static_cast<int>(kind)); }
+    MarkupKind kind() const { return value(kindKey); }
+    void setKind(MarkupKind kind) { insert(kindKey, kind); }
 
     // The content itself
     QString content() const { return typedValue<QString>(contentKey); }
     void setContent(const QString &content) { insert(contentKey, content); }
 
     bool isValid(QStringList *error) const override
-    { return check<int>(error, kindKey) && check<QString>(error, contentKey); }
+    { return check<MarkupKind>(error, kindKey) && check<QString>(error, contentKey); }
 };
 
 class LANGUAGESERVERPROTOCOL_EXPORT MarkupOrString : public Utils::variant<QString, MarkupContent>

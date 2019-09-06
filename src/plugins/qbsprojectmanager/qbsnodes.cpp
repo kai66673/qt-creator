@@ -30,6 +30,7 @@
 #include "qbsprojectmanagerconstants.h"
 #include "qbsrunconfiguration.h"
 
+#include <android/androidconstants.h>
 #include <coreplugin/fileiconprovider.h>
 #include <coreplugin/idocument.h>
 #include <projectexplorer/projectexplorerconstants.h>
@@ -216,61 +217,8 @@ static bool supportsNodeAction(ProjectAction action, const Node *node)
     const QbsProject * const project = parentQbsProjectNode(node)->project();
     if (!project->isProjectEditable())
         return false;
-
-    auto equalsNodeFilePath = [node](const QString &str)
-    {
-        return str == node->filePath().toString();
-    };
-
-    if (action == RemoveFile || action == Rename) {
-       if (node->nodeType() == ProjectExplorer::NodeType::File)
-           return !Utils::contains(project->qbsProject().buildSystemFiles(), equalsNodeFilePath);
-    }
-
-    return false;
-}
-
-// ----------------------------------------------------------------------
-// QbsFileNode:
-// ----------------------------------------------------------------------
-
-QbsFileNode::QbsFileNode(const Utils::FileName &filePath,
-                         const ProjectExplorer::FileType fileType,
-                         bool generated,
-                         int line) :
-    ProjectExplorer::FileNode(filePath, fileType, generated, line)
-{ }
-
-QString QbsFileNode::displayName() const
-{
-    int l = line();
-    if (l < 0)
-        return ProjectExplorer::FileNode::displayName();
-    return ProjectExplorer::FileNode::displayName() + QLatin1Char(':') + QString::number(l);
-}
-
-
-QbsFolderNode::QbsFolderNode(const Utils::FileName &folderPath, ProjectExplorer::NodeType nodeType,
-                             const QString &displayName)
-    : ProjectExplorer::FolderNode(folderPath, nodeType, displayName)
-{
-}
-
-bool QbsFolderNode::supportsAction(ProjectAction action, const Node *node) const
-{
-    return supportsNodeAction(action, node);
-}
-
-// ---------------------------------------------------------------------------
-// QbsBaseProjectNode:
-// ---------------------------------------------------------------------------
-
-QbsBaseProjectNode::QbsBaseProjectNode(const Utils::FileName &path) :
-    ProjectExplorer::ProjectNode(path)
-{ }
-
-bool QbsBaseProjectNode::showInSimpleTree() const
-{
+    if (action == RemoveFile || action == Rename)
+        return node->asFileNode();
     return false;
 }
 
@@ -279,7 +227,7 @@ bool QbsBaseProjectNode::showInSimpleTree() const
 // --------------------------------------------------------------------
 
 QbsGroupNode::QbsGroupNode(const qbs::GroupData &grp, const QString &productPath) :
-    QbsBaseProjectNode(Utils::FileName())
+    ProjectNode(Utils::FilePath())
 {
     static QIcon groupIcon = QIcon(QString(Constants::QBS_GROUP_ICON));
     setIcon(groupIcon);
@@ -356,7 +304,7 @@ bool QbsGroupNode::renameFile(const QString &filePath, const QString &newFilePat
 FolderNode::AddNewInformation QbsGroupNode::addNewInformation(const QStringList &files,
                                                               Node *context) const
 {
-    AddNewInformation info = QbsBaseProjectNode::addNewInformation(files, context);
+    AddNewInformation info = ProjectNode::addNewInformation(files, context);
     if (context != this)
         --info.priority;
     return info;
@@ -367,16 +315,12 @@ FolderNode::AddNewInformation QbsGroupNode::addNewInformation(const QStringList 
 // --------------------------------------------------------------------
 
 QbsProductNode::QbsProductNode(const qbs::ProductData &prd) :
-    QbsBaseProjectNode(Utils::FileName::fromString(prd.location().filePath())),
+    ProjectNode(Utils::FilePath::fromString(prd.location().filePath())),
     m_qbsProductData(prd)
 {
     static QIcon productIcon = Core::FileIconProvider::directoryIcon(Constants::QBS_PRODUCT_OVERLAY_ICON);
     setIcon(productIcon);
-}
-
-bool QbsProductNode::showInSimpleTree() const
-{
-    return true;
+    setIsProduct();
 }
 
 bool QbsProductNode::supportsAction(ProjectAction action, const Node *node) const
@@ -448,12 +392,47 @@ QString QbsProductNode::buildKey() const
     return QbsProject::uniqueProductName(m_qbsProductData);
 }
 
+QVariant QbsProductNode::data(Core::Id role) const
+{
+    if (role == Android::Constants::AndroidDeploySettingsFile) {
+        for (const auto &artifact : m_qbsProductData.generatedArtifacts()) {
+            if (artifact.fileTags().contains("qt_androiddeployqt_input"))
+                return artifact.filePath();
+        }
+        return {};
+    }
+
+    if (role == Android::Constants::AndroidSoLibPath) {
+        QStringList ret{m_qbsProductData.buildDirectory()};
+        for (const auto &artifact : m_qbsProductData.generatedArtifacts()) {
+            if (artifact.fileTags().contains("dynamiclibrary")) {
+                ret << QFileInfo(artifact.filePath()).path();
+            }
+        }
+        ret.removeDuplicates();
+        return ret;
+    }
+
+    if (role == Android::Constants::AndroidManifest) {
+        for (const auto &artifact : m_qbsProductData.generatedArtifacts()) {
+            if (artifact.fileTags().contains("android.manifest_final"))
+                return artifact.filePath();
+        }
+        return {};
+    }
+
+    if (role == Android::Constants::AndroidApk)
+        return m_qbsProductData.targetExecutable();
+
+    return {};
+}
+
 // --------------------------------------------------------------------
 // QbsProjectNode:
 // --------------------------------------------------------------------
 
-QbsProjectNode::QbsProjectNode(const Utils::FileName &projectDirectory) :
-    QbsBaseProjectNode(projectDirectory)
+QbsProjectNode::QbsProjectNode(const Utils::FilePath &projectDirectory) :
+    ProjectNode(projectDirectory)
 {
     static QIcon projectIcon = Core::FileIconProvider::directoryIcon(ProjectExplorer::Constants::FILEOVERLAY_QT);
     setIcon(projectIcon);
@@ -467,11 +446,6 @@ QbsProject *QbsProjectNode::project() const
 const qbs::Project QbsProjectNode::qbsProject() const
 {
     return project()->qbsProject();
-}
-
-bool QbsProjectNode::showInSimpleTree() const
-{
-    return true;
 }
 
 void QbsProjectNode::setProjectData(const qbs::ProjectData &data)

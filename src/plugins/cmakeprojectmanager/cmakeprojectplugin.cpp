@@ -43,9 +43,12 @@
 #include <coreplugin/actionmanager/actionmanager.h>
 #include <coreplugin/fileiconprovider.h>
 #include <coreplugin/icore.h>
+
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/projectmanager.h>
 #include <projectexplorer/projecttree.h>
+#include <projectexplorer/runcontrol.h>
+
 #include <texteditor/snippets/snippetprovider.h>
 
 #include <utils/parameteraction.h>
@@ -59,6 +62,8 @@ namespace Internal {
 class CMakeProjectPluginPrivate
 {
 public:
+    CMakeToolManager cmakeToolManager; // have that before the first CMakeKitAspect
+
     Utils::ParameterAction *m_buildTargetContextAction = nullptr;
     QMetaObject::Connection m_actionConnect;
 
@@ -67,9 +72,14 @@ public:
     CMakeManager manager;
     CMakeBuildStepFactory buildStepFactory;
     CMakeRunConfigurationFactory runConfigFactory;
+    SimpleRunWorkerFactory<SimpleTargetRunner, CMakeRunConfiguration> runWorkerFactory;
     CMakeBuildConfigurationFactory buildConfigFactory;
     CMakeEditorFactory editorFactor;
     CMakeLocatorFilter locatorFiler;
+
+    CMakeKitAspect cmakeKitAspect;
+    CMakeGeneratorKitAspect cmakeGeneratorKitAspect;
+    CMakeConfigurationKitAspect cmakeConfigurationKitAspect;
 };
 
 const std::unique_ptr<CMakeSpecificSettings>
@@ -104,12 +114,6 @@ bool CMakeProjectPlugin::initialize(const QStringList & /*arguments*/, QString *
                                                tr("CMake", "SnippetProvider"));
     ProjectManager::registerProjectType<CMakeProject>(Constants::CMAKEPROJECTMIMETYPE);
 
-    new CMakeToolManager(this);
-
-    KitManager::registerKitAspect<CMakeKitAspect>();
-    KitManager::registerKitAspect<CMakeGeneratorKitAspect>();
-    KitManager::registerKitAspect<CMakeConfigurationKitAspect>();
-
     //menus
     ActionContainer *msubproject =
             ActionManager::actionContainer(ProjectExplorer::Constants::M_SUBPROJECTCONTEXT);
@@ -143,7 +147,7 @@ void CMakeProjectPlugin::extensionsInitialized()
 void CMakeProjectPlugin::updateContextActions()
 {
     Project *project = ProjectTree::currentProject();
-    const Node *node = ProjectTree::findCurrentNode();
+    const Node *node = ProjectTree::currentNode();
     auto targetNode = dynamic_cast<const CMakeTargetNode *>(node);
     // as targetNode can be deleted while the menu is open, we keep only the
     const QString targetDisplayName = targetNode ? targetNode->displayName() : QString();

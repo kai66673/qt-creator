@@ -63,7 +63,7 @@ void QmlObjectNode::setVariantProperty(const PropertyName &name, const QVariant 
         timelineFrames.setValue(value, frame);
 
         return;
-    } else if (modelNode().hasId() && timelineIsActive()) {
+    } else if (modelNode().hasId() && timelineIsActive() && currentTimeline().hasKeyframeGroup(modelNode(), name)) {
         QmlTimelineKeyframeGroup timelineFrames(currentTimeline().keyframeGroup(modelNode(), name));
 
         Q_ASSERT(timelineFrames.isValid());
@@ -263,7 +263,7 @@ QString QmlObjectNode::stripedTranslatableText(const PropertyName &name) const
             return regularExpressionPatter.cap(2);
         return instanceValue(name).toString();
     }
-    return modelNode().variantProperty(name).value().toString();
+    return instanceValue(name).toString();
 }
 
 QString QmlObjectNode::expression(const PropertyName &name) const
@@ -625,9 +625,10 @@ bool QmlObjectNode::hasInstanceParent() const
 
 bool QmlObjectNode::hasInstanceParentItem() const
 {
-    return nodeInstance().parentId() >= 0
-            && nodeInstanceView()->hasInstanceForId(nodeInstance().parentId())
-            && QmlItemNode::isItemOrWindow(view()->modelNodeForInternalId(nodeInstance().parentId()));
+    return isValid()
+           && nodeInstance().parentId() >= 0
+           && nodeInstanceView()->hasInstanceForId(nodeInstance().parentId())
+           && QmlItemNode::isItemOrWindow(view()->modelNodeForInternalId(nodeInstance().parentId()));
 }
 
 

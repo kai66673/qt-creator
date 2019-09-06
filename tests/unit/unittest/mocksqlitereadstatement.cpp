@@ -90,6 +90,13 @@ MockSqliteReadStatement::values<ClangBackEnd::UsedMacro, 2>(
     return valuesReturnUsedMacros(reserveSize, sourceId);
 }
 
+template<>
+FilePathIds MockSqliteReadStatement::values<ClangBackEnd::FilePathId>(std::size_t reserveSize,
+                                                                      const int &projectPartId)
+{
+    return valuesReturnFilePathIds(reserveSize, projectPartId);
+}
+
 template <>
 std::vector<Sources::Directory> MockSqliteReadStatement::values<Sources::Directory, 2>(std::size_t reserveSize)
 {
@@ -116,11 +123,24 @@ MockSqliteReadStatement::value<int>(const Utils::PathString &text)
     return valueReturnInt32(text);
 }
 
+template<>
+Utils::optional<ClangBackEnd::ProjectPartId> MockSqliteReadStatement::value<ClangBackEnd::ProjectPartId>(
+    const Utils::SmallStringView &text)
+{
+    return valueReturnProjectPartId(text);
+}
+
 template <>
 Utils::optional<int>
 MockSqliteReadStatement::value<int>(const int &directoryId, const Utils::SmallStringView &text)
 {
     return valueReturnInt32(directoryId, text);
+}
+
+template<>
+Utils::optional<int> MockSqliteReadStatement::value<int>(const int &value)
+{
+    return valueReturnInt32(value);
 }
 
 template <>
@@ -144,9 +164,9 @@ MockSqliteReadStatement::value<Utils::PathString>(const Utils::SmallStringView &
     return valueReturnPathString(path);
 }
 
-template <>
-Utils::optional<ClangBackEnd::FilePath>
-MockSqliteReadStatement::value<ClangBackEnd::FilePath>(const Utils::SmallStringView &path)
+template<>
+Utils::optional<ClangBackEnd::FilePath> MockSqliteReadStatement::value<ClangBackEnd::FilePath>(
+    const int &path)
 {
     return valueReturnFilePath(path);
 }
@@ -165,16 +185,36 @@ MockSqliteReadStatement::value<ClangBackEnd::ProjectPartArtefact, 8>(const Utils
     return valueReturnProjectPartArtefact(projectPartName);
 }
 
-template <>
+template<>
+Utils::optional<ClangBackEnd::ProjectPartContainer>
+MockSqliteReadStatement::value<ClangBackEnd::ProjectPartContainer, 8>(const int &id)
+{
+    return valueReturnProjectPartContainer(id);
+}
+
+template<>
+ClangBackEnd::ProjectPartContainers MockSqliteReadStatement::values<ClangBackEnd::ProjectPartContainer,
+                                                                    8>(std::size_t reserveSize)
+{
+    return valuesReturnProjectPartContainers(reserveSize);
+}
+
+template<>
 Utils::optional<ClangBackEnd::ProjectPartPch>
-MockSqliteReadStatement::value<ClangBackEnd::ProjectPartPch, 2>(const int &projectPartId)
+MockSqliteReadStatement::value<ClangBackEnd::ProjectPartPch, 3>(const int &projectPartId)
 {
     return valueReturnProjectPartPch(projectPartId);
 }
 
-template <>
-Utils::optional<Utils::SmallString>
-MockSqliteReadStatement::value<Utils::SmallString>(const int &sourceId)
+template<>
+Utils::optional<ClangBackEnd::PchPaths> MockSqliteReadStatement::value<ClangBackEnd::PchPaths, 2>(
+    const int &projectPartId)
+{
+    return valueReturnPchPaths(projectPartId);
+}
+
+template<>
+Utils::optional<Utils::SmallString> MockSqliteReadStatement::value<Utils::SmallString>(const int &sourceId)
 {
     return valueReturnSmallString(sourceId);
 }
@@ -186,11 +226,25 @@ MockSqliteReadStatement::value<SourceLocation, 3>(const long long &symbolId, con
     return valueReturnSourceLocation(symbolId, locationKind);
 }
 
-template <>
-SourceEntries
-MockSqliteReadStatement::values<SourceEntry, 3>(std::size_t reserveSize, const int &filePathId, const int &projectPartId)
+template<>
+SourceEntries MockSqliteReadStatement::values<SourceEntry, 4>(std::size_t reserveSize,
+                                                              const int &filePathId,
+                                                              const int &projectPartId)
 {
     return valuesReturnSourceEntries(reserveSize, filePathId, projectPartId);
+}
+
+template<>
+SourceTimeStamps MockSqliteReadStatement::values<SourceTimeStamp, 2>(std::size_t reserveSize)
+{
+    return valuesReturnSourceTimeStamps(reserveSize);
+}
+
+template<>
+SourceTimeStamps MockSqliteReadStatement::values<SourceTimeStamp, 2>(std::size_t reserveSize,
+                                                                     const int &sourcePathId)
+{
+    return valuesReturnSourceTimeStamps(reserveSize, sourcePathId);
 }
 
 template <>

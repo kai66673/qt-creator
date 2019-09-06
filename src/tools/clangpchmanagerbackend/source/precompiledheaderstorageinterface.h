@@ -25,9 +25,13 @@
 
 #pragma once
 
-#include <filepath.h>
+#include "projectpartpch.h"
+
+#include <pchpaths.h>
+#include <projectpartid.h>
 
 #include <utils/smallstringvector.h>
+#include <utils/optional.h>
 
 namespace ClangBackEnd {
 
@@ -39,17 +43,20 @@ public:
     PrecompiledHeaderStorageInterface(const PrecompiledHeaderStorageInterface &) = delete;
     PrecompiledHeaderStorageInterface &operator=(const PrecompiledHeaderStorageInterface &) = delete;
 
-    virtual void insertProjectPrecompiledHeader(Utils::SmallStringView projectPartName,
+    virtual void insertProjectPrecompiledHeader(ProjectPartId projectPartId,
                                                 Utils::SmallStringView pchPath,
                                                 long long pchBuildTime)
         = 0;
-    virtual void deleteProjectPrecompiledHeader(Utils::SmallStringView projectPartName) = 0;
-    virtual void insertSystemPrecompiledHeaders(const Utils::SmallStringVector &projectPartNames,
+    virtual void deleteProjectPrecompiledHeader(ProjectPartId projectPartId) = 0;
+    virtual void deleteProjectPrecompiledHeaders(const ProjectPartIds &projectPartIds) = 0;
+    virtual void insertSystemPrecompiledHeaders(const ProjectPartIds &projectPartIds,
                                                 Utils::SmallStringView pchPath,
                                                 long long pchBuildTime)
         = 0;
-    virtual void deleteSystemPrecompiledHeaders(const Utils::SmallStringVector &projectPartNames) = 0;
-    virtual FilePath fetchSystemPrecompiledHeaderPath(Utils::SmallStringView projectPartName) = 0;
+    virtual void deleteSystemPrecompiledHeaders(const ProjectPartIds &projectPartIds) = 0;
+    virtual FilePath fetchSystemPrecompiledHeaderPath(ProjectPartId projectPartId) = 0;
+    virtual FilePath fetchPrecompiledHeader(ProjectPartId projectPartId) const = 0;
+    virtual PchPaths fetchPrecompiledHeaders(ProjectPartId projectPartId) const = 0;
 
 protected:
     ~PrecompiledHeaderStorageInterface() = default;

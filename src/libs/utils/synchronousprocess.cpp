@@ -24,15 +24,18 @@
 ****************************************************************************/
 
 #include "synchronousprocess.h"
-#include "qtcassert.h"
+#include "executeondestruction.h"
 #include "hostosinfo.h"
+#include "qtcassert.h"
+#include "qtcprocess.h"
 
 #include <QDebug>
-#include <QTimer>
-#include <QTextCodec>
 #include <QDir>
+#include <QLoggingCategory>
 #include <QMessageBox>
+#include <QTextCodec>
 #include <QThread>
+#include <QTimer>
 
 #include <QApplication>
 
@@ -80,6 +83,8 @@ enum { syncDebug = 0 };
 enum { defaultMaxHangTimerCount = 10 };
 
 namespace Utils {
+
+Q_LOGGING_CATEGORY(processLog, "qtc.utils.synchronousprocess", QtWarningMsg);
 
 // A special QProcess derivative allowing for terminal control.
 class TerminalControllingProcess : public QProcess {
@@ -297,8 +302,7 @@ SynchronousProcess::SynchronousProcess() :
 {
     d->m_timer.setInterval(1000);
     connect(&d->m_timer, &QTimer::timeout, this, &SynchronousProcess::slotTimeout);
-    connect(&d->m_process,
-            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+    connect(&d->m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &SynchronousProcess::finished);
     connect(&d->m_process, &QProcess::errorOccurred, this, &SynchronousProcess::error);
     connect(&d->m_process, &QProcess::readyReadStandardOutput,
@@ -446,8 +450,11 @@ SynchronousProcessResponse SynchronousProcess::run(const QString &binary,
                                                    const QStringList &args,
                                                    const QByteArray &writeData)
 {
-    if (debug)
-        qDebug() << '>' << Q_FUNC_INFO << binary << args;
+    qCDebug(processLog).noquote() << "Starting:"
+                                  << QtcProcess::joinArgs(QStringList(binary) + args);
+    ExecuteOnDestruction logResult([this] {
+        qCDebug(processLog) << d->m_result;
+    });
 
     d->clearForRun();
 
@@ -493,13 +500,17 @@ SynchronousProcessResponse SynchronousProcess::run(const QString &binary,
             QApplication::restoreOverrideCursor();
     }
 
-    if (debug)
-        qDebug() << '<' << Q_FUNC_INFO << binary << d->m_result;
     return  d->m_result;
 }
 
 SynchronousProcessResponse SynchronousProcess::runBlocking(const QString &binary, const QStringList &args)
 {
+    qCDebug(processLog).noquote() << "Starting blocking:"
+                                  << QtcProcess::joinArgs(QStringList(binary) + args);
+    ExecuteOnDestruction logResult([this] {
+        qCDebug(processLog) << d->m_result;
+    });
+
     d->clearForRun();
 
     // On Windows, start failure is triggered immediately if the

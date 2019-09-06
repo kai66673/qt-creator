@@ -39,6 +39,7 @@
 #include <utils/qtcassert.h>
 #include <utils/stylehelper.h>
 #include <utils/theme/theme.h>
+#include <utils/utilsicons.h>
 
 #include <QAction>
 #include <QEvent>
@@ -291,7 +292,7 @@ void ProgressManagerPrivate::readSettings()
 {
     QSettings *settings = ICore::settings();
     settings->beginGroup(QLatin1String(kSettingsGroup));
-    m_progressViewPinned = settings->value(QLatin1String(kDetailsPinned), false).toBool();
+    m_progressViewPinned = settings->value(QLatin1String(kDetailsPinned), true).toBool();
     settings->endGroup();
 }
 
@@ -319,7 +320,7 @@ void ProgressManagerPrivate::init()
     m_summaryProgressBar->setCancelEnabled(false);
     m_summaryProgressLayout->addWidget(m_summaryProgressBar);
     layout->addWidget(m_summaryProgressWidget);
-    auto toggleButton = new ToggleButton(m_statusBarWidget);
+    auto toggleButton = new QToolButton(m_statusBarWidget);
     layout->addWidget(toggleButton);
     m_statusBarWidget->installEventFilter(this);
     StatusBarManager::addStatusBarWidget(m_statusBarWidget, StatusBarManager::RightCorner);
@@ -327,10 +328,7 @@ void ProgressManagerPrivate::init()
     QAction *toggleProgressView = new QAction(tr("Toggle Progress Details"), this);
     toggleProgressView->setCheckable(true);
     toggleProgressView->setChecked(m_progressViewPinned);
-    // we have to set an transparent icon to prevent the tool button to show text
-    QPixmap p(1, 1);
-    p.fill(Qt::transparent);
-    toggleProgressView->setIcon(QIcon(p));
+    toggleProgressView->setIcon(Utils::Icons::TOGGLE_PROGRESSDETAILS_TOOLBAR.icon());
     Command *cmd = ActionManager::registerAction(toggleProgressView,
                                                  "QtCreator.ToggleProgressDetails");
 
@@ -456,6 +454,8 @@ FutureProgress *ProgressManagerPrivate::doAddTask(const QFuture<void> &future, c
     connect(progress, &FutureProgress::fadeStarted,
             this, &ProgressManagerPrivate::updateSummaryProgressBar);
     connect(progress, &FutureProgress::statusBarWidgetChanged,
+            this, &ProgressManagerPrivate::updateStatusDetailsWidget);
+    connect(progress, &FutureProgress::subtitleInStatusBarChanged,
             this, &ProgressManagerPrivate::updateStatusDetailsWidget);
     updateStatusDetailsWidget();
 
@@ -657,9 +657,22 @@ void ProgressManagerPrivate::updateStatusDetailsWidget()
     QList<FutureProgress *>::iterator i = m_taskList.end();
     while (i != m_taskList.begin()) {
         --i;
-        candidateWidget = (*i)->statusBarWidget();
+        FutureProgress *progress = *i;
+        candidateWidget = progress->statusBarWidget();
         if (candidateWidget) {
-            m_currentStatusDetailsProgress = *i;
+            m_currentStatusDetailsProgress = progress;
+            break;
+        } else if (progress->isSubtitleVisibleInStatusBar() && !progress->subtitle().isEmpty()) {
+            if (!m_statusDetailsLabel) {
+                m_statusDetailsLabel = new QLabel(m_summaryProgressWidget);
+                QFont font(m_statusDetailsLabel->font());
+                font.setPointSizeF(StyleHelper::sidebarFontSize());
+                font.setBold(true);
+                m_statusDetailsLabel->setFont(font);
+            }
+            m_statusDetailsLabel->setText(progress->subtitle());
+            candidateWidget = m_statusDetailsLabel;
+            m_currentStatusDetailsProgress = progress;
             break;
         }
     }
@@ -696,33 +709,6 @@ void ProgressManagerPrivate::progressDetailsToggled(bool checked)
     settings->setValue(QLatin1String(kDetailsPinned), m_progressViewPinned);
     settings->endGroup();
 }
-
-ToggleButton::ToggleButton(QWidget *parent)
-    : QToolButton(parent)
-{
-    setToolButtonStyle(Qt::ToolButtonIconOnly);
-    if (creatorTheme()->flag(Theme::FlatToolBars)) {
-        QPalette p = palette();
-        p.setBrush(QPalette::Base, creatorTheme()->color(Theme::ToggleButtonBackgroundColor));
-        setPalette(p);
-    }
-}
-
-QSize ToggleButton::sizeHint() const
-{
-    return QSize(13, 12); // Uneven width, because the arrow's width is also uneven.
-}
-
-void ToggleButton::paintEvent(QPaintEvent *event)
-{
-    QToolButton::paintEvent(event);
-    QPainter p(this);
-    QStyleOption arrowOpt;
-    arrowOpt.initFrom(this);
-    arrowOpt.rect.adjust(2, 0, -1, -2);
-    StyleHelper::drawArrow(QStyle::PE_IndicatorArrowUp, &p, &arrowOpt);
-}
-
 
 ProgressManager::ProgressManager() = default;
 

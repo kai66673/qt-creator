@@ -30,7 +30,6 @@
 #include "androidtoolchain.h"
 #include "androidmanager.h"
 #include "adbcommandswidget.h"
-#include "androidrunenvironmentaspect.h"
 
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/project.h>
@@ -108,7 +107,9 @@ void BaseStringListAspect::setLabel(const QString &label)
 AndroidRunConfiguration::AndroidRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    addAspect<AndroidRunEnvironmentAspect>();
+    auto envAspect = addAspect<EnvironmentAspect>();
+    envAspect->addSupportedBaseEnvironment(tr("Clean Environment"), {});
+
     addAspect<ArgumentsAspect>();
 
     auto amStartArgsAspect = addAspect<BaseStringAspect>();
@@ -153,24 +154,6 @@ void AndroidRunConfiguration::updateTargetInformation()
     const BuildTargetInfo bti = buildTargetInfo();
     setDisplayName(bti.displayName);
     setDefaultDisplayName(bti.displayName);
-}
-
-QString AndroidRunConfiguration::disabledReason() const
-{
-    const BuildTargetInfo bti = buildTargetInfo();
-    const QString projectFileName = bti.projectFilePath.toString();
-
-    if (project()->isParsing())
-        return tr("The project file \"%1\" is currently being parsed.").arg(projectFileName);
-
-    if (!project()->hasParsingData()) {
-        if (!bti.projectFilePath.exists())
-            return tr("The project file \"%1\" does not exist.").arg(projectFileName);
-
-        return tr("The project file \"%1\" could not be parsed.").arg(projectFileName);
-    }
-
-    return QString();
 }
 
 } // namespace Android

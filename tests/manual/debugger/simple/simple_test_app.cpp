@@ -276,8 +276,7 @@ void dummyStatement(...) {}
 
 #if USE_AUTOBREAK
 #   ifdef Q_CC_MSVC
-#       include <crtdbg.h>
-#       define BREAK_HERE _CrtDbgReport(_CRT_WARN, NULL, NULL, "simple_test_app", NULL)
+#       define BREAK_HERE DebugBreak();
 #   else
 #       define BREAK_HERE asm("int $3; mov %eax, %eax")
 #   endif
@@ -2511,7 +2510,6 @@ namespace qset {
 
 namespace qsharedpointer {
 
-
     class EmployeeData : public QSharedData
     {
     public:
@@ -4567,7 +4565,7 @@ namespace qvariant {
 #if QT_VERSION > 0x050000
         QList<int> list;
         list << 1 << 2 << 3;
-        QVariant variant = qVariantFromValue(list);
+        QVariant variant = QVariant::fromValue(list);
         BREAK_HERE;
         // Expand list variant variant.data.
         // Check list <3 items> QList<int>.
@@ -5007,7 +5005,6 @@ QString fooxx()
 
 
 namespace basic {
-
 
     struct Empty {};
     struct Data { Data() : a(42) {} int a; };

@@ -30,8 +30,10 @@
 #include "desktopdeviceconfigurationwidget.h"
 #include "desktopprocesssignaloperation.h"
 
+#include <coreplugin/fileutils.h>
+
 #include <projectexplorer/projectexplorerconstants.h>
-#include <projectexplorer/runconfiguration.h>
+#include <projectexplorer/runcontrol.h>
 
 #include <ssh/sshconnection.h>
 
@@ -58,9 +60,10 @@ DesktopDevice::DesktopDevice()
     const QString portRange =
             QString::fromLatin1("%1-%2").arg(DESKTOP_PORT_START).arg(DESKTOP_PORT_END);
     setFreePorts(Utils::PortList::fromString(portRange));
+    setOpenTerminal([](const Utils::Environment &env, const QString &workingDir) {
+        Core::FileUtils::openTerminal(workingDir, env);
+    });
 }
-
-DesktopDevice::DesktopDevice(const DesktopDevice &other) = default;
 
 IDevice::DeviceInfo DesktopDevice::deviceInformation() const
 {
@@ -175,11 +178,6 @@ QUrl DesktopDevice::toolControlChannel(const ControlChannelHint &) const
 Utils::OsType DesktopDevice::osType() const
 {
     return Utils::HostOsInfo::hostOs();
-}
-
-IDevice::Ptr DesktopDevice::clone() const
-{
-    return Ptr(new DesktopDevice(*this));
 }
 
 } // namespace ProjectExplorer

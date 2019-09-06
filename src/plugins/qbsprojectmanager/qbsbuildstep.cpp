@@ -128,6 +128,11 @@ QbsBuildStep::QbsBuildStep(ProjectExplorer::BuildStepList *bsl) :
     setDisplayName(tr("Qbs Build"));
     setQbsConfiguration(QVariantMap());
 
+    auto qbsBuildConfig = qobject_cast<QbsBuildConfiguration *>(buildConfiguration());
+    QTC_CHECK(qbsBuildConfig);
+    connect(this, &QbsBuildStep::qbsConfigurationChanged,
+            qbsBuildConfig, &QbsBuildConfiguration::qbsConfigurationChanged);
+
 //    setQbsConfiguration(other->qbsConfiguration(PreserveVariables));
 }
 
@@ -222,9 +227,8 @@ void QbsBuildStep::setQbsConfiguration(const QVariantMap &config)
     if (tmp == m_qbsConfiguration)
         return;
     m_qbsConfiguration = tmp;
-    auto bc = static_cast<QbsBuildConfiguration *>(buildConfiguration());
-    if (bc)
-        bc->emitBuildTypeChanged();
+    if (ProjectExplorer::BuildConfiguration *bc = buildConfiguration())
+        emit bc->buildTypeChanged();
     emit qbsConfigurationChanged();
 }
 
@@ -253,17 +257,17 @@ bool QbsBuildStep::hasCustomInstallRoot() const
     return m_qbsConfiguration.contains(Constants::QBS_INSTALL_ROOT_KEY);
 }
 
-Utils::FileName QbsBuildStep::installRoot(VariableHandling variableHandling) const
+Utils::FilePath QbsBuildStep::installRoot(VariableHandling variableHandling) const
 {
-    Utils::FileName root = Utils::FileName::fromString(qbsConfiguration(variableHandling)
-            .value(Constants::QBS_INSTALL_ROOT_KEY).toString());
-    if (root.isNull()) {
-        const QbsBuildConfiguration * const bc
-                = static_cast<QbsBuildConfiguration *>(buildConfiguration());
-        root = bc->buildDirectory().appendPath(bc->configurationName())
-                .appendPath(qbs::InstallOptions::defaultInstallRoot());
-    }
-    return root;
+    const QString root =
+            qbsConfiguration(variableHandling).value(Constants::QBS_INSTALL_ROOT_KEY).toString();
+    if (!root.isNull())
+        return Utils::FilePath::fromString(root);
+
+    const QbsBuildConfiguration * const bc
+            = static_cast<QbsBuildConfiguration *>(buildConfiguration());
+    return bc->buildDirectory().pathAppended(bc->configurationName())
+            .pathAppended(qbs::InstallOptions::defaultInstallRoot());
 }
 
 int QbsBuildStep::maxJobs() const
@@ -395,7 +399,7 @@ void QbsBuildStep::createTaskAndOutput(ProjectExplorer::Task::TaskType type, con
                                        const QString &file, int line)
 {
     ProjectExplorer::Task task = ProjectExplorer::Task(type, message,
-                                                       Utils::FileName::fromString(file), line,
+                                                       Utils::FilePath::fromString(file), line,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE);
     emit addTask(task, 1);
     emit addOutput(message, OutputFormat::Stdout);
@@ -412,9 +416,8 @@ void QbsBuildStep::setBuildVariant(const QString &variant)
         return;
     m_qbsConfiguration.insert(Constants::QBS_CONFIG_VARIANT_KEY, variant);
     emit qbsConfigurationChanged();
-    auto bc = static_cast<QbsBuildConfiguration *>(buildConfiguration());
-    if (bc)
-        bc->emitBuildTypeChanged();
+    if (ProjectExplorer::BuildConfiguration *bc = buildConfiguration())
+        emit bc->buildTypeChanged();
 }
 
 QString QbsBuildStep::profile() const
@@ -553,11 +556,11 @@ QbsBuildStepConfigWidget::QbsBuildStepConfigWidget(QbsBuildStep *step) :
     m_ui->qmlDebuggingWarningIcon->setPixmap(Utils::Icons::WARNING.pixmap());
 
     connect(m_ui->buildVariantComboBox,
-            static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &QbsBuildStepConfigWidget::changeBuildVariant);
     connect(m_ui->keepGoingCheckBox, &QAbstractButton::toggled,
             this, &QbsBuildStepConfigWidget::changeKeepGoing);
-    connect(m_ui->jobSpinBox, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+    connect(m_ui->jobSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &QbsBuildStepConfigWidget::changeJobCount);
     connect(m_ui->showCommandLinesCheckBox, &QCheckBox::toggled, this,
             &QbsBuildStepConfigWidget::changeShowCommandLines);

@@ -146,7 +146,7 @@ static bool waitForProcessedEditorDocument_internal(CppEditorDocumentHandle *edi
 {
     QTC_ASSERT(editorDocument, return false);
 
-    QTime timer;
+    QElapsedTimer timer;
     timer.start();
 
     forever {
@@ -208,7 +208,7 @@ CPlusPlus::Document::Ptr TestCase::waitForFileInGlobalSnapshot(const QString &fi
 QList<CPlusPlus::Document::Ptr> TestCase::waitForFilesInGlobalSnapshot(const QStringList &filePaths,
                                                                        int timeOutInMs)
 {
-    QTime t;
+    QElapsedTimer t;
     t.start();
 
     QList<CPlusPlus::Document::Ptr> result;
@@ -231,7 +231,7 @@ bool TestCase::waitUntilCppModelManagerIsAwareOf(Project *project, int timeOutIn
     if (!project)
         return false;
 
-    QTime t;
+    QElapsedTimer t;
     t.start();
 
     CppModelManager *modelManager = CppModelManager::instance();
@@ -275,7 +275,7 @@ ProjectOpenerAndCloser::~ProjectOpenerAndCloser()
     foreach (Project *project, m_openProjects)
         ProjectExplorerPlugin::unloadProject(project);
 
-    QTime t;
+    QElapsedTimer t;
     t.start();
     while (!hasGcFinished && t.elapsed() <= 30000)
         QCoreApplication::processEvents();
@@ -340,8 +340,8 @@ static bool copyRecursively(const QString &sourceDirPath,
         return file.setPermissions(file.permissions() | QFile::WriteUser);
     };
 
-    return Utils::FileUtils::copyRecursively(Utils::FileName::fromString(sourceDirPath),
-                                             Utils::FileName::fromString(targetDirPath),
+    return Utils::FileUtils::copyRecursively(Utils::FilePath::fromString(sourceDirPath),
+                                             Utils::FilePath::fromString(targetDirPath),
                                              error,
                                              copyHelper);
 }

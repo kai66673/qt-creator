@@ -27,6 +27,7 @@
 
 #include "genericdirectuploadstep.h"
 #include "linuxdevice.h"
+#include "makeinstallstep.h"
 #include "remotelinuxcheckforfreediskspacestep.h"
 #include "remotelinuxkillappstep.h"
 #include "remotelinux_constants.h"
@@ -60,6 +61,19 @@ RemoteLinuxDeployConfigurationFactory::RemoteLinuxDeployConfigurationFactory()
                                                       "Deploy to Remote Linux Host"));
     setUseDeploymentDataView();
 
+    const auto needsMakeInstall = [](Target *target)
+    {
+        const Project * const prj = target->project();
+        return prj->deploymentKnowledge() == DeploymentKnowledge::Bad
+                && prj->hasMakeInstallEquivalent();
+    };
+    setPostRestore([needsMakeInstall](DeployConfiguration *dc, const QVariantMap &map) {
+        // 4.9 -> 4.10. See QTCREATORBUG-22689.
+        if (map.value("_checkMakeInstall").toBool() && needsMakeInstall(dc->target()))
+                dc->stepList()->insertStep(0, new MakeInstallStep(dc->stepList()));
+    });
+
+    addInitialStep(MakeInstallStep::stepId(), needsMakeInstall);
     addInitialStep(RemoteLinuxCheckForFreeDiskSpaceStep::stepId());
     addInitialStep(RemoteLinuxKillAppStep::stepId());
     addInitialStep(RsyncDeployStep::stepId(), [](Target *target) {

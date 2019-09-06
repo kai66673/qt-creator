@@ -79,16 +79,16 @@ def registerCommand(name, func):
 #
 #######################################################################
 
-# Just convienience for 'python print ...'
+# For CLI dumper use, see README.txt
 class PPCommand(gdb.Command):
     def __init__(self):
         super(PPCommand, self).__init__('pp', gdb.COMMAND_OBSCURE)
     def invoke(self, args, from_tty):
-        print(eval(args))
+        print(theCliDumper.fetchVariable(args))
 
 PPCommand()
 
-# Just convienience for 'python print gdb.parse_and_eval(...)'
+# Just convenience for 'python print gdb.parse_and_eval(...)'
 class PPPCommand(gdb.Command):
     def __init__(self):
         super(PPPCommand, self).__init__('ppp', gdb.COMMAND_OBSCURE)
@@ -141,7 +141,8 @@ class PlainDumper:
         d.putType(value.nativeValue.type.name)
         val = printer.to_string()
         if isinstance(val, str):
-            d.putValue(val)
+            # encode and avoid extra quotes ('"') at beginning and end
+            d.putValue(d.hexencode(val), 'utf8:1:0')
         elif sys.version_info[0] <= 2 and isinstance(val, unicode):
             d.putValue(val)
         else: # Assuming LazyString
@@ -152,7 +153,7 @@ class PlainDumper:
         if d.isExpanded():
             with Children(d):
                 for child in children:
-                    d.putSubItem(child[0], d.fromNativeValue(child[1]))
+                    d.putSubItem(child[0], d.fromNativeValue(gdb.Value(child[1])))
 
 def importPlainDumpers(args):
     if args == 'off':
@@ -168,7 +169,7 @@ registerCommand('importPlainDumpers', importPlainDumpers)
 
 
 
-class OutputSafer:
+class OutputSaver:
     def __init__(self, d):
         self.d = d
 
@@ -178,7 +179,7 @@ class OutputSafer:
 
     def __exit__(self, exType, exValue, exTraceBack):
         if self.d.passExceptions and not exType is None:
-            showException('OUTPUTSAFER', exType, exValue, exTraceBack)
+            showException('OUTPUTSAVER', exType, exValue, exTraceBack)
             self.d.output = self.savedOutput
         else:
             self.savedOutput += self.d.output
@@ -891,16 +892,33 @@ class Dumper(DumperBase):
     def createSpecialBreakpoints(self, args):
         self.specialBreakpoints = []
         def newSpecial(spec):
-            class SpecialBreakpoint(gdb.Breakpoint):
+            # GDB < 8.1 does not have the 'qualified' parameter here,
+            # GDB >= 8.1 applies some generous pattern matching, hitting
+            # e.g. also Foo::abort() when asking for '::abort'
+            class Pre81SpecialBreakpoint(gdb.Breakpoint):
                 def __init__(self, spec):
-                    super(SpecialBreakpoint, self).\
-                        __init__(spec, gdb.BP_BREAKPOINT, internal=True)
+                    super(Pre81SpecialBreakpoint, self).__init__(spec,
+                        gdb.BP_BREAKPOINT, internal=True)
                     self.spec = spec
 
                 def stop(self):
                     print("Breakpoint on '%s' hit." % self.spec)
                     return True
-            return SpecialBreakpoint(spec)
+
+            class SpecialBreakpoint(gdb.Breakpoint):
+                def __init__(self, spec):
+                    super(SpecialBreakpoint, self).__init__(spec,
+                        gdb.BP_BREAKPOINT, internal=True, qualified=True)
+                    self.spec = spec
+
+                def stop(self):
+                    print("Breakpoint on '%s' hit." % self.spec)
+                    return True
+
+            try:
+                return SpecialBreakpoint(spec)
+            except:
+                return Pre81SpecialBreakpoint(spec)
 
         # FIXME: ns is accessed too early. gdb.Breakpoint() has no
         # 'rbreak' replacement, and breakpoints created with
@@ -1278,7 +1296,7 @@ class Dumper(DumperBase):
             frame = gdb.newest_frame()
             ns = self.qtNamespace()
             needle = self.qtNamespace() + 'QV4::ExecutionEngine'
-            pat = '%sqt_v4StackTrace(((%sQV4::ExecutionEngine *)0x%x)->currentContext)'
+            pat = '%sqt_v4StackTraceForEngine((void*)0x%x)'
             done = False
             while i < limit and frame and not done:
                 block = None
@@ -1295,7 +1313,7 @@ class Dumper(DumperBase):
                                dereftype = typeobj.target().unqualified()
                                if dereftype.name == needle:
                                     addr = toInteger(value)
-                                    expr = pat % (ns, ns, addr)
+                                    expr = pat % (ns, addr)
                                     res = str(gdb.parse_and_eval(expr))
                                     pos = res.find('"stack=[')
                                     if pos != -1:
@@ -1311,7 +1329,7 @@ class Dumper(DumperBase):
         frame = gdb.newest_frame()
         self.currentCallContext = None
         while i < limit and frame:
-            with OutputSafer(self):
+            with OutputSaver(self):
                 name = frame.name()
                 functionName = '??' if name is None else name
                 fileName = ''
@@ -1407,7 +1425,7 @@ class CliDumper(Dumper):
         self.chidrenSuffix = '] '
         self.indent = 0
         self.isCli = True
-
+        self.setupDumpers({})
 
     def put(self, line):
         if self.output.endswith('\n'):
@@ -1420,26 +1438,25 @@ class CliDumper(Dumper):
     def putOriginalAddress(self, address):
         pass
 
-    def fetchVariables(self, args):
+    def fetchVariable(self, name):
+        args = {}
         args['fancy'] = 1
         args['passexception'] = 1
         args['autoderef'] = 1
         args['qobjectnames'] = 1
-        name = args['varlist']
+        args['varlist'] = name
         self.prepare(args)
         self.output = name + ' = '
-        frame = gdb.selected_frame()
-        value = frame.read_var(name)
+        value = self.parseAndEvaluate(name)
         with TopLevelItem(self, name):
             self.putItem(value)
         return self.output
 
-# Global instance.
-#if gdb.parameter('height') is None:
+
+# Global instances.
 theDumper = Dumper()
-#else:
-#    import codecs
-#    theDumper = CliDumper()
+theCliDumper = CliDumper()
+
 
 ######################################################################
 #

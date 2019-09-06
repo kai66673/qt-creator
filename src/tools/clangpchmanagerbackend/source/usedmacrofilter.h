@@ -87,23 +87,23 @@ public:
 
     UsedMacroFilter(const SourceEntries &includes,
                     const UsedMacros &usedMacros,
-                    const CompilerMacros &compilerMacros)
-    {
-        filterIncludes(includes);
+                    const CompilerMacros &compilerMacros) {
+        filterSources(includes);
         systemUsedMacros = filterUsedMarcos(usedMacros, systemIncludes);
         projectUsedMacros = filterUsedMarcos(usedMacros, projectIncludes);
         filter(compilerMacros);
     }
 
-    void filterIncludes(const SourceEntries &includes)
-    {
-        systemIncludes.reserve(includes.size());
-        projectIncludes.reserve(includes.size());
-        topSystemIncludes.reserve(includes.size() / 10);
-        topProjectIncludes.reserve(includes.size() / 10);
+    void filterSources(const SourceEntries &sources) {
+        systemIncludes.reserve(sources.size());
+        projectIncludes.reserve(sources.size());
+        topSystemIncludes.reserve(sources.size() / 10);
+        topProjectIncludes.reserve(sources.size() / 10);
+        userIncludes.reserve(sources.size());
+        this->sources.reserve(sources.size());
 
-        for (SourceEntry include : includes)
-            filterInclude(include);
+        for (SourceEntry source : sources)
+            filterSource(source);
     }
 
     void filter(const CompilerMacros &compilerMacros)
@@ -121,28 +121,33 @@ public:
     }
 
 private:
-    void filterInclude(SourceEntry include)
-    {
-        switch (include.sourceType) {
-        case SourceType::TopSystemInclude:
-            topSystemIncludes.emplace_back(include.sourceId);
-            systemIncludes.emplace_back(include.sourceId);
-            break;
-        case SourceType::SystemInclude:
-            systemIncludes.emplace_back(include.sourceId);
-            break;
-        case SourceType::TopProjectInclude:
-            topProjectIncludes.emplace_back(include.sourceId);
-            projectIncludes.emplace_back(include.sourceId);
-            break;
-        case SourceType::ProjectInclude:
-            projectIncludes.emplace_back(include.sourceId);
-            break;
-        case SourceType::UserInclude:
-            break;
+    void filterSource(SourceEntry source) {
+        if (source.hasMissingIncludes == HasMissingIncludes::Yes)
+            return;
+
+        switch (source.sourceType) {
+            case SourceType::TopSystemInclude:
+                topSystemIncludes.emplace_back(source.sourceId);
+                systemIncludes.emplace_back(source.sourceId);
+                break;
+            case SourceType::SystemInclude:
+                systemIncludes.emplace_back(source.sourceId);
+                break;
+            case SourceType::TopProjectInclude:
+                topProjectIncludes.emplace_back(source.sourceId);
+                projectIncludes.emplace_back(source.sourceId);
+                break;
+            case SourceType::ProjectInclude:
+                projectIncludes.emplace_back(source.sourceId);
+                break;
+            case SourceType::UserInclude:
+                userIncludes.emplace_back(source.sourceId);
+                break;
+            case SourceType::Source:
+                sources.emplace_back(source.sourceId);
+                break;
         }
 
-        allIncludes.emplace_back(include.sourceId);
     }
 
     static Utils::SmallStringVector filterUsedMarcos(const UsedMacros &usedMacros,
@@ -209,7 +214,8 @@ private:
     }
 
 public:
-    FilePathIds allIncludes;
+    FilePathIds sources;
+    FilePathIds userIncludes;
     FilePathIds projectIncludes;
     FilePathIds systemIncludes;
     FilePathIds topProjectIncludes;

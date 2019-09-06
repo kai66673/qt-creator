@@ -50,6 +50,8 @@
 #include "qmt/tasks/diagramscenecontroller.h"
 #include "qmt/tasks/ielementtasks.h"
 
+#include <utils/algorithm.h>
+
 #include <QSet>
 #include <QGraphicsItem>
 #include <QGraphicsSceneMouseEvent>
@@ -468,10 +470,10 @@ bool DiagramSceneModel::exportPdf(const QString &fileName, bool selectedElements
     QSizeF pageSize = status.m_sceneBoundingRect.size();
     pageSize += QSizeF(2.0 * border, 2.0 * border);
     pageSize *= scaleFactor;
+    pageSize *= dotsPerMm;
 
     QPdfWriter pdfWriter(fileName);
-    pdfWriter.setPageSize(QPdfWriter::Custom);
-    pdfWriter.setPageSizeMM(pageSize * dotsPerMm);
+    pdfWriter.setPageSize(QPageSize(pageSize, QPageSize::Millimeter));
 
     QPainter pdfPainter;
     pdfPainter.begin(&pdfWriter);
@@ -514,8 +516,8 @@ bool DiagramSceneModel::exportSvg(const QString &fileName, bool selectedElements
 
     return true;
 #else // QT_NO_SVG
-    Q_UNUSED(fileName);
-    Q_UNUSED(selectedElements);
+    Q_UNUSED(fileName)
+    Q_UNUSED(selectedElements)
     return false;
 #endif // QT_NO_SVG
 }
@@ -639,7 +641,7 @@ void DiagramSceneModel::keyReleaseEvent(QKeyEvent *event)
 
 void DiagramSceneModel::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    updateFocusItem(QSet<QGraphicsItem *>::fromList(m_graphicsScene->selectedItems()));
+    updateFocusItem(Utils::toSet(m_graphicsScene->selectedItems()));
     m_latchController->mousePressEventLatching(event);
     mousePressEventReparenting(event);
 }
@@ -681,7 +683,7 @@ void DiagramSceneModel::mouseReleaseEventReparenting(QGraphicsSceneMouseEvent *e
     if (event->modifiers() & Qt::AltModifier) {
         ModelController *modelController = diagramController()->modelController();
         MPackage *newOwner = nullptr;
-        QSet<QGraphicsItem *> selectedItemSet = m_graphicsScene->selectedItems().toSet();
+        QSet<QGraphicsItem *> selectedItemSet = Utils::toSet(m_graphicsScene->selectedItems());
         QList<QGraphicsItem *> itemsUnderMouse = m_graphicsScene->items(event->scenePos());
         foreach (QGraphicsItem *item, itemsUnderMouse) {
             if (!selectedItemSet.contains(item)) {
@@ -840,7 +842,7 @@ void DiagramSceneModel::onSelectionChanged()
     bool selectionChanged = false;
 
     // collect and update all primary selected items (selected by user)
-    QSet<QGraphicsItem *> newSelectedItems = QSet<QGraphicsItem *>::fromList(m_graphicsScene->selectedItems());
+    QSet<QGraphicsItem *> newSelectedItems = Utils::toSet(m_graphicsScene->selectedItems());
     updateFocusItem(newSelectedItems);
     foreach (QGraphicsItem *item, m_selectedItems) {
         if (!newSelectedItems.contains(item)) {

@@ -172,7 +172,7 @@ void CompilerOptionsBuilder::addSyntaxOnly()
     isClStyle() ? add("/Zs") : add("-fsyntax-only");
 }
 
-static QStringList createLanguageOptionGcc(ProjectFile::Kind fileKind, bool objcExt)
+QStringList createLanguageOptionGcc(ProjectFile::Kind fileKind, bool objcExt)
 {
     QStringList options;
 
@@ -455,6 +455,8 @@ void CompilerOptionsBuilder::addLanguageVersionAndExtensions()
     case LanguageVersion::CXX2a:
         option = (gnuExtensions ? QLatin1String("-std=gnu++2a") : QLatin1String("-std=c++2a"));
         break;
+    case LanguageVersion::None:
+        break;
     }
 
     add(option, /*gccOnlyOption=*/true);
@@ -522,6 +524,7 @@ static QStringList languageFeatureMacros()
         "__cpp_guaranteed_copy_elision",
         "__cpp_hex_float",
         "__cpp_if_constexpr",
+        "__cpp_impl_destroying_delete",
         "__cpp_inheriting_constructors",
         "__cpp_init_captures",
         "__cpp_initializer_lists",
@@ -706,6 +709,7 @@ void CompilerOptionsBuilder::evaluateCompilerFlags()
                                            qgetenv("QTC_CLANG_CMD_OPTIONS_BLACKLIST"))
                                            .split(';', QString::SkipEmptyParts);
 
+    const Core::Id &toolChain = m_projectPart.toolchainType;
     bool containsDriverMode = false;
     bool skipNext = false;
     for (const QString &option : m_projectPart.compilerFlags) {
@@ -716,6 +720,13 @@ void CompilerOptionsBuilder::evaluateCompilerFlags()
 
         if (userBlackList.contains(option))
             continue;
+
+        // TODO: Make it possible that the clang binary/driver ignores unknown options,
+        // as it is done for libclang/clangd (not checking for OPT_UNKNOWN).
+        if (toolChain == ProjectExplorer::Constants::MINGW_TOOLCHAIN_TYPEID) {
+            if (option == "-fkeep-inline-dllexport" || option == "-fno-keep-inline-dllexport")
+                continue;
+        }
 
         // Ignore warning flags as these interfere with our user-configured diagnostics.
         // Note that once "-w" is provided, no warnings will be emitted, even if "-Wall" follows.
@@ -741,9 +752,18 @@ void CompilerOptionsBuilder::evaluateCompilerFlags()
             continue;
         }
 
+        if (option.startsWith("/Y", Qt::CaseSensitive)
+            || (option.startsWith("/F", Qt::CaseSensitive) && option != "/F")) {
+            // Precompiled header flags.
+            // Skip also the next option if it's not glued to the current one.
+            if (option.size() > 3)
+                skipNext = true;
+            continue;
+        }
+
         // Check whether a language version is already used.
         QString theOption = option;
-        if (theOption.startsWith("-std=")) {
+        if (theOption.startsWith("-std=") || theOption.startsWith("--std=")) {
             m_compilerFlags.isLanguageVersionSpecified = true;
             theOption.replace("=c18", "=c17");
             theOption.replace("=gnu18", "=gnu17");
@@ -760,7 +780,6 @@ void CompilerOptionsBuilder::evaluateCompilerFlags()
         m_compilerFlags.flags.append(theOption);
     }
 
-    const Core::Id &toolChain = m_projectPart.toolchainType;
     if (!containsDriverMode
         && (toolChain == ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID
             || toolChain == ProjectExplorer::Constants::CLANG_CL_TOOLCHAIN_TYPEID)) {

@@ -19,7 +19,13 @@ SOURCES += baremetalplugin.cpp \
     gdbserverprovidermanager.cpp \
     openocdgdbserverprovider.cpp \
     defaultgdbserverprovider.cpp \
-    stlinkutilgdbserverprovider.cpp
+    stlinkutilgdbserverprovider.cpp \
+    iarewtoolchain.cpp \
+    keiltoolchain.cpp \
+    sdcctoolchain.cpp \
+    iarewparser.cpp \
+    keilparser.cpp \
+    sdccparser.cpp \
 
 HEADERS += baremetalplugin.h \
     baremetalconstants.h \
@@ -38,7 +44,13 @@ HEADERS += baremetalplugin.h \
     gdbserverprovidermanager.h \
     openocdgdbserverprovider.h \
     defaultgdbserverprovider.h \
-    stlinkutilgdbserverprovider.h
+    stlinkutilgdbserverprovider.h \
+    iarewtoolchain.h \
+    keiltoolchain.h \
+    sdcctoolchain.h \
+    iarewparser.h \
+    keilparser.h \
+    sdccparser.h \
 
 RESOURCES += \
     baremetal.qrc

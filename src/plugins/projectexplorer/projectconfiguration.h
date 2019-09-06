@@ -41,6 +41,7 @@ QT_END_NAMESPACE
 namespace ProjectExplorer {
 
 class Project;
+class ProjectConfigurationAspects;
 
 class PROJECTEXPLORER_EXPORT ProjectConfigurationAspect : public QObject
 {
@@ -68,6 +69,7 @@ public:
     virtual void fromMap(const QVariantMap &) {}
     virtual void toMap(QVariantMap &) const {}
     virtual void addToConfigurationLayout(QFormLayout *) {}
+    virtual void acquaintSiblings(const ProjectConfigurationAspects &) {}
 
 signals:
     void changed();
@@ -168,6 +170,8 @@ public:
     ProjectConfigurationAspect *aspect(Core::Id id) const;
     template <typename T> T *aspect() const { return m_aspects.aspect<T>(); }
 
+    void acquaintAspects();
+
 signals:
     void displayNameChanged();
     void toolTipChanged();
@@ -181,29 +185,6 @@ private:
     QString m_defaultDisplayName;
     QString m_toolTip;
     Utils::MacroExpander m_macroExpander;
-};
-
-class PROJECTEXPLORER_EXPORT StatefulProjectConfiguration : public ProjectConfiguration
-{
-    Q_OBJECT
-
-public:
-    StatefulProjectConfiguration() = default;
-
-    bool isEnabled() const;
-
-    virtual QString disabledReason() const = 0;
-
-signals:
-    void enabledChanged();
-
-protected:
-    StatefulProjectConfiguration(QObject *parent, Core::Id id);
-
-    void setEnabled(bool enabled);
-
-private:
-    bool m_isEnabled = false;
 };
 
 // helper function:

@@ -26,15 +26,18 @@
 #include "gdbserverproviderprocess.h"
 
 #include <projectexplorer/devicesupport/idevice.h>
+#include <projectexplorer/runcontrol.h>
 
 #include <utils/environment.h>
-#include <utils/qtcprocess.h>
 #include <utils/qtcassert.h>
+#include <utils/qtcprocess.h>
 
 using namespace ProjectExplorer;
 
 namespace BareMetal {
 namespace Internal {
+
+// GdbServerProviderProcess
 
 GdbServerProviderProcess::GdbServerProviderProcess(
         const QSharedPointer<const ProjectExplorer::IDevice> &device,
@@ -46,7 +49,7 @@ GdbServerProviderProcess::GdbServerProviderProcess(
         m_process->setUseCtrlCStub(true);
 
     connect(m_process, &QProcess::errorOccurred, this, &GdbServerProviderProcess::error);
-    connect(m_process, static_cast<void (QProcess::*)(int)>(&QProcess::finished),
+    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &GdbServerProviderProcess::finished);
 
     connect(m_process, &QProcess::readyReadStandardOutput,
@@ -60,7 +63,7 @@ GdbServerProviderProcess::GdbServerProviderProcess(
 void GdbServerProviderProcess::start(const ProjectExplorer::Runnable &runnable)
 {
     QTC_ASSERT(m_process->state() == QProcess::NotRunning, return);
-    m_process->setCommand(runnable.executable, runnable.commandLineArguments);
+    m_process->setCommand(runnable.commandLine());
     m_process->start();
 }
 

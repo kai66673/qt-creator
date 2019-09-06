@@ -47,6 +47,8 @@ Project {
             "linuxdeviceprocess.h",
             "linuxdevicetester.cpp",
             "linuxdevicetester.h",
+            "makeinstallstep.cpp",
+            "makeinstallstep.h",
             "packageuploader.cpp",
             "packageuploader.h",
             "publickeydeploymentdialog.cpp",
@@ -58,7 +60,6 @@ Project {
             "remotelinuxcheckforfreediskspaceservice.h",
             "remotelinuxcheckforfreediskspacestep.cpp",
             "remotelinuxcheckforfreediskspacestep.h",
-            "remotelinuxcheckforfreediskspacestepwidget.ui",
             "remotelinuxcustomcommanddeploymentstep.cpp",
             "remotelinuxcustomcommanddeploymentstep.h",
             "remotelinuxcustomcommanddeployservice.cpp",
@@ -101,7 +102,7 @@ Project {
             "typespecificdeviceconfigurationlistmodel.h",
             "uploadandinstalltarpackagestep.cpp",
             "uploadandinstalltarpackagestep.h",
-            "images/embeddedtarget.png"
+            "images/embeddedtarget.png",
         ]
 
         Export {

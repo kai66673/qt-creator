@@ -58,11 +58,11 @@ ValgrindToolRunner::ValgrindToolRunner(RunControl *runControl)
     runControl->setIcon(ProjectExplorer::Icons::ANALYZER_START_SMALL_TOOLBAR);
     setSupportsReRunning(false);
 
-    m_settings = runControl->runConfiguration()
-            ->currentSettings<ValgrindBaseSettings>(ANALYZER_VALGRIND_SETTINGS);
+    m_settings =
+            qobject_cast<ValgrindBaseSettings *>(runControl->settings(ANALYZER_VALGRIND_SETTINGS));
 
     if (!m_settings)
-        m_settings = ValgrindPlugin::globalSettings();
+        m_settings = ValgrindGlobalSettings::instance();
 }
 
 void ValgrindToolRunner::start()
@@ -86,7 +86,7 @@ void ValgrindToolRunner::start()
     m_runner.setDevice(device());
     m_runner.setDebuggee(runnable());
 
-    if (auto aspect = runControl()->runConfiguration()->aspect<TerminalAspect>())
+    if (auto aspect = runControl()->aspect<TerminalAspect>())
         m_runner.setUseTerminal(aspect->useTerminal());
 
     connect(&m_runner, &ValgrindRunner::processOutputReceived,

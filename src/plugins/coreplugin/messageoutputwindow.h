@@ -27,6 +27,11 @@
 
 #include "ioutputpane.h"
 
+QT_BEGIN_NAMESPACE
+class QFont;
+class QToolButton;
+QT_END_NAMESPACE
+
 namespace Core {
 class OutputWindow;
 
@@ -41,7 +46,6 @@ public:
     ~MessageOutputWindow() override;
 
     QWidget *outputWidget(QWidget *parent) override;
-    QList<QWidget*> toolBarWidgets() const override { return {}; }
 
     QString displayName() const override;
     int priorityInStatusBar() const override;
@@ -60,6 +64,8 @@ public:
     bool canNavigate() const override;
 
 private:
+    void updateFilter() override;
+
     OutputWindow *m_widget;
 };
 

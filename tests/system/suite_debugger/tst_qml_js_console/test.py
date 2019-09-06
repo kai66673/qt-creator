@@ -28,7 +28,7 @@ source("../../shared/qtcreator.py")
 def typeToDebuggerConsole(expression):
     editableIndex = getQModelIndexStr("text=''",
                                       ":DebugModeWidget_Debugger::Internal::ConsoleView")
-    mouseClick(editableIndex, 5, 5, 0, Qt.LeftButton)
+    mouseClick(editableIndex)
     type(waitForObject(":Debugger::Internal::ConsoleEdit"), expression)
     type(waitForObject(":Debugger::Internal::ConsoleEdit"), "<Return>")
 
@@ -82,7 +82,7 @@ def getQmlJSConsoleOutput():
         return [""]
 
 def runChecks(elementProps, parent, checks):
-    mouseClick(getQModelIndexStr(elementProps, parent), 5, 5, 0, Qt.LeftButton)
+    mouseClick(getQModelIndexStr(elementProps, parent))
     for check in checks:
         useDebuggerConsole(*check)
 
@@ -139,6 +139,7 @@ def main():
         switchViewTo(ViewConstants.EDIT)
         # start debugging
         clickButton(fancyDebugButton)
+        progressBarWait()
         waitForObject(":Locals and Expressions_Debugger::Internal::WatchTreeView")
         rootIndex = getQModelIndexStr("text='QQmlEngine'",
                                       ":Locals and Expressions_Debugger::Internal::WatchTreeView")
@@ -146,8 +147,10 @@ def main():
         mainRect = getQModelIndexStr("text='Rectangle'", rootIndex)
         doubleClick(waitForObject(mainRect))
         if not object.exists(":DebugModeWidget_Debugger::Internal::ConsoleView"):
-            invokeMenuItem("Window", "Output Panes", "Debugger Console")
-        progressBarWait()
+            invokeMenuItem("Window", "Output Panes", "QML Debugger Console")
+        # Window might be too small to show Locals, so close what we don't need
+        for view in ("Stack", "Breakpoints", "Expressions"):
+            invokeMenuItem("Window", "Views", view)
         # color and float values have additional ZERO WIDTH SPACE (\u200b), different usage of
         # whitespaces inside expressions is part of the test
         checks = [("color", u"#\u200b008000"), ("width", "50"),

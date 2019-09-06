@@ -94,13 +94,13 @@ void PerfProfilerEventStorage::clear()
     m_file.clear();
     m_size = 0;
     if (!m_file.open())
-        m_errorHandler(tr("Failed to reset temporary trace file"));
+        m_errorHandler(tr("Failed to reset temporary trace file."));
 }
 
 void PerfProfilerEventStorage::finalize()
 {
     if (!m_file.flush())
-        m_errorHandler(tr("Failed to flush temporary trace file"));
+        m_errorHandler(tr("Failed to flush temporary trace file."));
 }
 
 bool PerfProfilerEventStorage::replay(
@@ -110,13 +110,13 @@ bool PerfProfilerEventStorage::replay(
     case Timeline::TraceStashFile<PerfEvent>::ReplaySuccess:
         return true;
     case Timeline::TraceStashFile<PerfEvent>::ReplayOpenFailed:
-        m_errorHandler(tr("Cannot re-open temporary trace file"));
+        m_errorHandler(tr("Cannot re-open temporary trace file."));
         break;
     case Timeline::TraceStashFile<PerfEvent>::ReplayLoadFailed:
         // Happens if the loader rejects an event. Not an actual error
         break;
     case Timeline::TraceStashFile<PerfEvent>::ReplayReadPastEnd:
-        m_errorHandler(tr("Read past end from temporary trace file"));
+        m_errorHandler(tr("Read past end from temporary trace file."));
         break;
     }
     return false;
@@ -217,6 +217,10 @@ void PerfProfilerTraceManager::resetAttributes()
                                                            tr("Thread ended")));
     setEventType(PerfEvent::LostTypeId, PerfEventType(PerfEventType::LostDefinition,
                                                       tr("Samples lost")));
+    setEventType(PerfEvent::ContextSwitchTypeId,
+                 PerfEventType(PerfEventType::ContextSwitchDefinition, tr("Context switch")));
+    setEventType(PerfEvent::LastSpecialTypeId,
+                 PerfEventType(PerfEventType::InvalidFeature, tr("Invalid")));
 }
 
 void PerfProfilerTraceManager::finalize()
@@ -279,7 +283,7 @@ void PerfProfilerTraceManager::replayPerfEvents(PerfEventLoader loader, Initiali
         QTC_ASSERT(traceEvent.is<PerfEvent>(), return false);
         PerfEvent &&event = traceEvent.asRvalueRef<PerfEvent>();
         processSample(event);
-        loader(event, eventType(event.typeIndex()));
+        loader(event, eventType(event.attributeId(0)));
         return true;
     });
 
@@ -397,13 +401,13 @@ int PerfProfilerEventTypeStorage::append(Timeline::TraceEventType &&type)
     if (perfType.isLocation()) {
         const size_t index = m_locations.size();
         m_locations.push_back(perfType);
-        QTC_ASSERT(index <= std::numeric_limits<int>::max(),
+        QTC_ASSERT(index <= size_t(std::numeric_limits<int>::max()),
                    return std::numeric_limits<int>::max());
         return static_cast<int>(index);
     } else if (perfType.isAttribute()) {
         const size_t index = m_attributes.size();
         m_attributes.push_back(perfType);
-        QTC_ASSERT(index <= std::numeric_limits<int>::max(),
+        QTC_ASSERT(index <= size_t(std::numeric_limits<int>::max()),
                    return -std::numeric_limits<int>::max());
         return -static_cast<int>(index);
     }
@@ -414,7 +418,8 @@ int PerfProfilerEventTypeStorage::append(Timeline::TraceEventType &&type)
 int PerfProfilerEventTypeStorage::size() const
 {
     const size_t result = m_attributes.size() + m_locations.size();
-    QTC_ASSERT(result <= std::numeric_limits<int>::max(), return std::numeric_limits<int>::max());
+    QTC_ASSERT(result <= size_t(std::numeric_limits<int>::max()),
+               return std::numeric_limits<int>::max());
     return static_cast<int>(result);
 }
 
@@ -633,7 +638,7 @@ void PerfProfilerTraceManager::loadFromPerfData(const QString &filePath,
 
     reader->future().reportStarted();
     initialize();
-    reader->load(filePath, executableDirPath, kit);
+    reader->loadFromFile(filePath, executableDirPath, kit);
 }
 
 } // namespace Internal

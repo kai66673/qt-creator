@@ -38,10 +38,9 @@ class QTCREATOR_UTILS_EXPORT QtcProcess : public QProcess
 
 public:
     QtcProcess(QObject *parent = nullptr);
-    void setEnvironment(const Environment &env)
-        { m_environment = env; m_haveEnv = true; }
-    void setCommand(const QString &command, const QString &arguments)
-        { m_command = command; m_arguments = arguments; }
+
+    void setEnvironment(const Environment &env) { m_environment = env; m_haveEnv = true; }
+    void setCommand(const CommandLine &cmdLine) { m_commandLine  = cmdLine; }
     void setUseCtrlCStub(bool enabled);
     void start();
     void terminate();
@@ -80,7 +79,8 @@ public:
     //! Prepare argument of a shell command for feeding into QProcess
     static Arguments prepareArgs(const QString &cmd, SplitError *err,
                                  OsType osType = HostOsInfo::hostOs(),
-                                 const Environment *env = nullptr, const QString *pwd = nullptr);
+                                 const Environment *env = nullptr, const QString *pwd = nullptr,
+                                 bool abortOnMeta = true);
     //! Prepare a shell command for feeding into QProcess
     static bool prepareCommand(const QString &command, const QString &arguments,
                                QString *outCmd, Arguments *outArgs, OsType osType = HostOsInfo::hostOs(),
@@ -141,8 +141,7 @@ public:
     };
 
 private:
-    QString m_command;
-    QString m_arguments;
+    CommandLine m_commandLine;
     Environment m_environment;
     bool m_haveEnv = false;
     bool m_useCtrlCStub = false;

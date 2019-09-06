@@ -50,15 +50,14 @@ class PROJECTEXPLORER_EXPORT SysRootKitAspect : public KitAspect
 public:
     SysRootKitAspect();
 
-    QVariant defaultValue(const Kit *k) const override;
-    QList<Task> validate(const Kit *k) const override;
+    Tasks validate(const Kit *k) const override;
     KitAspectWidget *createConfigWidget(Kit *k) const override;
     ItemList toUserOutput(const Kit *k) const override;
     void addToMacroExpander(Kit *kit, Utils::MacroExpander *expander) const override;
 
     static Core::Id id();
-    static Utils::FileName sysRoot(const Kit *k);
-    static void setSysRoot(Kit *k, const Utils::FileName &v);
+    static Utils::FilePath sysRoot(const Kit *k);
+    static void setSysRoot(Kit *k, const Utils::FilePath &v);
 };
 
 // --------------------------------------------------------------------------
@@ -72,8 +71,7 @@ class PROJECTEXPLORER_EXPORT ToolChainKitAspect : public KitAspect
 public:
     ToolChainKitAspect();
 
-    QVariant defaultValue(const Kit *k) const override;
-    QList<Task> validate(const Kit *k) const override;
+    Tasks validate(const Kit *k) const override;
     void upgrade(Kit *k) override;
     void fix(Kit *k) override;
     void setup(Kit *k) override;
@@ -117,8 +115,8 @@ class PROJECTEXPLORER_EXPORT DeviceTypeKitAspect : public KitAspect
 public:
     DeviceTypeKitAspect();
 
-    QVariant defaultValue(const Kit *k) const override;
-    QList<Task> validate(const Kit *k) const override;
+    void setup(Kit *k) override;
+    Tasks validate(const Kit *k) const override;
     KitAspectWidget *createConfigWidget(Kit *k) const override;
     ItemList toUserOutput(const Kit *k) const override;
 
@@ -141,8 +139,7 @@ class PROJECTEXPLORER_EXPORT DeviceKitAspect : public KitAspect
 public:
     DeviceKitAspect();
 
-    QVariant defaultValue(const Kit *k) const override;
-    QList<Task> validate(const Kit *k) const override;
+    Tasks validate(const Kit *k) const override;
     void fix(Kit *k) override;
     void setup(Kit *k) override;
 
@@ -161,6 +158,8 @@ public:
     static void setDeviceId(Kit *k, Core::Id dataId);
 
 private:
+    QVariant defaultValue(const Kit *k) const;
+
     void kitsWereLoaded();
     void deviceUpdated(Core::Id dataId);
     void devicesChanged();
@@ -178,8 +177,7 @@ class PROJECTEXPLORER_EXPORT EnvironmentKitAspect : public KitAspect
 public:
     EnvironmentKitAspect();
 
-    QVariant defaultValue(const Kit *k) const override;
-    QList<Task> validate(const Kit *k) const override;
+    Tasks validate(const Kit *k) const override;
     void fix(Kit *k) override;
 
     void addToEnvironment(const Kit *k, Utils::Environment &env) const override;

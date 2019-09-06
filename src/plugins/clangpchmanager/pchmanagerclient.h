@@ -28,7 +28,7 @@
 #include "clangpchmanager_global.h"
 
 #include <pchmanagerclientinterface.h>
-#include <projectpartpchproviderinterface.h>
+#include <projectpartid.h>
 
 #include <vector>
 
@@ -37,48 +37,35 @@ class PchManagerConnectionClient;
 class ProgressManagerInterface;
 class PchManagerNotifierInterface;
 
-class CLANGPCHMANAGER_EXPORT PchManagerClient final : public ClangBackEnd::PchManagerClientInterface,
-                                                      public ClangBackEnd::ProjectPartPchProviderInterface
+class CLANGPCHMANAGER_EXPORT PchManagerClient final : public ClangBackEnd::PchManagerClientInterface
 {
     friend class PchManagerNotifierInterface;
 public:
-    PchManagerClient(ProgressManagerInterface &progressManager)
-        : m_progressManager(progressManager)
+    PchManagerClient(ProgressManagerInterface &pchCreationProgressManager,
+                     ProgressManagerInterface &dependencyCreationProgressManager)
+        : m_pchCreationProgressManager(pchCreationProgressManager)
+        , m_dependencyCreationProgressManager(dependencyCreationProgressManager)
     {}
 
     void alive() override;
     void precompiledHeadersUpdated(ClangBackEnd::PrecompiledHeadersUpdatedMessage &&message) override;
     void progress(ClangBackEnd::ProgressMessage &&message) override;
 
-    void precompiledHeaderRemoved(const QString &projectPartId);
+    void precompiledHeaderRemoved(ClangBackEnd::ProjectPartId projectPartId);
 
     void setConnectionClient(PchManagerConnectionClient *connectionClient);
 
-    Utils::optional<ClangBackEnd::ProjectPartPch> projectPartPch(
-            Utils::SmallStringView projectPartId) const override;
-
-    const ClangBackEnd::ProjectPartPchs &projectPartPchs() const override
-    {
-        return m_projectPartPchs;
-    }
-
-unittest_public:
-    const std::vector<PchManagerNotifierInterface*> &notifiers() const;
-    void precompiledHeaderUpdated(const QString &projectPartId,
-                                  const QString &pchFilePath,
-                                  long long lastModified);
+    unittest_public : const std::vector<PchManagerNotifierInterface *> &notifiers() const;
+    void precompiledHeaderUpdated(ClangBackEnd::ProjectPartId projectPartId);
 
     void attach(PchManagerNotifierInterface *notifier);
     void detach(PchManagerNotifierInterface *notifier);
 
-    void addProjectPartPch(ClangBackEnd::ProjectPartPch &&projectPartPch);
-    void removeProjectPartPch(Utils::SmallStringView projectPartId);
-
 private:
-    ClangBackEnd::ProjectPartPchs m_projectPartPchs;
     std::vector<PchManagerNotifierInterface*> m_notifiers;
     PchManagerConnectionClient *m_connectionClient=nullptr;
-    ProgressManagerInterface &m_progressManager;
+    ProgressManagerInterface &m_pchCreationProgressManager;
+    ProgressManagerInterface &m_dependencyCreationProgressManager;
 };
 
 } // namespace ClangPchManager

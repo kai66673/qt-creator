@@ -33,18 +33,18 @@
 
 #include <QDir>
 #include <QRegularExpression>
+#include <QSet>
 
 using namespace ProjectExplorer;
 
 namespace CompilationDatabaseProjectManager {
+namespace Internal {
 
 static QString updatedPathFlag(const QString &pathStr, const QString &workingDir)
 {
     QString result = pathStr;
-    if (!QDir(pathStr).exists()
-            && QDir(workingDir + "/" + pathStr).exists()) {
+    if (QDir(pathStr).isRelative())
         result = workingDir + "/" + pathStr;
-    }
 
     return result;
 }
@@ -99,7 +99,8 @@ void filteredFlags(const QString &fileName,
                    QStringList &flags,
                    HeaderPaths &headerPaths,
                    Macros &macros,
-                   CppTools::ProjectFile::Kind &fileKind)
+                   CppTools::ProjectFile::Kind &fileKind,
+                   QString &sysRoot)
 {
     if (flags.empty())
         return;
@@ -183,6 +184,12 @@ void filteredFlags(const QString &fileName,
             continue;
         }
 
+        if (flag.startsWith("--sysroot=")) {
+            if (sysRoot.isEmpty())
+                sysRoot = updatedPathFlag(flag.mid(10), workingDir);
+            continue;
+        }
+
         if ((flag.startsWith("-std=") || flag.startsWith("/std:"))
                 && fileKind == CppTools::ProjectFile::Unclassified) {
             const bool cpp = (flag.contains("c++") || flag.contains("gnu++"));
@@ -205,7 +212,7 @@ void filteredFlags(const QString &fileName,
     flags = filtered;
 }
 
-QStringList splitCommandLine(QString commandLine)
+QStringList splitCommandLine(QString commandLine, QSet<QString> &flagsCache)
 {
     QStringList result;
     bool insideQuotes = false;
@@ -215,16 +222,24 @@ QStringList splitCommandLine(QString commandLine)
     for (const QString &part : commandLine.split(QRegularExpression("\""))) {
         if (insideQuotes) {
             const QString quotedPart = "\"" + part + "\"";
-            if (result.last().endsWith("="))
-                result.last().append(quotedPart);
-            else
-                result.append(quotedPart);
+            if (result.last().endsWith("=")) {
+                auto flagIt = flagsCache.insert(result.last() + quotedPart);
+                result.last() = *flagIt;
+            } else {
+                auto flagIt = flagsCache.insert(quotedPart);
+                result.append(*flagIt);
+            }
         } else { // If 's' is outside quotes ...
-            result.append(part.split(QRegularExpression("\\s+"), QString::SkipEmptyParts));
+            for (const QString &flag :
+                 part.split(QRegularExpression("\\s+"), QString::SkipEmptyParts)) {
+                auto flagIt = flagsCache.insert(flag);
+                result.append(*flagIt);
+            }
         }
         insideQuotes = !insideQuotes;
     }
     return result;
 }
 
+} // namespace Internal
 } // namespace CompilationDatabaseProjectManager

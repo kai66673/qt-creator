@@ -61,17 +61,18 @@ AndroidPackageInstallationStep::AndroidPackageInstallationStep(BuildStepList *bs
 bool AndroidPackageInstallationStep::init()
 {
     BuildConfiguration *bc = buildConfiguration();
-    QString dirPath = bc->buildDirectory().appendPath(Constants::ANDROID_BUILDDIRECTORY).toString();
+    QString dirPath = bc->buildDirectory().pathAppended(Constants::ANDROID_BUILDDIRECTORY).toString();
     if (HostOsInfo::isWindowsHost())
         if (bc->environment().searchInPath("sh.exe").isEmpty())
             dirPath = QDir::toNativeSeparators(dirPath);
 
     ToolChain *tc = ToolChainKitAspect::toolChain(target()->kit(),
                                                        ProjectExplorer::Constants::CXX_LANGUAGE_ID);
+    QTC_ASSERT(tc, return false);
 
     ProcessParameters *pp = processParameters();
     pp->setMacroExpander(bc->macroExpander());
-    pp->setWorkingDirectory(bc->buildDirectory().toString());
+    pp->setWorkingDirectory(bc->buildDirectory());
     pp->setCommand(tc->makeCommand(bc->environment()));
     Environment env = bc->environment();
     Environment::setupEnglishOutput(&env);
@@ -99,7 +100,7 @@ void AndroidPackageInstallationStep::doRun()
 {
     QString error;
     foreach (const QString &dir, m_androidDirsToClean) {
-        FileName androidDir = FileName::fromString(dir);
+        FilePath androidDir = FilePath::fromString(dir);
         if (!dir.isEmpty() && androidDir.exists()) {
             emit addOutput(tr("Removing directory %1").arg(dir), OutputFormat::NormalMessage);
             if (!FileUtils::removeRecursively(androidDir, &error)) {

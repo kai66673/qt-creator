@@ -80,17 +80,17 @@ QString QnxQtVersion::qnxHost() const
     return QString();
 }
 
-Utils::FileName QnxQtVersion::qnxTarget() const
+Utils::FilePath QnxQtVersion::qnxTarget() const
 {
     if (!m_environmentUpToDate)
         updateEnvironment();
 
     foreach (const Utils::EnvironmentItem &item, m_qnxEnv) {
         if (item.name == QLatin1String(Constants::QNX_TARGET_KEY))
-            return Utils::FileName::fromUserInput(item.value);
+            return Utils::FilePath::fromUserInput(item.value);
     }
 
-    return Utils::FileName();
+    return Utils::FilePath();
 }
 
 QString QnxQtVersion::cpuDir() const
@@ -118,7 +118,7 @@ void QnxQtVersion::fromMap(const QVariantMap &map)
     setSdpPath(QDir::fromNativeSeparators(map.value(QLatin1String(SDP_PATH_KEY)).toString()));
 }
 
-QList<ProjectExplorer::Abi> QnxQtVersion::detectQtAbis() const
+ProjectExplorer::Abis QnxQtVersion::detectQtAbis() const
 {
     ensureMkSpecParsed();
     return QnxUtils::convertAbis(BaseQtVersion::detectQtAbis());

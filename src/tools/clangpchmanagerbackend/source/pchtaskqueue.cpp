@@ -25,10 +25,15 @@
 
 #include "pchtaskqueue.h"
 
+#include <environment.h>
 #include <pchcreatorinterface.h>
 #include <precompiledheaderstorageinterface.h>
 #include <progresscounter.h>
 #include <sqlitetransaction.h>
+
+#include <utils/algorithm.h>
+
+#include <iostream>
 
 namespace ClangBackEnd {
 
@@ -42,30 +47,30 @@ void PchTaskQueue::addPchTasks(PchTasks &&newPchTasks, PchTasks &destination)
 
     PchTasks mergedPchTasks;
     mergedPchTasks.reserve(destination.size() + newPchTasks.size());
-    std::set_union(std::make_move_iterator(newPchTasks.begin()),
-                   std::make_move_iterator(newPchTasks.end()),
-                   std::make_move_iterator(destination.begin()),
-                   std::make_move_iterator(destination.end()),
-                   std::back_inserter(mergedPchTasks),
-                   compare);
+    Utils::set_union(std::make_move_iterator(newPchTasks.begin()),
+                     std::make_move_iterator(newPchTasks.end()),
+                     std::make_move_iterator(destination.begin()),
+                     std::make_move_iterator(destination.end()),
+                     std::back_inserter(mergedPchTasks),
+                     compare);
 
     destination = std::move(mergedPchTasks);
 
     m_progressCounter.addTotal(int(destination.size() - oldSize));
 }
 
-void PchTaskQueue::removePchTasksByProjectPartId(const Utils::SmallStringVector &projectsPartIds,
+void PchTaskQueue::removePchTasksByProjectPartId(const ProjectPartIds &projectsPartIds,
                                                  PchTasks &destination)
 {
     class CompareDifference
     {
     public:
-        bool operator()(const PchTask &first, const Utils::SmallString &second)
+        bool operator()(const PchTask &first, ProjectPartId second)
         {
             return first.projectPartId() < second;
         }
 
-        bool operator()(const Utils::SmallString &first, const PchTask &second)
+        bool operator()(ProjectPartId first, const PchTask &second)
         {
             return first < second.projectPartId();
         }
@@ -97,7 +102,7 @@ void PchTaskQueue::addProjectPchTasks(PchTasks &&pchTasks)
     addPchTasks(std::move(pchTasks), m_projectPchTasks);
 }
 
-void PchTaskQueue::removePchTasks(const Utils::SmallStringVector &projectsPartIds)
+void PchTaskQueue::removePchTasks(const ProjectPartIds &projectsPartIds)
 {
     removePchTasksByProjectPartId(projectsPartIds, m_projectPchTasks);
 }
@@ -142,16 +147,17 @@ std::vector<PchTaskQueue::Task> PchTaskQueue::createProjectTasks(PchTasks &&pchT
     auto convert = [this](auto &&pchTask) {
         return [pchTask = std::move(pchTask), this](PchCreatorInterface &pchCreator) mutable {
             const auto projectPartId = pchTask.projectPartId();
-            pchTask.systemPchPath = m_precompiledHeaderStorage.fetchSystemPrecompiledHeaderPath(
-                projectPartId);
-            pchCreator.generatePch(std::move(pchTask));
-            const auto &projectPartPch = pchCreator.projectPartPch();
-            if (projectPartPch.pchPath.empty()) {
-                m_precompiledHeaderStorage.deleteProjectPrecompiledHeader(projectPartId);
-            } else {
-                m_precompiledHeaderStorage.insertProjectPrecompiledHeader(
-                    projectPartId, projectPartPch.pchPath, projectPartPch.lastModified);
-            }
+                pchTask.systemPchPath = m_precompiledHeaderStorage.fetchSystemPrecompiledHeaderPath(
+                    projectPartId);
+                pchTask.preIncludeSearchPath = m_environment.preIncludeSearchPath();
+                pchCreator.generatePch(std::move(pchTask));
+                const auto &projectPartPch = pchCreator.projectPartPch();
+                if (projectPartPch.pchPath.empty()) {
+                    m_precompiledHeaderStorage.deleteProjectPrecompiledHeader(projectPartId);
+                } else {
+                    m_precompiledHeaderStorage.insertProjectPrecompiledHeader(
+                        projectPartId, projectPartPch.pchPath, projectPartPch.lastModified);
+                }
         };
     };
 
@@ -171,15 +177,15 @@ std::vector<PchTaskQueue::Task> PchTaskQueue::createSystemTasks(PchTasks &&pchTa
     auto convert = [this](auto &&pchTask) {
         return [pchTask = std::move(pchTask), this](PchCreatorInterface &pchCreator) mutable {
             const auto projectPartIds = pchTask.projectPartIds;
-            pchCreator.generatePch(std::move(pchTask));
-            const auto &projectPartPch = pchCreator.projectPartPch();
-            if (projectPartPch.pchPath.empty()) {
-                m_precompiledHeaderStorage.deleteSystemPrecompiledHeaders(projectPartIds);
-            } else {
-                m_precompiledHeaderStorage.insertSystemPrecompiledHeaders(projectPartIds,
-                                                                          projectPartPch.pchPath,
-                                                                          projectPartPch.lastModified);
-            }
+                pchTask.preIncludeSearchPath = m_environment.preIncludeSearchPath();
+                pchCreator.generatePch(std::move(pchTask));
+                const auto &projectPartPch = pchCreator.projectPartPch();
+                if (projectPartPch.pchPath.empty()) {
+                    m_precompiledHeaderStorage.deleteSystemPrecompiledHeaders(projectPartIds);
+                } else {
+                    m_precompiledHeaderStorage.insertSystemPrecompiledHeaders(
+                        projectPartIds, projectPartPch.pchPath, projectPartPch.lastModified);
+                }
         };
     };
 

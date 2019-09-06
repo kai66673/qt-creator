@@ -284,7 +284,7 @@ QueryContext::QueryContext(const QString &query,
     connect(&m_process, &QProcess::readyReadStandardOutput, this, [this] {
         m_output.append(m_process.readAllStandardOutput());
     });
-    connect(&m_process, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+    connect(&m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &QueryContext::processFinished);
     connect(&m_process, &QProcess::errorOccurred, this, &QueryContext::processError);
     connect(&m_watcher, &QFutureWatcherBase::canceled, this, &QueryContext::terminate);
@@ -315,7 +315,7 @@ void QueryContext::start()
     m_progress.reportStarted();
     // Order: synchronous call to error handling if something goes wrong.
     VcsOutputWindow::appendCommand(
-                m_process.workingDirectory(), Utils::FileName::fromString(m_binary), m_arguments);
+                m_process.workingDirectory(), Utils::FilePath::fromString(m_binary), m_arguments);
     m_timer.start();
     m_process.start(m_binary, m_arguments);
     m_process.closeWriteChannel();
@@ -376,7 +376,7 @@ void QueryContext::timeout()
                     arg(timeOutMS / 1000), QMessageBox::NoButton, parent);
     QPushButton *terminateButton = box.addButton(tr("Terminate"), QMessageBox::YesRole);
     box.addButton(tr("Keep Running"), QMessageBox::NoRole);
-    connect(&m_process, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+    connect(&m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             &box, &QDialog::reject);
     box.exec();
     if (m_process.state() != QProcess::Running)
@@ -842,7 +842,7 @@ QList<QStandardItem *> GerritModel::changeToRow(const GerritChangePtr &c) const
 {
     QList<QStandardItem *> row;
     const QVariant filterV = QVariant(c->filterString());
-    const QVariant changeV = qVariantFromValue(c);
+    const QVariant changeV = QVariant::fromValue(c);
     for (int i = 0; i < GerritModel::ColumnCount; ++i) {
         auto item = new QStandardItem;
         item->setData(changeV, GerritModel::GerritChangeRole);

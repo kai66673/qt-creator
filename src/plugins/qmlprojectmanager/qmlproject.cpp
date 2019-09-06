@@ -56,13 +56,13 @@ using namespace ProjectExplorer;
 
 namespace QmlProjectManager {
 
-QmlProject::QmlProject(const Utils::FileName &fileName) :
+QmlProject::QmlProject(const Utils::FilePath &fileName) :
     Project(QString::fromLatin1(Constants::QMLPROJECT_MIMETYPE), fileName,
             [this]() { refreshProjectFile(); })
 {
     const QString normalized
             = Utils::FileUtils::normalizePathName(fileName.toFileInfo().canonicalFilePath());
-    m_canonicalProjectDir = Utils::FileName::fromString(normalized).parentDir();
+    m_canonicalProjectDir = Utils::FilePath::fromString(normalized).parentDir();
 
     setId(QmlProjectManager::Constants::QML_PROJECT_ID);
     setProjectLanguages(Context(ProjectExplorer::Constants::QMLJS_LANGUAGE_ID));
@@ -97,7 +97,7 @@ void QmlProject::onKitChanged()
     refresh(Configuration);
 }
 
-Utils::FileName QmlProject::canonicalProjectDir() const
+Utils::FilePath QmlProject::canonicalProjectDir() const
 {
     return m_canonicalProjectDir;
 }
@@ -165,7 +165,7 @@ void QmlProject::refresh(RefreshOptions options)
     QmlJS::ModelManagerInterface::ProjectInfo projectInfo =
             modelManager->defaultProjectInfoForProject(this);
     foreach (const QString &searchPath, makeAbsolute(canonicalProjectDir(), customImportPaths()))
-        projectInfo.importPaths.maybeInsert(Utils::FileName::fromString(searchPath),
+        projectInfo.importPaths.maybeInsert(Utils::FilePath::fromString(searchPath),
                                             QmlJS::Dialect::Qml);
 
     modelManager->updateProjectInfo(projectInfo, this);
@@ -186,24 +186,24 @@ void QmlProject::setMainFile(const QString &mainFilePath)
         m_projectItem.data()->setMainFile(mainFilePath);
 }
 
-Utils::FileName QmlProject::targetDirectory(const Target *target) const
+Utils::FilePath QmlProject::targetDirectory(const Target *target) const
 {
     if (DeviceTypeKitAspect::deviceTypeId(target->kit())
             == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE)
         return canonicalProjectDir();
 
-    return m_projectItem ? Utils::FileName::fromString(m_projectItem->targetDirectory())
-                         : Utils::FileName();
+    return m_projectItem ? Utils::FilePath::fromString(m_projectItem->targetDirectory())
+                         : Utils::FilePath();
 }
 
-Utils::FileName QmlProject::targetFile(const Utils::FileName &sourceFile,
+Utils::FilePath QmlProject::targetFile(const Utils::FilePath &sourceFile,
                                        const Target *target) const
 {
     const QDir sourceDir(m_projectItem ? m_projectItem->sourceDirectory()
                                        : canonicalProjectDir().toString());
     const QDir targetDir(targetDirectory(target).toString());
     const QString relative = sourceDir.relativeFilePath(sourceFile.toString());
-    return Utils::FileName::fromString(QDir::cleanPath(targetDir.absoluteFilePath(relative)));
+    return Utils::FilePath::fromString(QDir::cleanPath(targetDir.absoluteFilePath(relative)));
 }
 
 QList<Utils::EnvironmentItem> QmlProject::environment() const
@@ -222,6 +222,13 @@ QStringList QmlProject::customImportPaths() const
 {
     if (m_projectItem)
         return m_projectItem.data()->importPaths();
+    return {};
+}
+
+QStringList QmlProject::customFileSelectors() const
+{
+    if (m_projectItem)
+        return m_projectItem.data()->fileSelectors();
     return {};
 }
 
@@ -245,7 +252,7 @@ bool QmlProject::needsBuildConfigurations() const
     return false;
 }
 
-QStringList QmlProject::makeAbsolute(const Utils::FileName &path, const QStringList &relativePaths)
+QStringList QmlProject::makeAbsolute(const Utils::FilePath &path, const QStringList &relativePaths)
 {
     if (path.isEmpty())
         return relativePaths;
@@ -256,12 +263,19 @@ QStringList QmlProject::makeAbsolute(const Utils::FileName &path, const QStringL
     });
 }
 
+QVariant QmlProject::additionalData(Id id, const Target *) const
+{
+    if (id == Constants::customFileSelectorsData)
+        return customFileSelectors();
+    return {};
+}
+
 void QmlProject::refreshFiles(const QSet<QString> &/*added*/, const QSet<QString> &removed)
 {
     refresh(Files);
     if (!removed.isEmpty()) {
         if (auto modelManager = QmlJS::ModelManagerInterface::instance())
-            modelManager->removeFiles(removed.toList());
+            modelManager->removeFiles(Utils::toList(removed));
     }
     refreshTargetDirectory();
 }
@@ -273,9 +287,9 @@ void QmlProject::refreshTargetDirectory()
         updateDeploymentData(target);
 }
 
-QList<Task> QmlProject::projectIssues(const Kit *k) const
+Tasks QmlProject::projectIssues(const Kit *k) const
 {
-    QList<Task> result = Project::projectIssues(k);
+    Tasks result = Project::projectIssues(k);
 
     const QtSupport::BaseQtVersion *version = QtSupport::QtKitAspect::qtVersion(k);
     if (!version)
@@ -347,6 +361,11 @@ Project::RestoreResult QmlProject::fromMap(const QVariantMap &map, QString *erro
     return RestoreResult::Ok;
 }
 
+ProjectExplorer::DeploymentKnowledge QmlProject::deploymentKnowledge() const
+{
+    return DeploymentKnowledge::Perfect;
+}
+
 void QmlProject::generateProjectTree()
 {
     if (!m_projectItem)
@@ -355,12 +374,12 @@ void QmlProject::generateProjectTree()
     auto newRoot = std::make_unique<Internal::QmlProjectNode>(this);
 
     for (const QString &f : m_projectItem.data()->files()) {
-        const Utils::FileName fileName = Utils::FileName::fromString(f);
+        const Utils::FilePath fileName = Utils::FilePath::fromString(f);
         const FileType fileType = (fileName == projectFilePath())
                 ? FileType::Project : FileNode::fileTypeForFileName(fileName);
-        newRoot->addNestedNode(std::make_unique<FileNode>(fileName, fileType, false));
+        newRoot->addNestedNode(std::make_unique<FileNode>(fileName, fileType));
     }
-    newRoot->addNestedNode(std::make_unique<FileNode>(projectFilePath(), FileType::Project, false));
+    newRoot->addNestedNode(std::make_unique<FileNode>(projectFilePath(), FileType::Project));
 
     setRootProjectNode(std::move(newRoot));
     refreshTargetDirectory();
@@ -380,7 +399,7 @@ void QmlProject::updateDeploymentData(ProjectExplorer::Target *target)
     for (const QString &file : m_projectItem->files()) {
         deploymentData.addFile(
                     file,
-                    targetFile(Utils::FileName::fromString(file), target).parentDir().toString());
+                    targetFile(Utils::FilePath::fromString(file), target).parentDir().toString());
     }
 
     target->setDeploymentData(deploymentData);

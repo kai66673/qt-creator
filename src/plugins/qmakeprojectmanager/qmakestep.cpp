@@ -33,6 +33,7 @@
 #include "qmakeparser.h"
 #include "qmakeproject.h"
 #include "qmakeprojectmanagerconstants.h"
+#include "qmakesettings.h"
 
 #include <projectexplorer/buildmanager.h>
 #include <projectexplorer/buildsteplist.h>
@@ -114,9 +115,9 @@ QString QMakeStep::allArguments(const BaseQtVersion *v, ArgumentFlags flags) con
             }
         }
     }
-    FileName specArg = mkspec();
+    const QString specArg = mkspec();
     if (!userProvidedMkspec && !specArg.isEmpty())
-        arguments << "-spec" << specArg.toUserOutput();
+        arguments << "-spec" << QDir::toNativeSeparators(specArg);
 
     // Find out what flags we pass on to qmake
     arguments << bc->configCommandLineArguments();
@@ -165,6 +166,7 @@ QMakeStepConfig QMakeStep::deducedArguments() const
 
 bool QMakeStep::init()
 {
+    m_wasSuccess = true;
     QmakeBuildConfiguration *qmakeBc = qmakeBuildConfiguration();
     const BaseQtVersion *qtVersion = QtKitAspect::qtVersion(target()->kit());
 
@@ -180,7 +182,7 @@ bool QMakeStep::init()
     else
         workingDirectory = qmakeBc->buildDirectory().toString();
 
-    m_qmakeExecutable = qtVersion->qmakeCommand().toString();
+    m_qmakeExecutable = qtVersion->qmakeCommand();
     m_qmakeArguments = allArguments(qtVersion);
     m_runMakeQmake = (qtVersion->qtVersion() >= QtVersionNumber(5, 0 ,0));
 
@@ -213,14 +215,15 @@ bool QMakeStep::init()
     }
 
     // Check whether we need to run qmake
-    bool makefileOutDated = (qmakeBc->compareToImportFrom(makefile) != QmakeBuildConfiguration::MakefileMatches);
-    if (m_forced || makefileOutDated)
+    if (m_forced || QmakeSettings::alwaysRunQmake()
+            || qmakeBc->compareToImportFrom(makefile) != QmakeBuildConfiguration::MakefileMatches) {
         m_needToRunQMake = true;
+    }
     m_forced = false;
 
     ProcessParameters *pp = processParameters();
     pp->setMacroExpander(qmakeBc->macroExpander());
-    pp->setWorkingDirectory(workingDirectory);
+    pp->setWorkingDirectory(Utils::FilePath::fromString(workingDirectory));
     pp->setEnvironment(qmakeBc->environment());
 
     setOutputParser(new QMakeParser);
@@ -231,7 +234,7 @@ bool QMakeStep::init()
     QTC_ASSERT(node, return false);
     QString proFile = node->filePath().toString();
 
-    QList<ProjectExplorer::Task> tasks = qtVersion->reportIssues(proFile, workingDirectory);
+    Tasks tasks = qtVersion->reportIssues(proFile, workingDirectory);
     Utils::sort(tasks);
 
     if (!tasks.isEmpty()) {
@@ -308,7 +311,7 @@ void QMakeStep::finish(bool success)
     runNextCommand();
 }
 
-void QMakeStep::startOneCommand(const QString &command, const QString &args)
+void QMakeStep::startOneCommand(const FilePath &command, const QString &args)
 {
     ProcessParameters *pp = processParameters();
     pp->setCommand(command);
@@ -340,7 +343,7 @@ void QMakeStep::runNextCommand()
     case State::RUN_MAKE_QMAKE_ALL:
         {
             auto *parser = new GnuMakeParser;
-            parser->setWorkingDirectory(processParameters()->workingDirectory());
+            parser->setWorkingDirectory(processParameters()->workingDirectory().toString());
             setOutputParser(parser);
             m_nextState = State::POST_PROCESS;
             startOneCommand(m_makeExecutable, m_makeArguments);
@@ -433,10 +436,10 @@ void QMakeStep::setSeparateDebugInfo(bool enable)
     qmakeBuildConfiguration()->emitProFileEvaluateNeeded();
 }
 
-QString QMakeStep::makeCommand() const
+FilePath QMakeStep::makeCommand() const
 {
-    auto *ms = qobject_cast<BuildStepList *>(parent())->firstOfType<MakeStep>();
-    return ms ? ms->effectiveMakeCommand() : QString();
+    auto ms = qobject_cast<BuildStepList *>(parent())->firstOfType<MakeStep>();
+    return ms ? ms->effectiveMakeCommand() : FilePath();
 }
 
 QString QMakeStep::makeArguments(const QString &makefile) const
@@ -456,7 +459,7 @@ QString QMakeStep::effectiveQMakeCall() const
     QString qmake = qtVersion ? qtVersion->qmakeCommand().toUserOutput() : QString();
     if (qmake.isEmpty())
         qmake = tr("<no Qt version>");
-    QString make = makeCommand();
+    QString make = makeCommand().toString();
     if (make.isEmpty())
         make = tr("<no Make step found>");
 
@@ -488,14 +491,14 @@ QString QMakeStep::userArguments()
     return m_userArgs;
 }
 
-FileName QMakeStep::mkspec() const
+QString QMakeStep::mkspec() const
 {
     QString additionalArguments = m_userArgs;
     QtcProcess::addArgs(&additionalArguments, m_extraArgs);
     for (QtcProcess::ArgIterator ait(&additionalArguments); ait.next(); ) {
         if (ait.value() == "-spec") {
             if (ait.next())
-                return FileName::fromUserInput(ait.value());
+                return FilePath::fromUserInput(ait.value()).toString();
         }
     }
 
@@ -561,7 +564,7 @@ QMakeStepConfigWidget::QMakeStepConfigWidget(QMakeStep *step)
     connect(m_ui->qmakeAdditonalArgumentsLineEdit, &QLineEdit::textEdited,
             this, &QMakeStepConfigWidget::qmakeArgumentsLineEdited);
     connect(m_ui->buildConfigurationComboBox,
-            static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &QMakeStepConfigWidget::buildConfigurationSelected);
     connect(m_ui->qmlDebuggingLibraryCheckBox, &QCheckBox::toggled,
             this, &QMakeStepConfigWidget::linkQmlDebuggingLibraryChecked);

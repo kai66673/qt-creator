@@ -29,7 +29,6 @@
 #include "modelnodepositionstorage.h"
 #include "abstractproperty.h"
 #include "bindingproperty.h"
-#include "enumeration.h"
 #include "filemanager/firstdefinitionfinder.h"
 #include "filemanager/objectlengthcalculator.h"
 #include "filemanager/qmlrefactoring.h"
@@ -41,6 +40,8 @@
 #include "propertyparser.h"
 #include "rewriterview.h"
 #include "variantproperty.h"
+
+#include <enumeration.h>
 
 #include <qmljs/qmljsevaluate.h>
 #include <qmljs/qmljslink.h>
@@ -76,7 +77,8 @@ bool isSupportedAttachedProperties(const QString &propertyName)
 QStringList supportedVersionsList()
 {
     static const QStringList list = {
-        "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "2.12"
+        "2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "2.8", "2.9",
+        "2.10", "2.11", "2.12", "2.13"
     };
     return list;
 }
@@ -96,7 +98,8 @@ QStringList globalQtEnums()
 QStringList knownEnumScopes()
 {
     static const QStringList list = {
-        "TextInput", "TextEdit", "Material", "Universal", "Font", "Shape", "ShapePath", "AbstractButton"
+        "TextInput", "TextEdit", "Material", "Universal", "Font", "Shape", "ShapePath",
+        "AbstractButton", "Text"
     };
     return list;
 }
@@ -371,6 +374,13 @@ bool smartVeryFuzzyCompare(const QVariant &value1, const QVariant &value2)
     return false;
 }
 
+bool smartColorCompare(const QVariant &value1, const QVariant &value2)
+{
+    if ((value1.type() == QVariant::Color) || (value2.type() == QVariant::Color))
+        return value1.value<QColor>().rgba() == value2.value<QColor>().rgba();
+    return false;
+}
+
 bool equals(const QVariant &a, const QVariant &b)
 {
     if (a.canConvert<QmlDesigner::Enumeration>() && b.canConvert<QmlDesigner::Enumeration>())
@@ -378,6 +388,8 @@ bool equals(const QVariant &a, const QVariant &b)
     if (a == b)
         return true;
     if (smartVeryFuzzyCompare(a, b))
+        return true;
+    if (smartColorCompare(a, b))
         return true;
     return false;
 }

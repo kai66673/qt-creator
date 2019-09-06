@@ -124,6 +124,7 @@ const char DEVICE_SETTINGS_PAGE_ID[] = "AA.Device Settings";
 const char TASK_CATEGORY_COMPILE[] = "Task.Category.Compile";
 const char TASK_CATEGORY_BUILDSYSTEM[] = "Task.Category.Buildsystem";
 const char TASK_CATEGORY_DEPLOYMENT[] = "Task.Category.Deploy";
+const char TASK_CATEGORY_AUTOTEST[] = "Task.Category.Autotest";
 
 // Wizard categories
 const char QT_PROJECT_WIZARD_CATEGORY[] = "H.Project";
@@ -185,6 +186,7 @@ const char VAR_CURRENTBUILD_NAME[] = "CurrentBuild:Name";
 const char VAR_CURRENTBUILD_TYPE[] = "CurrentBuild:Type";
 const char VAR_CURRENTBUILD_ENV[] = "CurrentBuild:Env";
 const char VAR_CURRENTRUN_NAME[] = "CurrentRun:Name";
+const char VAR_CURRENTRUN_WORKINGDIR[] = "CurrentRun:WorkingDir";
 
 // JsonWizard:
 const char PAGE_ID_PREFIX[] = "PE.Wizard.Page.";
@@ -209,9 +211,11 @@ const char FILEOVERLAY_QRC[]=":/projectexplorer/images/fileoverlay_qrc.png";
 const char FILEOVERLAY_CPP[]=":/projectexplorer/images/fileoverlay_cpp.png";
 const char FILEOVERLAY_H[]=":/projectexplorer/images/fileoverlay_h.png";
 const char FILEOVERLAY_SCXML[]=":/projectexplorer/images/fileoverlay_scxml.png";
+const char FILEOVERLAY_PY[]=":/projectexplorer/images/fileoverlay_py.png";
 const char FILEOVERLAY_UNKNOWN[]=":/projectexplorer/images/fileoverlay_unknown.png";
 
 const char ADD_FILES_DIALOG_FILTER_HISTORY_KEY[] = "ProjectExplorer.AddFilesFilterKey";
+const char PROJECT_ROOT_PATH_KEY[] = "ProjectExplorer.Project.RootPath";
 
 } // namespace Constants
 } // namespace ProjectExplorer

@@ -30,6 +30,8 @@
 #include "qmakenodes.h"
 #include "qmakebuildconfiguration.h"
 #include "qmakeprojectmanagerconstants.h"
+#include "qmakesettings.h"
+#include "qmakestep.h"
 
 #include <coreplugin/variablechooser.h>
 #include <projectexplorer/target.h>
@@ -38,6 +40,7 @@
 #include <projectexplorer/gnumakeparser.h>
 #include <projectexplorer/processparameters.h>
 #include <projectexplorer/projectexplorer.h>
+#include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/xcodebuildparser.h>
 #include <utils/qtcprocess.h>
@@ -61,18 +64,13 @@ QmakeMakeStep::QmakeMakeStep(BuildStepList *bsl)
     }
 }
 
-QmakeBuildConfiguration *QmakeMakeStep::qmakeBuildConfiguration() const
-{
-    return static_cast<QmakeBuildConfiguration *>(buildConfiguration());
-}
-
 bool QmakeMakeStep::init()
 {
-    QmakeBuildConfiguration *bc = qmakeBuildConfiguration();
+    const auto bc = static_cast<QmakeBuildConfiguration *>(buildConfiguration());
     if (!bc)
         emit addTask(Task::buildConfigurationMissingTask());
 
-    const QString make = effectiveMakeCommand();
+    Utils::FilePath make = effectiveMakeCommand();
     if (make.isEmpty())
         emit addTask(makeCommandMissingTask());
 
@@ -80,6 +78,10 @@ bool QmakeMakeStep::init()
         emitFaultyConfigurationMessage();
         return false;
     }
+
+    // Ignore all but the first make step for a non-top-level build. See QTCREATORBUG-15794.
+    m_ignoredNonTopLevelBuild = (bc->fileNodeBuild() || bc->subNodeBuild())
+            && static_cast<BuildStepList *>(parent())->firstOfType<QmakeMakeStep>() != this;
 
     ProcessParameters *pp = processParameters();
     pp->setMacroExpander(bc->macroExpander());
@@ -89,7 +91,7 @@ bool QmakeMakeStep::init()
         workingDirectory = bc->subNodeBuild()->buildDir();
     else
         workingDirectory = bc->buildDirectory().toString();
-    pp->setWorkingDirectory(workingDirectory);
+    pp->setWorkingDirectory(Utils::FilePath::fromString(workingDirectory));
 
     pp->setCommand(make);
 
@@ -141,7 +143,8 @@ bool QmakeMakeStep::init()
                     objectsDir += "/release";
             }
         }
-        QString relObjectsDir = QDir(pp->workingDirectory()).relativeFilePath(objectsDir);
+        QString relObjectsDir = QDir(pp->workingDirectory().toString())
+                .relativeFilePath(objectsDir);
         if (relObjectsDir == ".")
             relObjectsDir.clear();
         if (!relObjectsDir.isEmpty())
@@ -168,13 +171,23 @@ bool QmakeMakeStep::init()
                                          // it has a low priority.
 
     m_scriptTarget = (static_cast<QmakeProject *>(bc->target()->project())->rootProjectNode()->projectType() == ProjectType::ScriptTemplate);
+    m_unalignedBuildDir = !bc->isBuildDirAtSafeLocation();
+
+    // A user doing "make clean" indicates they want a proper rebuild, so make sure to really
+    // execute qmake on the next build.
+    if (static_cast<BuildStepList *>(parent())->id()
+            == ProjectExplorer::Constants::BUILDSTEPS_CLEAN) {
+        const auto qmakeStep = bc->qmakeStep();
+        if (qmakeStep)
+            qmakeStep->setForced(true);
+    }
 
     return AbstractProcessStep::init();
 }
 
 void QmakeMakeStep::doRun()
 {
-    if (m_scriptTarget) {
+    if (m_scriptTarget || m_ignoredNonTopLevelBuild) {
         emit finished(true);
         return;
     }
@@ -188,6 +201,18 @@ void QmakeMakeStep::doRun()
     }
 
     AbstractProcessStep::doRun();
+}
+
+void QmakeMakeStep::finish(bool success)
+{
+    if (!success && !isCanceled() && m_unalignedBuildDir
+            && QmakeSettings::warnAgainstUnalignedBuildDir()) {
+        const QString msg = tr("The build directory is not at the same level as the source "
+                               "directory, which could be the reason for the build failure.");
+        emit addTask(Task(Task::Warning, msg, Utils::FilePath(), -1,
+                          ProjectExplorer::Constants::TASK_CATEGORY_BUILDSYSTEM));
+    }
+    MakeStep::finish(success);
 }
 
 ///

@@ -43,9 +43,13 @@ public:
     bool initialize(const QStringList &arguments, QString *errorMessage) final;
     void extensionsInitialized() final;
 private:
-    QList<QObject *> createTestObjects() const final;
+    void projectChanged();
+
+    QVector<QObject *> createTestObjects() const final;
 
     CompilationDatabaseEditorFactory factory;
+    CompilationDatabaseBuildConfigurationFactory buildConfigFactory;
+    QAction *m_changeProjectRootDirectoryAction;
 };
 
 } // namespace Internal

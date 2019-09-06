@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <coreplugin/id.h>
 #include <utils/fileutils.h>
 #include <clang/Format/Format.h>
 
@@ -37,10 +38,16 @@ namespace ClangFormat {
 // Creates the style for the current project or the global style if needed.
 void createStyleFileIfNeeded(bool isGlobal);
 
+QString currentProjectUniqueId();
+
+std::string currentProjectConfigText();
+std::string currentGlobalConfigText();
+
 clang::format::FormatStyle currentProjectStyle();
 clang::format::FormatStyle currentGlobalStyle();
 
 // Is the style from the matching .clang-format file or global one if it's not found.
-clang::format::FormatStyle styleForFile(Utils::FileName fileName);
+QString configForFile(Utils::FilePath fileName);
+clang::format::FormatStyle styleForFile(Utils::FilePath fileName);
 
 }

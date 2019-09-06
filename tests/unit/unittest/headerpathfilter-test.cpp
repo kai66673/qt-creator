@@ -26,6 +26,7 @@
 #include "googletest.h"
 
 #include <cpptools/headerpathfilter.h>
+#include <projectexplorer/project.h>
 
 namespace {
 
@@ -37,7 +38,7 @@ MATCHER_P(HasBuiltIn,
           std::string(negation ? "isn't " : "is ")
               + PrintToString(HeaderPath{QString::fromUtf8(path), HeaderPathType::BuiltIn}))
 {
-    return arg.path == path && arg.type == HeaderPathType::BuiltIn;
+    return arg.path == QString::fromUtf8(path) && arg.type == HeaderPathType::BuiltIn;
 }
 
 MATCHER_P(HasSystem,
@@ -45,7 +46,7 @@ MATCHER_P(HasSystem,
           std::string(negation ? "isn't " : "is ")
               + PrintToString(HeaderPath{QString::fromUtf8(path), HeaderPathType::System}))
 {
-    return arg.path == path && arg.type == HeaderPathType::System;
+    return arg.path == QString::fromUtf8(path) && arg.type == HeaderPathType::System;
 }
 
 MATCHER_P(HasFramework,
@@ -53,7 +54,7 @@ MATCHER_P(HasFramework,
           std::string(negation ? "isn't " : "is ")
               + PrintToString(HeaderPath{QString::fromUtf8(path), HeaderPathType::Framework}))
 {
-    return arg.path == path && arg.type == HeaderPathType::Framework;
+    return arg.path == QString::fromUtf8(path) && arg.type == HeaderPathType::Framework;
 }
 
 MATCHER_P(HasUser,
@@ -61,7 +62,7 @@ MATCHER_P(HasUser,
           std::string(negation ? "isn't " : "is ")
               + PrintToString(HeaderPath{QString::fromUtf8(path), HeaderPathType::User}))
 {
-    return arg.path == path && arg.type == HeaderPathType::User;
+    return arg.path == QString::fromUtf8(path) && arg.type == HeaderPathType::User;
 }
 
 class HeaderPathFilter : public testing::Test
@@ -80,9 +81,11 @@ protected:
                             HeaderPath{"/project/user_path", HeaderPathType::User}};
 
         projectPart.headerPaths = headerPaths;
+        projectPart.project = &project;
     }
 
 protected:
+    ProjectExplorer::Project project;
     CppTools::ProjectPart projectPart;
     CppTools::HeaderPathFilter filter{
         projectPart, CppTools::UseTweakedHeaderPaths::No, {}, {}, "/project", "/build"};
@@ -100,7 +103,8 @@ TEST_F(HeaderPathFilter, System)
     filter.process();
 
     ASSERT_THAT(filter.systemHeaderPaths,
-                ElementsAre(HasSystem("/system_path"),
+                ElementsAre(HasSystem("/project/.pre_includes"),
+                            HasSystem("/system_path"),
                             HasFramework("/framework_path"),
                             HasUser("/outside_project_user_path"),
                             HasUser("/buildb/user_path"),
@@ -137,7 +141,8 @@ TEST_F(HeaderPathFilter, DontAddInvalidPath)
                 AllOf(Field(&CppTools::HeaderPathFilter::builtInHeaderPaths,
                             ElementsAre(HasBuiltIn("/builtin_path"))),
                       Field(&CppTools::HeaderPathFilter::systemHeaderPaths,
-                            ElementsAre(HasSystem("/system_path"),
+                            ElementsAre(HasSystem("/project/.pre_includes"),
+                                        HasSystem("/system_path"),
                                         HasFramework("/framework_path"),
                                         HasUser("/outside_project_user_path"),
                                         HasUser("/buildb/user_path"),

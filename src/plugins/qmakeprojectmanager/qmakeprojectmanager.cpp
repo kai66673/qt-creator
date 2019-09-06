@@ -53,16 +53,6 @@ using namespace TextEditor;
 
 namespace QmakeProjectManager {
 
-Node *QmakeManager::contextNode()
-{
-    return ProjectTree::findCurrentNode();
-}
-
-Project *QmakeManager::contextProject()
-{
-    return ProjectTree::currentProject();
-}
-
 static QmakeProFileNode *buildableFileProFile(Node *node)
 {
     if (node) {
@@ -77,7 +67,7 @@ static QmakeProFileNode *buildableFileProFile(Node *node)
 
 FileNode *QmakeManager::contextBuildableFileNode()
 {
-    Node *node = contextNode();
+    Node *node = ProjectTree::currentNode();
 
     QmakeProFileNode *subProjectNode = buildableFileProFile(node);
     FileNode *fileNode = node ? node->asFileNode() : nullptr;
@@ -97,7 +87,7 @@ void QmakeManager::addLibraryContextMenu()
 {
     QString projectPath;
 
-    Node *node = contextNode();
+    Node *node = ProjectTree::currentNode();
     if (ContainerNode *cn = node->asContainerNode())
         projectPath = cn->project()->projectFilePath().toString();
     else if (dynamic_cast<QmakeProFileNode *>(node))
@@ -142,7 +132,7 @@ void QmakeManager::runQMake()
 
 void QmakeManager::runQMakeContextMenu()
 {
-    runQMakeImpl(contextProject(), contextNode());
+    runQMakeImpl(ProjectTree::currentProject(), ProjectTree::currentNode());
 }
 
 void QmakeManager::runQMakeImpl(ProjectExplorer::Project *p, ProjectExplorer::Node *node)
@@ -194,7 +184,7 @@ void QmakeManager::buildFileContextMenu()
 void QmakeManager::buildFile()
 {
     if (Core::IDocument *currentDocument= Core::EditorManager::currentDocument()) {
-        const Utils::FileName file = currentDocument->filePath();
+        const Utils::FilePath file = currentDocument->filePath();
         Node *n = ProjectTree::nodeForFile(file);
         FileNode *node  = n ? n->asFileNode() : nullptr;
         Project *project = SessionManager::projectForFile(file);
@@ -206,8 +196,11 @@ void QmakeManager::buildFile()
 
 void QmakeManager::handleSubDirContextMenu(QmakeManager::Action action, bool isFileBuild)
 {
-    handleSubDirContextMenu(action, isFileBuild, contextProject(),
-                            buildableFileProFile(contextNode()), contextBuildableFileNode());
+    handleSubDirContextMenu(action,
+                            isFileBuild,
+                            ProjectTree::currentProject(),
+                            buildableFileProFile(ProjectTree::currentNode()),
+                            contextBuildableFileNode());
 }
 
 void QmakeManager::handleSubDirContextMenu(QmakeManager::Action action, bool isFileBuild,

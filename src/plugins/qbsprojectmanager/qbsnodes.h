@@ -35,58 +35,20 @@ namespace Internal {
 class QbsNodeTreeBuilder;
 class QbsProject;
 
-// ----------------------------------------------------------------------
-// QbsFileNode:
-// ----------------------------------------------------------------------
-
-class QbsFileNode : public ProjectExplorer::FileNode
-{
-public:
-    QbsFileNode(const Utils::FileName &filePath, const ProjectExplorer::FileType fileType, bool generated,
-                int line);
-
-    QString displayName() const override;
-};
-
-class QbsFolderNode : public ProjectExplorer::FolderNode
-{
-public:
-    QbsFolderNode(const Utils::FileName &folderPath, ProjectExplorer::NodeType nodeType,
-                  const QString &displayName);
-
-private:
-    bool supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const final;
-};
-
-// ---------------------------------------------------------------------------
-// QbsBaseProjectNode:
-// ---------------------------------------------------------------------------
-
-class QbsGroupNode;
-
-class QbsBaseProjectNode : public ProjectExplorer::ProjectNode
-{
-public:
-    explicit QbsBaseProjectNode(const Utils::FileName &absoluteFilePath);
-
-    bool showInSimpleTree() const override;
-};
-
 // --------------------------------------------------------------------
 // QbsGroupNode:
 // --------------------------------------------------------------------
 
-class QbsGroupNode : public QbsBaseProjectNode
+class QbsGroupNode : public ProjectExplorer::ProjectNode
 {
 public:
     QbsGroupNode(const qbs::GroupData &grp, const QString &productPath);
 
+    bool showInSimpleTree() const final { return false; }
     bool supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const final;
     bool addFiles(const QStringList &filePaths, QStringList *notAdded = nullptr) override;
     bool removeFiles(const QStringList &filePaths, QStringList *notRemoved = nullptr) override;
     bool renameFile(const QString &filePath, const QString &newFilePath) override;
-
-    qbs::GroupData qbsGroupData() const { return m_qbsGroupData; }
 
 private:
     AddNewInformation addNewInformation(const QStringList &files, Node *context) const override;
@@ -99,12 +61,11 @@ private:
 // QbsProductNode:
 // --------------------------------------------------------------------
 
-class QbsProductNode : public QbsBaseProjectNode
+class QbsProductNode : public ProjectExplorer::ProjectNode
 {
 public:
     explicit QbsProductNode(const qbs::ProductData &prd);
 
-    bool showInSimpleTree() const override;
     bool supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const final;
     bool addFiles(const QStringList &filePaths, QStringList *notAdded = nullptr) override;
     bool removeFiles(const QStringList &filePaths, QStringList *notRemoved = nullptr) override;
@@ -114,6 +75,7 @@ public:
     QString buildKey() const override;
 
     const qbs::ProductData qbsProductData() const { return m_qbsProductData; }
+    QVariant data(Core::Id role) const override;
 
 private:
     const qbs::ProductData m_qbsProductData;
@@ -123,16 +85,15 @@ private:
 // QbsProjectNode:
 // ---------------------------------------------------------------------------
 
-class QbsProjectNode : public QbsBaseProjectNode
+class QbsProjectNode : public ProjectExplorer::ProjectNode
 {
 public:
-    explicit QbsProjectNode(const Utils::FileName &projectDirectory);
+    explicit QbsProjectNode(const Utils::FilePath &projectDirectory);
 
     virtual QbsProject *project() const;
     const qbs::Project qbsProject() const;
     const qbs::ProjectData qbsProjectData() const { return m_projectData; }
 
-    bool showInSimpleTree() const override;
     void setProjectData(const qbs::ProjectData &data); // FIXME: Needed?
 
 private:

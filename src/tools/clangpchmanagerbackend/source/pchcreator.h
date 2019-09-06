@@ -48,14 +48,7 @@ class Environment;
 class GeneratedFiles;
 class PchManagerClientInterface;
 class ClangPathWatcherInterface;
-
-class PchCreatorIncludes
-{
-public:
-    FilePathIds includeIds;
-    FilePathIds topIncludeIds;
-    FilePathIds topSystemIncludeIds;
-};
+class BuildDependenciesStorageInterface;
 
 class PchCreator final : public PchCreatorInterface
 {
@@ -63,12 +56,12 @@ public:
     PchCreator(Environment &environment,
                Sqlite::Database &database,
                PchManagerClientInterface &pchManagerClient,
-               ClangPathWatcherInterface &clangPathwatcher)
-        : m_filePathCache(database)
-        , m_environment(environment)
-        , m_pchManagerClient(pchManagerClient)
-        , m_clangPathwatcher(clangPathwatcher)
-    {}
+               ClangPathWatcherInterface &clangPathwatcher,
+               BuildDependenciesStorageInterface &buildDependenciesStorage)
+        : m_filePathCache(database), m_environment(environment),
+          m_pchManagerClient(pchManagerClient),
+          m_clangPathwatcher(clangPathwatcher),
+          m_buildDependenciesStorage(buildDependenciesStorage) {}
 
     void generatePch(PchTask &&pchTask) override;
     const ProjectPartPch &projectPartPch() override;
@@ -87,21 +80,29 @@ public:
     static Utils::SmallStringVector generateClangCompilerArguments(const PchTask &pchTask,
                                                                    FilePathView pchPath);
 
-    const ClangTool &clangTool() const
-    {
-        return m_clangTool;
-    }
+    const ClangTool &clangTool() const { return m_clangTool; }
+
+    FilePathIds existingSources(FilePathIds sources) const;
+
+    const FilePathIds &watchedSystemIncludes() const { return m_watchedSystemIncludes; }
+    const FilePathIds &watchedProjectIncludes() const { return m_watchedProjectIncludes; }
+    const FilePathIds &watchedUserIncludes() const { return m_watchedUserIncludes; }
+    const FilePathIds &watchedSources() const { return m_watchedSources; }
 
 private:
     mutable std::mt19937_64 randomNumberGenator{std::random_device{}()};
     ClangTool m_clangTool;
     ProjectPartPch m_projectPartPch;
     FilePathCaching m_filePathCache;
-    FilePathIds m_allInclues;
+    FilePathIds m_watchedSystemIncludes;
+    FilePathIds m_watchedProjectIncludes;
+    FilePathIds m_watchedUserIncludes;
+    FilePathIds m_watchedSources;
     FilePathIds m_generatedFilePathIds;
     Environment &m_environment;
     PchManagerClientInterface &m_pchManagerClient;
     ClangPathWatcherInterface &m_clangPathwatcher;
+    BuildDependenciesStorageInterface &m_buildDependenciesStorage;
     bool m_isUsed = false;
 };
 

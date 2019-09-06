@@ -171,7 +171,7 @@ BestNodeSelector::BestNodeSelector(const QString &commonDirectory, const QString
 void BestNodeSelector::inspect(AddNewTree *tree, bool isContextNode)
 {
     FolderNode *node = tree->node();
-    if (node->nodeType() == NodeType::Project) {
+    if (node->isProjectNodeType()) {
         if (static_cast<ProjectNode *>(node)->deploysFolder(m_commonDirectory)) {
             m_deploys = true;
             m_deployText += tree->displayName() + QLatin1Char('\n');
@@ -284,9 +284,9 @@ ProjectWizardPage::ProjectWizardPage(QWidget *parent) : WizardPage(parent),
 {
     m_ui->setupUi(this);
     m_ui->vcsManageButton->setText(ICore::msgShowOptionsDialog());
-    connect(m_ui->projectComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_ui->projectComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ProjectWizardPage::projectChanged);
-    connect(m_ui->addToVersionControlComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_ui->addToVersionControlComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ProjectWizardPage::versionControlChanged);
     connect(m_ui->vcsManageButton, &QAbstractButton::clicked, this, &ProjectWizardPage::manageVcs);
     setProperty(SHORT_TITLE_PROPERTY, tr("Summary"));
@@ -299,7 +299,7 @@ ProjectWizardPage::ProjectWizardPage(QWidget *parent) : WizardPage(parent),
 
 ProjectWizardPage::~ProjectWizardPage()
 {
-    disconnect(m_ui->projectComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    disconnect(m_ui->projectComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
                this, &ProjectWizardPage::projectChanged);
     delete m_ui;
 }
@@ -534,7 +534,7 @@ void ProjectWizardPage::setFiles(const QStringList &fileNames)
             const bool filePath2HasDir = filePath2.contains(QLatin1Char('/'));
 
             if (filePath1HasDir == filePath2HasDir)
-                return FileName::fromString(filePath1) < FileName::fromString(filePath2);
+                return FilePath::fromString(filePath1) < FilePath::fromString(filePath2);
             return filePath1HasDir;
         }
 );

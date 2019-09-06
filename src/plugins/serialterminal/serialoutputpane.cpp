@@ -169,7 +169,7 @@ SerialOutputPane::SerialOutputPane(Settings &settings) :
     updateLineEndingsComboBox();
     inputLayout->addWidget(m_lineEndingsSelection);
 
-    connect(m_lineEndingsSelection, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_lineEndingsSelection, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SerialOutputPane::defaultLineEndingChanged);
 
     layout->addLayout(inputLayout);
@@ -305,7 +305,7 @@ void SerialOutputPane::createNewOutputWindow(SerialControl *rc)
     static uint counter = 0;
     Core::Id contextId = Core::Id(Constants::C_SERIAL_OUTPUT).withSuffix(counter++);
     Core::Context context(contextId);
-    Core::OutputWindow *ow = new Core::OutputWindow(context, m_tabWidget);
+    Core::OutputWindow *ow = new Core::OutputWindow(context, QString(), m_tabWidget);
     using TextEditor::TextEditorSettings;
     auto fontSettingsChanged = [ow] {
         ow->setBaseFont(TextEditorSettings::fontSettings().font());
@@ -352,7 +352,6 @@ void SerialOutputPane::createToolButtons()
     m_connectButton = new QToolButton;
     m_connectButton->setIcon(Utils::Icons::RUN_SMALL_TOOLBAR.icon());
     m_connectButton->setToolTip(tr("Connect"));
-    m_connectButton->setAutoRaise(true);
     m_connectButton->setEnabled(false);
     connect(m_connectButton, &QToolButton::clicked,
             this, &SerialOutputPane::connectControl);
@@ -361,7 +360,6 @@ void SerialOutputPane::createToolButtons()
     m_disconnectButton = new QToolButton;
     m_disconnectButton->setIcon(Utils::Icons::STOP_SMALL_TOOLBAR.icon());
     m_disconnectButton->setToolTip(tr("Disconnect"));
-    m_disconnectButton->setAutoRaise(true);
     m_disconnectButton->setEnabled(false);
 
     connect(m_disconnectButton, &QToolButton::clicked,
@@ -371,7 +369,6 @@ void SerialOutputPane::createToolButtons()
     m_resetButton = new QToolButton;
     m_resetButton->setIcon(Utils::Icons::RELOAD.icon());
     m_resetButton->setToolTip(tr("Reset Board"));
-    m_resetButton->setAutoRaise(true);
     m_resetButton->setEnabled(false);
 
     connect(m_resetButton, &QToolButton::clicked,
@@ -381,7 +378,6 @@ void SerialOutputPane::createToolButtons()
     m_newButton = new QToolButton;
     m_newButton->setIcon(Utils::Icons::PLUS_TOOLBAR.icon());
     m_newButton->setToolTip(tr("Add New Terminal"));
-    m_newButton->setAutoRaise(true);
     m_newButton->setEnabled(true);
 
     connect(m_newButton, &QToolButton::clicked,
@@ -393,7 +389,7 @@ void SerialOutputPane::createToolButtons()
     m_portsSelection->setModel(m_devicesModel);
     updatePortsList();
     connect(m_portsSelection, &ComboBox::opened, this, &SerialOutputPane::updatePortsList);
-    connect(m_portsSelection, static_cast<void (ComboBox::*)(int)>(&ComboBox::currentIndexChanged),
+    connect(m_portsSelection, QOverload<int>::of(&ComboBox::currentIndexChanged),
             this, &SerialOutputPane::activePortNameChanged);
     // TODO: the ports are not updated with the box opened (if the user wait for it) -> add a timer?
 
@@ -402,7 +398,7 @@ void SerialOutputPane::createToolButtons()
     m_baudRateSelection = new ComboBox;
     m_baudRateSelection->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_baudRateSelection->addItems(m_devicesModel->baudRates());
-    connect(m_baudRateSelection, static_cast<void (ComboBox::*)(int)>(&ComboBox::currentIndexChanged),
+    connect(m_baudRateSelection, QOverload<int>::of(&ComboBox::currentIndexChanged),
             this, &SerialOutputPane::activeBaudRateChanged);
 
     if (m_settings.baudRate > 0)

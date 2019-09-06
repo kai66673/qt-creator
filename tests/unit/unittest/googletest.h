@@ -40,6 +40,7 @@
 #include "conditionally-disabled-tests.h"
 #include "gtest-qt-printing.h"
 #include "gtest-creator-printing.h"
+#include "gtest-llvm-printing.h"
 #ifdef CLANG_UNIT_TESTS
 #  include "gtest-clang-printing.h"
 #endif

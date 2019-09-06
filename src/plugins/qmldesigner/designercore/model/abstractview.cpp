@@ -44,7 +44,6 @@
 
 namespace QmlDesigner {
 
-
 /*!
 \class QmlDesigner::AbstractView
 \ingroup CoreModel
@@ -615,6 +614,20 @@ void AbstractView::deactivateTimelineRecording()
 
     if (model())
         model()->d->notifyCurrentTimelineChanged(ModelNode());
+}
+
+bool AbstractView::executeInTransaction(const QByteArray &identifier, const AbstractView::OperationBlock &lambda)
+{
+    try {
+        RewriterTransaction transaction = beginRewriterTransaction(identifier);
+        lambda();
+        transaction.commit();
+    } catch (const Exception &e) {
+        e.showException();
+        return false;
+    }
+
+    return true;
 }
 
 QList<ModelNode> AbstractView::allModelNodes() const

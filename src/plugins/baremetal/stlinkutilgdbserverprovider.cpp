@@ -23,25 +23,26 @@
 **
 ****************************************************************************/
 
-#include "stlinkutilgdbserverprovider.h"
 #include "baremetalconstants.h"
-#include "gdbserverprovidermanager.h"
 
+#include "gdbserverprovidermanager.h"
+#include "stlinkutilgdbserverprovider.h"
+
+#include <utils/fileutils.h>
 #include <utils/pathchooser.h>
 #include <utils/qtcassert.h>
-#include <utils/fileutils.h>
 
 #include <coreplugin/variablechooser.h>
 
-#include <QString>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QFileInfo>
-
 #include <QFormLayout>
 #include <QLineEdit>
-#include <QComboBox>
-#include <QSpinBox>
-#include <QCheckBox>
 #include <QPlainTextEdit>
+#include <QSpinBox>
+
+using namespace Utils;
 
 namespace BareMetal {
 namespace Internal {
@@ -54,15 +55,10 @@ const char extendedModeKeyC[] = "BareMetal.StLinkUtilGdbServerProvider.ExtendedM
 const char resetBoardKeyC[] = "BareMetal.StLinkUtilGdbServerProvider.ResetBoard";
 const char transportLayerKeyC[] = "BareMetal.StLinkUtilGdbServerProvider.TransportLayer";
 
+// StLinkUtilGdbServerProvider
+
 StLinkUtilGdbServerProvider::StLinkUtilGdbServerProvider()
     : GdbServerProvider(QLatin1String(Constants::STLINK_UTIL_PROVIDER_ID))
-    , m_host(QLatin1String("localhost"))
-    , m_port(4242)
-    , m_executableFile(QLatin1String("st-util"))
-    , m_verboseLevel(0)
-    , m_extendedMode(false)
-    , m_resetBoard(true)
-    , m_transport(RawUsb)
 {
     setInitCommands(defaultInitCommands());
     setResetCommands(defaultResetCommands());
@@ -88,7 +84,7 @@ QString StLinkUtilGdbServerProvider::defaultInitCommands()
 
 QString StLinkUtilGdbServerProvider::defaultResetCommands()
 {
-    return QLatin1String("");
+    return {};
 }
 
 QString StLinkUtilGdbServerProvider::typeDisplayName() const
@@ -106,32 +102,27 @@ QString StLinkUtilGdbServerProvider::channel() const
         return m_host + QLatin1Char(':') + QString::number(m_port);
     case StartupOnPipe:
         // Unsupported mode
-        return QString();
+        return {};
     default: // wrong
-        return QString();
+        return {};
     }
 }
 
-QString StLinkUtilGdbServerProvider::executable() const
+CommandLine StLinkUtilGdbServerProvider::command() const
 {
-    return m_executableFile;
-}
-
-QStringList StLinkUtilGdbServerProvider::arguments() const
-{
-    QStringList args;
+    CommandLine cmd{m_executableFile, {}};
 
     if (m_extendedMode)
-        args << QLatin1String("--multi");
+        cmd.addArg("--multi");
 
     if (!m_resetBoard)
-        args << QLatin1String("--no-reset");
+        cmd.addArg("--no-reset");
 
-    args << (QLatin1String("--stlink_version=") + QString::number(m_transport));
-    args << (QLatin1String("--listen_port=") + QString::number(m_port));
-    args << (QLatin1String("--verbose=") + QString::number(m_verboseLevel));
+    cmd.addArg("--stlink_version=" + QString::number(m_transport));
+    cmd.addArg("--listen_port=" + QString::number(m_port));
+    cmd.addArg("--verbose=" + QString::number(m_verboseLevel));
 
-    return args;
+    return cmd;
 }
 
 bool StLinkUtilGdbServerProvider::canStartupMode(StartupMode m) const
@@ -169,7 +160,7 @@ QVariantMap StLinkUtilGdbServerProvider::toMap() const
     QVariantMap data = GdbServerProvider::toMap();
     data.insert(QLatin1String(hostKeyC), m_host);
     data.insert(QLatin1String(portKeyC), m_port);
-    data.insert(QLatin1String(executableFileKeyC), m_executableFile);
+    data.insert(QLatin1String(executableFileKeyC), m_executableFile.toVariant());
     data.insert(QLatin1String(verboseLevelKeyC), m_verboseLevel);
     data.insert(QLatin1String(extendedModeKeyC), m_extendedMode);
     data.insert(QLatin1String(resetBoardKeyC), m_resetBoard);
@@ -184,7 +175,7 @@ bool StLinkUtilGdbServerProvider::fromMap(const QVariantMap &data)
 
     m_host = data.value(QLatin1String(hostKeyC)).toString();
     m_port = data.value(QLatin1String(portKeyC)).toInt();
-    m_executableFile = data.value(QLatin1String(executableFileKeyC)).toString();
+    m_executableFile = FileName::fromVariant(data.value(QLatin1String(executableFileKeyC)));
     m_verboseLevel = data.value(QLatin1String(verboseLevelKeyC)).toInt();
     m_extendedMode = data.value(QLatin1String(extendedModeKeyC)).toBool();
     m_resetBoard = data.value(QLatin1String(resetBoardKeyC)).toBool();
@@ -213,6 +204,8 @@ GdbServerProviderConfigWidget *StLinkUtilGdbServerProvider::configurationWidget(
     return new StLinkUtilGdbServerProviderConfigWidget(this);
 }
 
+// StLinkUtilGdbServerProviderFactory
+
 StLinkUtilGdbServerProviderFactory::StLinkUtilGdbServerProviderFactory()
 {
     setId(QLatin1String(Constants::STLINK_UTIL_PROVIDER_ID));
@@ -233,13 +226,15 @@ bool StLinkUtilGdbServerProviderFactory::canRestore(const QVariantMap &data) con
 
 GdbServerProvider *StLinkUtilGdbServerProviderFactory::restore(const QVariantMap &data)
 {
-    auto p = new StLinkUtilGdbServerProvider;
-    auto updated = data;
+    const auto p = new StLinkUtilGdbServerProvider;
+    const auto updated = data;
     if (p->fromMap(updated))
         return p;
     delete p;
     return nullptr;
 }
+
+// StLinkUtilGdbServerProviderConfigWidget
 
 StLinkUtilGdbServerProviderConfigWidget::StLinkUtilGdbServerProviderConfigWidget(
         StLinkUtilGdbServerProvider *p)
@@ -283,7 +278,7 @@ StLinkUtilGdbServerProviderConfigWidget::StLinkUtilGdbServerProviderConfigWidget
     addErrorLabel();
     setFromProvider();
 
-    auto chooser = new Core::VariableChooser(this);
+    const auto chooser = new Core::VariableChooser(this);
     chooser->addSupportedWidget(m_initCommandsTextEdit);
     chooser->addSupportedWidget(m_resetCommandsTextEdit);
 
@@ -293,14 +288,14 @@ StLinkUtilGdbServerProviderConfigWidget::StLinkUtilGdbServerProviderConfigWidget
             this, &GdbServerProviderConfigWidget::dirty);
 
     connect(m_verboseLevelSpinBox,
-            static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+            QOverload<int>::of(&QSpinBox::valueChanged),
             this, &GdbServerProviderConfigWidget::dirty);
     connect(m_extendedModeCheckBox, &QAbstractButton::clicked,
             this, &GdbServerProviderConfigWidget::dirty);
     connect(m_resetBoardCheckBox, &QAbstractButton::clicked,
             this, &GdbServerProviderConfigWidget::dirty);
     connect(m_transportLayerComboBox,
-            static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &GdbServerProviderConfigWidget::dirty);
 
     connect(m_initCommandsTextEdit, &QPlainTextEdit::textChanged,
@@ -309,10 +304,9 @@ StLinkUtilGdbServerProviderConfigWidget::StLinkUtilGdbServerProviderConfigWidget
             this, &GdbServerProviderConfigWidget::dirty);
 
     connect(m_startupModeComboBox,
-            static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &StLinkUtilGdbServerProviderConfigWidget::startupModeChanged);
 }
-
 
 void StLinkUtilGdbServerProviderConfigWidget::startupModeChanged()
 {
@@ -332,12 +326,12 @@ void StLinkUtilGdbServerProviderConfigWidget::startupModeChanged()
 
 void StLinkUtilGdbServerProviderConfigWidget::applyImpl()
 {
-    auto p = static_cast<StLinkUtilGdbServerProvider *>(provider());
+    const auto p = static_cast<StLinkUtilGdbServerProvider *>(provider());
     Q_ASSERT(p);
 
     p->m_host = m_hostWidget->host();
     p->m_port = m_hostWidget->port();
-    p->m_executableFile = m_executableFileChooser->fileName().toString();
+    p->m_executableFile = m_executableFileChooser->fileName();
     p->m_verboseLevel = m_verboseLevelSpinBox->value();
     p->m_extendedMode = m_extendedModeCheckBox->isChecked();
     p->m_resetBoard = m_resetBoardCheckBox->isChecked();
@@ -391,11 +385,11 @@ void StLinkUtilGdbServerProviderConfigWidget::setFromProvider()
     const auto p = static_cast<StLinkUtilGdbServerProvider *>(provider());
     Q_ASSERT(p);
 
-    QSignalBlocker blocker(this);
+    const QSignalBlocker blocker(this);
     startupModeChanged();
     m_hostWidget->setHost(p->m_host);
     m_hostWidget->setPort(p->m_port);
-    m_executableFileChooser->setFileName(Utils::FileName::fromString(p->m_executableFile));
+    m_executableFileChooser->setFileName(p->m_executableFile);
     m_verboseLevelSpinBox->setValue(p->m_verboseLevel);
     m_extendedModeCheckBox->setChecked(p->m_extendedMode);
     m_resetBoardCheckBox->setChecked(p->m_resetBoard);

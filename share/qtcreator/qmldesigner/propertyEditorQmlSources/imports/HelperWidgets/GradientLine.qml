@@ -40,6 +40,8 @@ Item {
     property alias gradientPropertyName: gradientModel.gradientPropertyName
     property alias gradientTypeName: gradientModel.gradientTypeName
 
+    signal selectedNodeChanged
+
     onHasGradientChanged: {
         colorLine.invalidate()
     }
@@ -57,6 +59,26 @@ Item {
 
     function deleteGradient() {
         gradientModel.deleteGradient()
+    }
+
+    function setPresetByID(presetID) {
+        gradientModel.setPresetByID(presetID)
+        colorLine.invalidate()
+        colorLine.select(0)
+    }
+
+    function setPresetByStops(stopsPositions, stopsColors, stopsCount) {
+        gradientModel.setPresetByStops(stopsPositions, stopsColors, stopsCount)
+        colorLine.invalidate()
+        colorLine.select(0)
+    }
+
+    function savePreset() {
+        gradientModel.savePreset()
+    }
+
+    function updateGradient() {
+        gradientModel.updateGradient()
     }
 
     Connections {
@@ -89,6 +111,7 @@ Item {
             gradientModel.lock()
             currentColor = repeater.itemAt(index).item.color
             gradientModel.unlock()
+            selectedNodeChanged()
         }
 
         function invalidate() {
@@ -118,6 +141,7 @@ Item {
                 height: 40
                 anchors.left: parent.left
                 anchors.right: parent.right
+                cursorShape: Qt.PointingHandCursor
 
                 onClicked: {
                     var currentPosition = mouseX / colorLine.effectiveWidth
@@ -305,6 +329,7 @@ Item {
                 drag.maximumX: colorLine.effectiveWidth
                 drag.minimumY: !readOnly ? 0 : 20
                 drag.maximumY: 20
+                cursorShape: Qt.PointingHandCursor
 
                 // using pressed property instead of drag.active which was not working
                 onExited: {

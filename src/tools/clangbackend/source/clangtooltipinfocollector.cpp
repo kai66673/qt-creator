@@ -36,6 +36,7 @@
 #include <clangsupport/sourcerangecontainer.h>
 #include <utils/qtcassert.h>
 #include <utils/textfileformat.h>
+#include <utils/qtcassert.h>
 
 #include <utf8string.h>
 
@@ -86,7 +87,6 @@ Utf8String displayName(const Cursor &cursor)
 
 Utf8String textForFunctionLike(const Cursor &cursor)
 {
-#ifdef IS_PRETTY_DECL_SUPPORTED
     CXPrintingPolicy policy = clang_getCursorPrintingPolicy(cursor.cx());
     clang_PrintingPolicy_setProperty(policy, CXPrintingPolicy_FullyQualifiedName, 1);
     clang_PrintingPolicy_setProperty(policy, CXPrintingPolicy_TerseOutput, 1);
@@ -97,17 +97,6 @@ Utf8String textForFunctionLike(const Cursor &cursor)
         clang_getCursorPrettyPrinted(cursor.cx(), policy));
     clang_PrintingPolicy_dispose(policy);
     return prettyPrinted;
-#else
-    // Printing function declarations with displayName() is quite limited:
-    //   * result type is not included
-    //   * parameter names are not included
-    //   * templates in the result type are not included
-    //   * no full qualification of the function name
-    return Utf8String(cursor.resultType().spelling())
-         + Utf8StringLiteral(" ")
-         + qualificationPrefix(cursor)
-         + Utf8String(cursor.displayName());
-#endif
 }
 
 Utf8String textForEnumConstantDecl(const Cursor &cursor)
@@ -392,7 +381,7 @@ static bool isBuiltinOrPointerToBuiltin(const Type &type)
 
     // TODO: Simplify
     // TODO: Test with **
-    while (theType.pointeeType().isValid()) {
+    while (theType.pointeeType().isValid() && theType != theType.pointeeType()) {
         theType = theType.pointeeType();
         if (theType.isBuiltinType())
             return true;
@@ -436,7 +425,7 @@ ToolTipInfo ToolTipInfoCollector::qDocInfo(const Cursor &cursor) const
         }
 
         Type type = cursor.type();
-        while (type.pointeeType().isValid())
+        while (type.pointeeType().isValid() && type != type.pointeeType())
             type = type.pointeeType();
 
         const Cursor typeCursor = type.declaration();

@@ -32,54 +32,39 @@
 
 #include <utils/qtcassert.h>
 
+using namespace Utils;
+
 namespace ProjectExplorer {
 
-enum BaseEnvironmentBase {
-    CleanEnvironmentBase = 0,
-    SystemEnvironmentBase,
-    BuildEnvironmentBase
-};
-
-Utils::Environment LocalEnvironmentAspect::baseEnvironment() const
+LocalEnvironmentAspect::LocalEnvironmentAspect(Target *target)
 {
-    int base = baseEnvironmentBase();
-    Utils::Environment env;
-    if (base == static_cast<int>(BuildEnvironmentBase)) {
-        if (BuildConfiguration *bc = m_target->activeBuildConfiguration()) {
+    setIsLocal(true);
+    addSupportedBaseEnvironment(tr("Clean Environment"), {});
+
+    addSupportedBaseEnvironment(tr("System Environment"), [] {
+        return Environment::systemEnvironment();
+    });
+
+    addPreferredBaseEnvironment(tr("Build Environment"), [target] {
+        Environment env;
+        if (BuildConfiguration *bc = target->activeBuildConfiguration()) {
             env = bc->environment();
         } else { // Fallback for targets without buildconfigurations:
-            env = Utils::Environment::systemEnvironment();
-            m_target->kit()->addToEnvironment(env);
+            env = Environment::systemEnvironment();
+            target->kit()->addToEnvironment(env);
         }
-    } else if (base == static_cast<int>(SystemEnvironmentBase)) {
-        env = Utils::Environment::systemEnvironment();
-    }
+        return  env;
+    });
 
-    if (m_baseEnvironmentModifier)
-        m_baseEnvironmentModifier(env);
-
-    return env;
+    target->subscribeSignal(&BuildConfiguration::environmentChanged,
+                            this, &LocalEnvironmentAspect::buildEnvironmentHasChanged);
+    connect(target, &Target::activeBuildConfigurationChanged,
+            this, &LocalEnvironmentAspect::buildEnvironmentHasChanged);
 }
 
 void LocalEnvironmentAspect::buildEnvironmentHasChanged()
 {
-    if (baseEnvironmentBase() == static_cast<int>(BuildEnvironmentBase))
-        emit environmentChanged();
-}
-
-LocalEnvironmentAspect::LocalEnvironmentAspect(Target *target,
-                                               const BaseEnvironmentModifier &modifier) :
-    m_baseEnvironmentModifier(modifier),
-    m_target(target)
-{
-    addPreferredBaseEnvironment(BuildEnvironmentBase, tr("Build Environment"));
-    addSupportedBaseEnvironment(SystemEnvironmentBase, tr("System Environment"));
-    addSupportedBaseEnvironment(CleanEnvironmentBase, tr("Clean Environment"));
-
-    m_target->subscribeSignal(&BuildConfiguration::environmentChanged,
-                              this, &LocalEnvironmentAspect::buildEnvironmentHasChanged);
-    connect(m_target, &Target::activeBuildConfigurationChanged,
-            this, &LocalEnvironmentAspect::buildEnvironmentHasChanged);
+    emit environmentChanged();
 }
 
 } // namespace ProjectExplorer

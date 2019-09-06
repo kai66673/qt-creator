@@ -23,14 +23,15 @@
 **
 ****************************************************************************/
 
-#include "defaultgdbserverprovider.h"
 #include "baremetalconstants.h"
+#include "defaultgdbserverprovider.h"
 #include "gdbserverprovidermanager.h"
 
 #include <utils/qtcassert.h>
 
 #include <coreplugin/variablechooser.h>
 
+#include <QCheckBox>
 #include <QFormLayout>
 #include <QPlainTextEdit>
 
@@ -40,10 +41,10 @@ namespace Internal {
 static const char hostKeyC[] = "BareMetal.DefaultGdbServerProvider.Host";
 static const char portKeyC[] = "BareMetal.DefaultGdbServerProvider.Port";
 
+// DefaultGdbServerProvider
+
 DefaultGdbServerProvider::DefaultGdbServerProvider()
     : GdbServerProvider(QLatin1String(Constants::DEFAULT_PROVIDER_ID))
-    , m_host(QLatin1String("localhost"))
-    , m_port(3333)
 {
 }
 
@@ -132,6 +133,8 @@ GdbServerProviderConfigWidget *DefaultGdbServerProvider::configurationWidget()
     return new DefaultGdbServerProviderConfigWidget(this);
 }
 
+// DefaultGdbServerProviderFactory
+
 DefaultGdbServerProviderFactory::DefaultGdbServerProviderFactory()
 {
     setId(QLatin1String(Constants::DEFAULT_PROVIDER_ID));
@@ -152,13 +155,15 @@ bool DefaultGdbServerProviderFactory::canRestore(const QVariantMap &data) const
 
 GdbServerProvider *DefaultGdbServerProviderFactory::restore(const QVariantMap &data)
 {
-    auto p = new DefaultGdbServerProvider;
-    auto updated = data;
+    const auto p = new DefaultGdbServerProvider;
+    const auto updated = data;
     if (p->fromMap(updated))
         return p;
     delete p;
     return nullptr;
 }
+
+// GdbServerProviderConfigWidget
 
 DefaultGdbServerProviderConfigWidget::DefaultGdbServerProviderConfigWidget(
         DefaultGdbServerProvider *provider)
@@ -169,6 +174,9 @@ DefaultGdbServerProviderConfigWidget::DefaultGdbServerProviderConfigWidget(
     m_hostWidget = new HostWidget(this);
     m_mainLayout->addRow(tr("Host:"), m_hostWidget);
 
+    m_useExtendedRemoteCheckBox = new QCheckBox(this);
+    m_useExtendedRemoteCheckBox->setToolTip("Use GDB target extended-remote");
+    m_mainLayout->addRow(tr("Extended mode:"), m_useExtendedRemoteCheckBox);
     m_initCommandsTextEdit = new QPlainTextEdit(this);
     m_initCommandsTextEdit->setToolTip(defaultInitCommandsTooltip());
     m_mainLayout->addRow(tr("Init commands:"), m_initCommandsTextEdit);
@@ -179,11 +187,13 @@ DefaultGdbServerProviderConfigWidget::DefaultGdbServerProviderConfigWidget(
     addErrorLabel();
     setFromProvider();
 
-    auto chooser = new Core::VariableChooser(this);
+    const auto chooser = new Core::VariableChooser(this);
     chooser->addSupportedWidget(m_initCommandsTextEdit);
     chooser->addSupportedWidget(m_resetCommandsTextEdit);
 
     connect(m_hostWidget, &HostWidget::dataChanged,
+            this, &GdbServerProviderConfigWidget::dirty);
+    connect(m_useExtendedRemoteCheckBox, &QCheckBox::stateChanged,
             this, &GdbServerProviderConfigWidget::dirty);
     connect(m_initCommandsTextEdit, &QPlainTextEdit::textChanged,
             this, &GdbServerProviderConfigWidget::dirty);
@@ -198,6 +208,7 @@ void DefaultGdbServerProviderConfigWidget::applyImpl()
 
     p->setHost(m_hostWidget->host());
     p->setPort(m_hostWidget->port());
+    p->setUseExtendedRemote(m_useExtendedRemoteCheckBox->isChecked());
     p->setInitCommands(m_initCommandsTextEdit->toPlainText());
     p->setResetCommands(m_resetCommandsTextEdit->toPlainText());
 }
@@ -212,9 +223,10 @@ void DefaultGdbServerProviderConfigWidget::setFromProvider()
     const auto p = static_cast<DefaultGdbServerProvider *>(provider());
     Q_ASSERT(p);
 
-    QSignalBlocker blocker(this);
+    const QSignalBlocker blocker(this);
     m_hostWidget->setHost(p->m_host);
     m_hostWidget->setPort(p->m_port);
+    m_useExtendedRemoteCheckBox->setChecked(p->useExtendedRemote());
     m_initCommandsTextEdit->setPlainText(p->initCommands());
     m_resetCommandsTextEdit->setPlainText(p->resetCommands());
 }

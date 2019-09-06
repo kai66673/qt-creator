@@ -28,6 +28,8 @@
 #include "abstractprocessstep.h"
 #include "projectexplorer_global.h"
 
+#include <utils/fileutils.h>
+
 QT_FORWARD_DECLARE_CLASS(QListWidgetItem);
 
 namespace Utils { class Environment; }
@@ -56,20 +58,20 @@ public:
     QString allArguments() const;
     QString userArguments() const;
     void setUserArguments(const QString &args);
-    QString makeCommand() const;
-    void setMakeCommand(const QString &command);
-    QString effectiveMakeCommand() const;
+    Utils::FilePath makeCommand() const;
+    void setMakeCommand(const Utils::FilePath &command);
+    Utils::FilePath effectiveMakeCommand() const;
 
     void setClean(bool clean);
     bool isClean() const;
 
     static QString defaultDisplayName();
 
-    QString defaultMakeCommand() const;
+    Utils::FilePath defaultMakeCommand() const;
     static QString msgNoMakeCommand();
     static Task makeCommandMissingTask();
 
-    bool isJobCountSupported() const;
+    virtual bool isJobCountSupported() const;
     int jobCount() const;
     void setJobCount(int count);
     bool jobCountOverridesMakeflags() const;
@@ -80,16 +82,18 @@ public:
 
     Utils::Environment environment(BuildConfiguration *bc) const;
 
+protected:
+    bool fromMap(const QVariantMap &map) override;
+
 private:
     QVariantMap toMap() const override;
-    bool fromMap(const QVariantMap &map) override;
     static int defaultJobCount();
     QStringList jobArguments() const;
 
     QStringList m_buildTargets;
     QStringList m_availableTargets;
     QString m_makeArguments;
-    QString m_makeCommand;
+    Utils::FilePath m_makeCommand;
     int m_userJobCount = 4;
     bool m_overrideMakeflags = false;
     bool m_clean = false;

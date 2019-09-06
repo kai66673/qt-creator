@@ -23,11 +23,11 @@
 **
 ****************************************************************************/
 
-#include "gdbserverprovidermanager.h"
 #include "gdbserverprovider.h"
+#include "gdbserverprovidermanager.h"
 
-#include "openocdgdbserverprovider.h"
 #include "defaultgdbserverprovider.h"
+#include "openocdgdbserverprovider.h"
 #include "stlinkutilgdbserverprovider.h"
 
 #include <coreplugin/icore.h>
@@ -35,8 +35,8 @@
 #include <extensionsystem/pluginmanager.h>
 
 #include <utils/algorithm.h>
-#include <utils/qtcassert.h>
 #include <utils/persistentsettings.h>
+#include <utils/qtcassert.h>
 
 #include <QDir>
 
@@ -50,8 +50,10 @@ const char fileNameKeyC[] = "/gdbserverproviders.xml";
 
 static GdbServerProviderManager *m_instance = nullptr;
 
+// GdbServerProviderManager
+
 GdbServerProviderManager::GdbServerProviderManager()
-    : m_configFile(Utils::FileName::fromString(Core::ICore::userResourcePath() + fileNameKeyC))
+    : m_configFile(Utils::FilePath::fromString(Core::ICore::userResourcePath() + fileNameKeyC))
     , m_factories({new DefaultGdbServerProviderFactory,
                    new OpenOcdGdbServerProviderFactory,
                    new StLinkUtilGdbServerProviderFactory})
@@ -103,7 +105,7 @@ void GdbServerProviderManager::restoreProviders()
 
         const QVariantMap map = data.value(key).toMap();
         bool restored = false;
-        foreach (GdbServerProviderFactory *f, m_factories) {
+        for (GdbServerProviderFactory *f : qAsConst(m_factories)) {
             if (f->canRestore(map)) {
                 if (GdbServerProvider *p = f->restore(map)) {
                     registerProvider(p);
@@ -127,7 +129,7 @@ void GdbServerProviderManager::saveProviders()
     data.insert(QLatin1String(fileVersionKeyC), 1);
 
     int count = 0;
-    foreach (const GdbServerProvider *p, m_providers) {
+    for (const GdbServerProvider *p : qAsConst(m_providers)) {
         if (p->isValid()) {
             const QVariantMap tmp = p->toMap();
             if (tmp.isEmpty())

@@ -25,6 +25,7 @@
 
 #include "iosprobe.h"
 
+#include <utils/algorithm.h>
 #include <utils/synchronousprocess.h>
 
 #include <QDir>
@@ -87,15 +88,15 @@ void XcodeProbe::setupDefaultToolchains(const QString &devPath)
     };
 
     XcodePlatform clangProfile;
-    clangProfile.developerPath = Utils::FileName::fromString(devPath);
+    clangProfile.developerPath = Utils::FilePath::fromString(devPath);
 
     const QFileInfo clangCInfo = getClangInfo("clang");
     if (clangCInfo.exists())
-        clangProfile.cCompilerPath = Utils::FileName(clangCInfo);
+        clangProfile.cCompilerPath = Utils::FilePath::fromFileInfo(clangCInfo);
 
     const QFileInfo clangCppInfo = getClangInfo("clang++");
     if (clangCppInfo.exists())
-        clangProfile.cxxCompilerPath = Utils::FileName(clangCppInfo);
+        clangProfile.cxxCompilerPath = Utils::FilePath::fromFileInfo(clangCppInfo);
 
     QSet<QString> allArchitectures;
     static const std::map<QString, QStringList> sdkConfigs {
@@ -111,14 +112,14 @@ void XcodeProbe::setupDefaultToolchains(const QString &devPath)
     for (const auto &sdkConfig : sdkConfigs) {
         XcodePlatform::SDK sdk;
         sdk.directoryName = sdkConfig.first;
-        sdk.path = Utils::FileName::fromString(devPath
+        sdk.path = Utils::FilePath::fromString(devPath
                 + QString(QLatin1String("/Platforms/%1.platform/Developer/SDKs/%1.sdk")).arg(
                     sdk.directoryName));
         sdk.architectures = sdkConfig.second;
         const QFileInfo sdkPathInfo(sdk.path.toString());
         if (sdkPathInfo.exists() && sdkPathInfo.isDir()) {
             clangProfile.sdks.push_back(sdk);
-            allArchitectures += sdk.architectures.toSet();
+            allArchitectures += Utils::toSet(sdk.architectures);
         }
     }
 

@@ -226,11 +226,12 @@ void GenericLinuxDeviceTester::testRsync()
         if (d->rsyncProcess.error() == QProcess::FailedToStart)
             handleRsyncFinished();
     });
-    connect(&d->rsyncProcess, static_cast<void (QProcess::*)(int)>(&QProcess::finished),
-            [this] {
+    connect(&d->rsyncProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this] {
         handleRsyncFinished();
     });
-    const RsyncCommandLine cmdLine = RsyncDeployStep::rsyncCommand(*d->connection);
+    const RsyncCommandLine cmdLine = RsyncDeployStep::rsyncCommand(*d->connection,
+                                                                   RsyncDeployStep::defaultFlags());
     const QStringList args = QStringList(cmdLine.options)
             << "-n" << "--exclude=*" << (cmdLine.remoteHostSpec + ":/tmp");
     d->rsyncProcess.start("rsync", args);

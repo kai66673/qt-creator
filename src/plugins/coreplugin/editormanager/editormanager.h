@@ -128,7 +128,9 @@ public:
     static bool closeDocument(IDocument *document, bool askAboutModifiedEditors = true);
     static bool closeDocuments(const QList<IDocument *> &documents, bool askAboutModifiedEditors = true);
     static void closeDocument(DocumentModel::Entry *entry);
+    static bool closeDocuments(const QList<DocumentModel::Entry *> &entries);
     static void closeOtherDocuments(IDocument *document);
+    static bool closeAllDocuments();
 
     static void addCurrentPositionToNavigationHistory(const QByteArray &saveState = QByteArray());
     static void cutForwardNavigationHistory();
@@ -161,6 +163,7 @@ public:
 
     static void addSaveAndCloseEditorActions(QMenu *contextMenu, DocumentModel::Entry *entry,
                                              IEditor *editor = nullptr);
+    static void addPinEditorActions(QMenu *contextMenu, DocumentModel::Entry *entry);
     static void addNativeDirAndOpenWithActions(QMenu *contextMenu, DocumentModel::Entry *entry);
     static void populateOpenWithMenu(QMenu *menu, const QString &fileName);
 
@@ -174,10 +177,12 @@ signals:
     void documentStateChanged(Core::IDocument *document);
     void editorCreated(Core::IEditor *editor, const QString &fileName);
     void editorOpened(Core::IEditor *editor);
+    void documentOpened(Core::IDocument *document);
     void editorAboutToClose(Core::IEditor *editor);
     void editorsClosed(QList<Core::IEditor *> editors);
+    void documentClosed(Core::IDocument *document);
     void findOnFileSystemRequest(const QString &path);
-    void openFileProperties(const Utils::FileName &path);
+    void openFileProperties(const Utils::FilePath &path);
     void aboutToSave(IDocument *document);
     void saved(IDocument *document);
     void autoSaved();

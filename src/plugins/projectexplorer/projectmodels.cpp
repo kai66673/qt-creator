@@ -148,7 +148,9 @@ QVariant FlatModel::data(const QModelIndex &index, int role) const
                 static QIcon warnIcon = Utils::Icons::WARNING.icon();
                 static QIcon emptyIcon = Utils::Icons::EMPTY16.icon();
                 if (project) {
-                    if (project->isParsing())
+                    if (project->needsConfiguration())
+                        result = warnIcon;
+                    else if (project->isParsing())
                         result = emptyIcon;
                     else if (!project->activeTarget()
                              || !project->projectIssues(project->activeTarget()->kit()).isEmpty())
@@ -180,7 +182,7 @@ QVariant FlatModel::data(const QModelIndex &index, int role) const
             break;
         }
         case Project::isParsingRole: {
-            result = project ? project->isParsing() : false;
+            result = project ? project->isParsing() && !project->needsConfiguration() : false;
             break;
         }
         }
@@ -219,8 +221,8 @@ bool FlatModel::setData(const QModelIndex &index, const QVariant &value, int rol
     Node *node = nodeForIndex(index);
     QTC_ASSERT(node, return false);
 
-    Utils::FileName orgFilePath = node->filePath();
-    Utils::FileName newFilePath = orgFilePath.parentDir().appendPath(value.toString());
+    const Utils::FilePath orgFilePath = node->filePath();
+    const Utils::FilePath newFilePath = orgFilePath.parentDir().pathAppended(value.toString());
 
     ProjectExplorerPlugin::renameFile(node, newFilePath.toString());
     emit renamed(orgFilePath, newFilePath);
@@ -261,7 +263,7 @@ void FlatModel::addOrRebuildProjectModel(Project *project)
 
     if (container->childCount() == 0) {
         auto projectFileNode = std::make_unique<FileNode>(project->projectFilePath(),
-                                                          FileType::Project, false);
+                                                          FileType::Project);
         seen.insert(projectFileNode.get());
         container->appendChild(new WrapperNode(projectFileNode.get()));
         project->containerNode()->addNestedNode(std::move(projectFileNode));
@@ -378,6 +380,8 @@ void FlatModel::saveExpandData()
 void FlatModel::addFolderNode(WrapperNode *parent, FolderNode *folderNode, QSet<Node *> *seen)
 {
     for (Node *node : folderNode->nodes()) {
+        if (m_filterGeneratedFiles && node->isGenerated())
+            continue;
         if (FolderNode *subFolderNode = node->asFolderNode()) {
             const bool isHidden = m_filterProjects && !subFolderNode->showInSimpleTree();
             if (!isHidden && !seen->contains(subFolderNode)) {
@@ -390,8 +394,7 @@ void FlatModel::addFolderNode(WrapperNode *parent, FolderNode *folderNode, QSet<
                 addFolderNode(parent, subFolderNode, seen);
             }
         } else if (FileNode *fileNode = node->asFileNode()) {
-            const bool isHidden = m_filterGeneratedFiles && fileNode->isGenerated();
-            if (!isHidden && !seen->contains(fileNode)) {
+            if (!seen->contains(fileNode)) {
                 seen->insert(fileNode);
                 parent->appendChild(new WrapperNode(fileNode));
             }
@@ -452,11 +455,11 @@ class DropFileDialog : public QDialog
 {
     Q_DECLARE_TR_FUNCTIONS(ProjectExplorer::Internal::FlatModel)
 public:
-    DropFileDialog(const FileName &defaultTargetDir)
+    DropFileDialog(const FilePath &defaultTargetDir)
         : m_buttonBox(new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel)),
           m_buttonGroup(new QButtonGroup(this))
     {
-        setWindowTitle(tr("Please choose a drop action"));
+        setWindowTitle(tr("Choose Drop Action"));
         const bool offerFileIo = !defaultTargetDir.isEmpty();
         auto * const layout = new QVBoxLayout(this);
         layout->addWidget(new QLabel(tr("You just dragged some files from one project node to "
@@ -468,8 +471,8 @@ public:
         m_buttonGroup->addButton(moveButton, int(DropAction::Move));
         layout->addWidget(moveButton);
         if (offerFileIo) {
-            copyButton->setText(tr("Copy only the file references"));
-            moveButton->setText(tr("Move only the file references"));
+            copyButton->setText(tr("Copy Only File References"));
+            moveButton->setText(tr("Move Only File References"));
             auto * const copyWithFilesButton
                     = new QRadioButton(tr("Copy file references and files"), this);
             m_buttonGroup->addButton(copyWithFilesButton, int(DropAction::CopyWithFiles));
@@ -489,9 +492,7 @@ public:
                 m_buttonBox->button(QDialogButtonBox::Ok)->setEnabled(valid);
             });
             targetDirLayout->addWidget(m_targetDirChooser);
-            connect(m_buttonGroup,
-                    static_cast<void (QButtonGroup::*)(int)>(&QButtonGroup::buttonClicked),
-                    this, [this] {
+            connect(m_buttonGroup, QOverload<int>::of(&QButtonGroup::buttonClicked), this, [this] {
                 switch (dropAction()) {
                 case DropAction::CopyWithFiles:
                 case DropAction::MoveWithFiles:
@@ -507,8 +508,8 @@ public:
                 }
             });
         } else {
-            copyButton->setText(tr("Copy the file references"));
-            moveButton->setText(tr("Move the file references"));
+            copyButton->setText(tr("Copy File References"));
+            moveButton->setText(tr("Move File References"));
             moveButton->setChecked(true);
         }
         connect(m_buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -517,9 +518,9 @@ public:
     }
 
     DropAction dropAction() const { return static_cast<DropAction>(m_buttonGroup->checkedId()); }
-    FileName targetDir() const
+    FilePath targetDir() const
     {
-        return m_targetDirChooser ? m_targetDirChooser->fileName() : FileName();
+        return m_targetDirChooser ? m_targetDirChooser->fileName() : FilePath();
     }
 
 private:
@@ -577,15 +578,15 @@ bool FlatModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int r
 
     // Node weirdness: Sometimes the "file path" is a directory, sometimes it's a file...
     const auto dirForProjectNode = [](const ProjectNode *pNode) {
-        const FileName dir = pNode->filePath();
+        const FilePath dir = pNode->filePath();
         if (dir.toFileInfo().isDir())
             return dir;
-        return FileName::fromString(dir.toFileInfo().path());
+        return FilePath::fromString(dir.toFileInfo().path());
     };
-    FileName targetDir = dirForProjectNode(targetProjectNode);
+    FilePath targetDir = dirForProjectNode(targetProjectNode);
 
     // Ask the user what to do now: Copy or add? With or without file transfer?
-    DropFileDialog dlg(targetDir == dirForProjectNode(sourceProjectNode) ? FileName() : targetDir);
+    DropFileDialog dlg(targetDir == dirForProjectNode(sourceProjectNode) ? FilePath() : targetDir);
     if (dlg.exec() != QDialog::Accepted)
         return true;
     if (!dlg.targetDir().isEmpty())
@@ -597,9 +598,7 @@ bool FlatModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int r
 
     // Some helper functions for the file operations.
     const auto targetFilePath = [&targetDir](const QString &sourceFilePath) {
-        FileName targetFile = targetDir;
-        targetFile.appendPath(QFileInfo(sourceFilePath).fileName());
-        return targetFile.toString();
+        return targetDir.pathAppended(QFileInfo(sourceFilePath).fileName()).toString();
     };
 
     struct VcsInfo {
@@ -781,6 +780,11 @@ bool FlatModel::projectFilterEnabled()
 bool FlatModel::generatedFilesFilterEnabled()
 {
     return m_filterGeneratedFiles;
+}
+
+bool FlatModel::trimEmptyDirectoriesEnabled()
+{
+    return m_trimEmptyDirectories;
 }
 
 Node *FlatModel::nodeForIndex(const QModelIndex &index) const

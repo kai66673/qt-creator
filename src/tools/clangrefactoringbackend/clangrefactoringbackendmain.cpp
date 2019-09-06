@@ -30,10 +30,12 @@
 #include <QDir>
 
 #include <connectionserver.h>
+#include <environment.h>
+#include <executeinloop.h>
 #include <filepathcaching.h>
 #include <generatedfiles.h>
-#include <refactoringserver.h>
 #include <refactoringclientproxy.h>
+#include <refactoringserver.h>
 #include <symbolindexing.h>
 
 #include <sqliteexception.h>
@@ -51,48 +53,6 @@ using ClangBackEnd::RefactoringDatabaseInitializer;
 using ClangBackEnd::ConnectionServer;
 using ClangBackEnd::SymbolIndexing;
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
-template<typename CallableType>
-class CallableEvent : public QEvent
-{
-public:
-    using Callable = std::decay_t<CallableType>;
-    CallableEvent(Callable &&callable)
-        : QEvent(QEvent::None)
-        , callable(std::move(callable))
-    {}
-    CallableEvent(const Callable &callable)
-        : QEvent(QEvent::None)
-        , callable(callable)
-    {}
-
-    ~CallableEvent() { callable(); }
-
-public:
-    Callable callable;
-};
-
-template<typename Callable>
-void executeInLoop(Callable &&callable, QObject *object = QCoreApplication::instance())
-{
-    if (QThread *thread = qobject_cast<QThread *>(object))
-        object = QAbstractEventDispatcher::instance(thread);
-
-    QCoreApplication::postEvent(object,
-                                new CallableEvent<Callable>(std::forward<Callable>(callable)),
-                                Qt::HighEventPriority);
-}
-#else
-template<typename Callable>
-void executeInLoop(Callable &&callable, QObject *object = QCoreApplication::instance())
-{
-    if (QThread *thread = qobject_cast<QThread *>(object))
-        object = QAbstractEventDispatcher::instance(thread);
-
-    QMetaObject::invokeMethod(object, std::forward<Callable>(callable));
-}
-#endif
-
 QStringList processArguments(QCoreApplication &application)
 {
     QCommandLineParser parser;
@@ -100,6 +60,8 @@ QStringList processArguments(QCoreApplication &application)
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument(QStringLiteral("connection"), QStringLiteral("Connection"));
+    parser.addPositionalArgument(QStringLiteral("databasepath"), QStringLiteral("Database path"));
+    parser.addPositionalArgument(QStringLiteral("resourcepath"), QStringLiteral("Resource path"));
 
     parser.process(application);
 
@@ -126,12 +88,32 @@ public:
     }
 };
 
-struct Data // because we have a cycle dependency
+class ApplicationEnvironment final : public ClangBackEnd::Environment
 {
-    Data(const QString &databasePath)
-        : database{Utils::PathString{databasePath}, 100000ms}
+public:
+    ApplicationEnvironment(const QString &preIncludeSearchPath)
+        : m_preIncludeSearchPath(ClangBackEnd::FilePath{preIncludeSearchPath})
     {}
 
+    Utils::PathString pchBuildDirectory() const override { return {}; }
+    uint hardwareConcurrency() const override { return std::thread::hardware_concurrency(); }
+    ClangBackEnd::NativeFilePathView preIncludeSearchPath() const override
+    {
+        return m_preIncludeSearchPath;
+    }
+
+private:
+    ClangBackEnd::NativeFilePath m_preIncludeSearchPath;
+};
+
+struct Data // because we have a cycle dependency
+{
+    Data(const QString &databasePath, const QString &preIncludeSearchPath)
+        : environment{preIncludeSearchPath}
+        , database{Utils::PathString{databasePath}, 100000ms}
+    {}
+
+    ApplicationEnvironment environment;
     Sqlite::Database database;
     RefactoringDatabaseInitializer<Sqlite::Database> databaseInitializer{database};
     FilePathCaching filePathCache{database};
@@ -144,7 +126,8 @@ struct Data // because we have a cycle dependency
                                       executeInLoop([&] {
                                           clangCodeModelServer.setProgress(progress, total);
                                       });
-                                  }};
+                                  },
+                                  environment};
 };
 
 #ifdef Q_OS_WIN
@@ -172,8 +155,9 @@ int main(int argc, char *argv[])
         const QStringList arguments = processArguments(application);
         const QString connectionName = arguments[0];
         const QString databasePath = arguments[1];
+        const QString preIncludeSearchPath = arguments[2] + "/indexer_preincludes";
 
-        Data data{databasePath};
+        Data data{databasePath, preIncludeSearchPath};
 
         ConnectionServer<RefactoringServer, RefactoringClientProxy> connectionServer;
         connectionServer.setServer(&data.clangCodeModelServer);

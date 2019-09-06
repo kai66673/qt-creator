@@ -33,12 +33,13 @@
 #include <utils/fileutils.h>
 
 QT_BEGIN_NAMESPACE
-class QFormLayout;
-class QLineEdit;
-class QLabel;
+class QCheckBox;
 class QComboBox;
-class QSpinBox;
+class QFormLayout;
+class QLabel;
+class QLineEdit;
 class QPlainTextEdit;
+class QSpinBox;
 QT_END_NAMESPACE
 
 namespace BareMetal {
@@ -47,6 +48,8 @@ namespace Internal {
 class BareMetalDevice;
 class GdbServerProviderConfigWidget;
 class GdbServerProviderManager;
+
+// GdbServerProvider
 
 class GdbServerProvider
 {
@@ -68,6 +71,7 @@ public:
     StartupMode startupMode() const;
     QString initCommands() const;
     QString resetCommands() const;
+    bool useExtendedRemote() const;
 
     virtual bool operator==(const GdbServerProvider &) const;
 
@@ -80,8 +84,7 @@ public:
 
     virtual QVariantMap toMap() const;
 
-    virtual QString executable() const;
-    virtual QStringList arguments() const;
+    virtual Utils::CommandLine command() const;
 
     virtual bool isValid() const;
     virtual bool canStartupMode(StartupMode) const;
@@ -96,6 +99,7 @@ protected:
     void setStartupMode(StartupMode);
     void setInitCommands(const QString &);
     void setResetCommands(const QString &);
+    void setUseExtendedRemote(bool);
 
     void providerUpdated();
 
@@ -104,13 +108,16 @@ protected:
 private:
     QString m_id;
     mutable QString m_displayName;
-    StartupMode m_startupMode;
+    StartupMode m_startupMode = NoStartup;
     QString m_initCommands;
     QString m_resetCommands;
     QSet<BareMetalDevice *> m_devices;
+    bool m_useExtendedRemote = false;
 
     friend class GdbServerProviderConfigWidget;
 };
+
+// GdbServerProviderFactory
 
 class GdbServerProviderFactory : public QObject
 {
@@ -136,6 +143,8 @@ private:
     QString m_displayName;
     QString m_id;
 };
+
+// GdbServerProviderConfigWidget
 
 class GdbServerProviderConfigWidget : public QWidget
 {
@@ -166,18 +175,20 @@ protected:
     static QString defaultInitCommandsTooltip();
     static QString defaultResetCommandsTooltip();
 
-    QFormLayout *m_mainLayout;
-    QLineEdit *m_nameLineEdit;
-    QComboBox *m_startupModeComboBox;
+    QFormLayout *m_mainLayout = nullptr;
+    QLineEdit *m_nameLineEdit = nullptr;
+    QComboBox *m_startupModeComboBox = nullptr;
 
 private:
     void setFromProvider();
 
-    GdbServerProvider *m_provider;
+    GdbServerProvider *m_provider = nullptr;
     QLabel *m_errorLabel = nullptr;
 };
 
-class HostWidget : public QWidget
+// HostWidget
+
+class HostWidget final : public QWidget
 {
     Q_OBJECT
 
@@ -193,8 +204,8 @@ signals:
     void dataChanged();
 
 private:
-    QLineEdit *m_hostLineEdit;
-    QSpinBox *m_portSpinBox;
+    QLineEdit *m_hostLineEdit = nullptr;
+    QSpinBox *m_portSpinBox = nullptr;
 };
 
 } // namespace Internal

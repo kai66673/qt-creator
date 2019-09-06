@@ -40,13 +40,14 @@ public:
     explicit GenericDirectUploadStep(ProjectExplorer::BuildStepList *bsl);
     ~GenericDirectUploadStep() override;
 
-    bool initInternal(QString *error = nullptr) override;
+    CheckResult initInternal() override;
 
     static Core::Id stepId();
     static QString displayName();
 
 private:
     GenericDirectUploadService *deployService() const override;
+    void doRun() override;
 
     Internal::GenericDirectUploadStepPrivate *d;
 };

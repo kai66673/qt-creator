@@ -194,8 +194,12 @@ bool QmlDesignerPlugin::delayedInitialize()
     d->settings.fromSettings(Core::ICore::settings());
 
     d->viewManager.registerViewTakingOwnership(new QmlDesigner::Internal::ConnectionView);
-    if (DesignerSettings::getValue(DesignerSettingsKey::ENABLE_TIMELINEVIEW).toBool())
-        d->viewManager.registerViewTakingOwnership(new QmlDesigner::TimelineView);
+    if (DesignerSettings::getValue(DesignerSettingsKey::ENABLE_TIMELINEVIEW).toBool()) {
+        auto timelineView = new QmlDesigner::TimelineView;
+        d->viewManager.registerViewTakingOwnership(timelineView);
+        timelineView->registerActions();
+    }
+
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::SourceTool);
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::ColorTool);
     d->viewManager.registerFormEditorToolTakingOwnership(new QmlDesigner::TextTool);
@@ -213,13 +217,13 @@ void QmlDesignerPlugin::extensionsInitialized()
     });
 }
 
-static QStringList allUiQmlFilesforCurrentProject(const Utils::FileName &fileName)
+static QStringList allUiQmlFilesforCurrentProject(const Utils::FilePath &fileName)
 {
     QStringList list;
     ProjectExplorer::Project *currentProject = ProjectExplorer::SessionManager::projectForFile(fileName);
 
     if (currentProject) {
-        foreach (const Utils::FileName &fileName, currentProject->files(ProjectExplorer::Project::SourceFiles)) {
+        foreach (const Utils::FilePath &fileName, currentProject->files(ProjectExplorer::Project::SourceFiles)) {
             if (fileName.endsWith(".ui.qml"))
                 list.append(fileName.toString());
         }
@@ -228,7 +232,7 @@ static QStringList allUiQmlFilesforCurrentProject(const Utils::FileName &fileNam
     return list;
 }
 
-static QString projectPath(const Utils::FileName &fileName)
+static QString projectPath(const Utils::FilePath &fileName)
 {
     QString path;
     ProjectExplorer::Project *currentProject = ProjectExplorer::SessionManager::projectForFile(fileName);
@@ -300,7 +304,7 @@ void QmlDesignerPlugin::showDesigner()
 
     d->mainWidget.initialize();
 
-    const Utils::FileName fileName = Core::EditorManager::currentEditor()->document()->filePath();
+    const Utils::FilePath fileName = Core::EditorManager::currentEditor()->document()->filePath();
     const QStringList allUiQmlFiles = allUiQmlFilesforCurrentProject(fileName);
     if (warningsForQmlFilesInsteadOfUiQmlEnabled() && !fileName.endsWith(".ui.qml") && !allUiQmlFiles.isEmpty()) {
         OpenUiQmlFileDialog dialog(&d->mainWidget);

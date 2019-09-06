@@ -102,7 +102,7 @@ public:
     QList<RunConfiguration *> m_runConfigurations;
     RunConfiguration* m_activeRunConfiguration = nullptr;
     DeploymentData m_deploymentData;
-    BuildTargetInfoList m_appTargets;
+    QList<BuildTargetInfo> m_appTargets;
     QVariantMap m_pluginSettings;
 
     Kit *const m_kit;
@@ -345,30 +345,23 @@ DeploymentData Target::deploymentData() const
     return d->m_deploymentData;
 }
 
-void Target::setApplicationTargets(const BuildTargetInfoList &appTargets)
+void Target::setApplicationTargets(const QList<BuildTargetInfo> &appTargets)
 {
-    if (appTargets.list.toSet() != d->m_appTargets.list.toSet()) {
+    if (Utils::toSet(appTargets) != Utils::toSet(d->m_appTargets)) {
         d->m_appTargets = appTargets;
         emit applicationTargetsChanged();
     }
 }
 
-BuildTargetInfoList Target::applicationTargets() const
+const QList<BuildTargetInfo> Target::applicationTargets() const
 {
     return d->m_appTargets;
 }
 
 BuildTargetInfo Target::buildTarget(const QString &buildKey) const
 {
-    return Utils::findOrDefault(d->m_appTargets.list, [&buildKey](const BuildTargetInfo &ti) {
+    return Utils::findOrDefault(d->m_appTargets, [&buildKey](const BuildTargetInfo &ti) {
         return ti.buildKey == buildKey;
-    });
-}
-
-bool Target::hasBuildTarget(const QString &buildKey) const
-{
-    return Utils::anyOf(d->m_appTargets.list, [buildKey](const BuildTargetInfo &bti) {
-        return bti.buildKey == buildKey;
     });
 }
 
@@ -692,6 +685,11 @@ void Target::setNamedSettings(const QString &name, const QVariant &value)
 QVariant Target::additionalData(Core::Id id) const
 {
     return project()->additionalData(id, this);
+}
+
+MakeInstallCommand Target::makeInstallCommand(const QString &installRoot) const
+{
+    return project()->makeInstallCommand(this, installRoot);
 }
 
 void Target::updateDeviceState()

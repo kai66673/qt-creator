@@ -64,14 +64,6 @@ IosSimulator::IosSimulator()
     setDeviceState(DeviceReadyToUse);
 }
 
-IosSimulator::IosSimulator(const IosSimulator &other)
-    : IDevice(other), m_lastPort(other.m_lastPort)
-{
-    setDisplayName(QCoreApplication::translate("Ios::Internal::IosSimulator", "iOS Simulator"));
-    setDeviceState(DeviceReadyToUse);
-}
-
-
 IDevice::DeviceInfo IosSimulator::deviceInformation() const
 {
     return IDevice::DeviceInfo();
@@ -90,22 +82,6 @@ IDeviceWidget *IosSimulator::createWidget()
 DeviceProcessSignalOperation::Ptr IosSimulator::signalOperation() const
 {
     return DeviceProcessSignalOperation::Ptr();
-}
-
-IDevice::Ptr IosSimulator::clone() const
-{
-    return IDevice::Ptr(new IosSimulator(*this));
-}
-
-void IosSimulator::fromMap(const QVariantMap &map)
-{
-    IDevice::fromMap(map);
-}
-
-QVariantMap IosSimulator::toMap() const
-{
-    QVariantMap res = IDevice::toMap();
-    return res;
 }
 
 Utils::Port IosSimulator::nextPort() const
@@ -140,14 +116,7 @@ Utils::OsType IosSimulator::osType() const
     return Utils::OsTypeMac;
 }
 
-IosSimulator::ConstPtr IosKitInformation::simulator(Kit *kit)
-{
-    if (!kit)
-        return IosSimulator::ConstPtr();
-    IDevice::ConstPtr dev = DeviceKitAspect::device(kit);
-    IosSimulator::ConstPtr res = dev.dynamicCast<const IosSimulator>();
-    return res;
-}
+// IosDeviceType
 
 IosDeviceType::IosDeviceType(IosDeviceType::Type type, const QString &identifier, const QString &displayName) :
     type(type), identifier(identifier), displayName(displayName)

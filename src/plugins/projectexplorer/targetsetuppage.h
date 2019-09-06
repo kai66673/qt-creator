@@ -40,7 +40,7 @@
 QT_FORWARD_DECLARE_CLASS(QSpacerItem)
 
 namespace Core { class Id; }
-namespace Utils { class FileName; }
+namespace Utils { class FilePath; }
 
 namespace ProjectExplorer {
 class Kit;
@@ -70,6 +70,7 @@ public:
     void setPreferredKitPredicate(const ProjectExplorer::Kit::Predicate &predicate);
     void setProjectPath(const QString &dir);
     void setProjectImporter(ProjectImporter *importer);
+    bool importLineEditHasFocus() const;
 
     /// Sets whether the targetsetupage uses a scrollarea
     /// to host the widgets from the factories
@@ -105,7 +106,7 @@ private:
     Internal::TargetSetupWidget *addWidget(Kit *k);
 
     void setupImports();
-    void import(const Utils::FileName &path, bool silent = false);
+    void import(const Utils::FilePath &path, bool silent = false);
 
     void setupWidgets(const QString &filterText = QString());
     void reset();

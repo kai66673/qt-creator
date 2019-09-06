@@ -153,7 +153,7 @@ QString PuppetCreator::getStyleConfigFileName() const
 {
 #ifndef QMLDESIGNER_TEST
     if (m_currentProject) {
-        for (const Utils::FileName &fileName : m_currentProject->files(ProjectExplorer::Project::SourceFiles)) {
+        for (const Utils::FilePath &fileName : m_currentProject->files(ProjectExplorer::Project::SourceFiles)) {
             if (fileName.fileName() == "qtquickcontrols2.conf")
                 return  fileName.toString();
         }
@@ -422,7 +422,7 @@ QProcessEnvironment PuppetCreator::processEnvironment() const
     const QtSupport::BaseQtVersion *qt = QtSupport::QtKitAspect::qtVersion(m_kit);
     if (QTC_GUARD(qt)) { // Kits without a Qt version should not have a puppet!
         // Update PATH to include QT_HOST_BINS
-        const Utils::FileName qtBinPath = qt->binPath();
+        const Utils::FilePath qtBinPath = qt->binPath();
         environment.prependOrSetPath(qtBinPath.toString());
     }
     environment.set("QML_BAD_GUI_RENDER_LOOP", "true");
@@ -472,10 +472,15 @@ QProcessEnvironment PuppetCreator::processEnvironment() const
     if (!styleConfigFileName.isEmpty())
         environment.appendOrSet("QT_QUICK_CONTROLS_CONF", styleConfigFileName);
 
+    QStringList customFileSelectors;
+
     if (m_currentProject && m_currentProject->activeTarget()) {
         QStringList designerImports = m_currentProject->activeTarget()
                 ->additionalData("QmlDesignerImportPath").toStringList();
         importPaths.append(designerImports);
+
+        customFileSelectors = m_currentProject->activeTarget()
+                ->additionalData("CustomFileSelectorsData").toStringList();
     }
 
     if (m_availablePuppetType == FallbackPuppet)
@@ -483,10 +488,14 @@ QProcessEnvironment PuppetCreator::processEnvironment() const
 
     environment.appendOrSet("QML2_IMPORT_PATH", importPaths.join(pathSep), pathSep);
 
+    if (!customFileSelectors.isEmpty())
+        environment.appendOrSet("QML_FILE_SELECTORS", customFileSelectors.join(","), pathSep);
+
     qCInfo(puppetStart) << Q_FUNC_INFO;
     qCInfo(puppetStart) << "Puppet qrc mapping" << m_qrcMapping;
     qCInfo(puppetStart) << "Puppet import paths:" << importPaths;
     qCInfo(puppetStart) << "Puppet environment:" << environment.toStringList();
+    qCInfo(puppetStart) << "Puppet selectors:" << customFileSelectors;
 
     return environment.toProcessEnvironment();
 }
@@ -501,7 +510,7 @@ QString PuppetCreator::buildCommand() const
                                                                   ProjectExplorer::Constants::CXX_LANGUAGE_ID);
 
     if (toolChain)
-        return toolChain->makeCommand(environment);
+        return toolChain->makeCommand(environment).toString();
 
     return QString();
 }

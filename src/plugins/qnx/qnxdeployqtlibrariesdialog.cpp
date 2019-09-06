@@ -256,6 +256,11 @@ QList<DeployableFile> QnxDeployQtLibrariesDialog::gatherFiles(
     if (dirPath.isEmpty())
         return result;
 
+    static const QStringList unusedDirs = {"include", "mkspecs", "cmake", "pkgconfig"};
+    const QString dp = dirPath.endsWith('/') ? dirPath.left(dirPath.size() - 1) : dirPath;
+    if (unusedDirs.contains(dp))
+        return result;
+
     QDir dir(dirPath);
     QFileInfoList list = dir.entryInfoList(nameFilters,
             QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
@@ -265,6 +270,10 @@ QList<DeployableFile> QnxDeployQtLibrariesDialog::gatherFiles(
             result.append(gatherFiles(fileInfo.absoluteFilePath(), baseDirPath.isEmpty() ?
                                           dirPath : baseDirPath));
         } else {
+            static const QStringList unusedSuffixes = {"cmake", "la", "prl", "a", "pc"};
+            if (unusedSuffixes.contains(fileInfo.suffix()))
+                continue;
+
             QString remoteDir;
             if (baseDirPath.isEmpty()) {
                 remoteDir = fullRemoteDirectory() + QLatin1Char('/') +
@@ -292,12 +301,9 @@ void QnxDeployQtLibrariesDialog::checkRemoteDirectoryExistance()
     QTC_CHECK(m_state == Inactive);
 
     m_state = CheckingRemoteDirectory;
-
     m_ui->deployLogWindow->appendPlainText(tr("Checking existence of \"%1\"")
                                            .arg(fullRemoteDirectory()));
-
-    const QByteArray cmd = "test -d " + fullRemoteDirectory().toLatin1();
-    m_processRunner->run(cmd, m_device->sshParameters());
+    m_processRunner->run("test -d " + fullRemoteDirectory(), m_device->sshParameters());
 }
 
 void QnxDeployQtLibrariesDialog::removeRemoteDirectory()
@@ -305,11 +311,8 @@ void QnxDeployQtLibrariesDialog::removeRemoteDirectory()
     QTC_CHECK(m_state == CheckingRemoteDirectory);
 
     m_state = RemovingRemoteDirectory;
-
     m_ui->deployLogWindow->appendPlainText(tr("Removing \"%1\"").arg(fullRemoteDirectory()));
-
-    const QByteArray cmd = "rm -rf " + fullRemoteDirectory().toLatin1();
-    m_processRunner->run(cmd, m_device->sshParameters());
+    m_processRunner->run("rm -rf " + fullRemoteDirectory(), m_device->sshParameters());
 }
 
 } // namespace Internal

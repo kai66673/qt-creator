@@ -191,9 +191,18 @@ def qdump__CPlusPlus__Internal__Value(d, value):
     d.putValue(value["l"])
     d.putPlainChildren(value)
 
-def qdump__Utils__FileName(d, value):
-    d.putStringValue(value)
+def qdump__Utils__FilePath(d, value):
+    try:
+        if not d.extractPointer(value["m_url"]):  # there is no valid URL
+            d.putStringValue(value["m_data"])
+        else:
+            d.putItem(value["m_url"])
+    except:
+        d.putStringValue(value)  # support FileName before 4.10 as well
     d.putPlainChildren(value)
+
+def qdump__Utils__FileName(d, value):
+    qdump__Utils__FilePath(d, value)
 
 def qdump__Utils__ElfSection(d, value):
     d.putByteArrayValue(value["name"])
@@ -250,21 +259,23 @@ def qdump__Core__GeneratedFile(d, value):
     d.putStringValue(value["m_d"]["d"]["path"])
     d.putPlainChildren(value)
 
-def qdump__ProjectExplorer__Node(d, value):
-    d.putStringValue(value["m_filePath"])
-    d.putPlainChildren(value)
+#def qdump__ProjectExplorer__Node(d, value):
+#    d.putStringValue(value["m_filePath"])
+#    d.putPlainChildren(value)
+#
+#def qdump__ProjectExplorer__FolderNode(d, value):
+#    d.putStringValue(value["m_displayName"])
+#    d.putPlainChildren(value)
 
-def qdump__ProjectExplorer__FolderNode(d, value):
-    d.putStringValue(value["m_displayName"])
-    d.putPlainChildren(value)
+# Broke when moving to unique_ptr
+#def qdump__ProjectExplorer__ToolChain(d, value):
+#    d.putStringValue(value["d"]["m_displayName"])
+#    d.putPlainChildren(value)
 
-def qdump__ProjectExplorer__ToolChain(d, value):
-    d.putStringValue(value["d"]["m_displayName"])
-    d.putPlainChildren(value)
-
-def qdump__ProjectExplorer__Kit(d, value):
-    d.putStringValue(value["d"]["m_unexpandedDisplayName"])
-    d.putPlainChildren(value)
+# Broke when moving to unique_ptr
+#def qdump__ProjectExplorer__Kit(d, value):
+#    d.putStringValue(value["d"]["m_unexpandedDisplayName"])
+#    d.putPlainChildren(value)
 
 def qdump__ProjectExplorer__ProjectNode(d, value):
     qdump__ProjectExplorer__FolderNode(d, value)

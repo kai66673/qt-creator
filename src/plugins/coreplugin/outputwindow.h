@@ -30,9 +30,9 @@
 
 #include <utils/outputformat.h>
 
+#include <QElapsedTimer>
 #include <QPlainTextEdit>
 #include <QTimer>
-#include <QTime>
 
 namespace Utils { class OutputFormatter; }
 
@@ -45,7 +45,14 @@ class CORE_EXPORT OutputWindow : public QPlainTextEdit
     Q_OBJECT
 
 public:
-    OutputWindow(Context context, QWidget *parent = nullptr);
+    enum class FilterModeFlag {
+        Default       = 0x00, // Plain text, non case sensitive, for initialization
+        RegExp        = 0x01,
+        CaseSensitive = 0x02,
+    };
+    Q_DECLARE_FLAGS(FilterModeFlags, FilterModeFlag)
+
+    OutputWindow(Context context, const QString &settingsKey, QWidget *parent = nullptr);
     ~OutputWindow() override;
 
     Utils::OutputFormatter *formatter() const;
@@ -68,7 +75,10 @@ public:
     void setBaseFont(const QFont &newFont);
     float fontZoom() const;
     void setFontZoom(float zoom);
+    void resetZoom() { setFontZoom(0); }
     void setWheelZoomEnabled(bool enabled);
+
+    void updateFilterProperties(const QString &filterText, Qt::CaseSensitivity caseSensitivity, bool regexp);
 
 signals:
     void wheelZoom();
@@ -89,9 +99,10 @@ protected:
 private:
     using QPlainTextEdit::setFont; // call setBaseFont instead, which respects the zoom factor
     QTimer m_scrollTimer;
-    QTime m_lastMessage;
+    QElapsedTimer m_lastMessage;
     void enableUndoRedo();
     QString doNewlineEnforcement(const QString &out);
+    void filterNewContent();
 
     Internal::OutputWindowPrivate *d;
 };

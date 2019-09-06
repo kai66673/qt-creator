@@ -85,7 +85,7 @@ static TypeName resolveTypeName(const ASTPropertyReference *ref, const ContextPt
 {
     TypeName type = "unknown";
 
-    if (ref->ast()->defaultToken.isValid()) {
+    if (ref->ast()->propertyToken.isValid()) {
         type = ref->ast()->memberType->name.toUtf8();
 
         if (type == "alias") {
@@ -336,14 +336,14 @@ private:
 static inline bool isValueType(const TypeName &type)
 {
     static const PropertyTypeList objectValuesList({"QFont", "QPoint", "QPointF",
-        "QSize", "QSizeF", "QVector3D", "QVector2D"});
+        "QSize", "QSizeF", "QVector3D", "QVector2D", "font"});
     return objectValuesList.contains(type);
 }
 
 static inline bool isValueType(const QString &type)
 {
     static const QStringList objectValuesList({"QFont", "QPoint", "QPointF",
-        "QSize", "QSizeF", "QVector3D", "QVector2D"});
+        "QSize", "QSizeF", "QVector3D", "QVector2D", "font"});
     return objectValuesList.contains(type);
 }
 
@@ -870,6 +870,12 @@ bool NodeMetaInfoPrivate::isPropertyList(const PropertyName &propertyName) const
     const CppComponentValue *qmlObjectValue = getNearestCppComponentValue();
     if (!qmlObjectValue)
         return false;
+
+    if (!qmlObjectValue->hasProperty(QString::fromUtf8(propertyName))) {
+        const TypeName typeName = propertyType(propertyName);
+        return (typeName == "Item"  || typeName == "QtObject");
+    }
+
     return qmlObjectValue->isListProperty(QString::fromUtf8(propertyName));
 }
 
@@ -1477,6 +1483,11 @@ TypeName NodeMetaInfo::typeName() const
     return m_privateData->qualfiedTypeName();
 }
 
+TypeName NodeMetaInfo::simplifiedTypeName() const
+{
+    return typeName().split('.').constLast();
+}
+
 int NodeMetaInfo::majorVersion() const
 {
     return m_privateData->majorVersion();
@@ -1550,6 +1561,7 @@ bool NodeMetaInfo::isGraphicalItem() const
 {
     return isSubclassOf("QtQuick.Item")
             || isSubclassOf("QtQuick.Window.Window")
+            || isSubclassOf("QtQuick.Dialogs.Dialog")
             || isSubclassOf("QtQuick.Controls.Popup");
 }
 

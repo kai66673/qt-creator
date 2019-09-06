@@ -514,7 +514,7 @@ void ShortcutSettingsWidget::initialize()
         if (s->m_cmd->defaultKeySequence() != s->m_key)
             setModified(item, true);
 
-        item->setData(0, Qt::UserRole, qVariantFromValue(s));
+        item->setData(0, Qt::UserRole, QVariant::fromValue(s));
 
         markCollisions(s);
     }
@@ -552,7 +552,7 @@ bool ShortcutSettingsWidget::markCollisions(ShortcutItem *item)
     }
     item->m_item->setForeground(2, hasCollision
                                 ? Utils::creatorTheme()->color(Utils::Theme::TextColorError)
-                                : commandList()->palette().window());
+                                : commandList()->palette().windowText());
     return hasCollision;
 }
 

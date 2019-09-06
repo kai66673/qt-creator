@@ -51,8 +51,8 @@ AvdDialog::AvdDialog(int minApiLevel, AndroidSdkManager *sdkManager, const QStri
     m_hideTipTimer.setSingleShot(true);
 
     if (targetArch.isEmpty()) {
-        m_avdDialog.abiComboBox->addItems(QStringList({"armeabi-v7a", "armeabi", "x86", "mips",
-                                                       "arm64-v8a", "x86_64", "mips64"}));
+        m_avdDialog.abiComboBox->addItems(QStringList({"armeabi-v7a", "armeabi", "x86",
+                                                       "arm64-v8a", "x86_64"}));
     } else {
         m_avdDialog.abiComboBox->addItems(QStringList(targetArch));
     }
@@ -66,7 +66,7 @@ AvdDialog::AvdDialog(int minApiLevel, AndroidSdkManager *sdkManager, const QStri
     updateApiLevelComboBox();
 
     connect(m_avdDialog.abiComboBox,
-            static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &AvdDialog::updateApiLevelComboBox);
 
     connect(&m_hideTipTimer, &QTimer::timeout,

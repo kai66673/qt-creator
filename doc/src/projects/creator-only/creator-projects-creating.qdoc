@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2018 The Qt Company Ltd.
+** Copyright (C) 2019 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Creator documentation.
@@ -118,13 +118,20 @@
 
                 Create a Qt Quick application that uses
                 \l{http://doc.qt.io/qt-5/qtquickcontrols2-index.html}
-                {Qt Quick Controls 2} to implement a scrollable list (requires
+                {Qt Quick Controls} to implement a scrollable list (requires
                 Qt 5.9 or later) or a set of pages with a stack-based or
                 swipe-based navigation model (requires Qt 5.7 or later).
 
             \li Qt Console Application
 
                 Use a single main.cpp file
+
+            \li Qt for Python Application - Empty or Window
+
+                Create a \l{https://doc.qt.io/qtforpython/index.html}
+                {Qt for Python} application that contains only the main
+                code for a QApplication or create one that contains an
+                empty window.
 
         \endlist
 
@@ -248,6 +255,8 @@
 
     For more information about creating Qt Quick projects, see
     \l {Creating Qt Quick Projects}.
+
+    \include creator-python-project.qdocinc python project wizards
 
     \section1 Adding Files to Projects
 
@@ -463,8 +472,10 @@
     and the subproject that you add as a value of the \l{Variables#subdirs}
     {SUBDIRS variable}. It also adds all the necessary files for the subproject.
 
-    To add more subprojects, right-click the project name in the \uicontrol Projects
-    pane, and select \uicontrol {New Subproject} in the context menu.
+    To create more subprojects, right-click the project name in the
+    \uicontrol Projects pane, and select \uicontrol {New Subproject} in the
+    context menu. To add an existing project as a subproject, select
+    \uicontrol {Add Existing Projects}.
 
     To remove subprojects, right-click the project name in the \uicontrol Projects
     pane, and select \uicontrol {Remove Subproject} in the context menu.

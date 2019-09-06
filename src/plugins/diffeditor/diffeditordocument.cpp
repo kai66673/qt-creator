@@ -113,7 +113,8 @@ void DiffEditorDocument::setDiffFiles(const QList<FileData> &data, const QString
                                       const QString &startupFile)
 {
     m_diffFiles = data;
-    m_baseDirectory = directory;
+    if (!directory.isEmpty())
+        m_baseDirectory = directory;
     m_startupFile = startupFile;
     emit documentChanged();
 }
@@ -126,6 +127,11 @@ QList<FileData> DiffEditorDocument::diffFiles() const
 QString DiffEditorDocument::baseDirectory() const
 {
     return m_baseDirectory;
+}
+
+void DiffEditorDocument::setBaseDirectory(const QString &directory)
+{
+    m_baseDirectory = directory;
 }
 
 QString DiffEditorDocument::startupFile() const
@@ -216,7 +222,7 @@ bool DiffEditorDocument::save(QString *errorString, const QString &fileName, boo
 
     const QFileInfo fi(fileName);
     setTemporary(false);
-    setFilePath(FileName::fromString(fi.absoluteFilePath()));
+    setFilePath(FilePath::fromString(fi.absoluteFilePath()));
     setPreferredDisplayName(QString());
     emit temporaryStateChanged();
 
@@ -263,7 +269,7 @@ Core::IDocument::OpenResult DiffEditorDocument::open(QString *errorString, const
         const QFileInfo fi(fileName);
         setTemporary(false);
         emit temporaryStateChanged();
-        setFilePath(FileName::fromString(fi.absoluteFilePath()));
+        setFilePath(FilePath::fromString(fi.absoluteFilePath()));
         setDiffFiles(fileDataList, fi.absolutePath());
     }
     endReload(ok);

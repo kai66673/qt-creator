@@ -30,8 +30,8 @@
 #include "gdbserverprovider.h"
 #include "gdbserverprovidermanager.h"
 
-#include <debugger/debuggerruncontrol.h>
 #include <debugger/debuggerkitinformation.h>
+#include <debugger/debuggerruncontrol.h>
 
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/buildsteplist.h>
@@ -52,10 +52,12 @@ using namespace ProjectExplorer;
 namespace BareMetal {
 namespace Internal {
 
+// BareMetalDebugSupport
+
 BareMetalDebugSupport::BareMetalDebugSupport(RunControl *runControl)
     : Debugger::DebuggerRunTool(runControl)
 {
-    auto dev = qSharedPointerCast<const BareMetalDevice>(device());
+    const auto dev = qSharedPointerCast<const BareMetalDevice>(device());
     if (!dev) {
         reportFailure(tr("Cannot debug: Kit has no device."));
         return;
@@ -70,11 +72,9 @@ BareMetalDebugSupport::BareMetalDebugSupport(RunControl *runControl)
 
     if (p->startupMode() == GdbServerProvider::StartupOnNetwork) {
         Runnable r;
-        r.executable = p->executable();
-        // We need to wrap the command arguments depending on a host OS,
-        // as the bare metal's GDB servers are launched on a host,
-        // but not on a target.
-        r.commandLineArguments = Utils::QtcProcess::joinArgs(p->arguments(), Utils::HostOsInfo::hostOs());
+        r.setCommandLine(p->command());
+        // Command arguments are in host OS style as the bare metal's GDB servers are launched
+        // on the host, not on that target.
         m_gdbServer = new SimpleTargetRunner(runControl);
         m_gdbServer->setRunnable(r);
         addStartDependency(m_gdbServer);
@@ -83,9 +83,7 @@ BareMetalDebugSupport::BareMetalDebugSupport(RunControl *runControl)
 
 void BareMetalDebugSupport::start()
 {
-    const auto rc = runControl()->runConfiguration();
-    QTC_ASSERT(rc, reportFailure(); return);
-    const auto exeAspect = rc->aspect<ExecutableAspect>();
+    const auto exeAspect = runControl()->aspect<ExecutableAspect>();
     QTC_ASSERT(exeAspect, reportFailure(); return);
 
     const QString bin = exeAspect->executable().toString();
@@ -98,10 +96,10 @@ void BareMetalDebugSupport::start()
         return;
     }
 
-    const Target *target = rc->target();
+    const Target *target = runControl()->target();
     QTC_ASSERT(target, reportFailure(); return);
 
-    auto dev = qSharedPointerCast<const BareMetalDevice>(device());
+    const auto dev = qSharedPointerCast<const BareMetalDevice>(device());
     QTC_ASSERT(dev, reportFailure(); return);
     const GdbServerProvider *p = GdbServerProviderManager::findProvider(dev->gdbServerProviderId());
     QTC_ASSERT(p, reportFailure(); return);
@@ -112,7 +110,7 @@ void BareMetalDebugSupport::start()
     QString commands;
     if (const BuildConfiguration *bc = target->activeBuildConfiguration()) {
         if (BuildStepList *bsl = bc->stepList(BareMetalGdbCommandsDeployStep::stepId())) {
-            foreach (const BareMetalGdbCommandsDeployStep *bs, bsl->allOfType<BareMetalGdbCommandsDeployStep>()) {
+            for (const BareMetalGdbCommandsDeployStep *bs : bsl->allOfType<BareMetalGdbCommandsDeployStep>()) {
                 if (!commands.endsWith("\n"))
                     commands.append("\n");
                 commands.append(bs->gdbCommands());
@@ -124,8 +122,8 @@ void BareMetalDebugSupport::start()
 
     Runnable inferior;
     inferior.executable = bin;
-    if (auto aspect = rc->aspect<ArgumentsAspect>())
-        inferior.commandLineArguments = aspect->arguments(rc->macroExpander());
+    if (const auto aspect = runControl()->aspect<ArgumentsAspect>())
+        inferior.commandLineArguments = aspect->arguments(runControl()->macroExpander());
     setInferior(inferior);
     setSymbolFile(bin);
     setStartMode(AttachToRemoteServer);
@@ -133,6 +131,7 @@ void BareMetalDebugSupport::start()
     setCommandsForReset(p->resetCommands());
     setRemoteChannel(p->channel());
     setUseContinueInsteadOfRun(true);
+    setUseExtendedRemote(p->useExtendedRemote());
 
     DebuggerRunTool::start();
 }

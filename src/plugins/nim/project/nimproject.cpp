@@ -60,7 +60,7 @@ namespace Nim {
 
 const int MIN_TIME_BETWEEN_PROJECT_SCANS = 4500;
 
-NimProject::NimProject(const FileName &fileName) : Project(Constants::C_NIM_MIMETYPE, fileName)
+NimProject::NimProject(const FilePath &fileName) : Project(Constants::C_NIM_MIMETYPE, fileName)
 {
     setId(Constants::C_NIMPROJECT_ID);
     setDisplayName(fileName.toFileInfo().completeBaseName());
@@ -117,16 +117,16 @@ void NimProject::collectProjectFiles()
 {
     m_lastProjectScan.start();
     QTC_ASSERT(!m_futureWatcher.future().isRunning(), return);
-    FileName prjDir = projectDirectory();
+    FilePath prjDir = projectDirectory();
     QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir,
     excluded = m_excludedFiles] {
-        return FileNode::scanForFiles(prjDir, [excluded](const FileName & fn) -> FileNode * {
+        return FileNode::scanForFiles(prjDir, [excluded](const FilePath & fn) -> FileNode * {
             const QString fileName = fn.fileName();
             if (excluded.contains(fn.toString())
                     || fileName.endsWith(".nimproject", HostOsInfo::fileNameCaseSensitivity())
                     || fileName.contains(".nimproject.user", HostOsInfo::fileNameCaseSensitivity()))
                 return nullptr;
-            return new FileNode(fn, FileType::Source, false);
+            return new FileNode(fn, FileType::Source);
         });
     });
     m_futureWatcher.setFuture(future);
@@ -150,11 +150,10 @@ void NimProject::updateProject()
     emitParsingFinished(true);
 }
 
-QList<Task> NimProject::projectIssues(const Kit *k) const
+Tasks NimProject::projectIssues(const Kit *k) const
 {
-    QList<Task> result = Project::projectIssues(k);
-    auto tc = dynamic_cast<NimToolChain *>(ToolChainKitAspect::toolChain(k,
-                                                                              Constants::C_NIMLANGUAGE_ID));
+    Tasks result = Project::projectIssues(k);
+    auto tc = dynamic_cast<NimToolChain *>(ToolChainKitAspect::toolChain(k, Constants::C_NIMLANGUAGE_ID));
     if (!tc) {
         result.append(createProjectTask(Task::TaskType::Error, tr("No Nim compiler set.")));
         return result;
@@ -165,7 +164,7 @@ QList<Task> NimProject::projectIssues(const Kit *k) const
     return result;
 }
 
-FileNameList NimProject::nimFiles() const
+FilePathList NimProject::nimFiles() const
 {
     return files([](const ProjectExplorer::Node *n) {
         return AllFiles(n) && n->filePath().endsWith(".nim");

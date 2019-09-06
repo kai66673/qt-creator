@@ -31,6 +31,7 @@
 #include <projectexplorer/project.h>
 #include <projectexplorer/projectnodes.h>
 #include <projectexplorer/runconfigurationaspects.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/target.h>
 
 #include <qtsupport/qtkitinformation.h>
@@ -61,13 +62,16 @@ namespace Internal {
 DesktopQmakeRunConfiguration::DesktopQmakeRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto envAspect = addAspect<LocalEnvironmentAspect>(target, [this](Environment &env) {
-                      addToBaseEnvironment(env);
-                   });
+    auto envAspect = addAspect<LocalEnvironmentAspect>(target);
+    envAspect->addModifier([this](Environment &env) {
+        BuildTargetInfo bti = buildTargetInfo();
+        if (bti.runEnvModifier)
+            bti.runEnvModifier(env, aspect<UseLibraryPathsAspect>()->value());
+    });
 
     addAspect<ExecutableAspect>();
     addAspect<ArgumentsAspect>();
-    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<WorkingDirectoryAspect>();
     addAspect<TerminalAspect>();
 
     setOutputFormatter<QtSupport::QtOutputFormatter>();
@@ -80,6 +84,10 @@ DesktopQmakeRunConfiguration::DesktopQmakeRunConfiguration(Target *target, Core:
         auto dyldAspect = addAspect<UseDyldSuffixAspect>();
         connect(dyldAspect, &UseLibraryPathsAspect::changed,
                 envAspect, &EnvironmentAspect::environmentChanged);
+        envAspect->addModifier([dyldAspect](Environment &env) {
+            if (dyldAspect->value())
+                env.set(QLatin1String("DYLD_IMAGE_SUFFIX"), QLatin1String("_debug"));
+        });
     }
 
     connect(target->project(), &Project::parsingFinished,
@@ -99,8 +107,7 @@ void DesktopQmakeRunConfiguration::updateTargetInformation()
         wda->pathChooser()->setBaseFileName(target()->project()->projectDirectory());
 
     auto terminalAspect = aspect<TerminalAspect>();
-    if (!terminalAspect->isUserSet())
-        terminalAspect->setUseTerminal(bti.usesTerminal);
+    terminalAspect->setUseTerminalHint(bti.usesTerminal);
 
     aspect<ExecutableAspect>()->setExecutable(bti.targetFilePath);
 }
@@ -118,31 +125,14 @@ void DesktopQmakeRunConfiguration::doAdditionalSetup(const RunConfigurationCreat
     updateTargetInformation();
 }
 
-void DesktopQmakeRunConfiguration::addToBaseEnvironment(Environment &env) const
+FilePath DesktopQmakeRunConfiguration::proFilePath() const
 {
-    BuildTargetInfo bti = buildTargetInfo();
-    if (bti.runEnvModifier)
-        bti.runEnvModifier(env, aspect<UseLibraryPathsAspect>()->value());
-
-    if (auto dyldAspect = aspect<UseDyldSuffixAspect>()) {
-        if (dyldAspect->value())
-            env.set(QLatin1String("DYLD_IMAGE_SUFFIX"), QLatin1String("_debug"));
-    }
-}
-
-bool DesktopQmakeRunConfiguration::canRunForNode(const Node *node) const
-{
-    return node->filePath() == proFilePath();
-}
-
-FileName DesktopQmakeRunConfiguration::proFilePath() const
-{
-    return FileName::fromString(buildKey());
+    return FilePath::fromString(buildKey());
 }
 
 QString DesktopQmakeRunConfiguration::defaultDisplayName()
 {
-    FileName profile = proFilePath();
+    FilePath profile = proFilePath();
     if (!profile.isEmpty())
         return profile.toFileInfo().completeBaseName();
     return tr("Qt Run Configuration");
@@ -157,8 +147,6 @@ DesktopQmakeRunConfigurationFactory::DesktopQmakeRunConfigurationFactory()
     registerRunConfiguration<DesktopQmakeRunConfiguration>("Qt4ProjectManager.Qt4RunConfiguration:");
     addSupportedProjectType(QmakeProjectManager::Constants::QMAKEPROJECT_ID);
     addSupportedTargetDeviceType(ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE);
-
-    addRunWorkerFactory<SimpleTargetRunner>(ProjectExplorer::Constants::NORMAL_RUN_MODE);
 }
 
 } // namespace Internal

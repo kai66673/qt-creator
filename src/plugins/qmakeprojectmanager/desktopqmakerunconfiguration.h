@@ -39,17 +39,13 @@ class DesktopQmakeRunConfiguration : public ProjectExplorer::RunConfiguration
 public:
     DesktopQmakeRunConfiguration(ProjectExplorer::Target *target, Core::Id id);
 
-    void addToBaseEnvironment(Utils::Environment &env) const;
-
 private:
     void updateTargetInformation();
     bool fromMap(const QVariantMap &map) final;
     void doAdditionalSetup(const ProjectExplorer::RunConfigurationCreationInfo &info) final;
 
     QString defaultDisplayName();
-    bool canRunForNode(const ProjectExplorer::Node *node) const final;
-
-    Utils::FileName proFilePath() const;
+    Utils::FilePath proFilePath() const;
 };
 
 class DesktopQmakeRunConfigurationFactory : public ProjectExplorer::RunConfigurationFactory

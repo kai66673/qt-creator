@@ -107,17 +107,18 @@ QString Utils::toString(::Utils::LanguageVersion languageVersion)
 {
 #define CASE_LANGUAGEVERSION(x) case ::Utils::LanguageVersion::x: return QLatin1String(#x)
     switch (languageVersion) {
-    CASE_LANGUAGEVERSION(C89);
-    CASE_LANGUAGEVERSION(C99);
-    CASE_LANGUAGEVERSION(C11);
-    CASE_LANGUAGEVERSION(C18);
-    CASE_LANGUAGEVERSION(CXX98);
-    CASE_LANGUAGEVERSION(CXX03);
-    CASE_LANGUAGEVERSION(CXX11);
-    CASE_LANGUAGEVERSION(CXX14);
-    CASE_LANGUAGEVERSION(CXX17);
-    CASE_LANGUAGEVERSION(CXX2a);
-    // no default to get a compiler warning if anything is added
+        CASE_LANGUAGEVERSION(None);
+        CASE_LANGUAGEVERSION(C89);
+        CASE_LANGUAGEVERSION(C99);
+        CASE_LANGUAGEVERSION(C11);
+        CASE_LANGUAGEVERSION(C18);
+        CASE_LANGUAGEVERSION(CXX98);
+        CASE_LANGUAGEVERSION(CXX03);
+        CASE_LANGUAGEVERSION(CXX11);
+        CASE_LANGUAGEVERSION(CXX14);
+        CASE_LANGUAGEVERSION(CXX17);
+        CASE_LANGUAGEVERSION(CXX2a);
+        // no default to get a compiler warning if anything is added
     }
 #undef CASE_LANGUAGEVERSION
     return QString();
@@ -383,6 +384,17 @@ QString Utils::toString(CPlusPlus::Kind kind)
     return QString();
 }
 
+QString Utils::toString(ProjectPart::ToolChainWordWidth width)
+{
+    switch (width) {
+    case ProjectPart::ToolChainWordWidth::WordWidth32Bit:
+        return QString("32");
+    case ProjectPart::ToolChainWordWidth::WordWidth64Bit:
+        return QString("64");
+    }
+    return QString();
+}
+
 QString Utils::partsForFile(const QString &fileName)
 {
     const QList<ProjectPart::Ptr> parts
@@ -502,16 +514,20 @@ void Dumper::dumpProjectInfos( const QList<ProjectInfo> &projectInfos)
             if (!part->projectConfigFile.isEmpty())
                 m_out << i3 << "Project Config File: " << part->projectConfigFile << "\n";
             m_out << i2 << "Project Part \"" << part->id() << "\"{{{3\n";
-            m_out << i3 << "Project Part Name    : " << part->displayName << "\n";
-            m_out << i3 << "Project Name         : " << projectName << "\n";
-            m_out << i3 << "Project File         : " << projectFilePath << "\n";
-            m_out << i3 << "Compiler Flags       : " << part->compilerFlags.join(", ") << "\n";
-            m_out << i3 << "Selected For Building: " << part->selectedForBuilding << "\n";
-            m_out << i3 << "Build Target Type    : " << Utils::toString(part->buildTargetType) << "\n";
-            m_out << i3 << "Lanugage Version     : " << Utils::toString(part->languageVersion)<<"\n";
-            m_out << i3 << "Lanugage Extensions  : " << Utils::toString(part->languageExtensions)
+            m_out << i3 << "Project Part Name      : " << part->displayName << "\n";
+            m_out << i3 << "Project Name           : " << projectName << "\n";
+            m_out << i3 << "Project File           : " << projectFilePath << "\n";
+            m_out << i3 << "ToolChain Type         : " << part->toolchainType.toString() << "\n";
+            m_out << i3 << "ToolChain Target Triple: " << part->toolChainTargetTriple << "\n";
+            m_out << i3 << "ToolChain Word Width   : " << part->toolChainWordWidth << "\n";
+            m_out << i3 << "Compiler Flags         : " << part->compilerFlags.join(", ") << "\n";
+            m_out << i3 << "Selected For Building  : " << part->selectedForBuilding << "\n";
+            m_out << i3 << "Build System Target    : " << part->buildSystemTarget << "\n";
+            m_out << i3 << "Build Target Type      : " << Utils::toString(part->buildTargetType) << "\n";
+            m_out << i3 << "Language Version       : " << Utils::toString(part->languageVersion)<<"\n";
+            m_out << i3 << "Language Extensions    : " << Utils::toString(part->languageExtensions)
                   << "\n";
-            m_out << i3 << "Qt Version           : " << Utils::toString(part->qtVersion) << "\n";
+            m_out << i3 << "Qt Version             : " << Utils::toString(part->qtVersion) << "\n";
 
             if (!part->files.isEmpty()) {
                 m_out << i3 << "Files:{{{4\n";
@@ -597,10 +613,10 @@ void Dumper::dumpWorkingCopy(const WorkingCopy &workingCopy)
     m_out << "Working Copy contains " << workingCopy.size() << " entries{{{1\n";
 
     const QByteArray i1 = indent(1);
-    QHashIterator< ::Utils::FileName, QPair<QByteArray, unsigned> > it = workingCopy.iterator();
+    QHashIterator< ::Utils::FilePath, QPair<QByteArray, unsigned> > it = workingCopy.iterator();
     while (it.hasNext()) {
         it.next();
-        const ::Utils::FileName &filePath = it.key();
+        const ::Utils::FilePath &filePath = it.key();
         unsigned sourcRevision = it.value().second;
         m_out << i1 << "rev=" << sourcRevision << ", " << filePath << "\n";
     }

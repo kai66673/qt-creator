@@ -132,7 +132,7 @@ SftpTransfer::SftpTransfer(const FilesToTransfer &files, Internal::FileTransferT
 
 void SftpTransfer::doStart()
 {
-    const FileName sftpBinary = SshSettings::sftpFilePath();
+    const FilePath sftpBinary = SshSettings::sftpFilePath();
     if (!sftpBinary.exists()) {
         emitError(tr("sftp binary \"%1\" does not exist.").arg(sftpBinary.toUserOutput()));
         return;
@@ -149,7 +149,7 @@ void SftpTransfer::doStart()
             break;
         case Internal::FileTransferType::Download:
             if (!QDir::root().mkdir(dir)) {
-                emitError(tr("Failed to create local directory \"%1\"")
+                emitError(tr("Failed to create local directory \"%1\".")
                           .arg(QDir::toNativeSeparators(dir)));
                 return;
             }
@@ -157,6 +157,7 @@ void SftpTransfer::doStart()
         }
     }
     for (const FileToTransfer &f : d->files) {
+        QString sourceFileOrLinkTarget;
         bool link = false;
         if (d->transferType == Internal::FileTransferType::Upload) {
             QFileInfo fi(f.sourceFile);
@@ -164,10 +165,13 @@ void SftpTransfer::doStart()
                 link = true;
                 d->batchFile.write("-rm " + QtcProcess::quoteArgUnix(f.targetFile).toLocal8Bit()
                                    + '\n');
+                sourceFileOrLinkTarget = fi.dir().relativeFilePath(fi.symLinkTarget()); // see QTBUG-5817.
+            } else {
+                sourceFileOrLinkTarget = f.sourceFile;
             }
          }
          d->batchFile.write(d->transferCommand(link) + ' '
-                            + QtcProcess::quoteArgUnix(f.sourceFile).toLocal8Bit() + ' '
+                            + QtcProcess::quoteArgUnix(sourceFileOrLinkTarget).toLocal8Bit() + ' '
                             + QtcProcess::quoteArgUnix(f.targetFile).toLocal8Bit() + '\n');
     }
     d->batchFile.flush();

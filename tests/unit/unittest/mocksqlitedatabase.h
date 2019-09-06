@@ -31,16 +31,17 @@
 #include "mocksqlitetransactionbackend.h"
 #include "mocksqlitewritestatement.h"
 
+#include <sqlitedatabaseinterface.h>
 #include <sqlitetable.h>
 #include <sqlitetransaction.h>
 
 #include <utils/smallstringview.h>
 
-class MockSqliteDatabase : public MockSqliteTransactionBackend
+class MockSqliteDatabase : public MockSqliteTransactionBackend, public Sqlite::DatabaseInterface
 {
 public:
-    using ReadStatement = MockSqliteReadStatement;
-    using WriteStatement = MockSqliteWriteStatement;
+    using ReadStatement = NiceMock<MockSqliteReadStatement>;
+    using WriteStatement = NiceMock<MockSqliteWriteStatement>;
 
     MOCK_METHOD1(execute,
                  void (Utils::SmallStringView sqlStatement));
@@ -56,5 +57,7 @@ public:
 
     MOCK_METHOD1(setIsInitialized,
                  void (bool));
+
+    MOCK_METHOD0(walCheckpointFull, void());
 };
 

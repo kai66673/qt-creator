@@ -41,6 +41,7 @@
 #include <utils/navigationtreeview.h>
 #include <utils/qtcassert.h>
 #include <utils/utilsicons.h>
+#include <vcsbase/vcscommand.h>
 #include <vcsbase/vcsoutputwindow.h>
 
 #include <QDir>
@@ -230,8 +231,11 @@ void BranchView::slotCustomContextMenu(const QPoint &point)
         contextMenu.addAction(tr("&Log"), this, [this] { log(selectedIndex()); });
         contextMenu.addSeparator();
         if (!currentSelected) {
-            if (currentLocal)
-                contextMenu.addAction(tr("Re&set"), this, &BranchView::reset);
+            auto resetMenu = new QMenu(tr("Re&set"), &contextMenu);
+            resetMenu->addAction(tr("&Hard"), this, [this] { reset("hard"); });
+            resetMenu->addAction(tr("&Mixed"), this, [this] { reset("mixed"); });
+            resetMenu->addAction(tr("&Soft"), this, [this] { reset("soft"); });
+            contextMenu.addMenu(resetMenu);
             QString mergeTitle;
             if (isFastForwardMerge()) {
                 contextMenu.addAction(tr("&Merge (Fast-Forward)"), this, [this] { merge(true); });
@@ -313,7 +317,7 @@ bool BranchView::add()
         }
     }
 
-    BranchAddDialog branchAddDialog(localNames, true, this);
+    BranchAddDialog branchAddDialog(localNames, BranchAddDialog::Type::AddBranch, this);
     branchAddDialog.setBranchName(suggestedName);
     branchAddDialog.setTrackedBranchName(isTracked ? trackedBranch : QString(), !isLocal);
     branchAddDialog.setCheckoutVisible(true);
@@ -379,21 +383,28 @@ bool BranchView::checkout()
                 return false;
         }
 
-        m_model->checkoutBranch(selected);
-
-        QString stashName;
-        client->synchronousStashList(m_repository, &stashes);
-        for (const Stash &stash : qAsConst(stashes)) {
-            if (stash.message.startsWith(popMessageStart)) {
-                stashName = stash.name;
-                break;
-            }
+        VcsBase::VcsCommand *command = m_model->checkoutBranch(selected);
+        const bool moveChanges = branchCheckoutDialog.moveLocalChangesToNextBranch();
+        const bool popStash = branchCheckoutDialog.popStashOfNextBranch();
+        if (command && (moveChanges || popStash)) {
+            connect(command, &VcsBase::VcsCommand::finished,
+                    this, [this, client, popMessageStart, moveChanges, popStash] {
+                if (moveChanges) {
+                    client->endStashScope(m_repository);
+                } else if (popStash) {
+                    QList<Stash> stashes;
+                    QString stashName;
+                    client->synchronousStashList(m_repository, &stashes);
+                    for (const Stash &stash : qAsConst(stashes)) {
+                        if (stash.message.startsWith(popMessageStart)) {
+                            stashName = stash.name;
+                            break;
+                        }
+                    }
+                    client->synchronousStashRestore(m_repository, stashName, true);
+                }
+            });
         }
-
-        if (branchCheckoutDialog.moveLocalChangesToNextBranch())
-            client->endStashScope(m_repository);
-        else if (branchCheckoutDialog.popStashOfNextBranch())
-            client->synchronousStashRestore(m_repository, stashName, true);
     }
 
     if (QTC_GUARD(m_branchView))
@@ -444,11 +455,10 @@ bool BranchView::rename()
     if (!isTag)
         localNames = m_model->localBranchNames();
 
-    BranchAddDialog branchAddDialog(localNames, false, this);
-    if (isTag)
-        branchAddDialog.setWindowTitle(tr("Rename Tag"));
+    const BranchAddDialog::Type type = isTag ? BranchAddDialog::Type::RenameTag
+                                             : BranchAddDialog::Type::RenameBranch;
+    BranchAddDialog branchAddDialog(localNames, type, this);
     branchAddDialog.setBranchName(oldName);
-    branchAddDialog.setTrackedBranchName(QString(), false);
 
     branchAddDialog.exec();
 
@@ -467,17 +477,17 @@ bool BranchView::rename()
     return false;
 }
 
-bool BranchView::reset()
+bool BranchView::reset(const QByteArray &resetType)
 {
     const QString currentName = m_model->fullName(m_model->currentBranch());
     const QString branchName = m_model->fullName(selectedIndex());
     if (currentName.isEmpty() || branchName.isEmpty())
         return false;
 
-    if (QMessageBox::question(this, tr("Git Reset"), tr("Hard reset branch \"%1\" to \"%2\"?")
+    if (QMessageBox::question(this, tr("Git Reset"), tr("Reset branch \"%1\" to \"%2\"?")
                               .arg(currentName).arg(branchName),
                               QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes) {
-        GitPlugin::client()->reset(m_repository, "--hard", branchName);
+        GitPlugin::client()->reset(m_repository, QLatin1String("--" + resetType), branchName);
         return true;
     }
     return false;

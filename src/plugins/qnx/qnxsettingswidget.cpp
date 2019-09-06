@@ -49,7 +49,7 @@ QnxSettingsWidget::QnxSettingsWidget(QWidget *parent) :
             this, &QnxSettingsWidget::addConfiguration);
     connect(m_ui->removeButton, &QAbstractButton::clicked,
             this, &QnxSettingsWidget::removeConfiguration);
-    connect(m_ui->configsCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_ui->configsCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &QnxSettingsWidget::updateInformation);
     connect(m_ui->generateKitsCheckBox, &QAbstractButton::toggled,
             this, &QnxSettingsWidget::generateKits);
@@ -83,7 +83,7 @@ void QnxSettingsWidget::addConfiguration()
     if (envFile.isEmpty())
         return;
 
-    QnxConfiguration *config = new QnxConfiguration(Utils::FileName::fromString(envFile));
+    QnxConfiguration *config = new QnxConfiguration(Utils::FilePath::fromString(envFile));
     if (m_qnxConfigManager->configurations().contains(config)
             || !config->isValid()) {
         QMessageBox::warning(Core::ICore::mainWindow(), tr("Warning"),

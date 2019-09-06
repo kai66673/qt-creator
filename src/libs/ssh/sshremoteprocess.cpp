@@ -54,24 +54,22 @@ using namespace Internal;
 
 struct SshRemoteProcess::SshRemoteProcessPrivate
 {
-    QByteArray remoteCommand;
+    QString remoteCommand;
     QStringList connectionArgs;
     QString displayName;
     bool useTerminal = false;
 };
 
-SshRemoteProcess::SshRemoteProcess(const QByteArray &command, const QStringList &connectionArgs)
+SshRemoteProcess::SshRemoteProcess(const QString &command, const QStringList &connectionArgs)
     : d(new SshRemoteProcessPrivate)
 {
     d->remoteCommand = command;
     d->connectionArgs = connectionArgs;
 
-    connect(this,
-            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-            [this] {
+    connect(this, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this] {
         QString error;
         if (exitStatus() == QProcess::CrashExit)
-            error = tr("The ssh binary crashed: %1").arg(errorString());
+            error = tr("The ssh process crashed: %1").arg(errorString());
         else if (exitCode() == 255)
             error = tr("Remote process crashed.");
         emit done(error);
@@ -129,7 +127,7 @@ QStringList SshRemoteProcess::fullLocalCommandLine() const
     if (!d->displayName.isEmpty())
         args.prepend("-X");
     if (!d->remoteCommand.isEmpty())
-        args << QLatin1String(d->remoteCommand);
+        args << d->remoteCommand;
     args.prepend(SshSettings::sshFilePath().toString());
     return args;
 }

@@ -47,14 +47,14 @@ public:
     QSet<Core::Id> targetDeviceTypes() const override;
 
     QString qnxHost() const;
-    Utils::FileName qnxTarget() const;
+    Utils::FilePath qnxTarget() const;
 
     QString cpuDir() const;
 
     QVariantMap toMap() const override;
     void fromMap(const QVariantMap &map) override;
 
-    QList<ProjectExplorer::Abi> detectQtAbis() const override;
+    ProjectExplorer::Abis detectQtAbis() const override;
 
     void addToEnvironment(const ProjectExplorer::Kit *k, Utils::Environment &env) const override;
     Utils::Environment qmakeRunEnvironment() const override;

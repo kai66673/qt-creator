@@ -28,10 +28,12 @@
 #include "buildenvironmentwidget.h"
 #include "buildinfo.h"
 #include "buildsteplist.h"
+#include "namedwidget.h"
 #include "kit.h"
 #include "kitinformation.h"
 #include "kitmanager.h"
 #include "project.h"
+#include "projectconfigurationaspects.h"
 #include "projectexplorer.h"
 #include "projectexplorerconstants.h"
 #include "projectmacroexpander.h"
@@ -40,13 +42,15 @@
 
 #include <coreplugin/idocument.h>
 
-#include <utils/qtcassert.h>
-#include <utils/macroexpander.h>
 #include <utils/algorithm.h>
-#include <utils/mimetypes/mimetype.h>
+#include <utils/detailswidget.h>
+#include <utils/macroexpander.h>
 #include <utils/mimetypes/mimedatabase.h>
+#include <utils/mimetypes/mimetype.h>
+#include <utils/qtcassert.h>
 
 #include <QDebug>
+#include <QFormLayout>
 
 static const char BUILD_STEP_LIST_COUNT[] = "ProjectExplorer.BuildConfiguration.BuildStepListCount";
 static const char BUILD_STEP_LIST_PREFIX[] = "ProjectExplorer.BuildConfiguration.BuildStepList.";
@@ -82,25 +86,72 @@ BuildConfiguration::BuildConfiguration(Target *target, Core::Id id)
     // Many macroexpanders are based on the current project, so they may change the environment:
     connect(ProjectTree::instance(), &ProjectTree::currentProjectChanged,
             this, &BuildConfiguration::updateCacheAndEmitEnvironmentChanged);
+
+    m_buildDirectoryAspect = addAspect<BaseStringAspect>();
+    m_buildDirectoryAspect->setSettingsKey(BUILDDIRECTORY_KEY);
+    m_buildDirectoryAspect->setLabelText(tr("Build directory:"));
+    m_buildDirectoryAspect->setDisplayStyle(BaseStringAspect::PathChooserDisplay);
+    m_buildDirectoryAspect->setExpectedKind(Utils::PathChooser::Directory);
+    m_buildDirectoryAspect->setBaseFileName(target->project()->projectDirectory());
+    m_buildDirectoryAspect->setEnvironment(environment());
+    connect(m_buildDirectoryAspect, &BaseStringAspect::changed,
+            this, &BuildConfiguration::buildDirectoryChanged);
+
+    connect(this, &BuildConfiguration::environmentChanged, this, [this] {
+        m_buildDirectoryAspect->setEnvironment(environment());
+    });
 }
 
-Utils::FileName BuildConfiguration::buildDirectory() const
+Utils::FilePath BuildConfiguration::buildDirectory() const
 {
-    const QString path = QDir::cleanPath(macroExpander()->expand(environment().expandVariables(m_buildDirectory.toString())));
-    return Utils::FileName::fromString(QDir::cleanPath(QDir(target()->project()->projectDirectory().toString()).absoluteFilePath(path)));
+    QString path = environment().expandVariables(m_buildDirectoryAspect->value().trimmed());
+    path = QDir::cleanPath(macroExpander()->expand(path));
+    return Utils::FilePath::fromString(QDir::cleanPath(QDir(target()->project()->projectDirectory().toString()).absoluteFilePath(path)));
 }
 
-Utils::FileName BuildConfiguration::rawBuildDirectory() const
+Utils::FilePath BuildConfiguration::rawBuildDirectory() const
 {
-    return m_buildDirectory;
+    return m_buildDirectoryAspect->fileName();
 }
 
-void BuildConfiguration::setBuildDirectory(const Utils::FileName &dir)
+void BuildConfiguration::setBuildDirectory(const Utils::FilePath &dir)
 {
-    if (dir == m_buildDirectory)
+    if (dir == m_buildDirectoryAspect->fileName())
         return;
-    m_buildDirectory = dir;
+    m_buildDirectoryAspect->setFileName(dir);
     emitBuildDirectoryChanged();
+}
+
+NamedWidget *BuildConfiguration::createConfigWidget()
+{
+    NamedWidget *named = new NamedWidget;
+    named->setDisplayName(m_configWidgetDisplayName);
+
+    QWidget *widget = nullptr;
+
+    if (m_configWidgetHasFrame) {
+        auto container = new Utils::DetailsWidget(named);
+        widget = new QWidget(container);
+        container->setState(Utils::DetailsWidget::NoSummary);
+        container->setWidget(widget);
+
+        auto vbox = new QVBoxLayout(named);
+        vbox->setMargin(0);
+        vbox->addWidget(container);
+    } else {
+        widget = named;
+    }
+
+    auto formLayout = new QFormLayout(widget);
+    formLayout->setMargin(0);
+    formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+
+    for (ProjectConfigurationAspect *aspect : aspects()) {
+        if (aspect->isVisible())
+            aspect->addToConfigurationLayout(formLayout);
+    }
+
+    return named;
 }
 
 void BuildConfiguration::initialize(const BuildInfo &info)
@@ -133,7 +184,6 @@ QVariantMap BuildConfiguration::toMap() const
     QVariantMap map(ProjectConfiguration::toMap());
     map.insert(QLatin1String(CLEAR_SYSTEM_ENVIRONMENT_KEY), m_clearSystemEnvironment);
     map.insert(QLatin1String(USER_ENVIRONMENT_CHANGES_KEY), Utils::EnvironmentItem::toStringList(m_userEnvironmentChanges));
-    map.insert(QLatin1String(BUILDDIRECTORY_KEY), m_buildDirectory.toString());
 
     map.insert(QLatin1String(BUILD_STEP_LIST_COUNT), m_stepLists.count());
     for (int i = 0; i < m_stepLists.count(); ++i)
@@ -146,7 +196,6 @@ bool BuildConfiguration::fromMap(const QVariantMap &map)
 {
     m_clearSystemEnvironment = map.value(QLatin1String(CLEAR_SYSTEM_ENVIRONMENT_KEY)).toBool();
     m_userEnvironmentChanges = Utils::EnvironmentItem::fromStringList(map.value(QLatin1String(USER_ENVIRONMENT_CHANGES_KEY)).toStringList());
-    m_buildDirectory = Utils::FileName::fromString(map.value(QLatin1String(BUILDDIRECTORY_KEY)).toString());
 
     updateCacheAndEmitEnvironmentChanged();
 
@@ -192,6 +241,31 @@ void BuildConfiguration::emitBuildDirectoryChanged()
         m_lastEmmitedBuildDirectory = buildDirectory();
         emit buildDirectoryChanged();
     }
+}
+
+ProjectExplorer::BaseStringAspect *BuildConfiguration::buildDirectoryAspect() const
+{
+    return m_buildDirectoryAspect;
+}
+
+void BuildConfiguration::setConfigWidgetDisplayName(const QString &display)
+{
+    m_configWidgetDisplayName = display;
+}
+
+void BuildConfiguration::setBuildDirectoryHistoryCompleter(const QString &history)
+{
+    m_buildDirectoryAspect->setHistoryCompleter(history);
+}
+
+void BuildConfiguration::setConfigWidgetHasFrame(bool configWidgetHasFrame)
+{
+    m_configWidgetHasFrame = configWidgetHasFrame;
+}
+
+void BuildConfiguration::setBuildDirectorySettingsKey(const QString &key)
+{
+    m_buildDirectoryAspect->setSettingsKey(key);
 }
 
 Target *BuildConfiguration::target() const
@@ -299,10 +373,6 @@ bool BuildConfiguration::isActive() const
  * PATH. This is used to in build configurations targeting broken build systems
  * to provide hints about which compiler to use.
  */
-void BuildConfiguration::prependCompilerPathToEnvironment(Utils::Environment &env) const
-{
-    return prependCompilerPathToEnvironment(target()->kit(), env);
-}
 
 void BuildConfiguration::prependCompilerPathToEnvironment(Kit *k, Utils::Environment &env)
 {
@@ -312,7 +382,7 @@ void BuildConfiguration::prependCompilerPathToEnvironment(Kit *k, Utils::Environ
     if (!tc)
         return;
 
-    const Utils::FileName compilerDir = tc->compilerCommand().parentDir();
+    const Utils::FilePath compilerDir = tc->compilerCommand().parentDir();
     if (!compilerDir.isEmpty())
         env.prependOrSetPath(compilerDir.toString());
 }
@@ -334,7 +404,7 @@ BuildConfigurationFactory::~BuildConfigurationFactory()
     g_buildConfigurationFactories.removeOne(this);
 }
 
-const QList<Task> BuildConfigurationFactory::reportIssues(ProjectExplorer::Kit *kit, const QString &projectPath,
+const Tasks BuildConfigurationFactory::reportIssues(ProjectExplorer::Kit *kit, const QString &projectPath,
                                                           const QString &buildDir) const
 {
     if (m_issueReporter)

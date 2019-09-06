@@ -36,6 +36,7 @@
 #include <utils/stringutils.h>
 
 #include <android/androidconstants.h>
+#include <ios/iosconstants.h>
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -52,7 +53,7 @@ namespace QmakeProjectManager {
   */
 
 QmakePriFileNode::QmakePriFileNode(QmakeProject *project, QmakeProFileNode *qmakeProFileNode,
-                                   const FileName &filePath, QmakePriFile *pf) :
+                                   const FilePath &filePath, QmakePriFile *pf) :
     ProjectNode(filePath),
     m_project(project),
     m_qmakeProFileNode(qmakeProFileNode),
@@ -112,7 +113,7 @@ bool QmakePriFileNode::supportsAction(ProjectAction action, const Node *node) co
             return !(pro && pro->knowsFile(node->filePath()));
 
         bool addExistingFiles = true;
-        if (node->nodeType() == NodeType::VirtualFolder) {
+        if (node->isVirtualFolderType()) {
             // A virtual folder, we do what the projectexplorer does
             const FolderNode *folder = node->asFolderNode();
             if (folder) {
@@ -132,19 +133,11 @@ bool QmakePriFileNode::supportsAction(ProjectAction action, const Node *node) co
         break;
     }
     case ProjectType::SubDirsTemplate:
-        if (action == AddSubProject || action == RemoveSubProject || action == AddExistingProject)
+        if (action == AddSubProject || action == AddExistingProject)
             return true;
         break;
     default:
         break;
-    }
-
-    if (action == HasSubProjectRunConfigurations) {
-        if (Target *t = m_project->activeTarget())  {
-            auto canRunForNode = [node](RunConfiguration *rc) { return rc->canRunForNode(node); };
-            if (Utils::anyOf(t->runConfigurations(), canRunForNode))
-                return true;
-        }
     }
 
     return false;
@@ -179,7 +172,7 @@ bool QmakePriFileNode::addFiles(const QStringList &filePaths, QStringList *notAd
     if (!pri)
         return false;
     QList<Node *> matchingNodes = findNodes([filePaths](const Node *n) {
-        return n->nodeType() == NodeType::File && filePaths.contains(n->filePath().toString());
+        return n->asFileNode() && filePaths.contains(n->filePath().toString());
     });
     matchingNodes = filtered(matchingNodes, [](const Node *n) {
         for (const Node *parent = n->parentFolderNode(); parent;
@@ -234,9 +227,11 @@ FolderNode::AddNewInformation QmakePriFileNode::addNewInformation(const QStringL
   \class QmakeProFileNode
   Implements abstract ProjectNode class
   */
-QmakeProFileNode::QmakeProFileNode(QmakeProject *project, const FileName &filePath, QmakeProFile *pf) :
+QmakeProFileNode::QmakeProFileNode(QmakeProject *project, const FilePath &filePath, QmakeProFile *pf) :
     QmakePriFileNode(project, this, filePath, pf)
-{ }
+{
+    setIsProduct();
+}
 
 bool QmakeProFileNode::showInSimpleTree() const
 {
@@ -286,16 +281,32 @@ QVariant QmakeProFileNode::data(Core::Id role) const
     if (role == Android::Constants::AndroidSoLibPath) {
         TargetInformation info = targetInformation();
         QStringList res = {info.buildDir.toString()};
-        Utils::FileName destDir = info.destDir;
+        Utils::FilePath destDir = info.destDir;
         if (!destDir.isEmpty()) {
             if (destDir.toFileInfo().isRelative())
-                destDir = Utils::FileName::fromString(QDir::cleanPath(info.buildDir.toString()
+                destDir = Utils::FilePath::fromString(QDir::cleanPath(info.buildDir.toString()
                                                                       + '/' + destDir.toString()));
             res.append(destDir.toString());
         }
         res.removeDuplicates();
         return res;
     }
+
+    if (role == Android::Constants::AndroidTargets)
+        return {};
+
+    if (role == Ios::Constants::IosTarget) {
+        const TargetInformation info = targetInformation();
+        if (info.valid)
+            return info.target;
+    }
+
+    if (role == Ios::Constants::IosBuildDir) {
+        const TargetInformation info = targetInformation();
+        if (info.valid)
+            return info.buildDir.toString();
+    }
+
     QTC_CHECK(false);
     return {};
 }
@@ -352,6 +363,13 @@ bool QmakeProFileNode::includedInExactParse() const
     return pro && pro->includedInExactParse();
 }
 
+bool QmakeProFileNode::supportsAction(ProjectAction action, const Node *node) const
+{
+    if (action == RemoveSubProject)
+        return parentProjectNode() && !parentProjectNode()->asContainerNode();
+    return QmakePriFileNode::supportsAction(action, node);
+}
+
 FolderNode::AddNewInformation QmakeProFileNode::addNewInformation(const QStringList &files, Node *context) const
 {
     Q_UNUSED(files)
@@ -395,10 +413,10 @@ QString QmakeProFileNode::buildDir() const
     return QString();
 }
 
-FileName QmakeProFileNode::buildDir(QmakeBuildConfiguration *bc) const
+FilePath QmakeProFileNode::buildDir(QmakeBuildConfiguration *bc) const
 {
     const QmakeProFile *pro = proFile();
-    return pro ? pro->buildDir(bc) : FileName();
+    return pro ? pro->buildDir(bc) : FilePath();
 }
 
 QString QmakeProFileNode::objectExtension() const

@@ -92,8 +92,6 @@ IosDevice::IosDevice()
     setFreePorts(ports);
 }
 
-IosDevice::IosDevice(const IosDevice &other) = default;
-
 IosDevice::IosDevice(const QString &uid)
     : m_lastPort(Constants::IOS_DEVICE_PORT_START)
 {
@@ -131,11 +129,6 @@ IDeviceWidget *IosDevice::createWidget()
 DeviceProcessSignalOperation::Ptr IosDevice::signalOperation() const
 {
     return DeviceProcessSignalOperation::Ptr();
-}
-
-IDevice::Ptr IosDevice::clone() const
-{
-    return IDevice::Ptr(new IosDevice(*this));
 }
 
 void IosDevice::fromMap(const QVariantMap &map)
@@ -234,14 +227,10 @@ void IosDeviceManager::deviceConnected(const QString &uid, const QString &name)
     } else if (dev->deviceState() != IDevice::DeviceConnected &&
                dev->deviceState() != IDevice::DeviceReadyToUse) {
         qCDebug(detectLog) << "updating ios device " << uid;
-        IosDevice *newDev = nullptr;
-        if (dev->type() == devType) {
-            auto iosDev = static_cast<const IosDevice *>(dev.data());
-            newDev = new IosDevice(*iosDev);
-        } else {
-            newDev = new IosDevice(uid);
-        }
-        devManager->addDevice(IDevice::ConstPtr(newDev));
+        if (dev->type() == devType) // FIXME: Should that be a QTC_ASSERT?
+            devManager->addDevice(dev->clone());
+        else
+            devManager->addDevice(IDevice::ConstPtr(new IosDevice(uid)));
     }
     updateInfo(uid);
 }
@@ -294,7 +283,8 @@ void IosDeviceManager::deviceInfo(IosToolHandler *, const QString &uid,
             skipUpdate = true;
             newDev = const_cast<IosDevice *>(iosDev);
         } else {
-            newDev = new IosDevice(*iosDev);
+            newDev = new IosDevice();
+            newDev->fromMap(iosDev->toMap());
         }
     } else {
         newDev = new IosDevice(uid);
@@ -538,20 +528,10 @@ void IosDeviceManager::updateAvailableDevices(const QStringList &devices)
     }
 }
 
-IosDevice::ConstPtr IosKitAspect::device(Kit *kit)
-{
-    if (!kit)
-        return IosDevice::ConstPtr();
-    IDevice::ConstPtr dev = DeviceKitAspect::device(kit);
-    IosDevice::ConstPtr res = dev.dynamicCast<const IosDevice>();
-    return res;
-}
-
-
 // Factory
 
 IosDeviceFactory::IosDeviceFactory()
-    : IDeviceFactory(Constants::IOS_DEVICE_ID)
+    : IDeviceFactory(Constants::IOS_DEVICE_TYPE)
 {
     setObjectName(QLatin1String("IosDeviceFactory"));
     setDisplayName(IosDevice::name());

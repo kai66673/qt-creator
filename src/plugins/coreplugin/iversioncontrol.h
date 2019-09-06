@@ -103,7 +103,7 @@ public:
      *
      * This method needs to be thread safe!
      */
-    virtual bool isVcsFileOrDirectory(const Utils::FileName &fileName) const = 0;
+    virtual bool isVcsFileOrDirectory(const Utils::FilePath &fileName) const = 0;
 
     /*!
      * Returns whether files in this directory should be managed with this
@@ -213,7 +213,7 @@ public:
      * \a extraArgs are passed on to the command being run.
      */
     virtual ShellCommand *createInitialCheckoutCommand(const QString &url,
-                                                       const Utils::FileName &baseDirectory,
+                                                       const Utils::FilePath &baseDirectory,
                                                        const QString &localName,
                                                        const QStringList &extraArgs);
 
@@ -226,9 +226,9 @@ private:
     TopicCache *m_topicCache;
 };
 
-Q_DECLARE_OPERATORS_FOR_FLAGS(Core::IVersionControl::SettingsFlags)
-
 } // namespace Core
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(Core::IVersionControl::SettingsFlags)
 
 #if defined(WITH_TESTS)
 
@@ -245,7 +245,7 @@ public:
     { }
     ~TestVersionControl() override;
 
-    bool isVcsFileOrDirectory(const Utils::FileName &fileName) const final
+    bool isVcsFileOrDirectory(const Utils::FilePath &fileName) const final
     { Q_UNUSED(fileName); return false; }
 
     void setManagedDirectories(const QHash<QString, QString> &dirs);

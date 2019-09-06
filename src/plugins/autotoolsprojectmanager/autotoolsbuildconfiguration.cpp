@@ -26,7 +26,6 @@
 ****************************************************************************/
 
 #include "autotoolsbuildconfiguration.h"
-#include "autotoolsbuildsettingswidget.h"
 #include "makestep.h"
 #include "autotoolsproject.h"
 #include "autotoolsprojectconstants.h"
@@ -44,15 +43,13 @@
 #include <utils/mimetypes/mimedatabase.h>
 #include <utils/qtcassert.h>
 
-#include <QFileInfo>
-#include <QInputDialog>
-
-using namespace AutotoolsProjectManager;
 using namespace AutotoolsProjectManager::Constants;
-using namespace Internal;
 using namespace ProjectExplorer;
 using namespace ProjectExplorer::Constants;
+using namespace Utils;
 
+namespace AutotoolsProjectManager {
+namespace Internal {
 
 // AutotoolsBuildConfiguration
 
@@ -61,7 +58,9 @@ AutotoolsBuildConfiguration::AutotoolsBuildConfiguration(Target *parent, Core::I
 {
     // /<foobar> is used so the un-changed check in setBuildDirectory() works correctly.
     // The leading / is to avoid the relative the path expansion in BuildConfiguration::buildDirectory.
-    setBuildDirectory(Utils::FileName::fromString("/<foobar>"));
+    setBuildDirectory(Utils::FilePath::fromString("/<foobar>"));
+    setBuildDirectoryHistoryCompleter("AutoTools.BuildDir.History");
+    setConfigWidgetDisplayName(tr("Autotools Manager"));
 }
 
 void AutotoolsBuildConfiguration::initialize(const BuildInfo &info)
@@ -97,11 +96,6 @@ void AutotoolsBuildConfiguration::initialize(const BuildInfo &info)
     cleanSteps->appendStep(cleanMakeStep);
 }
 
-NamedWidget *AutotoolsBuildConfiguration::createConfigWidget()
-{
-    return new AutotoolsBuildSettingsWidget(this);
-}
-
 
 // AutotoolsBuildConfiguration class
 
@@ -121,15 +115,15 @@ QList<BuildInfo> AutotoolsBuildConfigurationFactory::availableBuilds(const Targe
 
 QList<BuildInfo> AutotoolsBuildConfigurationFactory::availableSetups(const Kit *k, const QString &projectPath) const
 {
-    BuildInfo info = createBuildInfo(k,
-                                     Utils::FileName::fromString(AutotoolsProject::defaultBuildDirectory(projectPath)));
+    const QString path = QFileInfo(projectPath).absolutePath();
+    BuildInfo info = createBuildInfo(k, Utils::FilePath::fromString(path));
     //: The name of the build configuration created by default for a autotools project.
     info.displayName = tr("Default");
     return {info};
 }
 
 BuildInfo AutotoolsBuildConfigurationFactory::createBuildInfo(const Kit *k,
-                                                              const Utils::FileName &buildDir) const
+                                                              const Utils::FilePath &buildDir) const
 {
     BuildInfo info(this);
     info.typeName = tr("Build");
@@ -143,3 +137,6 @@ BuildConfiguration::BuildType AutotoolsBuildConfiguration::buildType() const
     // TODO: Should I return something different from Unknown?
     return Unknown;
 }
+
+} // Internal
+} // AutotoolsProjectManager

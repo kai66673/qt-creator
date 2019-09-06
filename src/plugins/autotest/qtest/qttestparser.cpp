@@ -239,7 +239,7 @@ static void fetchAndMergeBaseTestFunctions(const QSet<QString> &baseClasses,
                                            const CPlusPlus::Document::Ptr &doc,
                                            const CPlusPlus::Snapshot &snapshot)
 {
-    QList<QString> bases = baseClasses.toList();
+    QList<QString> bases = Utils::toList(baseClasses);
     while (!bases.empty()) {
         const QString base = bases.takeFirst();
         TestVisitor baseVisitor(base, snapshot);
@@ -250,7 +250,7 @@ static void fetchAndMergeBaseTestFunctions(const QSet<QString> &baseClasses,
         baseVisitor.accept(declaringDoc->globalNamespace());
         if (!baseVisitor.resultValid())
             continue;
-        bases.append(baseVisitor.baseClasses().toList());
+        bases.append(Utils::toList(baseVisitor.baseClasses()));
         mergeTestFunctions(testFunctions, baseVisitor.privateSlots());
     }
 }
@@ -389,9 +389,9 @@ void QtTestParser::release()
 bool QtTestParser::processDocument(QFutureInterface<TestParseResultPtr> futureInterface,
                                    const QString &fileName)
 {
-    if (!m_cppSnapshot.contains(fileName) || !selectedForBuilding(fileName))
+    CPlusPlus::Document::Ptr doc = document(fileName);
+    if (doc.isNull())
         return false;
-    CPlusPlus::Document::Ptr doc = m_cppSnapshot.find(fileName).value();
     const QString &oldName = m_testCaseNames.value(fileName);
     const QStringList &alternativeFiles = m_alternativeFiles.values(fileName);
     if ((!includesQtTest(doc, m_cppSnapshot) || !qtTestLibDefined(fileName)) && oldName.isEmpty())

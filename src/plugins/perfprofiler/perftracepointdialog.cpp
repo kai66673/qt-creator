@@ -29,8 +29,12 @@
 #include <projectexplorer/devicesupport/devicemanager.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/project.h>
+#include <projectexplorer/projectexplorerconstants.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/session.h>
 #include <projectexplorer/target.h>
+
+#include <utils/qtcassert.h>
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -92,7 +96,7 @@ PerfTracePointDialog::~PerfTracePointDialog()
 
 void PerfTracePointDialog::runScript()
 {
-    m_ui->label->setText(tr("Executing script ..."));
+    m_ui->label->setText(tr("Executing script..."));
     m_ui->textEdit->setReadOnly(true);
     m_ui->privilegesChooser->setEnabled(false);
     m_ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);

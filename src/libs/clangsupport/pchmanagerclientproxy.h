@@ -34,15 +34,13 @@ namespace ClangBackEnd {
 
 class PchManagerServerInterface;
 
-class CLANGSUPPORT_EXPORT PchManagerClientProxy : public PchManagerClientInterface
+class CLANGSUPPORT_EXPORT PchManagerClientProxy final : public PchManagerClientInterface
 {
 public:
+    explicit PchManagerClientProxy(PchManagerServerInterface *server, QLocalSocket *localSocket);
     explicit PchManagerClientProxy(PchManagerServerInterface *server, QIODevice *ioDevice);
     PchManagerClientProxy(const PchManagerClientProxy&) = delete;
     const PchManagerClientProxy &operator=(const PchManagerClientProxy&) = delete;
-
-    PchManagerClientProxy(PchManagerClientProxy&&other);
-    PchManagerClientProxy &operator=(PchManagerClientProxy&&other);
 
     void readMessages();
 
@@ -54,7 +52,6 @@ private:
     ClangBackEnd::WriteMessageBlock writeMessageBlock;
     ClangBackEnd::ReadMessageBlock readMessageBlock;
     PchManagerServerInterface *server = nullptr;
-    QIODevice *ioDevice = nullptr;
 };
 
 } // namespace ClangBackEnd

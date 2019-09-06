@@ -36,6 +36,7 @@
 
 #include <cpptools/compileroptionsbuilder.h>
 #include <cpptools/projectpart.h>
+#include <projectexplorer/project.h>
 
 #include <utils/smallstringvector.h>
 
@@ -48,15 +49,23 @@ using testing::_;
 
 using CppTools::CompilerOptionsBuilder;
 
-using ClangBackEnd::RequestSourceLocationsForRenamingMessage;
-
 using Utils::SmallString;
 using Utils::SmallStringVector;
 
 class RefactoringEngine : public ::testing::Test
 {
 protected:
-    void SetUp();
+    void SetUp()
+    {
+        projectPart = CppTools::ProjectPart::Ptr(new CppTools::ProjectPart);
+        projectPart->project = &project;
+        projectPart->files.push_back(projectFile);
+
+        CompilerOptionsBuilder optionsBuilder(*projectPart);
+        commandLine = Utils::SmallStringVector(
+            optionsBuilder.build(projectFile.kind, CppTools::UsePrecompiledHeaders::No));
+        commandLine.push_back(qStringFilePath);
+    }
 
 protected:
     NiceMock<MockFilePathCaching> mockFilePathCaching;
@@ -71,39 +80,13 @@ protected:
     QTextDocument textDocument{fileContent};
     QTextCursor cursor{&textDocument};
     QString qStringFilePath{QStringLiteral("/home/user/file.cpp")};
-    Utils::FileName filePath{Utils::FileName::fromString(qStringFilePath)};
+    Utils::FilePath filePath{Utils::FilePath::fromString(qStringFilePath)};
     ClangBackEnd::FilePath clangBackEndFilePath{qStringFilePath};
     SmallStringVector commandLine;
+    ProjectExplorer::Project project;
     CppTools::ProjectPart::Ptr projectPart;
     CppTools::ProjectFile projectFile{qStringFilePath, CppTools::ProjectFile::CXXSource};
 };
-
-TEST_F(RefactoringEngine, SendRequestSourceLocationsForRenamingMessage)
-{
-    cursor.setPosition(11);
-    RequestSourceLocationsForRenamingMessage message(clangBackEndFilePath.clone(),
-                                                     2,
-                                                     5,
-                                                     fileContent,
-                                                     commandLine.clone(),
-                                                     1);
-
-    EXPECT_CALL(mockRefactoringServer, requestSourceLocationsForRenamingMessage(message))
-        .Times(1);
-
-    engine.startLocalRenaming(CppTools::CursorInEditor{cursor, filePath},
-                              projectPart.data(), {});
-}
-
-TEST_F(RefactoringEngine, AfterSendRequestSourceLocationsForRenamingMessageIsUnusable)
-{
-    EXPECT_CALL(mockRefactoringServer, requestSourceLocationsForRenamingMessage(_));
-
-    engine.startLocalRenaming(CppTools::CursorInEditor{cursor, filePath},
-                              projectPart.data(), {});
-
-    ASSERT_FALSE(engine.isRefactoringEngineAvailable());
-}
 
 TEST_F(RefactoringEngine, ExpectSourceUsagesAtInFindUsages)
 {
@@ -143,17 +126,5 @@ TEST_F(RefactoringEngine, ServerIsUsableForUsableEngine)
 
     ASSERT_TRUE(mockRefactoringServer.isAvailable());
 }
-
-void RefactoringEngine::SetUp()
-{
-    projectPart = CppTools::ProjectPart::Ptr(new CppTools::ProjectPart);
-    projectPart->files.push_back(projectFile);
-
-    CompilerOptionsBuilder optionsBuilder(*projectPart);
-    commandLine = Utils::SmallStringVector(
-        optionsBuilder.build(projectFile.kind, CppTools::UsePrecompiledHeaders::No));
-    commandLine.push_back(qStringFilePath);
-}
-
 }
 

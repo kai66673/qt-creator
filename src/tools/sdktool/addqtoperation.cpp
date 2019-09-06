@@ -231,7 +231,7 @@ bool AddQtOperation::test() const
     if (!result.isEmpty())
         return false;
 
-    // Make sure name is unique:
+    // add 2nd Qt version:
     map = addQt(map, QLatin1String("testId2"), QLatin1String("Test Qt Version"), QLatin1String("testType3"),
                 QLatin1String("/tmp/test/qmake2"),
                 KeyValuePairList() << KeyValuePair(QLatin1String("extraData"), QVariant(QLatin1String("extraValue"))),
@@ -251,7 +251,7 @@ bool AddQtOperation::test() const
             || !version1.contains(QLatin1String(ID))
             || version1.value(QLatin1String(ID)).toInt() != -1
             || !version1.contains(QLatin1String(DISPLAYNAME))
-            || version1.value(QLatin1String(DISPLAYNAME)).toString() != QLatin1String("Test Qt Version2")
+            || version1.value(QLatin1String(DISPLAYNAME)).toString() != QLatin1String("Test Qt Version")
             || !version1.contains(QLatin1String(AUTODETECTED))
             || version1.value(QLatin1String(AUTODETECTED)).toBool() != true
             || !version1.contains(QLatin1String(AUTODETECTION_SOURCE))
@@ -296,20 +296,13 @@ QVariantMap AddQtOperation::addQt(const QVariantMap &map,
     }
     const QString qt = QString::fromLatin1(PREFIX) + QString::number(versionCount);
 
-    // Sanity check: Make sure displayName is unique.
-    QStringList nameKeys = FindKeyOperation::findKey(map, QLatin1String(DISPLAYNAME));
-    QStringList nameList;
-    foreach (const QString &nameKey, nameKeys)
-        nameList << GetOperation::get(map, nameKey).toString();
-    const QString uniqueName = makeUnique(displayName, nameList);
-
     // Sanitize qmake path:
     QString saneQmake = QDir::cleanPath(QDir::fromNativeSeparators(qmake));
 
     // insert data:
     KeyValuePairList data;
     data << KeyValuePair(QStringList() << qt << QLatin1String(ID), QVariant(-1));
-    data << KeyValuePair(QStringList() << qt << QLatin1String(DISPLAYNAME), QVariant(uniqueName));
+    data << KeyValuePair(QStringList() << qt << QLatin1String(DISPLAYNAME), QVariant(displayName));
     data << KeyValuePair(QStringList() << qt << QLatin1String(AUTODETECTED), QVariant(true));
     data << KeyValuePair(QStringList() << qt << QLatin1String(AUTODETECTION_SOURCE), QVariant(sdkId));
     data << KeyValuePair(QStringList() << qt << QLatin1String(QMAKE), QVariant(saneQmake));

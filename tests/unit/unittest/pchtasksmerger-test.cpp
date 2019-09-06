@@ -52,9 +52,12 @@ protected:
 protected:
     NiceMock<MockPchTaskQueue> mockPchTaskQueue;
     ClangBackEnd::PchTasksMerger merger{mockPchTaskQueue};
-    PchTask systemTask1{"ProjectPart1",
+    PchTask systemTask1{1,
                         {1, 2},
-                        {1, 2, 3},
+                        {},
+                        {},
+                        {},
+                        {},
                         {{"YI", "1", 1}, {"SAN", "3", 3}},
                         {"YI", "LIANG"},
                         {"--yi"},
@@ -63,9 +66,12 @@ protected:
                          {"/framework/path", 1, IncludeSearchPathType::System}},
                         {{"/to/path1", 1, IncludeSearchPathType::User},
                          {"/to/path2", 2, IncludeSearchPathType::User}}};
-    PchTask projectTask1{"ProjectPart1",
+    PchTask projectTask1{1,
                          {11, 12},
                          {11, 12},
+                         {21, 22},
+                         {31, 32},
+                         {41, 42},
                          {{"SE", "4", 4}, {"WU", "5", 5}},
                          {"ER", "SAN"},
                          {"--yi"},
@@ -73,9 +79,12 @@ protected:
                           {"/builtin/path", 2, IncludeSearchPathType::BuiltIn}},
                          {{"/to/path1", 1, IncludeSearchPathType::User},
                           {"/to/path2", 2, IncludeSearchPathType::User}}};
-    PchTask systemTask2{"ProjectPart2",
+    PchTask systemTask2{2,
                         {11, 12},
-                        {11, 12, 13},
+                        {},
+                        {},
+                        {},
+                        {},
                         {{"SE", "4", 4}, {"WU", "5", 5}},
                         {"ER", "SAN"},
                         {"--yi"},
@@ -84,9 +93,12 @@ protected:
                          {"/framework/path", 1, IncludeSearchPathType::System}},
                         {{"/to/path1", 1, IncludeSearchPathType::User},
                          {"/to/path2", 2, IncludeSearchPathType::User}}};
-    PchTask projectTask2{"ProjectPart2",
+    PchTask projectTask2{2,
                          {11, 12},
                          {11, 12},
+                         {21, 22},
+                         {31, 32},
+                         {41, 42},
                          {{"SE", "4", 4}, {"WU", "5", 5}},
                          {"ER", "SAN"},
                          {"--yi"},
@@ -95,9 +107,12 @@ protected:
                           {"/framework/path", 1, IncludeSearchPathType::System}},
                          {{"/to/path1", 1, IncludeSearchPathType::User},
                           {"/to/path2", 2, IncludeSearchPathType::User}}};
-    PchTask systemTask3{"ProjectPart3",
+    PchTask systemTask3{3,
                         {1, 2},
-                        {1, 2},
+                        {},
+                        {},
+                        {},
+                        {},
                         {{"YI", "2", 1}, {"SAN", "3", 3}},
                         {"YI", "LIANG"},
                         {"--yi"},
@@ -147,9 +162,9 @@ TEST_F(PchTasksMerger, AddSystemOnlyOneTask)
 
 TEST_F(PchTasksMerger, RemoveTasks)
 {
-    EXPECT_CALL(mockPchTaskQueue, removePchTasks(ElementsAre("project1", "project2")));
+    EXPECT_CALL(mockPchTaskQueue, removePchTasks(ElementsAre(1, 2)));
 
-    merger.removePchTasks({"project1", "project2"});
+    merger.removePchTasks({1, 2});
 }
 
 TEST_F(PchTasksMerger, MergeMacros)
@@ -268,32 +283,39 @@ TEST_F(PchTasksMerger, DontMergeIncludes)
     ASSERT_THAT(systemTask1.includes, ElementsAre(1, 2));
 }
 
-TEST_F(PchTasksMerger, MergeAllIncludes)
+TEST_F(PchTasksMerger, DontMergeWatchedSystemSources)
 {
     Merger::mergePchTasks(systemTask1, systemTask2);
 
-    ASSERT_THAT(systemTask1.allIncludes, ElementsAre(1, 2, 3, 11, 12, 13));
+    ASSERT_THAT(systemTask1.watchedSystemIncludes, IsEmpty());
 }
 
-TEST_F(PchTasksMerger, DontAllMergeIncludes)
+TEST_F(PchTasksMerger, DontMergeWatchedProjectSources)
 {
     Merger::mergePchTasks(systemTask1, systemTask3);
 
-    ASSERT_THAT(systemTask1.allIncludes, ElementsAre(1, 2, 3));
+    ASSERT_THAT(systemTask1.watchedProjectIncludes, IsEmpty());
+}
+
+TEST_F(PchTasksMerger, DontMergeWatchedUserSources)
+{
+    Merger::mergePchTasks(systemTask1, systemTask3);
+
+    ASSERT_THAT(systemTask1.watchedUserSources, IsEmpty());
 }
 
 TEST_F(PchTasksMerger, MergeProjectIds)
 {
     Merger::mergePchTasks(systemTask1, systemTask2);
 
-    ASSERT_THAT(systemTask1.projectPartIds, ElementsAre("ProjectPart1", "ProjectPart2"));
+    ASSERT_THAT(systemTask1.projectPartIds, ElementsAre(1, 2));
 }
 
 TEST_F(PchTasksMerger, DontMergeProjectIds)
 {
     Merger::mergePchTasks(systemTask1, systemTask3);
 
-    ASSERT_THAT(systemTask1.projectPartIds, ElementsAre("ProjectPart1"));
+    ASSERT_THAT(systemTask1.projectPartIds, ElementsAre(1));
 }
 
 TEST_F(PchTasksMerger, MergeIncludeSearchPaths)

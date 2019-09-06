@@ -48,6 +48,7 @@
 #include <utils/utilsicons.h>
 
 #include <QHeaderView>
+#include <QTimer>
 
 
 static inline void setScenePos(const QmlDesigner::ModelNode &modelNode,const QPointF &pos)
@@ -147,15 +148,21 @@ void NavigatorView::modelAttached(Model *model)
 {
     AbstractView::modelAttached(model);
 
-    m_currentModelInterface->setFilter(
-                DesignerSettings::getValue(DesignerSettingsKey::NAVIGATOR_SHOW_ONLY_VISIBLE_ITEMS).toBool());
-
     QTreeView *treeView = treeWidget();
-    treeView->expandAll();
 
     treeView->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     treeView->header()->resizeSection(1,26);
     treeView->setIndentation(20);
+
+    m_currentModelInterface->setFilter(false);
+
+
+    QTimer::singleShot(0, this, [this, treeView]() {
+        m_currentModelInterface->setFilter(
+                    DesignerSettings::getValue(DesignerSettingsKey::NAVIGATOR_SHOW_ONLY_VISIBLE_ITEMS).toBool());
+        treeView->expandAll();
+    });
+
 #ifdef _LOCK_ITEMS_
     treeView->header()->resizeSection(2,20);
 #endif
@@ -191,16 +198,10 @@ void NavigatorView::handleChangedExport(const ModelNode &modelNode, bool exporte
     if (rootNode.hasProperty(modelNodeId))
         rootNode.removeProperty(modelNodeId);
     if (exported) {
-        try {
-            RewriterTransaction transaction =
-                    beginRewriterTransaction(QByteArrayLiteral("NavigatorTreeModel:exportItem"));
-
+        executeInTransaction("NavigatorTreeModel:exportItem", [this, modelNode](){
             QmlObjectNode qmlObjectNode(modelNode);
             qmlObjectNode.ensureAliasExport();
-            transaction.commit();
-        }  catch (RewritingException &exception) { //better safe than sorry! There always might be cases where we fail
-            exception.showException();
-        }
+        });
     }
 }
 
@@ -393,7 +394,8 @@ void NavigatorView::upButtonClicked()
             index--;
             if (index < 0)
                 index = node.parentProperty().count() - 1; //wrap around
-            node.parentProperty().toNodeListProperty().slide(oldIndex, index);
+            if (oldIndex != index)
+                node.parentProperty().toNodeListProperty().slide(oldIndex, index);
         }
     }
     updateItemSelection();
@@ -410,7 +412,8 @@ void NavigatorView::downButtonClicked()
             index++;
             if (index >= node.parentProperty().count())
                 index = 0; //wrap around
-            node.parentProperty().toNodeListProperty().slide(oldIndex, index);
+            if (oldIndex != index)
+                node.parentProperty().toNodeListProperty().slide(oldIndex, index);
         }
     }
     updateItemSelection();

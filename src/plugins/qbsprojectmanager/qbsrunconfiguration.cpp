@@ -26,12 +26,15 @@
 #include "qbsrunconfiguration.h"
 
 #include "qbsnodes.h"
+#include "qbspmlogging.h"
 #include "qbsprojectmanagerconstants.h"
 #include "qbsproject.h"
 
+#include <projectexplorer/buildmanager.h>
 #include <projectexplorer/deploymentdata.h>
 #include <projectexplorer/localenvironmentaspect.h>
 #include <projectexplorer/project.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/runconfigurationaspects.h>
 #include <projectexplorer/target.h>
 
@@ -52,12 +55,18 @@ namespace Internal {
 QbsRunConfiguration::QbsRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto envAspect = addAspect<LocalEnvironmentAspect>(target,
-            [this](Environment &env) { addToBaseEnvironment(env); });
+    auto envAspect = addAspect<LocalEnvironmentAspect>(target);
+    envAspect->addModifier([this](Environment &env) {
+        bool usingLibraryPaths = aspect<UseLibraryPathsAspect>()->value();
+
+        BuildTargetInfo bti = buildTargetInfo();
+        if (bti.runEnvModifier)
+            bti.runEnvModifier(env, usingLibraryPaths);
+    });
 
     addAspect<ExecutableAspect>();
     addAspect<ArgumentsAspect>();
-    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<WorkingDirectoryAspect>();
     addAspect<TerminalAspect>();
 
     setOutputFormatter<QtSupport::QtOutputFormatter>();
@@ -69,6 +78,10 @@ QbsRunConfiguration::QbsRunConfiguration(Target *target, Core::Id id)
         auto dyldAspect = addAspect<UseDyldSuffixAspect>();
         connect(dyldAspect, &UseDyldSuffixAspect::changed,
                 envAspect, &EnvironmentAspect::environmentChanged);
+        envAspect->addModifier([dyldAspect](Environment &env) {
+            if (dyldAspect->value())
+                env.set("DYLD_IMAGE_SUFFIX", "_debug");
+        });
     }
 
     connect(project(), &Project::parsingFinished, this,
@@ -83,7 +96,6 @@ QbsRunConfiguration::QbsRunConfiguration(Target *target, Core::Id id)
             this, &QbsRunConfiguration::updateTargetInformation);
 
     auto qbsProject = static_cast<QbsProject *>(target->project());
-    connect(qbsProject, &QbsProject::dataChanged, this, [this] { m_envCache.clear(); });
     connect(qbsProject, &Project::parsingFinished,
             this, &QbsRunConfiguration::updateTargetInformation);
 }
@@ -108,36 +120,16 @@ void QbsRunConfiguration::doAdditionalSetup(const RunConfigurationCreationInfo &
     updateTargetInformation();
 }
 
-void QbsRunConfiguration::addToBaseEnvironment(Utils::Environment &env) const
+Utils::FilePath QbsRunConfiguration::executableToRun(const BuildTargetInfo &targetInfo) const
 {
-    if (auto dyldAspect = aspect<UseDyldSuffixAspect>()) {
-        if (dyldAspect->value())
-            env.set("DYLD_IMAGE_SUFFIX", "_debug");
-    }
-    bool usingLibraryPaths = aspect<UseLibraryPathsAspect>()->value();
-
-    const auto key = qMakePair(env.toStringList(), usingLibraryPaths);
-    const auto it = m_envCache.constFind(key);
-    if (it != m_envCache.constEnd()) {
-        env = it.value();
-        return;
-    }
-    BuildTargetInfo bti = buildTargetInfo();
-    if (bti.runEnvModifier)
-        bti.runEnvModifier(env, usingLibraryPaths);
-    m_envCache.insert(key, env);
-}
-
-Utils::FileName QbsRunConfiguration::executableToRun(const BuildTargetInfo &targetInfo) const
-{
-    const FileName appInBuildDir = targetInfo.targetFilePath;
+    const FilePath appInBuildDir = targetInfo.targetFilePath;
     if (target()->deploymentData().localInstallRoot().isEmpty())
         return appInBuildDir;
     const QString deployedAppFilePath = target()->deploymentData()
             .deployableForLocalFile(appInBuildDir.toString()).remoteFilePath();
     if (deployedAppFilePath.isEmpty())
         return appInBuildDir;
-    const FileName appInLocalInstallDir = target()->deploymentData().localInstallRoot()
+    const FilePath appInLocalInstallDir = target()->deploymentData().localInstallRoot()
             + deployedAppFilePath;
     return appInLocalInstallDir.exists() ? appInLocalInstallDir : appInBuildDir;
 }
@@ -145,10 +137,9 @@ Utils::FileName QbsRunConfiguration::executableToRun(const BuildTargetInfo &targ
 void QbsRunConfiguration::updateTargetInformation()
 {
     BuildTargetInfo bti = buildTargetInfo();
-    const FileName executable = executableToRun(bti);
+    const FilePath executable = executableToRun(bti);
     auto terminalAspect = aspect<TerminalAspect>();
-    if (!terminalAspect->isUserSet())
-        terminalAspect->setUseTerminal(bti.usesTerminal);
+    terminalAspect->setUseTerminalHint(bti.usesTerminal);
 
     aspect<ExecutableAspect>()->setExecutable(executable);
 
@@ -156,19 +147,11 @@ void QbsRunConfiguration::updateTargetInformation()
         QString defaultWorkingDir = QFileInfo(executable.toString()).absolutePath();
         if (!defaultWorkingDir.isEmpty()) {
             auto wdAspect = aspect<WorkingDirectoryAspect>();
-            wdAspect->setDefaultWorkingDirectory(FileName::fromString(defaultWorkingDir));
+            wdAspect->setDefaultWorkingDirectory(FilePath::fromString(defaultWorkingDir));
         }
     }
 
     emit enabledChanged();
-}
-
-bool QbsRunConfiguration::canRunForNode(const Node *node) const
-{
-    if (auto pn = dynamic_cast<const QbsProductNode *>(node))
-        return buildKey() == pn->buildKey();
-
-    return false;
 }
 
 // --------------------------------------------------------------------
@@ -180,8 +163,6 @@ QbsRunConfigurationFactory::QbsRunConfigurationFactory()
     registerRunConfiguration<QbsRunConfiguration>("Qbs.RunConfiguration:");
     addSupportedProjectType(Constants::PROJECT_ID);
     addSupportedTargetDeviceType(ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE);
-
-    addRunWorkerFactory<SimpleTargetRunner>(ProjectExplorer::Constants::NORMAL_RUN_MODE);
 }
 
 } // namespace Internal

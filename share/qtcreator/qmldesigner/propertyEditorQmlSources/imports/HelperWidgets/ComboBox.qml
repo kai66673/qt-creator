@@ -24,15 +24,16 @@
 ****************************************************************************/
 
 import QtQuick 2.1
-import QtQuick.Controls 1.1 as Controls
 import QtQuick.Controls.Styles 1.1
+import StudioControls 1.0 as StudioControls
+import StudioTheme 1.0 as StudioTheme
 
-Controls.ComboBox {
+StudioControls.ComboBox {
     id: comboBox
 
     property variant backendValue
 
-    property color textColor: colorLogic.textColor
+    labelColor: edit ? StudioTheme.Values.themeTextColor : colorLogic.textColor
     property string scope: "Qt"
 
     property bool useInteger: false
@@ -45,24 +46,35 @@ Controls.ComboBox {
 
     property bool block: false
 
+    property bool showExtendedFunctionButton: true
+
+    ExtendedFunctionLogic {
+        id: extFuncLogic
+        backendValue: comboBox.backendValue
+    }
+
+    actionIndicator.icon.color: extFuncLogic.color
+    actionIndicator.icon.text: extFuncLogic.glyph
+    actionIndicator.onClicked: extFuncLogic.show()
+
+    actionIndicator.visible: comboBox.showExtendedFunctionButton
+
     ColorLogic {
         id: colorLogic
         backendValue: comboBox.backendValue
-        onValueFromBackendChanged: {
-            invalidate();
-        }
+        onValueFromBackendChanged: colorLogic.invalidate()
 
         function invalidate() {
 
-            if (block)
+            if (comboBox.block)
                 return
 
-            block = true
+            comboBox.block = true
 
-            if (manualMapping) {
-                valueFromBackendChanged();
+            if (comboBox.manualMapping) {
+                comboBox.valueFromBackendChanged()
             } else if (!comboBox.useInteger) {
-                var enumString = comboBox.backendValue.enumeration;
+                var enumString = comboBox.backendValue.enumeration
 
                 if (enumString === "")
                     enumString = comboBox.backendValue.value
@@ -76,44 +88,33 @@ Controls.ComboBox {
                     comboBox.currentIndex = index
 
             } else {
-                if (comboBox.currentIndex !== backendValue.value)
-                    comboBox.currentIndex = backendValue.value
+                if (comboBox.currentIndex !== comboBox.backendValue.value)
+                    comboBox.currentIndex = comboBox.backendValue.value
             }
 
-            block = false
+            comboBox.block = false
         }
     }
 
-    onCurrentTextChanged: {
-        if (!__isCompleted)
-            return;
+    onCompressedActivated: {
+        if (!comboBox.__isCompleted)
+            return
 
-        if (backendValue === undefined)
-            return;
+        if (comboBox.backendValue === undefined)
+            return
 
-        if (manualMapping)
-            return;
+        if (comboBox.manualMapping)
+            return
 
         if (!comboBox.useInteger) {
-            backendValue.setEnumeration(comboBox.scope, comboBox.currentText);
+            comboBox.backendValue.setEnumeration(comboBox.scope, comboBox.currentText)
         } else {
-            backendValue.value = comboBox.currentIndex;
+            comboBox.backendValue.value = comboBox.currentIndex
         }
     }
 
     Component.onCompleted: {
         colorLogic.invalidate()
-        __isCompleted = true;
-    }
-
-    style: CustomComboBoxStyle {
-        textColor: comboBox.textColor
-    }
-
-    ExtendedFunctionButton {
-        x: 2
-        anchors.verticalCenter: parent.verticalCenter
-        backendValue: comboBox.backendValue
-        visible: comboBox.enabled
+        comboBox.__isCompleted = true
     }
 }

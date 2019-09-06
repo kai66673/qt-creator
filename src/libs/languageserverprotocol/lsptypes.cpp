@@ -53,8 +53,8 @@ Utils::optional<Diagnostic::Code> Diagnostic::code() const
     if (codeValue.isUndefined())
         return Utils::nullopt;
     QJsonValue::Type type = it.value().type();
-    QTC_ASSERT(type == QJsonValue::String || type == QJsonValue::Double,
-               return Utils::make_optional(Code(QString())));
+    if (type != QJsonValue::String && type != QJsonValue::Double)
+        return Utils::make_optional(Code(QString()));
     return Utils::make_optional(codeValue.isDouble() ? Code(codeValue.toInt())
                                                      : Code(codeValue.toString()));
 }
@@ -81,8 +81,7 @@ Utils::optional<WorkspaceEdit::Changes> WorkspaceEdit::changes() const
     auto it = find(changesKey);
     if (it == end())
         return Utils::nullopt;
-    QTC_ASSERT(it.value().type() == QJsonValue::Object, return Changes());
-    QJsonObject changesObject(it.value().toObject());
+    const QJsonObject &changesObject = it.value().toObject();
     Changes changesResult;
     for (const QString &key : changesObject.keys())
         changesResult[DocumentUri::fromProtocol(key)] = LanguageClientArray<TextEdit>(changesObject.value(key)).toList();
@@ -122,11 +121,13 @@ MarkupOrString::MarkupOrString(const MarkupContent &val)
 
 MarkupOrString::MarkupOrString(const QJsonValue &val)
 {
-    QTC_ASSERT(val.isString() | val.isObject(), return);
-    if (val.isString())
+    if (val.isString()) {
         emplace<QString>(val.toString());
-    else
-        emplace<MarkupContent>(MarkupContent(val.toObject()));
+    } else {
+        MarkupContent markupContent(val.toObject());
+        if (markupContent.isValid(nullptr))
+            emplace<MarkupContent>(MarkupContent(val.toObject()));
+    }
 }
 
 bool MarkupOrString::isValid(QStringList *error) const
@@ -323,8 +324,10 @@ Position::Position(const QTextCursor &cursor)
 int Position::toPositionInDocument(QTextDocument *doc) const
 {
     const QTextBlock block = doc->findBlockByNumber(line());
-    if (!block.isValid() || block.length() <= character())
+    if (!block.isValid())
         return -1;
+    if (block.length() <= character())
+        return block.position() + block.length();
     return block.position() + character();
 }
 
@@ -359,7 +362,7 @@ bool Range::overlaps(const Range &range) const
     return contains(range.start()) || contains(range.end());
 }
 
-bool DocumentFilter::applies(const Utils::FileName &fileName, const Utils::MimeType &mimeType) const
+bool DocumentFilter::applies(const Utils::FilePath &fileName, const Utils::MimeType &mimeType) const
 {
     if (Utils::optional<QString> _scheme = scheme()) {
         if (_scheme.value() == fileName.toString())
@@ -401,18 +404,32 @@ Utils::Link Location::toLink() const
 
 DocumentUri::DocumentUri(const QString &other)
     : QUrl(QUrl::fromPercentEncoding(other.toLocal8Bit()))
-{
-    QTC_ASSERT(isValid(), qWarning() << other);
-}
+{ }
 
-DocumentUri::DocumentUri(const Utils::FileName &other)
+DocumentUri::DocumentUri(const Utils::FilePath &other)
     : QUrl(QUrl::fromLocalFile(other.toString()))
 { }
 
-Utils::FileName DocumentUri::toFileName() const
+Utils::FilePath DocumentUri::toFileName() const
 {
-    return isLocalFile() ? Utils::FileName::fromUserInput(QUrl(*this).toLocalFile())
-                         : Utils::FileName();
+    return isLocalFile() ? Utils::FilePath::fromUserInput(QUrl(*this).toLocalFile())
+                         : Utils::FilePath();
+}
+
+MarkupKind::MarkupKind(const QJsonValue &value)
+{
+    m_value = value.toString() == "markdown" ? markdown : plaintext;
+}
+
+LanguageServerProtocol::MarkupKind::operator QJsonValue() const
+{
+    switch (m_value) {
+    case MarkupKind::markdown:
+        return "markdown";
+    case MarkupKind::plaintext:
+        return "plaintext";
+    }
+    return {};
 }
 
 } // namespace LanguageServerProtocol

@@ -73,7 +73,7 @@ void XcodebuildParser::stdOutput(const QString &line)
             Task task(Task::Warning,
                       QCoreApplication::translate("ProjectExplorer::XcodebuildParser",
                                                   "Replacing signature"),
-                      Utils::FileName::fromString(
+                      Utils::FilePath::fromString(
                           lne.left(lne.size() - QLatin1String(signatureChangeEndsWithPattern).size())), /* filename */
                       -1, /* line */
                       Constants::TASK_CATEGORY_COMPILE);
@@ -96,7 +96,7 @@ void XcodebuildParser::stdError(const QString &line)
         Task task(Task::Error,
                   QCoreApplication::translate("ProjectExplorer::XcodebuildParser",
                                               "Xcodebuild failed."),
-                  Utils::FileName(), /* filename */
+                  Utils::FilePath(), /* filename */
                   -1, /* line */
                   Constants::TASK_CATEGORY_COMPILE);
         taskAdded(task);
@@ -139,7 +139,7 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
     QTest::addColumn<OutputParserTester::Channel>("inputChannel");
     QTest::addColumn<QString>("childStdOutLines");
     QTest::addColumn<QString>("childStdErrLines");
-    QTest::addColumn<QList<Task> >("tasks");
+    QTest::addColumn<Tasks >("tasks");
     QTest::addColumn<QString>("outputLines");
     QTest::addColumn<ProjectExplorer::XcodebuildParser::XcodebuildStatus>("finalStatus");
 
@@ -147,42 +147,42 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
             << XcodebuildParser::OutsideXcodebuild
             << QString::fromLatin1("Sometext") << OutputParserTester::STDOUT
             << QString::fromLatin1("Sometext\n") << QString()
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::OutsideXcodebuild;
     QTest::newRow("outside pass-through stderr")
             << XcodebuildParser::OutsideXcodebuild
             << QString::fromLatin1("Sometext") << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("Sometext\n")
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::OutsideXcodebuild;
     QTest::newRow("inside pass stdout to stderr")
             << XcodebuildParser::InXcodebuild
             << QString::fromLatin1("Sometext") << OutputParserTester::STDOUT
             << QString() << QString::fromLatin1("Sometext\n")
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::InXcodebuild;
     QTest::newRow("inside ignore stderr")
             << XcodebuildParser::InXcodebuild
             << QString::fromLatin1("Sometext") << OutputParserTester::STDERR
             << QString() << QString()
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::InXcodebuild;
     QTest::newRow("unknown pass stdout to stderr")
             << XcodebuildParser::UnknownXcodebuildState
             << QString::fromLatin1("Sometext") << OutputParserTester::STDOUT
             << QString() << QString::fromLatin1("Sometext\n")
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::UnknownXcodebuildState;
     QTest::newRow("unknown ignore stderr (change?)")
             << XcodebuildParser::UnknownXcodebuildState
             << QString::fromLatin1("Sometext") << OutputParserTester::STDERR
             << QString() << QString()
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::UnknownXcodebuildState;
     QTest::newRow("switch outside->in->outside")
@@ -196,7 +196,7 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
                                    "outside2")
             << OutputParserTester::STDOUT
             << QString::fromLatin1("outside\noutside2\n") << QString::fromLatin1("in xcodebuild\nin xcodebuild2\n")
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::OutsideXcodebuild;
     QTest::newRow("switch Unknown->in->outside")
@@ -208,7 +208,7 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
                                    "outside")
             << OutputParserTester::STDOUT
             << QString::fromLatin1("outside\n") << QString::fromLatin1("unknown\nin xcodebuild\n")
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::OutsideXcodebuild;
     QTest::newRow("switch in->unknown")
@@ -218,12 +218,12 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
                                    "unknownErr")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(
                     Task::Error,
                     QCoreApplication::translate("ProjectExplorer::XcodebuildParser",
                                                 "Xcodebuild failed."),
-                    Utils::FileName(), /* filename */
+                    Utils::FilePath(), /* filename */
                     -1, /* line */
                     Constants::TASK_CATEGORY_COMPILE))
             << QString()
@@ -235,12 +235,12 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
                                    "unknownErr")
             << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("outErr\n")
-            << (QList<Task>()
+            << (Tasks()
                 << Task(
                     Task::Error,
                     QCoreApplication::translate("ProjectExplorer::XcodebuildParser",
                                                 "Xcodebuild failed."),
-                    Utils::FileName(), /* filename */
+                    Utils::FilePath(), /* filename */
                     -1, /* line */
                     Constants::TASK_CATEGORY_COMPILE))
             << QString()
@@ -249,11 +249,11 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
             << XcodebuildParser::InXcodebuild
             << QString::fromLatin1("/somepath/somefile.app: replacing existing signature") << OutputParserTester::STDOUT
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Warning,
                         QCoreApplication::translate("ProjectExplorer::XcodebuildParser",
                                                     "Replacing signature"),
-                        Utils::FileName::fromString(QLatin1String("/somepath/somefile.app")), /* filename */
+                        Utils::FilePath::fromString(QLatin1String("/somepath/somefile.app")), /* filename */
                         -1, /* line */
                         Constants::TASK_CATEGORY_COMPILE))
             << QString()
@@ -262,7 +262,7 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing_data()
             << XcodebuildParser::OutsideXcodebuild
             << QString::fromLatin1("/somepath/somefile.app: replacing existing signature") << OutputParserTester::STDOUT
             << QString::fromLatin1("/somepath/somefile.app: replacing existing signature\n") << QString()
-            << QList<Task>()
+            << Tasks()
             << QString()
             << XcodebuildParser::OutsideXcodebuild;
 }
@@ -282,7 +282,7 @@ void ProjectExplorerPlugin::testXcodebuildParserParsing()
     QFETCH(OutputParserTester::Channel, inputChannel);
     QFETCH(QString, childStdOutLines);
     QFETCH(QString, childStdErrLines);
-    QFETCH(QList<Task>, tasks);
+    QFETCH(Tasks, tasks);
     QFETCH(QString, outputLines);
     QFETCH(ProjectExplorer::XcodebuildParser::XcodebuildStatus, finalStatus);
 

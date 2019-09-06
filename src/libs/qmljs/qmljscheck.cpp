@@ -29,6 +29,7 @@
 #include "qmljsutils.h"
 #include "parser/qmljsast_p.h"
 
+#include <utils/algorithm.h>
 #include <utils/qtcassert.h>
 
 #include <QColor>
@@ -384,6 +385,7 @@ protected:
         _possiblyUndeclaredUses.clear();
         _seenNonDeclarationStatement = false;
         _formalParameterNames.clear();
+        QTC_ASSERT(_block == 0, _block = 0);
     }
 
     void postVisit(Node *ast)
@@ -399,8 +401,11 @@ protected:
         if (ast->name.isEmpty())
             return false;
         const QString &name = ast->name.toString();
-        if (!_declaredFunctions.contains(name) && !_declaredVariables.contains(name))
+        if (!_declaredFunctions.contains(name)
+                && !(_declaredVariables.contains(name)
+                     || _declaredBlockVariables.contains({name, _block}))) {
             _possiblyUndeclaredUses[name].append(ast->identifierToken);
+        }
         return false;
     }
 
@@ -416,13 +421,26 @@ protected:
         if (ast->bindingIdentifier.isEmpty() || !ast->isVariableDeclaration())
             return true;
         const QString &name = ast->bindingIdentifier.toString();
-
-        if (_formalParameterNames.contains(name))
+        VariableScope scope = ast->scope;
+        if (_formalParameterNames.contains(name)) {
             addMessage(WarnAlreadyFormalParameter, ast->identifierToken, name);
-        else if (_declaredFunctions.contains(name))
+        } else if (_declaredFunctions.contains(name)) {
             addMessage(WarnAlreadyFunction, ast->identifierToken, name);
-        else if (_declaredVariables.contains(name))
-            addMessage(WarnDuplicateDeclaration, ast->identifierToken, name);
+        } else if (scope == VariableScope::Let || scope == VariableScope::Const) {
+            if (_declaredBlockVariables.contains({name, _block}))
+                addMessage(WarnDuplicateDeclaration, ast->identifierToken, name);
+        } else if (scope == VariableScope::Var) {
+            if (_declaredVariables.contains(name)) {
+                addMessage(WarnDuplicateDeclaration, ast->identifierToken, name);
+            } else {
+                for (auto k : _declaredBlockVariables.keys()) {
+                    if (k.first == name) {
+                        addMessage(WarnDuplicateDeclaration, ast->identifierToken, name);
+                        break;
+                    }
+                }
+            }
+        }
 
         if (_possiblyUndeclaredUses.contains(name)) {
             foreach (const SourceLocation &loc, _possiblyUndeclaredUses.value(name)) {
@@ -430,7 +448,10 @@ protected:
             }
             _possiblyUndeclaredUses.remove(name);
         }
-        _declaredVariables[name] = ast;
+        if (scope == VariableScope::Let || scope == VariableScope::Const)
+            _declaredBlockVariables[{name, _block}] = ast;
+        else
+            _declaredVariables[name] = ast;
 
         return true;
     }
@@ -451,7 +472,7 @@ protected:
 
         if (_formalParameterNames.contains(name))
             addMessage(WarnAlreadyFormalParameter, ast->identifierToken, name);
-        else if (_declaredVariables.contains(name))
+        else if (_declaredVariables.contains(name) || _declaredBlockVariables.contains({name, _block}))
             addMessage(WarnAlreadyVar, ast->identifierToken, name);
         else if (_declaredFunctions.contains(name))
             addMessage(WarnDuplicateDeclaration, ast->identifierToken, name);
@@ -469,6 +490,25 @@ protected:
         return false;
     }
 
+    bool visit(Block *) override
+    {
+        ++_block;
+        return true;
+    }
+
+    void endVisit(Block *) override
+    {
+        auto it = _declaredBlockVariables.begin();
+        auto end = _declaredBlockVariables.end();
+        while (it != end) {
+            if (it.key().second == _block)
+                it = _declaredBlockVariables.erase(it);
+            else
+                ++it;
+        }
+        --_block;
+    }
+
 private:
     void addMessage(Type type, const SourceLocation &loc, const QString &arg1 = QString())
     {
@@ -478,9 +518,11 @@ private:
     QList<Message> _messages;
     QStringList _formalParameterNames;
     QHash<QString, PatternElement *> _declaredVariables;
+    QHash<QPair<QString, uint>, PatternElement *> _declaredBlockVariables;
     QHash<QString, FunctionDeclaration *> _declaredFunctions;
     QHash<QString, QList<SourceLocation> > _possiblyUndeclaredUses;
     bool _seenNonDeclarationStatement;
+    uint _block = 0;
 };
 
 class IdsThatShouldNotBeUsedInDesigner  : public QStringList
@@ -625,7 +667,7 @@ Check::Check(Document::Ptr doc, const ContextPtr &context)
         _isQtQuick2 = isQtQuick2();
     }
 
-    _enabledMessages = Message::allMessageTypes().toSet();
+    _enabledMessages = Utils::toSet(Message::allMessageTypes());
     disableMessage(HintAnonymousFunctionSpacing);
     disableMessage(HintDeclareVarsInOneLine);
     disableMessage(HintDeclarationsShouldBeAtStartOfFunction);
@@ -748,8 +790,8 @@ void Check::endVisit(UiObjectInitializer *)
 {
     m_propertyStack.pop();
     m_typeStack.pop();
-    UiObjectDefinition *objectDenition = cast<UiObjectDefinition *>(parent());
-    if (objectDenition && objectDenition->qualifiedTypeNameId->name == "Component")
+    UiObjectDefinition *objectDefinition = cast<UiObjectDefinition *>(parent());
+    if (objectDefinition && objectDefinition->qualifiedTypeNameId->name == "Component")
         m_idStack.pop();
     UiObjectBinding *objectBinding = cast<UiObjectBinding *>(parent());
     if (objectBinding && objectBinding->qualifiedTypeNameId->name == "Component")
@@ -1498,7 +1540,7 @@ void Check::scanCommentsForAnnotations()
 
         // enable all checks annotation
         if (comment.contains("@enable-all-checks"))
-            _enabledMessages = Message::allMessageTypes().toSet();
+            _enabledMessages = Utils::toSet(Message::allMessageTypes());
 
         // find all disable annotations
         int lastOffset = -1;
@@ -1635,7 +1677,7 @@ bool Check::visit(CallExpression *ast)
     if (!whiteListedFunction && !isMathFunction && !isDateFunction && !isDirectInConnectionsScope)
         addMessage(ErrFunctionsNotSupportedInQmlUi, location);
 
-    static const QStringList globalFunctions = {"String", "Boolean", "Date", "Number", "Object", "QT_TR_NOOP", "QT_TRANSLATE_NOOP", "QT_TRID_NOOP"};
+    static const QStringList globalFunctions = {"String", "Boolean", "Date", "Number", "Object", "Array", "QT_TR_NOOP", "QT_TRANSLATE_NOOP", "QT_TRID_NOOP"};
 
     if (!name.isEmpty() && name.at(0).isUpper() && !globalFunctions.contains(name)) {
         addMessage(WarnExpectedNewWithUppercaseFunction, location);

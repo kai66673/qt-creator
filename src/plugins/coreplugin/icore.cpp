@@ -33,8 +33,10 @@
 
 #include <utils/qtcassert.h>
 
-#include <QSysInfo>
 #include <QApplication>
+#include <QDebug>
+#include <QStandardPaths>
+#include <QSysInfo>
 
 /*!
     \namespace Core
@@ -328,9 +330,11 @@ ICore::ICore(MainWindow *mainwindow)
     m_mainwindow = mainwindow;
     // Save settings once after all plugins are initialized:
     connect(PluginManager::instance(), &PluginManager::initializationDone,
-            this, &ICore::saveSettings);
+            this, [] { ICore::saveSettings(ICore::InitializationDone); });
     connect(PluginManager::instance(), &PluginManager::testsFinished, [this] (int failedTests) {
         emit coreAboutToClose();
+        if (failedTests != 0)
+            qWarning("Test run was not successful: %d test(s) failed.", failedTests);
         QCoreApplication::exit(failedTests);
     });
 }
@@ -437,6 +441,11 @@ QString ICore::userResourcePath()
     }
 
     return urp;
+}
+
+QString ICore::cacheResourcePath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
 }
 
 QString ICore::installerResourcePath()
@@ -681,9 +690,9 @@ void ICore::setupScreenShooter(const QString &name, QWidget *w, const QRect &rc)
         new ScreenShooter(w, name, rc);
 }
 
-void ICore::saveSettings()
+void ICore::saveSettings(SaveSettingsReason reason)
 {
-    emit m_instance->saveSettingsRequested();
+    emit m_instance->saveSettingsRequested(reason);
     m_mainwindow->saveSettings();
 
     ICore::settings(QSettings::SystemScope)->sync();

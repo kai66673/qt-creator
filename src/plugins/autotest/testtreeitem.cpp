@@ -47,8 +47,9 @@ TestTreeItem::TestTreeItem(const QString &name, const QString &filePath, Type ty
     switch (m_type) {
     case Root:
     case GroupNode:
+    case TestSuite:
     case TestCase:
-    case TestFunctionOrSet:
+    case TestFunction:
         m_checked = Qt::Checked;
         break;
     default:
@@ -62,6 +63,7 @@ static QIcon testTreeIcon(TestTreeItem::Type type)
     static QIcon icons[] = {
         QIcon(),
         Utils::Icons::OPENFILE.icon(),
+        QIcon(":/autotest/images/suite.png"),
         Utils::CodeModelIcon::iconForType(Utils::CodeModelIcon::Class),
         Utils::CodeModelIcon::iconForType(Utils::CodeModelIcon::SlotPrivate),
         QIcon(":/autotest/images/data.png")
@@ -120,16 +122,17 @@ Qt::ItemFlags TestTreeItem::flags(int /*column*/) const
     case Root:
     case GroupNode:
         return Qt::ItemIsEnabled | Qt::ItemIsAutoTristate | Qt::ItemIsUserCheckable;
+    case TestSuite:
     case TestCase:
         return defaultFlags | Qt::ItemIsAutoTristate | Qt::ItemIsUserCheckable;
-    case TestFunctionOrSet:
+    case TestFunction:
         return defaultFlags | Qt::ItemIsUserCheckable;
     default:
         return defaultFlags;
     }
 }
 
-bool TestTreeItem::modifyTestCaseContent(const TestParseResult *result)
+bool TestTreeItem::modifyTestCaseOrSuiteContent(const TestParseResult *result)
 {
     bool hasBeenModified = modifyName(result->name);
     hasBeenModified |= modifyLineAndColumn(result);
@@ -170,8 +173,9 @@ Qt::CheckState TestTreeItem::checked() const
     switch (m_type) {
     case Root:
     case GroupNode:
+    case TestSuite:
     case TestCase:
-    case TestFunctionOrSet:
+    case TestFunction:
     case TestDataTag:
         return m_checked;
     default:
@@ -255,7 +259,7 @@ QList<TestConfiguration *> TestTreeItem::getSelectedTestConfigurations() const
     return QList<TestConfiguration *>();
 }
 
-QList<TestConfiguration *> TestTreeItem::getTestConfigurationsForFile(const Utils::FileName &) const
+QList<TestConfiguration *> TestTreeItem::getTestConfigurationsForFile(const Utils::FilePath &) const
 {
     return QList<TestConfiguration *>();
 }
@@ -364,9 +368,9 @@ QSet<QString> TestTreeItem::dependingInternalTargets(CppTools::CppModelManager *
     bool wasHeader;
     const QString correspondingFile
             = CppTools::correspondingHeaderOrSource(file, &wasHeader, CppTools::CacheUsage::ReadOnly);
-    const Utils::FileNameList dependingFiles = snapshot.filesDependingOn(
+    const Utils::FilePathList dependingFiles = snapshot.filesDependingOn(
                 wasHeader ? file : correspondingFile);
-    for (const Utils::FileName &fn : dependingFiles) {
+    for (const Utils::FilePath &fn : dependingFiles) {
         for (const CppTools::ProjectPart::Ptr &part : cppMM->projectPart(fn))
             result.insert(part->buildSystemTarget);
     }

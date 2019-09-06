@@ -1510,8 +1510,7 @@ void ConvertNumericLiteral::match(const CppQuickFixInterface &interface, QuickFi
             0x20
 
         */
-        QString replacement;
-        replacement.sprintf("0x%lX", value);
+        const QString replacement = QString::asprintf("0x%lX", value);
         auto op = new ConvertNumericLiteralOp(interface, start, start + numberLength, replacement);
         op->setDescription(QApplication::translate("CppTools::QuickFix", "Convert to Hexadecimal"));
         op->setPriority(priority);
@@ -1528,8 +1527,7 @@ void ConvertNumericLiteral::match(const CppQuickFixInterface &interface, QuickFi
           With
             040
         */
-        QString replacement;
-        replacement.sprintf("0%lo", value);
+        const QString replacement = QString::asprintf("0%lo", value);
         auto op = new ConvertNumericLiteralOp(interface, start, start + numberLength, replacement);
         op->setDescription(QApplication::translate("CppTools::QuickFix", "Convert to Octal"));
         op->setPriority(priority);
@@ -1546,8 +1544,7 @@ void ConvertNumericLiteral::match(const CppQuickFixInterface &interface, QuickFi
            With
             32
         */
-        QString replacement;
-        replacement.sprintf("%lu", value);
+        const QString replacement = QString::asprintf("%lu", value);
         auto op = new ConvertNumericLiteralOp(interface, start, start + numberLength, replacement);
         op->setDescription(QApplication::translate("CppTools::QuickFix", "Convert to Decimal"));
         op->setPriority(priority);
@@ -1973,16 +1970,16 @@ void AddIncludeForUndefinedIdentifier::match(const CppQuickFixInterface &interfa
 
             Snapshot localForwardHeaders = forwardHeaders;
             localForwardHeaders.insert(interface.snapshot().document(info->fileName()));
-            Utils::FileNameList headerAndItsForwardingHeaders;
-            headerAndItsForwardingHeaders << Utils::FileName::fromString(info->fileName());
+            Utils::FilePathList headerAndItsForwardingHeaders;
+            headerAndItsForwardingHeaders << Utils::FilePath::fromString(info->fileName());
             headerAndItsForwardingHeaders += localForwardHeaders.filesDependingOn(info->fileName());
 
-            foreach (const Utils::FileName &header, headerAndItsForwardingHeaders) {
+            foreach (const Utils::FilePath &header, headerAndItsForwardingHeaders) {
                 const QString include = findShortestInclude(currentDocumentFilePath,
                                                             header.toString(),
                                                             headerPaths);
                 if (include.size() > 2) {
-                    const QString headerFileName = Utils::FileName::fromString(info->fileName()).fileName();
+                    const QString headerFileName = Utils::FilePath::fromString(info->fileName()).fileName();
                     QTC_ASSERT(!headerFileName.isEmpty(), break);
 
                     int priority = 0;

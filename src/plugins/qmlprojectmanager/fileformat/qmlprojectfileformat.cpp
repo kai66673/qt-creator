@@ -63,7 +63,7 @@ void setupFileFilterItem(QmlProjectManager::FileFilterBaseItem *fileFilterItem, 
 
 namespace QmlProjectManager {
 
-QmlProjectItem *QmlProjectFileFormat::parseProjectFile(const Utils::FileName &fileName, QString *errorMessage)
+QmlProjectItem *QmlProjectFileFormat::parseProjectFile(const Utils::FilePath &fileName, QString *errorMessage)
 {
     QmlJS::SimpleReader simpleQmlJSReader;
 
@@ -87,6 +87,10 @@ QmlProjectItem *QmlProjectFileFormat::parseProjectFile(const Utils::FileName &fi
         const QVariant importPathsProperty = rootNode->property(QLatin1String("importPaths"));
         if (importPathsProperty.isValid())
             projectItem->setImportPaths(importPathsProperty.toStringList());
+
+        const QVariant fileSelectorsProperty = rootNode->property(QLatin1String("fileSelectors"));
+        if (fileSelectorsProperty.isValid())
+            projectItem->setFileSelectors(fileSelectorsProperty.toStringList());
 
         const QVariant targetDirectoryPropery = rootNode->property("targetDirectory");
         if (targetDirectoryPropery.isValid())

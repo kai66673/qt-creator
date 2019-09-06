@@ -100,7 +100,7 @@ LldbEngine::LldbEngine()
 
     connect(&m_lldbProc, &QProcess::errorOccurred,
             this, &LldbEngine::handleLldbError);
-    connect(&m_lldbProc, static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+    connect(&m_lldbProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &LldbEngine::handleLldbFinished);
     connect(&m_lldbProc, &QProcess::readyReadStandardOutput,
             this, &LldbEngine::readLldbStandardOutput);
@@ -207,7 +207,7 @@ void LldbEngine::setupEngine()
     if (QFileInfo(runParameters().debugger.workingDirectory).isDir())
         m_lldbProc.setWorkingDirectory(runParameters().debugger.workingDirectory);
 
-    m_lldbProc.setCommand(lldbCmd, QString());
+    m_lldbProc.setCommand(CommandLine(FilePath::fromString(lldbCmd), QString()));
     m_lldbProc.start();
 
     if (!m_lldbProc.waitForStarted()) {
@@ -263,7 +263,8 @@ void LldbEngine::setupEngine()
     for (auto it = sourcePathMap.constBegin(), cend = sourcePathMap.constEnd();
          it != cend;
          ++it) {
-        executeDebuggerCommand("settings append target.source-map " + it.key() + ' ' + it.value());
+        executeDebuggerCommand(
+                    "settings append target.source-map " + it.key() + ' ' + expand(it.value()));
     }
 
     DebuggerCommand cmd2("setupInferior");
@@ -274,7 +275,7 @@ void LldbEngine::setupEngine()
     cmd2.arg("nativemixed", isNativeMixedActive());
     cmd2.arg("workingdirectory", rp.inferior.workingDirectory);
     cmd2.arg("environment", rp.inferior.environment.toStringList());
-    cmd2.arg("processargs", toHex(rp.inferior.commandLineArguments));
+    cmd2.arg("processargs", toHex(QtcProcess::splitArgs(rp.inferior.commandLineArguments).join(QChar(0))));
 
     if (terminal()) {
         const qint64 attachedPID = terminal()->applicationPid();
@@ -395,6 +396,8 @@ void LldbEngine::handleResponse(const QString &response)
             handleOutputNotification(item);
         else if (name == "pid")
             notifyInferiorPid(item.toProcessHandle());
+        else if (name == "breakpointmodified")
+            handleInterpreterBreakpointModified(item);
     }
 }
 
@@ -607,6 +610,31 @@ void LldbEngine::handleOutputNotification(const GdbMi &output)
     showMessage(data, ch);
 }
 
+void LldbEngine::handleInterpreterBreakpointModified(const GdbMi &bpItem)
+{
+    QTC_ASSERT(bpItem.childCount(), return);
+    QString id = bpItem.childAt(0).m_data;
+
+    Breakpoint bp = breakHandler()->findBreakpointByResponseId(id);
+    if (!bp)        // FIXME adapt whole bp handling and turn into soft assert
+        return;
+
+    // this function got triggered by a lldb internal breakpoint event
+    // avoid asserts regarding unexpected state transitions
+    switch (bp->state()) {
+    case BreakpointInsertionRequested:  // was a pending bp
+        bp->gotoState(BreakpointInsertionProceeding, BreakpointInsertionRequested);
+        break;
+    case BreakpointInserted:            // was an inserted, gets updated now
+        bp->gotoState(BreakpointUpdateRequested, BreakpointInserted);
+        notifyBreakpointChangeProceeding(bp);
+        break;
+    default:
+        break;
+    }
+    updateBreakpointData(bp, bpItem, false);
+}
+
 void LldbEngine::loadSymbols(const QString &moduleName)
 {
     Q_UNUSED(moduleName)
@@ -736,6 +764,7 @@ void LldbEngine::doUpdateLocals(const UpdateParameters &params)
     cmd.arg("dyntype", boolSetting(UseDynamicType));
     cmd.arg("partialvar", params.partialVariable);
     cmd.arg("qobjectnames", boolSetting(ShowQObjectNames));
+    cmd.arg("timestamps", boolSetting(LogTimeStamps));
 
     StackFrame frame = stackHandler()->currentFrame();
     cmd.arg("context", frame.context);

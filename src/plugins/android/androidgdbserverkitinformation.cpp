@@ -80,14 +80,15 @@ AndroidGdbServerKitAspect::AndroidGdbServerKitAspect()
     setPriority(27999); // Just one less than Debugger!
 }
 
-QVariant AndroidGdbServerKitAspect::defaultValue(const Kit *kit) const
+void AndroidGdbServerKitAspect::setup(Kit *kit)
 {
-    return autoDetect(kit).toString();
+    if (kit && !kit->hasValue(id()))
+        kit->setValue(id(), autoDetect(kit).toString());
 }
 
-QList<Task> AndroidGdbServerKitAspect::validate(const Kit *) const
+Tasks AndroidGdbServerKitAspect::validate(const Kit *) const
 {
-    return QList<Task>();
+    return {};
 }
 
 bool AndroidGdbServerKitAspect::isApplicableToKit(const Kit *k) const
@@ -97,8 +98,7 @@ bool AndroidGdbServerKitAspect::isApplicableToKit(const Kit *k) const
 
 KitAspect::ItemList AndroidGdbServerKitAspect::toUserOutput(const Kit *kit) const
 {
-    return KitAspect::ItemList()
-            << qMakePair(tr("GDB server"), AndroidGdbServerKitAspect::gdbServer(kit).toUserOutput());
+    return {{tr("GDB server"), AndroidGdbServerKitAspect::gdbServer(kit).toUserOutput()}};
 }
 
 KitAspectWidget *AndroidGdbServerKitAspect::createConfigWidget(Kit *kit) const
@@ -112,23 +112,23 @@ Core::Id AndroidGdbServerKitAspect::id()
     return "Android.GdbServer.Information";
 }
 
-FileName AndroidGdbServerKitAspect::gdbServer(const Kit *kit)
+FilePath AndroidGdbServerKitAspect::gdbServer(const Kit *kit)
 {
-    QTC_ASSERT(kit, return FileName());
-    return FileName::fromString(kit->value(AndroidGdbServerKitAspect::id()).toString());
+    QTC_ASSERT(kit, return FilePath());
+    return FilePath::fromString(kit->value(AndroidGdbServerKitAspect::id()).toString());
 }
 
-void AndroidGdbServerKitAspect::setGdbSever(Kit *kit, const FileName &gdbServerCommand)
+void AndroidGdbServerKitAspect::setGdbSever(Kit *kit, const FilePath &gdbServerCommand)
 {
     QTC_ASSERT(kit, return);
     kit->setValue(AndroidGdbServerKitAspect::id(), gdbServerCommand.toString());
 }
 
-FileName AndroidGdbServerKitAspect::autoDetect(const Kit *kit)
+FilePath AndroidGdbServerKitAspect::autoDetect(const Kit *kit)
 {
     ToolChain *tc = ToolChainKitAspect::toolChain(kit, ProjectExplorer::Constants::CXX_LANGUAGE_ID);
     if (!tc || tc->typeId() != Constants::ANDROID_TOOLCHAIN_ID)
-        return FileName();
+        return FilePath();
     auto atc = static_cast<AndroidToolChain *>(tc);
     return atc->suggestedGdbServer();
 }

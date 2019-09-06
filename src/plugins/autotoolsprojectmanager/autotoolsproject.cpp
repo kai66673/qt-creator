@@ -28,7 +28,6 @@
 #include "autotoolsproject.h"
 #include "autotoolsbuildconfiguration.h"
 #include "autotoolsprojectconstants.h"
-#include "autotoolsprojectnode.h"
 #include "autotoolsopenprojectwizard.h"
 #include "makestep.h"
 #include "makefileparserthread.h"
@@ -40,6 +39,7 @@
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/buildsteplist.h>
 #include <projectexplorer/projectexplorerconstants.h>
+#include <projectexplorer/projectnodes.h>
 #include <projectexplorer/target.h>
 #include <projectexplorer/headerpath.h>
 #include <extensionsystem/pluginmanager.h>
@@ -68,7 +68,7 @@ using namespace AutotoolsProjectManager;
 using namespace AutotoolsProjectManager::Internal;
 using namespace ProjectExplorer;
 
-AutotoolsProject::AutotoolsProject(const Utils::FileName &fileName) :
+AutotoolsProject::AutotoolsProject(const Utils::FilePath &fileName) :
     Project(Constants::MAKEFILE_MIMETYPE, fileName),
     m_fileWatcher(new Utils::FileSystemWatcher(this)),
     m_cppCodeModelUpdater(new CppTools::CppProjectUpdater)
@@ -89,11 +89,6 @@ AutotoolsProject::~AutotoolsProject()
         delete m_makefileParserThread;
         m_makefileParserThread = nullptr;
     }
-}
-
-QString AutotoolsProject::defaultBuildDirectory(const QString &projectPath)
-{
-    return QFileInfo(projectPath).absolutePath();
 }
 
 // This function, is called at the very beginning, to
@@ -172,8 +167,7 @@ void AutotoolsProject::makefileParsingFinished()
 
     // Remove file watches for the current project state.
     // The file watches will be added again after the parsing.
-    foreach (const QString& watchedFile, m_watchedFiles)
-        m_fileWatcher->removeFile(watchedFile);
+    m_fileWatcher->removeFiles(m_watchedFiles);
 
     m_files.clear();
     m_watchedFiles.clear();
@@ -208,11 +202,11 @@ void AutotoolsProject::makefileParsingFinished()
         m_watchedFiles.append(absConfigureAc);
     }
 
-    auto newRoot = std::make_unique<AutotoolsProjectNode>(projectDirectory());
+    auto newRoot = std::make_unique<ProjectNode>(projectDirectory());
     for (const QString &f : m_files) {
-        const Utils::FileName path = Utils::FileName::fromString(f);
-        newRoot->addNestedNode(std::make_unique<FileNode>(path, FileNode::fileTypeForFileName(path),
-                                                          false));
+        const Utils::FilePath path = Utils::FilePath::fromString(f);
+        newRoot->addNestedNode(std::make_unique<FileNode>(path,
+                                                          FileNode::fileTypeForFileName(path)));
     }
     setRootProjectNode(std::move(newRoot));
 

@@ -34,7 +34,8 @@ Section {
 
     id: root
 
-    property int spinBoxWidth: 62
+    property int labelWidth: 42
+    property int spinBoxWidth: 96
 
     SectionLayout {
 
@@ -50,7 +51,8 @@ Section {
                 Layout.fillWidth: true
                 scope: "Flickable"
             }
-
+            ExpandingSpacer {
+            }
         }
 
         Label {
@@ -65,13 +67,14 @@ Section {
                 Layout.fillWidth: true
                 scope: "Flickable"
             }
-
+            ExpandingSpacer {
+            }
         }
 
 
         Label {
             text: qsTr("Movement")
-            tooltip: qsTr("Determines whether the flickable will give a feeling that the edges of the view are soft, rather than a hard physical boundary.")
+            tooltip: qsTr("Determines whether the Flickable will give a feeling that the edges of the view are soft, rather than a hard physical boundary.")
         }
 
         SecondColumnLayout {
@@ -81,18 +84,21 @@ Section {
                 Layout.fillWidth: true
                 scope: "Flickable"
             }
-
+            ExpandingSpacer {
+            }
         }
 
         Label {
-            text:qsTr("Interactive")
+            text: qsTr("Interactive")
+            tooltip: qsTr("Describes whether the user can interact with the Flickable. A user cannot drag or flick a Flickable that is not interactive.")
         }
 
         SecondColumnLayout {
             CheckBox {
+                Layout.fillWidth: true
                 backendValue: backendValues.interactive
+                text: backendValues.interactive.valueToString
             }
-
             ExpandingSpacer {
             }
         }
@@ -109,7 +115,6 @@ Section {
                 maximumValue: 8000
                 decimals: 0
             }
-
             ExpandingSpacer {
             }
         }
@@ -126,7 +131,6 @@ Section {
                 maximumValue: 8000
                 decimals: 0
             }
-
             ExpandingSpacer {
             }
         }
@@ -143,21 +147,21 @@ Section {
                 maximumValue: 2000
                 decimals: 0
             }
-
             ExpandingSpacer {
             }
         }
 
         Label {
-            text:qsTr("Pixel aligned")
+            text: qsTr("Pixel aligned")
+            tooltip: qsTr("Sets the alignment of contentX and contentY to pixels (true) or subpixels (false).")
         }
 
         SecondColumnLayout {
             CheckBox {
+                Layout.fillWidth: true
                 backendValue: backendValues.pixelAligned
-                tooltip: qsTr("Sets the alignment of contentX and contentY to pixels (true) or subpixels (false).")
+                text: backendValues.pixelAligned.valueToString
             }
-
             ExpandingSpacer {
             }
         }
@@ -170,14 +174,15 @@ Section {
 
             Label {
                 text: "W"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.contentWidth
                 minimumValue: 0
-                maximumValue: 8000
+                maximumValue: 10000
                 implicitWidth: root.spinBoxWidth
+                Layout.fillWidth: true
             }
 
             Item {
@@ -187,19 +192,17 @@ Section {
 
             Label {
                 text: "H"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.contentHeight
                 minimumValue: 0
-                maximumValue: 8000
+                maximumValue: 10000
                 implicitWidth: root.spinBoxWidth
-
+                Layout.fillWidth: true
             }
-
             ExpandingSpacer {
-
             }
         }
 
@@ -211,14 +214,15 @@ Section {
 
             Label {
                 text: "X"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.contentX
-                minimumValue: 0
+                minimumValue: -8000
                 maximumValue: 8000
                 implicitWidth: root.spinBoxWidth
+                Layout.fillWidth: true
             }
 
             Item {
@@ -228,19 +232,17 @@ Section {
 
             Label {
                 text: "Y"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.contentY
-                minimumValue: 0
+                minimumValue: -8000
                 maximumValue: 8000
                 implicitWidth: root.spinBoxWidth
-
+                Layout.fillWidth: true
             }
-
             ExpandingSpacer {
-
             }
         }
 
@@ -253,15 +255,16 @@ Section {
 
             Label {
                 text: "Top"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.topMargin
-                maximumValue: 0xffff
-                minimumValue: 0
+                minimumValue: -10000
+                maximumValue: 10000
                 decimals: 0
                 implicitWidth: root.spinBoxWidth
+                Layout.fillWidth: true
             }
 
             Item {
@@ -271,18 +274,18 @@ Section {
 
             Label {
                 text: "Bottom"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.bottomMargin
-                maximumValue: 0xffff
-                minimumValue: 0
+                minimumValue: -10000
+                maximumValue: 10000
                 decimals: 0
                 implicitWidth: root.spinBoxWidth
+                Layout.fillWidth: true
             }
             ExpandingSpacer {
-
             }
         }
 
@@ -295,15 +298,16 @@ Section {
 
             Label {
                 text: "Left"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.leftMargin
-                maximumValue: 0xffff
-                minimumValue: 0
+                minimumValue: -10000
+                maximumValue: 10000
                 decimals: 0
                 implicitWidth: root.spinBoxWidth
+                Layout.fillWidth: true
             }
 
             Item {
@@ -313,20 +317,19 @@ Section {
 
             Label {
                 text: "Right"
-                width: 28
+                width: root.labelWidth
             }
 
             SpinBox {
                 backendValue: backendValues.rightMargin
-                maximumValue: 0xffff
-                minimumValue: 0
+                minimumValue: -10000
+                maximumValue: 10000
                 decimals: 0
                 implicitWidth: root.spinBoxWidth
+                Layout.fillWidth: true
             }
             ExpandingSpacer {
-
             }
         }
-
     }
 }

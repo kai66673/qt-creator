@@ -13,14 +13,8 @@ HEADERS += \
     $$PWD/symbolindexinginterface.h \
     $$PWD/collectmacrospreprocessorcallbacks.h \
     $$PWD/projectpartentry.h \
-    $$PWD/symbolsvisitorbase.h \
     $$PWD/usedmacro.h \
     $$PWD/sourcedependency.h \
-    $$PWD/filestatus.h \
-    $$PWD/projectpartartefactexception.h \
-    $$PWD/projectpartartefact.h \
-    $$PWD/filestatuscache.h \
-    $$PWD/indexdataconsumer.h \
     $$PWD/sourcesmanager.h \
     $$PWD/symbolindexertaskqueue.h \
     $$PWD/symbolindexertaskqueueinterface.h \
@@ -29,11 +23,8 @@ HEADERS += \
 !isEmpty(LIBTOOLING_LIBS) {
 SOURCES += \
     $$PWD/refactoringcompilationdatabase.cpp \
-    $$PWD/symbolfinder.cpp \
-    $$PWD/symbollocationfinderaction.cpp \
     $$PWD/refactoringserver.cpp \
     $$PWD/macropreprocessorcallbacks.cpp \
-    $$PWD/findusrforcursoraction.cpp \
     $$PWD/clangquery.cpp \
     $$PWD/clangtool.cpp \
     $$PWD/sourcerangeextractor.cpp \
@@ -41,20 +32,16 @@ SOURCES += \
     $$PWD/collectsymbolsaction.cpp \
     $$PWD/collectmacrossourcefilecallbacks.cpp \
     $$PWD/symbolscollector.cpp \
+    $$PWD/filestatuspreprocessorcallbacks.cpp \
     $$PWD/clangquerygatherer.cpp \
     $$PWD/symbolindexing.cpp \
     $$PWD/indexdataconsumer.cpp
 
 HEADERS += \
     $$PWD/refactoringcompilationdatabase.h \
-    $$PWD/symbolfinder.h \
-    $$PWD/symbollocationfinderaction.h \
     $$PWD/refactoringserver.h \
     $$PWD/macropreprocessorcallbacks.h \
     $$PWD/sourcelocationsutils.h \
-    $$PWD/findcursorusr.h \
-    $$PWD/findusrforcursoraction.h \
-    $$PWD/findlocationsofusrs.h \
     $$PWD/clangquery.h \
     $$PWD/clangtool.h \
     $$PWD/sourcerangeextractor.h \
@@ -62,11 +49,12 @@ HEADERS += \
     $$PWD/collectsymbolsaction.h \
     $$PWD/collectmacrossourcefilecallbacks.h \
     $$PWD/symbolscollector.h \
+    $$PWD/symbolsvisitorbase.h \
+    $$PWD/indexdataconsumer.h \
+    $$PWD/filestatuspreprocessorcallbacks.h \
     $$PWD/clangquerygatherer.h
 }
 
 SOURCES += \
     $$PWD/sourcerangefilter.cpp \
-    $$PWD/symbolindexer.cpp \
-    $$PWD/projectpartartefact.cpp \
-    $$PWD/filestatuscache.cpp
+    $$PWD/symbolindexer.cpp

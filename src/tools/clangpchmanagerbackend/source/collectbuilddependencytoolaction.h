@@ -38,13 +38,11 @@ class CollectBuildDependencyToolAction final : public clang::tooling::FrontendAc
 {
 public:
     CollectBuildDependencyToolAction(BuildDependency &buildDependency,
-                              const FilePathCachingInterface &filePathCache,
-                              const ClangBackEnd::FilePaths &excludedIncludes,
-                              SourcesManager &sourcesManager)
-        : m_buildDependency(buildDependency),
-          m_filePathCache(filePathCache),
-          m_excludedFilePaths(excludedIncludes),
-          m_sourcesManager(sourcesManager)
+                                     const FilePathCachingInterface &filePathCache,
+                                     const ClangBackEnd::FilePaths &excludedIncludes)
+        : m_buildDependency(buildDependency)
+        , m_filePathCache(filePathCache)
+        , m_excludedFilePaths(excludedIncludes)
     {}
 
 
@@ -67,8 +65,7 @@ public:
         return new CollectBuildDependencyAction(m_buildDependency,
                                                 m_filePathCache,
                                                 m_excludedIncludeUIDs,
-                                                m_alreadyIncludedFileUIDs,
-                                                m_sourcesManager);
+                                                m_alreadyIncludedFileUIDs);
     }
 
     std::vector<uint> generateExcludedIncludeFileUIDs(clang::FileManager &fileManager) const
@@ -76,8 +73,10 @@ public:
         std::vector<uint> fileUIDs;
         fileUIDs.reserve(m_excludedFilePaths.size());
 
-        for (const ClangBackEnd::FilePath &filePath : m_excludedFilePaths) {
-            const clang::FileEntry *file = fileManager.getFile({filePath.data(), filePath.size()},
+        for (const FilePath &filePath : m_excludedFilePaths) {
+            NativeFilePath nativeFilePath{filePath};
+            const clang::FileEntry *file = fileManager.getFile({nativeFilePath.path().data(),
+                                                                nativeFilePath.path().size()},
                                                                true);
 
             if (file)
@@ -95,7 +94,6 @@ private:
     BuildDependency &m_buildDependency;
     const FilePathCachingInterface &m_filePathCache;
     const ClangBackEnd::FilePaths &m_excludedFilePaths;
-    SourcesManager &m_sourcesManager;
 };
 
 } // namespace ClangBackEnd

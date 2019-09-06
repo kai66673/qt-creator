@@ -31,6 +31,7 @@
 #include <utils/macroexpander.h>
 
 #include <projectexplorer/abi.h>
+#include <projectexplorer/task.h>
 
 #include <QSet>
 #include <QStringList>
@@ -48,7 +49,6 @@ class Kit;
 class ToolChain;
 class HeaderPath;
 class Target;
-class Task;
 } // namespace ProjectExplorer
 
 QT_BEGIN_NAMESPACE
@@ -137,8 +137,8 @@ public:
     virtual QString description() const = 0;
     virtual QString toHtml(bool verbose) const;
 
-    QList<ProjectExplorer::Abi> qtAbis() const;
-    virtual QList<ProjectExplorer::Abi> detectQtAbis() const;
+    ProjectExplorer::Abis qtAbis() const;
+    virtual ProjectExplorer::Abis detectQtAbis() const;
 
     enum PropertyVariant { PropertyVariantDev, PropertyVariantGet, PropertyVariantSrc };
     QString qmakeProperty(const QByteArray &name,
@@ -148,11 +148,11 @@ public:
     virtual Utils::Environment qmakeRunEnvironment() const;
 
     // source path defined by qmake property QT_INSTALL_PREFIX/src or by qmake.stash QT_SOURCE_TREE
-    Utils::FileName sourcePath() const;
+    Utils::FilePath sourcePath() const;
     // returns source path for installed qt packages and empty string for self build qt
-    Utils::FileName qtPackageSourcePath() const;
-    bool isInSourceDirectory(const Utils::FileName &filePath);
-    bool isSubProject(const Utils::FileName &filePath) const;
+    Utils::FilePath qtPackageSourcePath() const;
+    bool isInSourceDirectory(const Utils::FilePath &filePath);
+    bool isSubProject(const Utils::FilePath &filePath) const;
 
     // used by UiCodeModelSupport
     QString uicCommand() const;
@@ -175,16 +175,16 @@ public:
     QString frameworkInstallPath() const;
 
     // former local functions
-    Utils::FileName qmakeCommand() const;
+    Utils::FilePath qmakeCommand() const;
 
     /// @returns the name of the mkspec
-    Utils::FileName mkspec() const;
-    Utils::FileName mkspecFor(ProjectExplorer::ToolChain *tc) const;
+    QString mkspec() const;
+    QString mkspecFor(ProjectExplorer::ToolChain *tc) const;
     /// @returns the full path to the default directory
     /// specifally not the directory the symlink/ORIGINAL_QMAKESPEC points to
-    Utils::FileName mkspecPath() const;
+    Utils::FilePath mkspecPath() const;
 
-    bool hasMkspec(const Utils::FileName &spec) const;
+    bool hasMkspec(const QString &spec) const;
 
     enum QmakeBuildConfig
     {
@@ -201,7 +201,7 @@ public:
     /// Check a .pro-file/Qt version combination on possible issues
     /// @return a list of tasks, ordered on severity (errors first, then
     ///         warnings and finally info items.
-    QList<ProjectExplorer::Task> reportIssues(const QString &proFile, const QString &buildDir) const;
+    ProjectExplorer::Tasks reportIssues(const QString &proFile, const QString &buildDir) const;
 
     static bool isQmlDebuggingSupported(ProjectExplorer::Kit *k, QString *reason = nullptr);
     bool isQmlDebuggingSupported(QString *reason = nullptr) const;
@@ -216,24 +216,24 @@ public:
 
     virtual QtConfigWidget *createConfigurationWidget() const;
 
-    static QString defaultUnexpandedDisplayName(const Utils::FileName &qmakePath,
+    static QString defaultUnexpandedDisplayName(const Utils::FilePath &qmakePath,
                                       bool fromPath = false);
 
     virtual QSet<Core::Id> targetDeviceTypes() const = 0;
 
-    virtual QList<ProjectExplorer::Task> validateKit(const ProjectExplorer::Kit *k);
+    virtual ProjectExplorer::Tasks validateKit(const ProjectExplorer::Kit *k);
 
-    Utils::FileName headerPath() const;
-    Utils::FileName docsPath() const;
-    Utils::FileName libraryPath() const;
-    Utils::FileName pluginPath() const;
-    Utils::FileName qmlPath() const;
-    Utils::FileName binPath() const;
-    Utils::FileName mkspecsPath() const;
-    Utils::FileName qmlBinPath() const;
-    Utils::FileName librarySearchPath() const;
+    Utils::FilePath headerPath() const;
+    Utils::FilePath docsPath() const;
+    Utils::FilePath libraryPath() const;
+    Utils::FilePath pluginPath() const;
+    Utils::FilePath qmlPath() const;
+    Utils::FilePath binPath() const;
+    Utils::FilePath mkspecsPath() const;
+    Utils::FilePath qmlBinPath() const;
+    Utils::FilePath librarySearchPath() const;
 
-    Utils::FileNameList directoriesToIgnoreInProjectTree() const;
+    Utils::FilePathList directoriesToIgnoreInProjectTree() const;
 
     QString qtNamespace() const;
     QString qtLibInfix() const;
@@ -261,33 +261,33 @@ protected:
     BaseQtVersion();
     BaseQtVersion(const BaseQtVersion &other) = delete;
 
-    virtual QList<ProjectExplorer::Task> reportIssuesImpl(const QString &proFile, const QString &buildDir) const;
+    virtual ProjectExplorer::Tasks reportIssuesImpl(const QString &proFile, const QString &buildDir) const;
 
     // helper function for desktop and simulator to figure out the supported abis based on the libraries
-    Utils::FileNameList qtCorePaths() const;
-    static QList<ProjectExplorer::Abi> qtAbisFromLibrary(const Utils::FileNameList &coreLibraries);
+    Utils::FilePathList qtCorePaths() const;
+    static ProjectExplorer::Abis qtAbisFromLibrary(const Utils::FilePathList &coreLibraries);
 
     void ensureMkSpecParsed() const;
     virtual void parseMkSpec(ProFileEvaluator *) const;
 
 private:
-    void setupQmakePathAndId(const Utils::FileName &path);
+    void setupQmakePathAndId(const Utils::FilePath &path);
     void setAutoDetectionSource(const QString &autodetectionSource);
     void updateVersionInfo() const;
     enum HostBinaries { Designer, Linguist, Uic, QScxmlc };
     QString findHostBinary(HostBinaries binary) const;
     void updateMkspec() const;
     QHash<ProKey, ProString> versionInfo() const;
-    static bool queryQMakeVariables(const Utils::FileName &binary,
+    static bool queryQMakeVariables(const Utils::FilePath &binary,
                                     const Utils::Environment &env,
                                     QHash<ProKey, ProString> *versionInfo,
                                     QString *error = nullptr);
     static QString qmakeProperty(const QHash<ProKey, ProString> &versionInfo,
                                  const QByteArray &name,
                                  PropertyVariant variant = PropertyVariantGet);
-    static Utils::FileName mkspecDirectoryFromVersionInfo(const QHash<ProKey,ProString> &versionInfo);
-    static Utils::FileName mkspecFromVersionInfo(const QHash<ProKey,ProString> &versionInfo);
-    static Utils::FileName sourcePath(const QHash<ProKey,ProString> &versionInfo);
+    static Utils::FilePath mkspecDirectoryFromVersionInfo(const QHash<ProKey,ProString> &versionInfo);
+    static Utils::FilePath mkspecFromVersionInfo(const QHash<ProKey,ProString> &versionInfo);
+    static Utils::FilePath sourcePath(const QHash<ProKey,ProString> &versionInfo);
     void setId(int id); // used by the qtversionmanager for legacy restore
                         // and by the qtoptionspage to replace Qt versions
 
@@ -315,24 +315,24 @@ private:
     QString m_unexpandedDisplayName;
     QString m_autodetectionSource;
     QSet<Core::Id> m_overrideFeatures;
-    mutable Utils::FileName m_sourcePath;
-    mutable Utils::FileName m_qtSources;
+    mutable Utils::FilePath m_sourcePath;
+    mutable Utils::FilePath m_qtSources;
 
-    mutable Utils::FileName m_mkspec;
-    mutable Utils::FileName m_mkspecFullPath;
+    mutable Utils::FilePath m_mkspec;
+    mutable Utils::FilePath m_mkspecFullPath;
 
     mutable QHash<QString, QString> m_mkspecValues;
 
     mutable QHash<ProKey, ProString> m_versionInfo;
 
-    Utils::FileName m_qmakeCommand;
+    Utils::FilePath m_qmakeCommand;
     mutable QString m_qtVersionString;
     mutable QString m_uicCommand;
     mutable QString m_designerCommand;
     mutable QString m_linguistCommand;
     mutable QString m_qscxmlcCommand;
 
-    mutable QList<ProjectExplorer::Abi> m_qtAbis;
+    mutable ProjectExplorer::Abis m_qtAbis;
 
     MacroExpanderWrapper m_expander;
 };

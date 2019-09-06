@@ -34,13 +34,12 @@ namespace Internal { class ResourceFileWatcher; }
 class RESOURCE_EXPORT ResourceTopLevelNode : public ProjectExplorer::FolderNode
 {
 public:
-    ResourceTopLevelNode(const Utils::FileName &filePath, bool generated,
-                         const QString &contents, FolderNode *parent);
+    ResourceTopLevelNode(const Utils::FilePath &filePath,
+                         const Utils::FilePath &basePath,
+                         const QString &contents = {});
     ~ResourceTopLevelNode() override;
 
     void addInternalNodes();
-
-    QString addFileFilter() const override;
 
     bool supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const override;
     bool addFiles(const QStringList &filePaths, QStringList *notAdded) override;
@@ -51,7 +50,6 @@ public:
 
     AddNewInformation addNewInformation(const QStringList &files, Node *context) const override;
     bool showInSimpleTree() const override;
-    bool showWhenEmpty() const override;
     bool removeNonExistingFiles();
 
     QString contents() const { return m_contents; }
@@ -93,7 +91,7 @@ private:
 class RESOURCE_EXPORT ResourceFileNode : public ProjectExplorer::FileNode
 {
 public:
-    ResourceFileNode(const Utils::FileName &filePath, const QString &qrcPath, const QString &displayName);
+    ResourceFileNode(const Utils::FilePath &filePath, const QString &qrcPath, const QString &displayName);
 
     QString displayName() const override;
     QString qrcPath() const;

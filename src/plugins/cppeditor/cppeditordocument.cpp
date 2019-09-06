@@ -44,10 +44,12 @@
 #include <projectexplorer/session.h>
 
 #include <texteditor/icodestylepreferencesfactory.h>
+#include <texteditor/storagesettings.h>
 #include <texteditor/textdocumentlayout.h>
 #include <texteditor/texteditorsettings.h>
 
 #include <coreplugin/editormanager/editormanager.h>
+#include <utils/executeondestruction.h>
 #include <utils/mimetypes/mimedatabase.h>
 #include <utils/qtcassert.h>
 #include <utils/runextensions.h>
@@ -236,8 +238,8 @@ void CppEditorDocument::reparseWithPreferredParseContext(const QString &parseCon
     scheduleProcessDocument();
 }
 
-void CppEditorDocument::onFilePathChanged(const Utils::FileName &oldPath,
-                                          const Utils::FileName &newPath)
+void CppEditorDocument::onFilePathChanged(const Utils::FilePath &oldPath,
+                                          const Utils::FilePath &newPath)
 {
     Q_UNUSED(oldPath);
 
@@ -448,6 +450,8 @@ TextEditor::TabSettings CppEditorDocument::tabSettings() const
 
 bool CppEditorDocument::save(QString *errorString, const QString &fileName, bool autoSave)
 {
+    Utils::ExecuteOnDestruction resetSettingsOnScopeExit;
+
     if (indenter()->formatOnSave() && !autoSave) {
         auto *layout = qobject_cast<TextEditor::TextDocumentLayout *>(document()->documentLayout());
         const int documentRevision = layout->lastSaveRevision;
@@ -475,10 +479,16 @@ bool CppEditorDocument::save(QString *errorString, const QString &fileName, bool
 
         if (!editedRanges.empty()) {
             QTextCursor cursor(document());
-            cursor.joinPreviousEditBlock();
+            cursor.beginEditBlock();
             indenter()->format(editedRanges);
             cursor.endEditBlock();
         }
+
+        TextEditor::StorageSettings settings = storageSettings();
+        resetSettingsOnScopeExit.reset(
+            [this, defaultSettings = settings]() { setStorageSettings(defaultSettings); });
+        settings.m_cleanWhitespace = false;
+        setStorageSettings(settings);
     }
 
     return TextEditor::TextDocument::save(errorString, fileName, autoSave);

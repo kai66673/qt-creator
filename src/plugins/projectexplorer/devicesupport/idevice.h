@@ -120,6 +120,7 @@ public:
 // See cpp file for documentation.
 class PROJECTEXPLORER_EXPORT IDevice : public QEnableSharedFromThis<IDevice>
 {
+    friend class Internal::IDevicePrivate;
 public:
     using Ptr = QSharedPointer<IDevice>;
     using ConstPtr = QSharedPointer<const IDevice>;
@@ -127,8 +128,9 @@ public:
     enum Origin { ManuallyAdded, AutoDetected };
     enum MachineType { Hardware, Emulator };
 
-    IDevice &operator=(const IDevice &) = delete;
     virtual ~IDevice();
+
+    Ptr clone() const;
 
     QString displayName() const;
     void setDisplayName(const QString &name);
@@ -187,7 +189,6 @@ public:
 
     virtual void fromMap(const QVariantMap &map);
     virtual QVariantMap toMap() const;
-    virtual Ptr clone() const = 0;
 
     static Core::Id typeFromMap(const QVariantMap &map);
     static Core::Id idFromMap(const QVariantMap &map);
@@ -218,11 +219,19 @@ public:
 
     void setupId(Origin origin, Core::Id id = Core::Id());
 
+    bool canOpenTerminal() const;
+    void openTerminal(const Utils::Environment &env, const QString &workingDir) const;
+
 protected:
     IDevice();
-    IDevice(const IDevice &other);
+
+    using OpenTerminal = std::function<void(const Utils::Environment &, const QString &)>;
+    void setOpenTerminal(const OpenTerminal &openTerminal);
 
 private:
+    IDevice(const IDevice &) = delete;
+    IDevice &operator=(const IDevice &) = delete;
+
     int version() const;
 
     const std::unique_ptr<Internal::IDevicePrivate> d;

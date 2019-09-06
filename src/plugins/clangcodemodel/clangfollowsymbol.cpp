@@ -28,6 +28,7 @@
 
 #include <coreplugin/editormanager/editormanager.h>
 #include <cpptools/cppmodelmanager.h>
+#include <cpptools/cppfollowsymbolundercursor.h>
 #include <texteditor/texteditor.h>
 
 #include <clangsupport/tokeninfocontainer.h>
@@ -158,7 +159,7 @@ static ::Utils::ProcessLinkCallback extendedCallback(::Utils::ProcessLinkCallbac
     };
 }
 
-static bool isSameInvocationContext(const Utils::FileName &filePath)
+static bool isSameInvocationContext(const Utils::FilePath &filePath)
 {
     return TextEditor::BaseTextEditor::currentTextEditor()->editorWidget()->isVisible()
         && Core::EditorManager::currentDocument()->filePath() == filePath;
@@ -183,12 +184,22 @@ void ClangFollowSymbol::findLink(const CppTools::CursorInEditor &data,
         return processLinkCallback(Utils::Link());
 
     if (!resolveTarget) {
-        processLinkCallback(linkAtCursor(cursor,
-                                         data.filePath().toString(),
-                                         static_cast<uint>(line),
-                                         static_cast<uint>(column),
-                                         processor));
-        return;
+        Utils::Link link = linkAtCursor(cursor,
+                                        data.filePath().toString(),
+                                        static_cast<uint>(line),
+                                        static_cast<uint>(column),
+                                        processor);
+        if (link == Utils::Link()) {
+            CppTools::FollowSymbolUnderCursor followSymbol;
+            return followSymbol.findLink(data,
+                                         std::move(processLinkCallback),
+                                         false,
+                                         snapshot,
+                                         documentFromSemanticInfo,
+                                         symbolFinder,
+                                         inNextSplit);
+        }
+        return processLinkCallback(link);
     }
 
     QFuture<CppTools::SymbolInfo> infoFuture

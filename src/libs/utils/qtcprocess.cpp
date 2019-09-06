@@ -595,12 +595,12 @@ static QString quoteArgWin(const QString &arg)
 }
 
 QtcProcess::Arguments QtcProcess::prepareArgs(const QString &cmd, SplitError *err, OsType osType,
-                                   const Environment *env, const QString *pwd)
+                                   const Environment *env, const QString *pwd, bool abortOnMeta)
 {
     if (osType == OsTypeWindows)
         return prepareArgsWin(cmd, err, env, pwd);
     else
-        return Arguments::createUnixArgs(splitArgs(cmd, osType, true, err, env, pwd));
+        return Arguments::createUnixArgs(splitArgs(cmd, osType, abortOnMeta, err, env, pwd));
 }
 
 
@@ -694,7 +694,8 @@ void QtcProcess::start()
     const OsType osType = HostOsInfo::hostOs();
     if (m_haveEnv) {
         if (m_environment.size() == 0)
-            qWarning("QtcProcess::start: Empty environment set when running '%s'.", qPrintable(m_command));
+            qWarning("QtcProcess::start: Empty environment set when running '%s'.",
+                     qPrintable(m_commandLine.executable().toString()));
         env = m_environment;
 
         QProcess::setEnvironment(env.toStringList());
@@ -705,7 +706,9 @@ void QtcProcess::start()
     const QString &workDir = workingDirectory();
     QString command;
     QtcProcess::Arguments arguments;
-    bool success = prepareCommand(m_command, m_arguments, &command, &arguments, osType, &env, &workDir);
+    bool success = prepareCommand(m_commandLine.executable().toString(),
+                                  m_commandLine.arguments(),
+                                  &command, &arguments, osType, &env, &workDir);
     if (osType == OsTypeWindows) {
         QString args;
         if (m_useCtrlCStub) {

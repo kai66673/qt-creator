@@ -32,19 +32,37 @@
 class MockBuildDependenciesStorage : public ClangBackEnd::BuildDependenciesStorageInterface
 {
 public:
-    MOCK_METHOD1(updateSources,
-                 void (const ClangBackEnd::SourceEntries &sources));
+    MOCK_METHOD2(insertOrUpdateSources,
+                 void(const ClangBackEnd::SourceEntries &sources,
+                      ClangBackEnd::ProjectPartId projectPartId));
     MOCK_METHOD1(insertOrUpdateUsedMacros,
                  void (const ClangBackEnd::UsedMacros &usedMacros));
-    MOCK_METHOD1(insertFileStatuses,
-                 void (const ClangBackEnd::FileStatuses &fileStatuses));
+    MOCK_METHOD1(insertOrUpdateFileStatuses, void(const ClangBackEnd::FileStatuses &fileStatuses));
     MOCK_METHOD1(insertOrUpdateSourceDependencies,
                  void (const ClangBackEnd::SourceDependencies &sourceDependencies));
     MOCK_CONST_METHOD1(fetchLowestLastModifiedTime,
                        long long (ClangBackEnd::FilePathId sourceId));
     MOCK_CONST_METHOD2(fetchDependSources,
-                       ClangBackEnd::SourceEntries (ClangBackEnd::FilePathId sourceId, Utils::SmallStringView));
+                       ClangBackEnd::SourceEntries(ClangBackEnd::FilePathId sourceId,
+                                                   ClangBackEnd::ProjectPartId projectPartId));
     MOCK_CONST_METHOD1(fetchUsedMacros,
                        ClangBackEnd::UsedMacros (ClangBackEnd::FilePathId sourceId));
+    MOCK_METHOD1(fetchProjectPartId,
+                 ClangBackEnd::ProjectPartId(Utils::SmallStringView projectPartName));
+    MOCK_METHOD2(updatePchCreationTimeStamp,
+                 void(long long pchCreationTimeStamp, ClangBackEnd::ProjectPartId projectPartId));
+    MOCK_CONST_METHOD1(fetchPchSources,
+                       ClangBackEnd::FilePathIds(ClangBackEnd::ProjectPartId projectPartId));
+    MOCK_CONST_METHOD1(fetchSources,
+                       ClangBackEnd::FilePathIds(ClangBackEnd::ProjectPartId projectPartId));
+    MOCK_METHOD2(insertOrUpdateIndexingTimeStamps,
+                 void(const ClangBackEnd::FilePathIds &filePathIds,
+                      ClangBackEnd::TimeStamp indexingTimeStamp));
+    MOCK_METHOD1(insertOrUpdateIndexingTimeStamps, void(const ClangBackEnd::FileStatuses &));
+    MOCK_CONST_METHOD0(fetchIndexingTimeStamps, ClangBackEnd::SourceTimeStamps());
+    MOCK_CONST_METHOD1(fetchIncludedIndexingTimeStamps,
+                       ClangBackEnd::SourceTimeStamps(ClangBackEnd::FilePathId sourcePathId));
+    MOCK_CONST_METHOD1(fetchDependentSourceIds,
+                       ClangBackEnd::FilePathIds(const ClangBackEnd::FilePathIds &sourcePathIds));
 };
 

@@ -81,6 +81,7 @@ const char fixedOptionsC[] =
 "    -client                       Attempt to connect to already running first instance\n"
 "    -settingspath <path>          Override the default path where user settings are stored\n"
 "    -installsettingspath <path>   Override the default path from where user-independent settings are read\n"
+"    -temporarycleansettings       Use clean settings for debug or testing reasons\n"
 "    -pid <pid>                    Attempt to connect to instance given by pid\n"
 "    -block                        Block until editor is closed\n"
 "    -pluginpath <path>            Add a custom search path for plugins\n";
@@ -94,12 +95,14 @@ const char CLIENT_OPTION[] = "-client";
 const char SETTINGS_OPTION[] = "-settingspath";
 const char INSTALL_SETTINGS_OPTION[] = "-installsettingspath";
 const char TEST_OPTION[] = "-test";
+const char TEMPORARY_CLEAN_SETTINGS1[] = "-temporarycleansettings";
+const char TEMPORARY_CLEAN_SETTINGS2[] = "-tcs";
 const char PID_OPTION[] = "-pid";
 const char BLOCK_OPTION[] = "-block";
 const char PLUGINPATH_OPTION[] = "-pluginpath";
 const char USER_LIBRARY_PATH_OPTION[] = "-user-library-path"; // hidden option for qtcreator.sh
 
-typedef QList<PluginSpec *> PluginSpecSet;
+using PluginSpecSet = QVector<PluginSpec *>;
 
 // Helpers for displaying messages. Note that there is no console on Windows.
 
@@ -117,15 +120,15 @@ static inline QString toHtml(const QString &t)
 
 static void displayHelpText(const QString &t)
 {
-    if (Utils::HostOsInfo::isWindowsHost())
-        QMessageBox::information(0, QLatin1String(Core::Constants::IDE_DISPLAY_NAME), toHtml(t));
+    if (Utils::HostOsInfo::isWindowsHost() && qApp)
+        QMessageBox::information(nullptr, QLatin1String(Core::Constants::IDE_DISPLAY_NAME), toHtml(t));
     else
         qWarning("%s", qPrintable(t));
 }
 
 static void displayError(const QString &t)
 {
-    if (Utils::HostOsInfo::isWindowsHost())
+    if (Utils::HostOsInfo::isWindowsHost() && qApp)
         QMessageBox::critical(0, QLatin1String(Core::Constants::IDE_DISPLAY_NAME), t);
     else
         qCritical("%s", qPrintable(t));
@@ -193,7 +196,7 @@ static bool copyRecursively(const QString &srcFilePath,
     if (srcFileInfo.isDir()) {
         QDir targetDir(tgtFilePath);
         targetDir.cdUp();
-        if (!targetDir.mkdir(Utils::FileName::fromString(tgtFilePath).fileName()))
+        if (!targetDir.mkdir(Utils::FilePath::fromString(tgtFilePath).fileName()))
             return false;
         QDir sourceDir(srcFilePath);
         QStringList fileNames = sourceDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
@@ -231,15 +234,19 @@ static inline QStringList getPluginPaths()
                                     Core::Constants::IDE_DISPLAY_NAME :
                                     Core::Constants::IDE_ID);
     pluginPath += QLatin1String("/plugins/");
-    pluginPath += QLatin1String(Core::Constants::IDE_VERSION_LONG);
-    rc.push_back(pluginPath);
+    // Qt Creator X.Y.Z can load plugins from X.Y.(Z-1) etc, so add current and previous
+    // patch versions
+    const QString minorVersion = QString::number(IDE_VERSION_MAJOR) + '.'
+                                 + QString::number(IDE_VERSION_MINOR) + '.';
+    for (int patchVersion = IDE_VERSION_RELEASE; patchVersion >= 0; --patchVersion)
+        rc.push_back(pluginPath + minorVersion + QString::number(patchVersion));
     return rc;
 }
 
 static void setupInstallSettings(QString &installSettingspath)
 {
     if (!installSettingspath.isEmpty() && !QFileInfo(installSettingspath).isDir()) {
-        displayHelpText(QString("-installsettingspath needs to be the path where a %1/%2.ini exist.").arg(
+        displayError(QString("-installsettingspath \"%0\" needs to be the path where a %1/%2.ini exist.").arg(installSettingspath,
             QLatin1String(Core::Constants::IDE_SETTINGSVARIANT_STR), QLatin1String(Core::Constants::IDE_CASED_ID)));
         installSettingspath.clear();
     }
@@ -348,6 +355,7 @@ struct Options
     std::vector<char *> appArguments;
     Utils::optional<QString> userLibraryPath;
     bool hasTestOption = false;
+    bool wantsCleanSettings = false;
 };
 
 Options parseCommandLine(int argc, char *argv[])
@@ -372,6 +380,8 @@ Options parseCommandLine(int argc, char *argv[])
         } else if (arg == USER_LIBRARY_PATH_OPTION && hasNext) {
             ++it;
             options.userLibraryPath = nextArg;
+        } else if (arg == TEMPORARY_CLEAN_SETTINGS1 || arg == TEMPORARY_CLEAN_SETTINGS2) {
+            options.wantsCleanSettings = true;
         } else { // arguments that are still passed on to the application
             if (arg == TEST_OPTION)
                 options.hasTestOption = true;
@@ -424,7 +434,7 @@ int main(int argc, char **argv)
 #endif
 
     QScopedPointer<Utils::TemporaryDirectory> temporaryCleanSettingsDir;
-    if (options.settingsPath.isEmpty() && options.hasTestOption) {
+    if (options.settingsPath.isEmpty() && (options.hasTestOption || options.wantsCleanSettings)) {
         temporaryCleanSettingsDir.reset(new Utils::TemporaryDirectory("qtc-test-settings"));
         if (!temporaryCleanSettingsDir->isValid())
             return 1;

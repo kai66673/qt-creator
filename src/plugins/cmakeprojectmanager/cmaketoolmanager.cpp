@@ -57,7 +57,7 @@ static CMakeToolManagerPrivate *d = nullptr;
 
 CMakeToolManager *CMakeToolManager::m_instance = nullptr;
 
-CMakeToolManager::CMakeToolManager(QObject *parent) : QObject(parent)
+CMakeToolManager::CMakeToolManager()
 {
     QTC_ASSERT(!m_instance, return);
     m_instance = this;
@@ -86,7 +86,7 @@ QList<CMakeTool *> CMakeToolManager::cmakeTools()
     return Utils::toRawPointer<QList>(d->m_cmakeTools);
 }
 
-Id CMakeToolManager::registerOrFindCMakeTool(const FileName &command)
+Id CMakeToolManager::registerOrFindCMakeTool(const FilePath &command)
 {
     if (CMakeTool  *cmake = findByCommand(command))
         return cmake->id();
@@ -149,7 +149,7 @@ void CMakeToolManager::setDefaultCMakeTool(const Id &id)
     ensureDefaultCMakeToolIsValid();
 }
 
-CMakeTool *CMakeToolManager::findByCommand(const FileName &command)
+CMakeTool *CMakeToolManager::findByCommand(const FilePath &command)
 {
     return Utils::findOrDefault(d->m_cmakeTools, Utils::equal(&CMakeTool::cmakeExecutable, command));
 }

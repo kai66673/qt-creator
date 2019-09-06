@@ -44,13 +44,13 @@ QString currentProcessId()
 
 RefactoringConnectionClient::RefactoringConnectionClient(RefactoringClientInterface *client)
     : ConnectionClient(Utils::TemporaryDirectory::masterDirectoryPath()
-                       + QStringLiteral("/ClangRefactoringBackEnd-")
-                       + currentProcessId()),
-      m_serverProxy(client, nullptr)
+                       + QStringLiteral("/ClangRefactoringBackEnd-") + currentProcessId())
+    , m_serverProxy(client)
 {
     m_processCreator.setTemporaryDirectoryPattern("clangrefactoringbackend-XXXXXX");
     m_processCreator.setArguments({connectionName(),
-                                   Core::ICore::userResourcePath() + "/symbol-experimental-v1.db"});
+                                   Core::ICore::cacheResourcePath() + "/symbol-experimental-v1.db",
+                                   Core::ICore::resourcePath()});
 
     stdErrPrefixer().setPrefix("RefactoringConnectionClient.stderr: ");
     stdOutPrefixer().setPrefix("RefactoringConnectionClient.stdout: ");
@@ -81,9 +81,9 @@ QString RefactoringConnectionClient::outputName() const
     return QStringLiteral("RefactoringConnectionClient");
 }
 
-void RefactoringConnectionClient::newConnectedServer(QIODevice *ioDevice)
+void RefactoringConnectionClient::newConnectedServer(QLocalSocket *localSocket)
 {
-    m_serverProxy.setIoDevice(ioDevice);
+    m_serverProxy.setLocalSocket(localSocket);
 }
 
 } // namespace ClangBackEnd

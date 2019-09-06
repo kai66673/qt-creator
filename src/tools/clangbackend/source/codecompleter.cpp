@@ -130,7 +130,7 @@ static QString tweakName(const Utf8String &oldName)
     if (!oldName.contains('>'))
         return QString();
 
-    QString fullName = QString(oldName).trimmed();
+    QString fullName = oldName.toString().trimmed();
     if (!fullName.endsWith('>')) {
         // This is the class<type>::method case - remove ::method part
         if (!fullName.endsWith("create") || !fullName.contains("QSharedPointer"))
@@ -197,9 +197,7 @@ ClangCodeCompleteResults CodeCompleter::completeHelper(uint line, uint column)
 uint CodeCompleter::defaultOptions() const
 {
     uint options = CXCodeComplete_IncludeMacros
-        #ifdef IS_COMPLETION_FIXITS_BACKPORTED
             | CXCodeComplete_IncludeCompletionsWithFixIts
-        #endif
             | CXCodeComplete_IncludeCodePatterns;
 
     if (TranslationUnitUpdater::defaultParseOptions()

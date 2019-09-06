@@ -70,7 +70,7 @@ static void buildTree(ProjectExplorer::Tree *parent,
         current->fullPath = parent->fullPath + current->name;
         parent->childDirectories.push_back(current);
     } else {
-        current->fullPath = Utils::FileName::fromString(current->name);
+        current->fullPath = Utils::FilePath::fromString(current->name);
     }
     current->parent = parent;
     for (const Constants::TidyNode &nodeChild : node.children)
@@ -381,7 +381,7 @@ private:
 
             levelNode->childDirectories.append(checkNode);
 
-            m_topics.unite(check.topics.toSet());
+            m_topics.unite(Utils::toSet(check.topics));
         }
     }
 
@@ -860,11 +860,11 @@ void ClangDiagnosticConfigsWidget::syncClazyChecksGroupBox()
         return !m_clazySortFilterProxyModel->filterAcceptsRow(index.row(), index.parent());
     };
     const bool hasEnabledButHidden = m_clazyTreeModel->hasEnabledButNotVisibleChecks(isHidden);
-    const QString title = hasEnabledButHidden ? tr("Checks (%1 enabled, some are filtered out)")
-                                              : tr("Checks (%1 enabled)");
-
-    const QStringList checks = m_clazyTreeModel->enabledChecks();
-    m_clazyChecks->checksGroupBox->setTitle(title.arg(checks.count()));
+    const int checksCount = m_clazyTreeModel->enabledChecks().count();
+    const QString title = hasEnabledButHidden ? tr("Checks (%n enabled, some are filtered out)",
+                                                   nullptr, checksCount)
+                                              : tr("Checks (%n enabled)", nullptr, checksCount);
+    m_clazyChecks->checksGroupBox->setTitle(title);
 }
 
 void ClangDiagnosticConfigsWidget::updateConfig(const ClangDiagnosticConfig &config)
@@ -910,7 +910,7 @@ void ClangDiagnosticConfigsWidget::updateValidityWidgets(const QString &errorMes
 void ClangDiagnosticConfigsWidget::connectClangTidyItemChanged()
 {
     connect(m_tidyChecks->tidyMode,
-            static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &ClangDiagnosticConfigsWidget::onClangTidyModeChanged);
     connect(m_tidyTreeModel.get(), &TidyChecksTreeModel::dataChanged,
@@ -920,7 +920,7 @@ void ClangDiagnosticConfigsWidget::connectClangTidyItemChanged()
 void ClangDiagnosticConfigsWidget::disconnectClangTidyItemChanged()
 {
     disconnect(m_tidyChecks->tidyMode,
-               static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+               QOverload<int>::of(&QComboBox::currentIndexChanged),
                this,
                &ClangDiagnosticConfigsWidget::onClangTidyModeChanged);
     disconnect(m_tidyTreeModel.get(), &TidyChecksTreeModel::dataChanged,
@@ -1003,7 +1003,7 @@ void ClangDiagnosticConfigsWidget::setupTabs()
     setupTreeView(m_clazyChecks->checksView, m_clazySortFilterProxyModel, 2);
     m_clazyChecks->checksView->setSortingEnabled(true);
     m_clazyChecks->checksView->sortByColumn(0, Qt::AscendingOrder);
-    auto topicsModel = new QStringListModel(m_clazyTreeModel->topics().toList(), this);
+    auto topicsModel = new QStringListModel(Utils::toList(m_clazyTreeModel->topics()), this);
     topicsModel->sort(0);
     m_clazyChecks->topicsView->setModel(topicsModel);
     connect(m_clazyChecks->topicsResetButton, &QPushButton::clicked, [this](){

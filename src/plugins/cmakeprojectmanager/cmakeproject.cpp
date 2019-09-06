@@ -26,6 +26,7 @@
 #include "cmakeproject.h"
 
 #include "cmakebuildconfiguration.h"
+#include "cmakebuildstep.h"
 #include "cmakekitinformation.h"
 #include "cmakeprojectconstants.h"
 #include "cmakeprojectnodes.h"
@@ -37,6 +38,7 @@
 #include <cpptools/generatedcodemodelsupport.h>
 #include <cpptools/projectinfo.h>
 #include <cpptools/cpptoolsconstants.h>
+#include <projectexplorer/buildsteplist.h>
 #include <projectexplorer/buildtargetinfo.h>
 #include <projectexplorer/deploymentdata.h>
 #include <projectexplorer/headerpath.h>
@@ -52,6 +54,7 @@
 
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
+#include <utils/qtcprocess.h>
 #include <utils/stringutils.h>
 #include <utils/hostosinfo.h>
 
@@ -78,7 +81,7 @@ static CMakeBuildConfiguration *activeBc(const CMakeProject *p)
 /*!
   \class CMakeProject
 */
-CMakeProject::CMakeProject(const FileName &fileName) : Project(Constants::CMAKEMIMETYPE, fileName),
+CMakeProject::CMakeProject(const FilePath &fileName) : Project(Constants::CMAKEMIMETYPE, fileName),
     m_cppCodeModelUpdater(new CppTools::CppProjectUpdater)
 {
     setId(CMakeProjectManager::Constants::CMAKEPROJECT_ID);
@@ -211,7 +214,7 @@ CMakeProject::CMakeProject(const FileName &fileName) : Project(Constants::CMAKEM
     // TreeScanner:
     connect(&m_treeScanner, &TreeScanner::finished, this, &CMakeProject::handleTreeScanningFinished);
 
-    m_treeScanner.setFilter([this](const Utils::MimeType &mimeType, const Utils::FileName &fn) {
+    m_treeScanner.setFilter([this](const Utils::MimeType &mimeType, const Utils::FilePath &fn) {
         // Mime checks requires more resources, so keep it last in check list
         auto isIgnored =
                 fn.toString().startsWith(projectFilePath().toString() + ".user") ||
@@ -231,7 +234,7 @@ CMakeProject::CMakeProject(const FileName &fileName) : Project(Constants::CMAKEM
         return isIgnored;
     });
 
-    m_treeScanner.setTypeFactory([](const Utils::MimeType &mimeType, const Utils::FileName &fn) {
+    m_treeScanner.setTypeFactory([](const Utils::MimeType &mimeType, const Utils::FilePath &fn) {
         auto type = TreeScanner::genericFileType(mimeType, fn);
         if (type == FileType::Unknown) {
             if (mimeType.isValid()) {
@@ -265,13 +268,57 @@ void CMakeProject::updateProjectData(CMakeBuildConfiguration *bc)
     QTC_ASSERT(bc == aBc, return);
     QTC_ASSERT(m_treeScanner.isFinished() && !m_buildDirManager.isParsing(), return);
 
-    bc->setBuildTargets(m_buildDirManager.takeBuildTargets());
-    bc->setConfigurationFromCMake(m_buildDirManager.takeCMakeConfiguration());
+    const QList<CMakeBuildTarget> buildTargets = m_buildDirManager.takeBuildTargets();
+    bc->setBuildTargets(buildTargets);
+    const CMakeConfig cmakeConfig = m_buildDirManager.takeCMakeConfiguration();
+    bc->setConfigurationFromCMake(cmakeConfig);
+
+    CMakeConfig patchedConfig = cmakeConfig;
+    {
+        CMakeConfigItem settingFileItem;
+        settingFileItem.key = "ANDROID_DEPLOYMENT_SETTINGS_FILE";
+        settingFileItem.value = bc->buildDirectory()
+                .pathAppended("android_deployment_settings.json").toString().toUtf8();
+        patchedConfig.append(settingFileItem);
+    }
+
+    QSet<QString> res;
+    QStringList apps;
+    for (const auto &target : bc->buildTargets()) {
+        if (target.targetType == CMakeProjectManager::DynamicLibraryType) {
+            res.insert(target.executable.parentDir().toString());
+            apps.push_back(target.executable.toUserOutput());
+        }
+        // ### shall we add also the ExecutableType ?
+    }
+    {
+        CMakeConfigItem paths;
+        paths.key = "ANDROID_SO_LIBS_PATHS";
+        paths.values = Utils::toList(res);
+        patchedConfig.append(paths);
+    }
+
+    apps.sort();
+    {
+        CMakeConfigItem appsPaths;
+        appsPaths.key = "TARGETS_BUILD_PATH";
+        appsPaths.values = apps;
+        patchedConfig.append(appsPaths);
+    }
+
 
     auto newRoot = generateProjectTree(m_allFiles);
     if (newRoot) {
         setDisplayName(newRoot->displayName());
         setRootProjectNode(std::move(newRoot));
+
+        for (const CMakeBuildTarget &bt : buildTargets) {
+            const QString buildKey = CMakeTargetNode::generateId(bt.sourceDirectory, bt.title);
+            if (ProjectNode *node = findNodeForBuildKey(buildKey)) {
+                if (auto targetNode = dynamic_cast<CMakeTargetNode *>(node))
+                    targetNode->setConfig(patchedConfig);
+            }
+        }
     }
 
     Target *t = bc->target();
@@ -311,9 +358,8 @@ void CMakeProject::updateProjectData(CMakeBuildConfiguration *bc)
 void CMakeProject::updateQmlJSCodeModel()
 {
     QmlJS::ModelManagerInterface *modelManager = QmlJS::ModelManagerInterface::instance();
-    QTC_ASSERT(modelManager, return);
 
-    if (!activeTarget() || !activeTarget()->activeBuildConfiguration())
+    if (!modelManager || !activeTarget() || !activeTarget()->activeBuildConfiguration())
         return;
 
     QmlJS::ModelManagerInterface::ProjectInfo projectInfo =
@@ -335,7 +381,7 @@ void CMakeProject::updateQmlJSCodeModel()
     }
 
     foreach (const QString &cmakeImport, CMakeConfigItem::cmakeSplitValue(cmakeImports))
-        projectInfo.importPaths.maybeInsert(FileName::fromString(cmakeImport), QmlJS::Dialect::Qml);
+        projectInfo.importPaths.maybeInsert(FilePath::fromString(cmakeImport), QmlJS::Dialect::Qml);
 
     modelManager->updateProjectInfo(projectInfo, this);
 }
@@ -356,9 +402,9 @@ bool CMakeProject::knowsAllBuildExecutables() const
     return false;
 }
 
-QList<Task> CMakeProject::projectIssues(const Kit *k) const
+Tasks CMakeProject::projectIssues(const Kit *k) const
 {
-    QList<Task> result = Project::projectIssues(k);
+    Tasks result = Project::projectIssues(k);
 
     if (!CMakeKitAspect::cmakeTool(k))
         result.append(createProjectTask(Task::TaskType::Error, tr("No cmake tool set.")));
@@ -542,17 +588,16 @@ QStringList CMakeProject::filesGeneratedFrom(const QString &sourceFile) const
     if (!activeTarget())
         return QStringList();
     QFileInfo fi(sourceFile);
-    FileName project = projectDirectory();
-    FileName baseDirectory = FileName::fromString(fi.absolutePath());
+    FilePath project = projectDirectory();
+    FilePath baseDirectory = FilePath::fromString(fi.absolutePath());
 
     while (baseDirectory.isChildOf(project)) {
-        FileName cmakeListsTxt = baseDirectory;
-        cmakeListsTxt.appendPath("CMakeLists.txt");
+        const FilePath cmakeListsTxt = baseDirectory.pathAppended("CMakeLists.txt");
         if (cmakeListsTxt.exists())
             break;
         QDir dir(baseDirectory.toString());
         dir.cdUp();
-        baseDirectory = FileName::fromString(dir.absolutePath());
+        baseDirectory = FilePath::fromString(dir.absolutePath());
     }
 
     QDir srcDirRoot = QDir(project.toString());
@@ -576,6 +621,29 @@ QStringList CMakeProject::filesGeneratedFrom(const QString &sourceFile) const
     }
 }
 
+ProjectExplorer::DeploymentKnowledge CMakeProject::deploymentKnowledge() const
+{
+    return contains(files(AllFiles), [](const FilePath &f) {
+        return f.fileName() == "QtCreatorDeployment.txt";
+    }) ? DeploymentKnowledge::Approximative : DeploymentKnowledge::Bad;
+}
+
+MakeInstallCommand CMakeProject::makeInstallCommand(const Target *target,
+                                                    const QString &installRoot)
+{
+    MakeInstallCommand cmd;
+    if (const BuildConfiguration * const bc = target->activeBuildConfiguration()) {
+        if (const auto cmakeStep = bc->stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD)
+                ->firstOfType<CMakeBuildStep>()) {
+            if (CMakeTool *tool = CMakeKitAspect::cmakeTool(target->kit()))
+                cmd.command = tool->cmakeExecutable();
+        }
+    }
+    cmd.arguments << "--build" << "." << "--target" << "install";
+    cmd.environment.set("DESTDIR", QDir::toNativeSeparators(installRoot));
+    return cmd;
+}
+
 bool CMakeProject::mustUpdateCMakeStateBeforeBuild()
 {
     return m_delayedParsingTimer.isActive();
@@ -591,7 +659,7 @@ QList<ProjectExplorer::ExtraCompiler *> CMakeProject::findExtraCompilers() const
             = Utils::transform<QSet>(factories, &ExtraCompilerFactory::sourceTag);
 
     // Find all files generated by any of the extra compilers, in a rather crude way.
-    const FileNameList fileList = files([&fileExtensions](const Node *n) {
+    const FilePathList fileList = files([&fileExtensions](const Node *n) {
         if (!SourceFiles(n))
             return false;
         const QString fp = n->filePath().toString();
@@ -600,7 +668,7 @@ QList<ProjectExplorer::ExtraCompiler *> CMakeProject::findExtraCompilers() const
     });
 
     // Generate the necessary information:
-    for (const FileName &file : fileList) {
+    for (const FilePath &file : fileList) {
         ExtraCompilerFactory *factory = Utils::findOrDefault(factories, [&file](const ExtraCompilerFactory *f) {
             return file.endsWith('.' + f->sourceTag());
         });
@@ -610,9 +678,9 @@ QList<ProjectExplorer::ExtraCompiler *> CMakeProject::findExtraCompilers() const
         if (generated.isEmpty())
             continue;
 
-        const FileNameList fileNames
+        const FilePathList fileNames
                 = transform(generated,
-                            [](const QString &s) { return FileName::fromString(s); });
+                            [](const QString &s) { return FilePath::fromString(s); });
         extraCompilers.append(factory->create(this, file, fileNames));
     }
 

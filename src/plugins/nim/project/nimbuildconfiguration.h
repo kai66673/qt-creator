@@ -40,18 +40,14 @@ class NimBuildConfiguration : public ProjectExplorer::BuildConfiguration
     NimBuildConfiguration(ProjectExplorer::Target *target, Core::Id id);
 
     void initialize(const ProjectExplorer::BuildInfo &info) override;
-    ProjectExplorer::NamedWidget *createConfigWidget() override;
     ProjectExplorer::BuildConfiguration::BuildType buildType() const override;
 
-    bool fromMap(const QVariantMap &map) override;
-    QVariantMap toMap() const override;
-
 public:
-    Utils::FileName cacheDirectory() const;
-    Utils::FileName outFilePath() const;
+    Utils::FilePath cacheDirectory() const;
+    Utils::FilePath outFilePath() const;
 
 signals:
-    void outFilePathChanged(const Utils::FileName &outFilePath);
+    void outFilePathChanged(const Utils::FilePath &outFilePath);
 
 private:
     void setupBuild(const ProjectExplorer::BuildInfo *info);

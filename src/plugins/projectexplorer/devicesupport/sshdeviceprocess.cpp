@@ -26,7 +26,7 @@
 #include "sshdeviceprocess.h"
 
 #include "idevice.h"
-#include "../runconfiguration.h"
+#include "../runcontrol.h"
 
 #include <ssh/sshconnection.h>
 #include <ssh/sshconnectionmanager.h>
@@ -188,21 +188,21 @@ void SshDeviceProcess::handleConnected()
 
     d->process = runInTerminal() && d->runnable.executable.isEmpty()
             ? d->connection->createRemoteShell()
-            : d->connection->createRemoteProcess(fullCommandLine(d->runnable).toUtf8());
+            : d->connection->createRemoteProcess(fullCommandLine(d->runnable));
     const QString display = d->displayName();
     if (!display.isEmpty())
         d->process->requestX11Forwarding(display);
     if (runInTerminal()) {
         d->process->requestTerminal();
         const QStringList cmdLine = d->process->fullLocalCommandLine();
-        connect(&d->consoleProcess,
-                static_cast<void (ConsoleProcess::*)(QProcess::ProcessError)>(&ConsoleProcess::error),
+        connect(&d->consoleProcess, QOverload<QProcess::ProcessError>::of(&ConsoleProcess::error),
                 this, &DeviceProcess::error);
         connect(&d->consoleProcess, &ConsoleProcess::processStarted,
                 this, &SshDeviceProcess::handleProcessStarted);
         connect(&d->consoleProcess, &ConsoleProcess::stubStopped,
                 this, [this] { handleProcessFinished(d->consoleProcess.errorString()); });
-        d->consoleProcess.start(cmdLine.first(), cmdLine.mid(1).join(' '));
+        d->consoleProcess.start(cmdLine.first(), cmdLine.mid(1).join(' '),
+                                ConsoleProcess::MetaCharMode::Ignore);
     } else {
         connect(d->process.get(), &QSsh::SshRemoteProcess::started,
                 this, &SshDeviceProcess::handleProcessStarted);

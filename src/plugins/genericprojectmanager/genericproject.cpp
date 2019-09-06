@@ -82,7 +82,7 @@ namespace Internal {
 class GenericProjectFile : public Core::IDocument
 {
 public:
-    GenericProjectFile(GenericProject *parent, const FileName &fileName,
+    GenericProjectFile(GenericProject *parent, const FilePath &fileName,
                        GenericProject::RefreshOptions options) :
         m_project(parent),
         m_options(options)
@@ -129,8 +129,6 @@ public:
         setDisplayName(project->projectFilePath().toFileInfo().completeBaseName());
     }
 
-    bool showInSimpleTree() const override { return true; }
-
     bool supportsAction(ProjectAction action, const Node *) const override
     {
         return action == AddNewFile
@@ -172,7 +170,7 @@ static bool writeFile(const QString &filePath, const QString &contents)
     return saver.write(contents.toUtf8()) && saver.finalize();
 }
 
-GenericProject::GenericProject(const Utils::FileName &fileName) :
+GenericProject::GenericProject(const Utils::FilePath &fileName) :
     Project(Constants::GENERICMIMETYPE, fileName, [this]() { refresh(Everything); }),
     m_cppCodeModelUpdater(new CppTools::CppProjectUpdater),
     m_deployFileWatcher(new FileSystemWatcher(this))
@@ -203,19 +201,19 @@ GenericProject::GenericProject(const Utils::FileName &fileName) :
     }
 
     m_filesIDocument
-            = new ProjectDocument(Constants::GENERICMIMETYPE, FileName::fromString(m_filesFileName),
+            = new ProjectDocument(Constants::GENERICMIMETYPE, FilePath::fromString(m_filesFileName),
                                   [this]() { refresh(Files); });
     m_includesIDocument
-            = new ProjectDocument(Constants::GENERICMIMETYPE, FileName::fromString(m_includesFileName),
+            = new ProjectDocument(Constants::GENERICMIMETYPE, FilePath::fromString(m_includesFileName),
                                   [this]() { refresh(Configuration); });
     m_configIDocument
-            = new ProjectDocument(Constants::GENERICMIMETYPE, FileName::fromString(m_configFileName),
+            = new ProjectDocument(Constants::GENERICMIMETYPE, FilePath::fromString(m_configFileName),
                                   [this]() { refresh(Configuration); });
     m_cxxFlagsIDocument
-            = new ProjectDocument(Constants::GENERICMIMETYPE, FileName::fromString(m_cxxflagsFileName),
+            = new ProjectDocument(Constants::GENERICMIMETYPE, FilePath::fromString(m_cxxflagsFileName),
                                   [this]() { refresh(Configuration); });
     m_cFlagsIDocument
-            = new ProjectDocument(Constants::GENERICMIMETYPE, FileName::fromString(m_cflagsFileName),
+            = new ProjectDocument(Constants::GENERICMIMETYPE, FilePath::fromString(m_cflagsFileName),
                                   [this]() { refresh(Configuration); });
 
     connect(m_deployFileWatcher, &FileSystemWatcher::fileChanged,
@@ -291,7 +289,7 @@ bool GenericProject::addFiles(const QStringList &filePaths)
     for (const QString &filePath : filePaths)
         insertSorted(&newList, baseDir.relativeFilePath(filePath));
 
-    const QSet<QString> includes = m_projectIncludePaths.toSet();
+    const QSet<QString> includes = Utils::toSet(m_projectIncludePaths);
     QSet<QString> toAdd;
 
     for (const QString &filePath : filePaths) {
@@ -384,6 +382,26 @@ void GenericProject::parseProject(RefreshOptions options)
     }
 }
 
+FilePath GenericProject::findCommonSourceRoot()
+{
+    if (m_files.isEmpty())
+        return FilePath::fromFileInfo(QFileInfo(m_filesFileName).absolutePath());
+
+    QString root = m_files.front();
+    for (const QString &item : m_files) {
+        if (root.length() > item.length())
+            root.truncate(item.length());
+
+        for (int i = 0; i < root.length(); ++i) {
+            if (root[i] != item[i]) {
+                root.truncate(i);
+                break;
+            }
+        }
+    }
+    return FilePath::fromString(QFileInfo(root).absolutePath());
+}
+
 void GenericProject::refresh(RefreshOptions options)
 {
     emitParsingStarted();
@@ -392,30 +410,28 @@ void GenericProject::refresh(RefreshOptions options)
     if (options & Files) {
         auto newRoot = std::make_unique<GenericProjectNode>(this);
 
+        // find the common base directory of all source files
+        Utils::FilePath baseDir = findCommonSourceRoot();
+
         for (const QString &f : m_files) {
             FileType fileType = FileType::Source; // ### FIXME
             if (f.endsWith(".qrc"))
                 fileType = FileType::Resource;
-            newRoot->addNestedNode(std::make_unique<FileNode>(FileName::fromString(f), fileType,
-                                                              false));
+            newRoot->addNestedNode(std::make_unique<FileNode>(FilePath::fromString(f), fileType), baseDir);
         }
 
-        newRoot->addNestedNode(std::make_unique<FileNode>(FileName::fromString(m_filesFileName),
-                                                          FileType::Project,
-                                                          /* generated = */ false));
-        newRoot->addNestedNode(std::make_unique<FileNode>(FileName::fromString(m_includesFileName),
-                                                          FileType::Project,
-                                                          /* generated = */ false));
-        newRoot->addNestedNode(std::make_unique<FileNode>(FileName::fromString(m_configFileName),
-                                                          FileType::Project,
-                                                          /* generated = */ false));
-        newRoot->addNestedNode(std::make_unique<FileNode>(FileName::fromString(m_cxxflagsFileName),
-                                                          FileType::Project,
-                                                          /* generated = */ false));
-        newRoot->addNestedNode(std::make_unique<FileNode>(FileName::fromString(m_cflagsFileName),
-                                                          FileType::Project,
-                                                          /* generated = */ false));
+        newRoot->addNestedNode(std::make_unique<FileNode>(FilePath::fromString(m_filesFileName),
+                                                          FileType::Project));
+        newRoot->addNestedNode(std::make_unique<FileNode>(FilePath::fromString(m_includesFileName),
+                                                          FileType::Project));
+        newRoot->addNestedNode(std::make_unique<FileNode>(FilePath::fromString(m_configFileName),
+                                                          FileType::Project));
+        newRoot->addNestedNode(std::make_unique<FileNode>(FilePath::fromString(m_cxxflagsFileName),
+                                                          FileType::Project));
+        newRoot->addNestedNode(std::make_unique<FileNode>(FilePath::fromString(m_cflagsFileName),
+                                                          FileType::Project));
 
+        newRoot->compress();
         setRootProjectNode(std::move(newRoot));
     }
 
@@ -458,7 +474,7 @@ QStringList GenericProject::processEntries(const QStringList &paths,
         trimmedPath = buildEnv.expandVariables(trimmedPath);
         trimmedPath = expander->expand(trimmedPath);
 
-        trimmedPath = Utils::FileName::fromUserInput(trimmedPath).toString();
+        trimmedPath = Utils::FilePath::fromUserInput(trimmedPath).toString();
 
         fileInfo.setFile(projectDir, trimmedPath);
         if (fileInfo.exists()) {
@@ -493,14 +509,14 @@ void GenericProject::refreshCppCodeModel()
 void GenericProject::updateDeploymentData()
 {
     static const QString fileName("QtCreatorDeployment.txt");
-    Utils::FileName deploymentFilePath;
+    Utils::FilePath deploymentFilePath;
     if (activeTarget() && activeTarget()->activeBuildConfiguration()) {
         deploymentFilePath = activeTarget()->activeBuildConfiguration()->buildDirectory()
-                .appendPath(fileName);
+                .pathAppended(fileName);
     }
     bool hasDeploymentData = QFileInfo::exists(deploymentFilePath.toString());
     if (!hasDeploymentData) {
-        deploymentFilePath = projectDirectory().appendPath(fileName);
+        deploymentFilePath = projectDirectory().pathAppended(fileName);
         hasDeploymentData = QFileInfo::exists(deploymentFilePath.toString());
     }
     if (hasDeploymentData) {
@@ -572,6 +588,11 @@ Project::RestoreResult GenericProject::fromMap(const QVariantMap &map, QString *
             this, &GenericProject::activeTargetWasChanged);
     refresh(Everything);
     return RestoreResult::Ok;
+}
+
+ProjectExplorer::DeploymentKnowledge GenericProject::deploymentKnowledge() const
+{
+    return DeploymentKnowledge::Approximative;
 }
 
 } // namespace Internal

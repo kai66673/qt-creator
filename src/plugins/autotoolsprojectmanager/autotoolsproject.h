@@ -53,16 +53,17 @@ class AutotoolsProject : public ProjectExplorer::Project
     Q_OBJECT
 
 public:
-    explicit AutotoolsProject(const Utils::FileName &fileName);
+    explicit AutotoolsProject(const Utils::FilePath &fileName);
     ~AutotoolsProject() override;
 
-    static QString defaultBuildDirectory(const QString &projectPath);
     QStringList buildTargets() const;
 
 protected:
     RestoreResult fromMap(const QVariantMap &map, QString *errorMessage) override;
 
 private:
+    bool hasMakeInstallEquivalent() const override { return true; }
+
     /**
      *  Loads the project tree by parsing the makefiles.
      */

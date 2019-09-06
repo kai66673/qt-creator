@@ -88,7 +88,7 @@ void ResourceHandler::updateResourcesHelper(bool updateProjectResources)
         qDebug() << "ResourceHandler::updateResources()" << fileName;
 
     // Filename could change in the meantime.
-    Project *project = SessionManager::projectForFile(Utils::FileName::fromUserInput(fileName));
+    Project *project = SessionManager::projectForFile(Utils::FilePath::fromUserInput(fileName));
     const bool dirty = m_form->property("_q_resourcepathchanged").toBool();
     if (dirty)
         m_form->setDirty(true);
@@ -96,9 +96,25 @@ void ResourceHandler::updateResourcesHelper(bool updateProjectResources)
     // Does the file belong to a project?
     if (project) {
         // Collect project resource files.
-        ProjectNode *root = project->rootProjectNode();
+
+        // Find the (sub-)project the file belongs to. We don't want to find resources
+        // from other parts of the project tree, e.g. via a qmake subdirs project.
+        ProjectNode *projectNode = project->rootProjectNode();
+        Node * const fileNode = projectNode->findNode([&fileName](const Node *n) {
+            return n->filePath().toString() == fileName;
+        });
+        if (fileNode) {
+            // We do not want qbs groups or qmake .pri files here, as they contain only a subset
+            // of the relevant files.
+            projectNode = fileNode->parentProjectNode();
+            while (projectNode && !projectNode->isProduct())
+                projectNode = projectNode->parentProjectNode();
+        }
+        if (!projectNode)
+            projectNode = project->rootProjectNode();
+
         QStringList projectQrcFiles;
-        root->forEachNode([&](FileNode *node) {
+        projectNode->forEachNode([&](FileNode *node) {
             if (node->fileType() == FileType::Resource)
                 projectQrcFiles.append(node->filePath().toString());
         }, [&](FolderNode *node) {
@@ -114,7 +130,7 @@ void ResourceHandler::updateResourcesHelper(bool updateProjectResources)
             }
             if (!qrcPathsToBeAdded.isEmpty()) {
                 m_handlingResources = true;
-                root->addFiles(qrcPathsToBeAdded);
+                projectNode->addFiles(qrcPathsToBeAdded);
                 m_handlingResources = false;
                 projectQrcFiles += qrcPathsToBeAdded;
             }

@@ -63,16 +63,16 @@ public:
     QString warning() const;
 
     QStringList buildTargetTitles() const;
-    ProjectExplorer::BuildTargetInfoList appTargets() const;
+    const QList<CMakeBuildTarget> &buildTargets() const;
+    const QList<ProjectExplorer::BuildTargetInfo> appTargets() const;
     ProjectExplorer::DeploymentData deploymentData() const;
 
-    static Utils::FileName
-    shadowBuildDirectory(const Utils::FileName &projectFilePath, const ProjectExplorer::Kit *k,
+    static Utils::FilePath
+    shadowBuildDirectory(const Utils::FilePath &projectFilePath, const ProjectExplorer::Kit *k,
                          const QString &bcName, BuildConfiguration::BuildType buildType);
 
     // Context menu action:
     void buildTarget(const QString &buildTarget);
-
 signals:
     void errorOccured(const QString &message);
     void warningOccured(const QString &message);
@@ -104,6 +104,7 @@ private:
     void setWarning(const QString &message);
 
     CMakeConfig m_configurationForCMake;
+    CMakeConfig m_initialConfiguration;
     QString m_error;
     QString m_warning;
 

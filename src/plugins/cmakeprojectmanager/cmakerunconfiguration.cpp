@@ -33,9 +33,11 @@
 #include <projectexplorer/localenvironmentaspect.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/runconfigurationaspects.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/target.h>
 
 using namespace ProjectExplorer;
+using namespace Utils;
 
 namespace CMakeProjectManager {
 namespace Internal {
@@ -43,21 +45,22 @@ namespace Internal {
 CMakeRunConfiguration::CMakeRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    // Workaround for QTCREATORBUG-19354:
-    auto cmakeRunEnvironmentModifier = [target](Utils::Environment &env) {
-        if (!Utils::HostOsInfo::isWindowsHost())
-            return;
+    auto envAspect = addAspect<LocalEnvironmentAspect>(target);
 
-        const Kit *k = target->kit();
-        const QtSupport::BaseQtVersion *qt = QtSupport::QtKitAspect::qtVersion(k);
-        if (qt)
-            env.prependOrSetPath(qt->qmakeProperty("QT_INSTALL_BINS"));
-    };
-    auto envAspect = addAspect<LocalEnvironmentAspect>(target, cmakeRunEnvironmentModifier);
+    // Workaround for QTCREATORBUG-19354:
+    if (HostOsInfo::isWindowsHost()) {
+        envAspect->addModifier([target](Environment &env) {
+            const Kit *k = target->kit();
+            if (const QtSupport::BaseQtVersion *qt = QtSupport::QtKitAspect::qtVersion(k)) {
+                const QString installBinPath = qt->qmakeProperty("QT_INSTALL_BINS");
+                env.prependOrSetPath(installBinPath);
+            }
+        });
+    }
 
     addAspect<ExecutableAspect>();
     addAspect<ArgumentsAspect>();
-    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<WorkingDirectoryAspect>();
     addAspect<TerminalAspect>();
 
     connect(target->project(), &Project::parsingFinished,
@@ -73,6 +76,28 @@ void CMakeRunConfiguration::doAdditionalSetup(const RunConfigurationCreationInfo
     updateTargetInformation();
 }
 
+bool CMakeRunConfiguration::isBuildTargetValid() const
+{
+    return Utils::anyOf(target()->applicationTargets(), [this](const BuildTargetInfo &bti) {
+        return bti.buildKey == buildKey();
+    });
+}
+
+void CMakeRunConfiguration::updateEnabledState()
+{
+    if (!isBuildTargetValid())
+        setEnabled(false);
+    else
+        RunConfiguration::updateEnabledState();
+}
+
+QString CMakeRunConfiguration::disabledReason() const
+{
+    if (!isBuildTargetValid())
+        return tr("The project no longer builds the target associated with this run configuration.");
+    return RunConfiguration::disabledReason();
+}
+
 void CMakeRunConfiguration::updateTargetInformation()
 {
     BuildTargetInfo bti = buildTargetInfo();
@@ -81,8 +106,7 @@ void CMakeRunConfiguration::updateTargetInformation()
     aspect<LocalEnvironmentAspect>()->buildEnvironmentHasChanged();
 
     auto terminalAspect = aspect<TerminalAspect>();
-    if (!terminalAspect->isUserSet())
-        terminalAspect->setUseTerminal(bti.usesTerminal);
+    terminalAspect->setUseTerminalHint(bti.usesTerminal);
 }
 
 // Factory
@@ -91,8 +115,6 @@ CMakeRunConfigurationFactory::CMakeRunConfigurationFactory()
     registerRunConfiguration<CMakeRunConfiguration>("CMakeProjectManager.CMakeRunConfiguration.");
     addSupportedProjectType(CMakeProjectManager::Constants::CMAKEPROJECT_ID);
     addSupportedTargetDeviceType(ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE);
-
-    addRunWorkerFactory<SimpleTargetRunner>(ProjectExplorer::Constants::NORMAL_RUN_MODE);
 }
 
 } // Internal

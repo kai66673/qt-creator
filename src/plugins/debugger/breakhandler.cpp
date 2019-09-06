@@ -87,7 +87,7 @@ static BreakpointManager *theBreakpointManager = nullptr;
 class BreakpointMarker : public TextEditor::TextMark
 {
 public:
-    BreakpointMarker(const Breakpoint &bp, const FileName &fileName, int lineNumber)
+    BreakpointMarker(const Breakpoint &bp, const FilePath &fileName, int lineNumber)
         : TextMark(fileName, lineNumber, Constants::TEXT_MARK_CATEGORY_BREAKPOINT), m_bp(bp)
     {
         setColor(Theme::Debugger_Breakpoint_TextMarkColor);
@@ -106,7 +106,7 @@ public:
             gbp->m_params.lineNumber = lineNumber;
     }
 
-    void updateFileName(const FileName &fileName) final
+    void updateFileName(const FilePath &fileName) final
     {
         TextMark::updateFileName(fileName);
         QTC_ASSERT(m_bp, return);
@@ -145,7 +145,7 @@ public:
 class GlobalBreakpointMarker : public TextEditor::TextMark
 {
 public:
-    GlobalBreakpointMarker(GlobalBreakpoint gbp, const FileName &fileName, int lineNumber)
+    GlobalBreakpointMarker(GlobalBreakpoint gbp, const FilePath &fileName, int lineNumber)
         : TextMark(fileName, lineNumber, Constants::TEXT_MARK_CATEGORY_BREAKPOINT), m_gbp(gbp)
     {
         setColor(Theme::Debugger_Breakpoint_TextMarkColor);
@@ -174,7 +174,7 @@ public:
         m_gbp->update();
     }
 
-    void updateFileName(const FileName &fileName) final
+    void updateFileName(const FilePath &fileName) final
     {
         TextMark::updateFileName(fileName);
         QTC_ASSERT(m_gbp, return);
@@ -541,7 +541,7 @@ BreakpointDialog::BreakpointDialog(unsigned int enabledParts, QWidget *parent)
     verticalLayout->addWidget(m_buttonBox);
     verticalLayout->setStretchFactor(groupBoxAdvanced, 10);
 
-    connect(m_comboBoxType, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated),
+    connect(m_comboBoxType, QOverload<int>::of(&QComboBox::activated),
             this, &BreakpointDialog::typeChanged);
     connect(m_buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(m_buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -1006,7 +1006,7 @@ Breakpoints BreakHandler::findBreakpointsByIndex(const QList<QModelIndex> &list)
         if (Breakpoint bp = findBreakpointByIndex(index))
             items.insert(bp);
     }
-    return items.toList();
+    return Utils::toList(items);
 }
 
 SubBreakpoints BreakHandler::findSubBreakpointsByIndex(const QList<QModelIndex> &list) const
@@ -1016,7 +1016,7 @@ SubBreakpoints BreakHandler::findSubBreakpointsByIndex(const QList<QModelIndex> 
         if (SubBreakpoint sbp = findSubBreakpointByIndex(index))
             items.insert(sbp);
     }
-    return items.toList();
+    return Utils::toList(items);
 
 }
 
@@ -1302,7 +1302,7 @@ void BreakpointItem::setState(BreakpointState state)
     m_state = state;
 
     // FIXME: updateMarker() should recognize the need for icon changes.
-    if (state == BreakpointInserted) {
+    if (state == BreakpointInserted || state == BreakpointInsertionRequested) {
         destroyMarker();
         updateMarker();
     }
@@ -1661,8 +1661,8 @@ bool BreakHandler::contextMenuEvent(const ItemViewEvent &ev)
     // Delete by file: Find indices of breakpoints of the same file.
     QList<Breakpoint> breakpointsInFile;
     QString file;
-    if (Breakpoint bp = itemForIndexAtLevel<1>(ev.index())) {
-        const QModelIndex index = ev.index().sibling(ev.index().row(), BreakpointFileColumn);
+    if (Breakpoint bp = itemForIndexAtLevel<1>(ev.sourceModelIndex())) {
+        const QModelIndex index = ev.sourceModelIndex().sibling(ev.sourceModelIndex().row(), BreakpointFileColumn);
         if (!file.isEmpty()) {
             for (int i = 0; i != rowCount(); ++i)
                 if (index.data().toString() == file)
@@ -1877,7 +1877,7 @@ void BreakpointItem::updateMarkerIcon()
 
 void BreakpointItem::updateMarker()
 {
-    FileName file = FileName::fromString(markerFileName());
+    FilePath file = FilePath::fromString(markerFileName());
     int line = markerLineNumber();
     if (m_marker && (file != m_marker->fileName() || line != m_marker->lineNumber()))
         destroyMarker();
@@ -2031,14 +2031,18 @@ void BreakHandler::setWatchpointAtExpression(const QString &exp)
 
 void BreakHandler::releaseAllBreakpoints()
 {
+    GlobalBreakpoints gbps;
     for (Breakpoint bp : breakpoints()) {
         bp->removeChildren();
         bp->destroyMarker();
-        if (GlobalBreakpoint gbp = bp->globalBreakpoint())
-            gbp->updateMarker();
+        gbps.append(bp->globalBreakpoint());
     }
     clear();
-    // The now-unclaimed breakpoints are globally visible again.
+    // Make now-unclaimed breakpoints globally visible again.
+    for (GlobalBreakpoint gbp: qAsConst(gbps)) {
+        if (gbp)
+            gbp->updateMarker();
+    }
 }
 
 QString BreakpointItem::msgWatchpointByExpressionTriggered(const QString &expr) const
@@ -2294,7 +2298,7 @@ void GlobalBreakpointItem::updateMarker()
         return;
     }
 
-    const FileName file = FileName::fromString(m_params.fileName);
+    const FilePath file = FilePath::fromString(m_params.fileName);
     const int line = m_params.lineNumber;
     if (m_marker && (file != m_marker->fileName() || line != m_marker->lineNumber()))
         destroyMarker();
@@ -2435,7 +2439,7 @@ GlobalBreakpoints BreakpointManager::findBreakpointsByIndex(const QList<QModelIn
         if (GlobalBreakpoint gbp = findBreakpointByIndex(index))
             items.insert(gbp);
     }
-    return items.toList();
+    return Utils::toList(items);
 }
 
 GlobalBreakpoint BreakpointManager::createBreakpoint(const BreakpointParameters &params)
@@ -2626,7 +2630,7 @@ bool BreakpointManager::contextMenuEvent(const ItemViewEvent &ev)
     // Delete by file: Find indices of breakpoints of the same file.
     GlobalBreakpoints breakpointsInFile;
     QString file;
-    if (GlobalBreakpoint gbp = itemForIndexAtLevel<1>(ev.index())) {
+    if (GlobalBreakpoint gbp = itemForIndexAtLevel<1>(ev.sourceModelIndex())) {
         if (!file.isEmpty()) {
             for (int i = 0; i != rowCount(); ++i)
                 if (gbp->markerFileName() == file)

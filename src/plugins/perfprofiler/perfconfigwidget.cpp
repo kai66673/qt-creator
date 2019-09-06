@@ -33,6 +33,7 @@
 #include <projectexplorer/devicesupport/deviceprocess.h>
 #include <projectexplorer/kit.h>
 #include <projectexplorer/kitinformation.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/target.h>
 
 #include <utils/qtcprocess.h>
@@ -75,15 +76,14 @@ PerfConfigWidget::PerfConfigWidget(PerfSettings *settings, QWidget *parent) :
     m_ui->sampleMode->addItem(tr("frequency (Hz)"), QLatin1String(Constants::PerfSampleFrequency));
     m_ui->sampleMode->addItem(tr("event count"), QLatin1String(Constants::PerfSampleCount));
 
-    auto comboboxChangedSignal
-            = static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged);
+    auto comboboxChangedSignal = QOverload<int>::of(&QComboBox::currentIndexChanged);
     connect(m_ui->callgraphMode, comboboxChangedSignal, this, [this](int index) {
         QString mode = m_ui->callgraphMode->itemData(index).toString();
         m_settings->setCallgraphMode(mode);
         m_ui->stackSize->setEnabled(mode == QLatin1String(Constants::PerfCallgraphDwarf));
     });
 
-    auto spinBoxChangedSignal = static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged);
+    auto spinBoxChangedSignal = QOverload<int>::of(&QSpinBox::valueChanged);
     connect(m_ui->stackSize, spinBoxChangedSignal, m_settings, &PerfSettings::setStackSize);
     connect(m_ui->period, spinBoxChangedSignal, m_settings, &PerfSettings::setPeriod);
     connect(m_ui->sampleMode, comboboxChangedSignal, this, [this](int index) {
@@ -159,6 +159,10 @@ void PerfConfigWidget::setTarget(ProjectExplorer::Target *target)
     QTC_CHECK(!m_process || m_process->state() == QProcess::NotRunning);
 
     m_process.reset(device->createProcess(nullptr));
+    if (!m_process) {
+        m_ui->useTracePointsButton->setEnabled(false);
+        return;
+    }
 
     connect(m_process.get(), &ProjectExplorer::DeviceProcess::finished,
             this, &PerfConfigWidget::handleProcessFinished);
@@ -211,7 +215,7 @@ void PerfConfigWidget::handleProcessFinished()
 
     if (tracePoints.isEmpty()) {
         Core::AsynchronousMessageBox::warning(
-                    tr("No trace points found"),
+                    tr("No Trace Points Found"),
                     tr("Trace points can be defined with \"perf probe -a\"."));
     } else {
         for (const QByteArray &event : qAsConst(tracePoints)) {
@@ -233,7 +237,7 @@ void PerfConfigWidget::handleProcessError(QProcess::ProcessError error)
 {
     if (error == QProcess::FailedToStart) {
         Core::AsynchronousMessageBox::warning(
-                    tr("Cannot list trace points"),
+                    tr("Cannot List Trace Points"),
                     tr("\"perf probe -l\" failed to start. Is perf installed?"));
         m_ui->useTracePointsButton->setEnabled(true);
     }

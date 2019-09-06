@@ -219,9 +219,9 @@ static Abi macAbiForCpu(quint32 type) {
     }
 }
 
-static QList<Abi> parseCoffHeader(const QByteArray &data)
+static Abis parseCoffHeader(const QByteArray &data)
 {
-    QList<Abi> result;
+    Abis result;
     if (data.size() < 20)
         return result;
 
@@ -305,9 +305,9 @@ static QList<Abi> parseCoffHeader(const QByteArray &data)
     return result;
 }
 
-static QList<Abi> abiOf(const QByteArray &data)
+static Abis abiOf(const QByteArray &data)
 {
-    QList<Abi> result;
+    Abis result;
     if (data.size() <= 8)
         return result;
 
@@ -626,8 +626,10 @@ bool Abi::isCompatibleWith(const Abi &other) const
     if (isCompat && (osFlavor() == AndroidLinuxFlavor || other.osFlavor() == AndroidLinuxFlavor))
         isCompat = (architecture() == other.architecture()) &&  (osFlavor() == other.osFlavor());
 
-    if (!isCompat && compatibleMSVCFlavors(osFlavor(), other.osFlavor()))
+    if (!isCompat && wordWidth() == other.wordWidth()
+            && compatibleMSVCFlavors(osFlavor(), other.osFlavor())) {
         isCompat = true;
+    }
 
     return isCompat;
 }
@@ -661,6 +663,8 @@ QString Abi::toString(const Architecture &a)
         return QLatin1String("xtensa");
     case X86Architecture:
         return QLatin1String("x86");
+    case Mcs51Architecture:
+        return QLatin1String("mcs51");
     case MipsArchitecture:
         return QLatin1String("mips");
     case PowerPCArchitecture:
@@ -722,6 +726,10 @@ QString Abi::toString(const BinaryFormat &bf)
         return QLatin1String("mach_o");
     case RuntimeQmlFormat:
         return QLatin1String("qml_rt");
+    case UbrofFormat:
+        return QLatin1String("ubrof");
+    case OmfFormat:
+        return QLatin1String("omf");
     case UnknownFormat:
         Q_FALLTHROUGH();
     default:
@@ -789,6 +797,8 @@ Abi::Architecture Abi::architectureFromString(const QStringRef &a)
         return AvrArchitecture;
     if (a == "x86")
         return X86Architecture;
+    if (a == "mcs51")
+        return Mcs51Architecture;
     if (a == "mips")
         return MipsArchitecture;
     if (a == "ppc")
@@ -845,6 +855,10 @@ Abi::BinaryFormat Abi::binaryFormatFromString(const QStringRef &bf)
         return PEFormat;
     if (bf == "mach_o")
         return MachOFormat;
+    if (bf == "ubrof")
+        return UbrofFormat;
+    if (bf == "omf")
+        return OmfFormat;
     if (bf == "qml_rt")
         return RuntimeQmlFormat;
     return UnknownFormat;
@@ -969,9 +983,9 @@ Abi Abi::hostAbi()
 }
 
 //! Extract available ABIs from a binary using heuristics.
-QList<Abi> Abi::abisOfBinary(const Utils::FileName &path)
+Abis Abi::abisOfBinary(const Utils::FilePath &path)
 {
-    QList<Abi> tmp;
+    Abis tmp;
     if (path.isEmpty())
         return tmp;
 
@@ -1024,8 +1038,8 @@ QList<Abi> Abi::abisOfBinary(const Utils::FileName &path)
     f.close();
 
     // Remove duplicates:
-    QList<Abi> result;
-    foreach (const Abi &a, tmp) {
+    Abis result;
+    for (const Abi &a : qAsConst(tmp)) {
         if (!result.contains(a))
             result.append(a);
     }
@@ -1219,7 +1233,7 @@ void ProjectExplorer::ProjectExplorerPlugin::testAbiOfBinary()
     QFETCH(QString, file);
     QFETCH(QStringList, abis);
 
-    QList<Abi> result = Abi::abisOfBinary(Utils::FileName::fromString(file));
+    const Abis result = Abi::abisOfBinary(Utils::FilePath::fromString(file));
     QCOMPARE(result.count(), abis.count());
     for (int i = 0; i < abis.count(); ++i)
         QCOMPARE(result.at(i).toString(), abis.at(i));
@@ -1301,25 +1315,9 @@ void ProjectExplorer::ProjectExplorerPlugin::testAbiFromTargetTriplet_data()
                                             << int(Abi::LinuxOS) << int(Abi::GenericFlavor)
                                             << int(Abi::ElfFormat) << 32;
 
-    QTest::newRow("mipsel-linux-android") << int(Abi::MipsArchitecture)
-                                          << int(Abi::LinuxOS) << int(Abi::AndroidLinuxFlavor)
-                                          << int(Abi::ElfFormat) << 32;
-
-    QTest::newRow("mipsel-unknown-linux-android") << int(Abi::MipsArchitecture)
-                                                  << int(Abi::LinuxOS) << int(Abi::AndroidLinuxFlavor)
-                                                  << int(Abi::ElfFormat) << 32;
-
     QTest::newRow("mips-linux-gnu") << int(Abi::MipsArchitecture)
                                     << int(Abi::LinuxOS) << int(Abi::GenericFlavor)
                                     << int(Abi::ElfFormat) << 32;
-
-    QTest::newRow("mips64el-linux-android") << int(Abi::MipsArchitecture)
-                                            << int(Abi::LinuxOS) << int(Abi::AndroidLinuxFlavor)
-                                            << int(Abi::ElfFormat) << 64;
-
-    QTest::newRow("mips64el-unknown-linux-android") << int(Abi::MipsArchitecture)
-                                                    << int(Abi::LinuxOS) << int(Abi::AndroidLinuxFlavor)
-                                                    << int(Abi::ElfFormat) << 64;
 
     QTest::newRow("mips64-linux-octeon-gnu") << int(Abi::MipsArchitecture)
                                              << int(Abi::LinuxOS) << int(Abi::GenericFlavor)

@@ -365,17 +365,18 @@ QWidget *FontSettingsPage::widget()
         connect(d_ptr->m_ui->fontComboBox, &QFontComboBox::currentFontChanged,
                 this, &FontSettingsPage::fontSelected);
         connect(d_ptr->m_ui->sizeComboBox,
-                static_cast<void (QComboBox::*)(const QString &)>(&QComboBox::currentIndexChanged),
+                QOverload<const QString &>::of(&QComboBox::currentIndexChanged),
                 this, &FontSettingsPage::fontSizeSelected);
-        connect(d_ptr->m_ui->zoomSpinBox,
-                static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+        connect(d_ptr->m_ui->zoomSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
                 this, &FontSettingsPage::fontZoomChanged);
         connect(d_ptr->m_ui->antialias, &QCheckBox::toggled,
                 this, &FontSettingsPage::antialiasChanged);
         connect(d_ptr->m_ui->schemeComboBox,
-                static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, &FontSettingsPage::colorSchemeSelected);
         connect(d_ptr->m_ui->copyButton, &QPushButton::clicked,
+                this, &FontSettingsPage::openCopyColorSchemeDialog);
+        connect(d_ptr->m_ui->schemeEdit, &ColorSchemeEdit::copyScheme,
                 this, &FontSettingsPage::openCopyColorSchemeDialog);
         connect(d_ptr->m_ui->deleteButton, &QPushButton::clicked,
                 this, &FontSettingsPage::confirmDeleteColorScheme);
@@ -585,7 +586,7 @@ void FontSettingsPage::refreshColorSchemeList()
     int selected = 0;
 
     QStringList schemeList = styleDir.entryList();
-    QString defaultScheme = Utils::FileName::fromString(FontSettings::defaultSchemeFileName()).fileName();
+    QString defaultScheme = Utils::FilePath::fromString(FontSettings::defaultSchemeFileName()).fileName();
     if (schemeList.removeAll(defaultScheme))
         schemeList.prepend(defaultScheme);
     foreach (const QString &file, schemeList) {

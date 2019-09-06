@@ -69,11 +69,12 @@ QVariantMap AbstractRemoteLinuxDeployStep::toMap() const
 
 bool AbstractRemoteLinuxDeployStep::init()
 {
-    QString error;
     deployService()->setTarget(target());
-    const bool canDeploy = initInternal(&error);
-    if (!canDeploy)
-        emit addOutput(tr("Cannot deploy: %1").arg(error), OutputFormat::ErrorMessage);
+    const CheckResult canDeploy = initInternal();
+    if (!canDeploy) {
+        emit addOutput(tr("Cannot deploy: %1").arg(canDeploy.errorMessage()),
+                       OutputFormat::ErrorMessage);
+    }
     return canDeploy;
 }
 
@@ -114,7 +115,7 @@ void AbstractRemoteLinuxDeployStep::handleProgressMessage(const QString &message
 
 void AbstractRemoteLinuxDeployStep::handleErrorMessage(const QString &message)
 {
-    ProjectExplorer::Task task = Task(Task::Error, message, Utils::FileName(), -1,
+    ProjectExplorer::Task task = Task(Task::Error, message, Utils::FilePath(), -1,
                                       Constants::TASK_CATEGORY_DEPLOYMENT);
     emit addTask(task, 1); // TODO correct?
     emit addOutput(message, OutputFormat::ErrorMessage);
@@ -123,7 +124,7 @@ void AbstractRemoteLinuxDeployStep::handleErrorMessage(const QString &message)
 
 void AbstractRemoteLinuxDeployStep::handleWarningMessage(const QString &message)
 {
-    ProjectExplorer::Task task = Task(Task::Warning, message, Utils::FileName(), -1,
+    ProjectExplorer::Task task = Task(Task::Warning, message, Utils::FilePath(), -1,
                                       Constants::TASK_CATEGORY_DEPLOYMENT);
     emit addTask(task, 1); // TODO correct?
     emit addOutput(message, OutputFormat::ErrorMessage);

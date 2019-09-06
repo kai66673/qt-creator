@@ -54,6 +54,7 @@
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/projectmanager.h>
 #include <projectexplorer/projecttree.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/session.h>
 #include <projectexplorer/target.h>
 
@@ -91,7 +92,9 @@ public:
     QbsCleanStepFactory cleanStepFactory;
     QbsInstallStepFactory installStepFactory;
     QbsRunConfigurationFactory runConfigFactory;
+    SimpleRunWorkerFactory<SimpleTargetRunner, QbsRunConfiguration> runWorkerFactory;
     QbsProfilesSettingsPage profilesSetttingsPage;
+    QbsKitAspect qbsKitAspect;
 };
 
 QbsProjectManagerPlugin::~QbsProjectManagerPlugin()
@@ -112,7 +115,6 @@ bool QbsProjectManagerPlugin::initialize(const QStringList &arguments, QString *
     Core::HelpManager::registerDocumentation({Core::HelpManager::documentationPath() + "/qbs.qch"});
 
     ProjectManager::registerProjectType<QbsProject>(QmlJSTools::Constants::QBS_MIMETYPE);
-    KitManager::registerKitAspect<QbsKitAspect>();
 
     //menus
     // Build Menu:
@@ -219,16 +221,6 @@ bool QbsProjectManagerPlugin::initialize(const QStringList &arguments, QString *
     connect(m_buildSubprojectCtx, &QAction::triggered,
             this, &QbsProjectManagerPlugin::buildSubprojectContextMenu);
 
-    m_buildSubproject = new Utils::ParameterAction(tr("Build Subproject"), tr("Build Subproject \"%1\""),
-                                                Utils::ParameterAction::AlwaysEnabled, this);
-    command = Core::ActionManager::registerAction(m_buildSubproject, Constants::ACTION_BUILD_SUBPROJECT);
-    command->setAttribute(Core::Command::CA_Hide);
-    command->setAttribute(Core::Command::CA_UpdateText);
-    command->setDescription(m_buildFile->text());
-    command->setDefaultKeySequence(QKeySequence(tr("Ctrl+Shift+B")));
-    mbuild->addAction(command, ProjectExplorer::Constants::G_BUILD_BUILD);
-    connect(m_buildSubproject, &QAction::triggered, this, &QbsProjectManagerPlugin::buildSubproject);
-
     m_cleanSubprojectCtx = new QAction(tr("Clean"), this);
     command = Core::ActionManager::registerAction(
                 m_cleanSubprojectCtx, Constants::ACTION_CLEAN_SUBPROJECT_CONTEXT, projectContext);
@@ -236,17 +228,6 @@ bool QbsProjectManagerPlugin::initialize(const QStringList &arguments, QString *
     msubproject->addAction(command, ProjectExplorer::Constants::G_PROJECT_BUILD);
     connect(m_cleanSubprojectCtx, &QAction::triggered,
             this, &QbsProjectManagerPlugin::cleanSubprojectContextMenu);
-
-    m_cleanSubproject = new Utils::ParameterAction(
-                tr("Clean Subproject"), tr("Clean Subproject \"%1\""),
-                Utils::ParameterAction::AlwaysEnabled, this);
-    command = Core::ActionManager::registerAction(m_cleanSubproject,
-                                                  Constants::ACTION_CLEAN_SUBPROJECT);
-    command->setAttribute(Core::Command::CA_Hide);
-    command->setAttribute(Core::Command::CA_UpdateText);
-    mbuild->addAction(command, ProjectExplorer::Constants::G_BUILD_CLEAN);
-    connect(m_cleanSubproject, &QAction::triggered, this,
-            &QbsProjectManagerPlugin::cleanSubproject);
 
     m_rebuildSubprojectCtx = new QAction(tr("Rebuild"), this);
     command = Core::ActionManager::registerAction(
@@ -256,17 +237,6 @@ bool QbsProjectManagerPlugin::initialize(const QStringList &arguments, QString *
     msubproject->addAction(command, ProjectExplorer::Constants::G_PROJECT_BUILD);
     connect(m_rebuildSubprojectCtx, &QAction::triggered,
             this, &QbsProjectManagerPlugin::rebuildSubprojectContextMenu);
-
-    m_rebuildSubproject = new Utils::ParameterAction(
-                tr("Rebuild Subproject"), tr("Rebuild Subproject \"%1\""),
-                Utils::ParameterAction::AlwaysEnabled, this);
-    command = Core::ActionManager::registerAction(m_rebuildSubproject,
-                                                  Constants::ACTION_REBUILD_SUBPROJECT);
-    command->setAttribute(Core::Command::CA_Hide);
-    command->setAttribute(Core::Command::CA_UpdateText);
-    mbuild->addAction(command, ProjectExplorer::Constants::G_BUILD_REBUILD);
-    connect(m_rebuildSubproject, &QAction::triggered, this,
-            &QbsProjectManagerPlugin::rebuildSubproject);
 
 
     // Connect
@@ -313,12 +283,12 @@ void QbsProjectManagerPlugin::projectWasAdded(Project *project)
 void QbsProjectManagerPlugin::updateContextActions()
 {
     auto project = qobject_cast<Internal::QbsProject *>(ProjectTree::currentProject());
-    const Node *node = ProjectTree::findCurrentNode();
+    const Node *node = ProjectTree::currentNode();
     bool isEnabled = !BuildManager::isBuilding(project)
             && project && !project->isParsing()
             && node && node->isEnabled();
 
-    bool isFile = project && node && (node->nodeType() == NodeType::File);
+    const bool isFile = project && node && node->asFileNode();
     const bool isProduct = project && node && dynamic_cast<const QbsProductNode *>(node);
     const auto subproject = dynamic_cast<const QbsProjectNode *>(node);
     bool isSubproject = project && subproject && subproject != project->rootProjectNode();
@@ -346,32 +316,31 @@ void QbsProjectManagerPlugin::updateBuildActions()
     bool enabled = false;
     bool fileVisible = false;
     bool productVisible = false;
-    bool subprojectVisible = false;
 
     QString fileName;
     QString productName;
-    QString subprojectName;
 
     if (Node *editorNode = currentEditorNode()) {
-        QbsProject *editorProject = currentEditorProject();
-        enabled = editorProject
-                && !BuildManager::isBuilding(editorProject)
-                && !editorProject->isParsing();
-
         fileName = editorNode->filePath().fileName();
-        fileVisible = editorProject && editorNode && dynamic_cast<QbsBaseProjectNode *>(editorNode->parentProjectNode());
 
-        auto productNode =
-            dynamic_cast<QbsProductNode *>(editorNode ? editorNode->parentProjectNode() : nullptr);
+        ProjectNode *parentProjectNode = editorNode->parentProjectNode();
+        const QbsProductNode *productNode = nullptr;
+        for (const ProjectNode *potentialProductNode = parentProjectNode;
+             potentialProductNode && !productNode;
+             potentialProductNode = potentialProductNode->parentProjectNode()) {
+            productNode = dynamic_cast<const QbsProductNode *>(potentialProductNode);
+        }
+
         if (productNode) {
             productVisible = true;
             productName = productNode->displayName();
         }
-        auto subprojectNode =
-            dynamic_cast<QbsProjectNode *>(productNode ? productNode->parentFolderNode() : nullptr);
-        if (subprojectNode && editorProject && subprojectNode != editorProject->rootProjectNode()) {
-            subprojectVisible = true;
-            subprojectName = subprojectNode->displayName();
+
+        if (QbsProject *editorProject = currentEditorProject()) {
+            enabled = !BuildManager::isBuilding(editorProject) && !editorProject->isParsing();
+            fileVisible = productNode
+                    || dynamic_cast<QbsProjectNode *>(parentProjectNode)
+                    || dynamic_cast<QbsGroupNode *>(parentProjectNode);
         }
     }
 
@@ -388,16 +357,6 @@ void QbsProjectManagerPlugin::updateBuildActions()
     m_rebuildProduct->setEnabled(enabled);
     m_rebuildProduct->setVisible(productVisible);
     m_rebuildProduct->setParameter(productName);
-
-    m_buildSubproject->setEnabled(enabled);
-    m_buildSubproject->setVisible(subprojectVisible);
-    m_buildSubproject->setParameter(subprojectName);
-    m_cleanSubproject->setEnabled(enabled);
-    m_cleanSubproject->setVisible(subprojectVisible);
-    m_cleanSubproject->setParameter(subprojectName);
-    m_rebuildSubproject->setEnabled(enabled);
-    m_rebuildSubproject->setVisible(subprojectVisible);
-    m_rebuildSubproject->setParameter(subprojectName);
 }
 
 void QbsProjectManagerPlugin::projectChanged()
@@ -416,7 +375,7 @@ void QbsProjectManagerPlugin::projectChanged()
 
 void QbsProjectManagerPlugin::buildFileContextMenu()
 {
-    const Node *node = ProjectTree::findCurrentNode();
+    const Node *node = ProjectTree::currentNode();
     QTC_ASSERT(node, return);
     auto project = dynamic_cast<QbsProject *>(ProjectTree::currentProject());
     QTC_ASSERT(project, return);
@@ -453,7 +412,7 @@ void QbsProjectManagerPlugin::rebuildProductContextMenu()
 
 void QbsProjectManagerPlugin::runStepsForProductContextMenu(const QList<Core::Id> &stepTypes)
 {
-    const Node *node = ProjectTree::findCurrentNode();
+    const Node *node = ProjectTree::currentNode();
     QTC_ASSERT(node, return);
     auto project = dynamic_cast<QbsProject *>(ProjectTree::currentProject());
     QTC_ASSERT(project, return);
@@ -518,7 +477,7 @@ void QbsProjectManagerPlugin::rebuildSubprojectContextMenu()
 
 void QbsProjectManagerPlugin::runStepsForSubprojectContextMenu(const QList<Core::Id> &stepTypes)
 {
-    const Node *node = ProjectTree::findCurrentNode();
+    const Node *node = ProjectTree::currentNode();
     QTC_ASSERT(node, return);
     auto project = dynamic_cast<QbsProject *>(ProjectTree::currentProject());
     QTC_ASSERT(project, return);
@@ -531,52 +490,6 @@ void QbsProjectManagerPlugin::runStepsForSubprojectContextMenu(const QList<Core:
         toBuild << QbsProject::uniqueProductName(data);
 
     runStepsForProducts(project, toBuild, {stepTypes});
-}
-
-void QbsProjectManagerPlugin::buildSubproject()
-{
-    runStepsForSubproject({Core::Id(ProjectExplorer::Constants::BUILDSTEPS_BUILD)});
-}
-
-void QbsProjectManagerPlugin::cleanSubproject()
-{
-    runStepsForSubproject({Core::Id(ProjectExplorer::Constants::BUILDSTEPS_CLEAN)});
-}
-
-void QbsProjectManagerPlugin::rebuildSubproject()
-{
-    runStepsForSubproject({
-        Core::Id(ProjectExplorer::Constants::BUILDSTEPS_CLEAN),
-        Core::Id(ProjectExplorer::Constants::BUILDSTEPS_BUILD)
-    });
-}
-
-void QbsProjectManagerPlugin::runStepsForSubproject(const QList<Core::Id> &stepTypes)
-{
-    Node *editorNode = currentEditorNode();
-    QbsProject *editorProject = currentEditorProject();
-    if (!editorNode || !editorProject)
-        return;
-
-    QbsProjectNode *subproject = nullptr;
-    auto start = dynamic_cast<QbsBaseProjectNode *>(editorNode->parentProjectNode());
-    while (start && start != editorProject->rootProjectNode()) {
-        auto tmp = dynamic_cast<QbsProjectNode *>(start);
-        if (tmp) {
-            subproject = tmp;
-            break;
-        }
-        start = dynamic_cast<QbsProjectNode *>(start->parentFolderNode());
-    }
-
-    if (!subproject)
-        return;
-
-    QStringList toBuild;
-    foreach (const qbs::ProductData &data, subproject->qbsProjectData().allProducts())
-        toBuild << QbsProject::uniqueProductName(data);
-
-    runStepsForProducts(editorProject, toBuild, {stepTypes});
 }
 
 void QbsProjectManagerPlugin::buildFiles(QbsProject *project, const QStringList &files,

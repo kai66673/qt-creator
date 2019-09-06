@@ -50,8 +50,7 @@ HEADERS += \
     androidsdkmanagerwidget.h \
     androidpackageinstallationstep.h \
     androidextralibrarylistmodel.h \
-    createandroidmanifestwizard.h \
-    androidrunenvironmentaspect.h
+    createandroidmanifestwizard.h
 
 SOURCES += \
     androidconfigurations.cpp \
@@ -95,15 +94,13 @@ SOURCES += \
     androidsdkmanagerwidget.cpp \
     androidpackageinstallationstep.cpp \
     androidextralibrarylistmodel.cpp \
-    createandroidmanifestwizard.cpp \
-    androidrunenvironmentaspect.cpp
+    createandroidmanifestwizard.cpp
 
 FORMS += \
     androidsettingswidget.ui \
     addnewavddialog.ui \
     androidcreatekeystorecertificate.ui \
     androiddevicedialog.ui \
-    androidbuildapkwidget.ui \
     adbcommandswidget.ui \
     androidsdkmanagerwidget.ui
 

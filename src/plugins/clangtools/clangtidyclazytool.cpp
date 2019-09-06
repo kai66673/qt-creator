@@ -364,7 +364,7 @@ static ClangDiagnosticConfig getDiagnosticConfig(Project *project)
 
 void ClangTidyClazyTool::startTool(bool askUserForFileSelection)
 {
-    auto runControl = new RunControl(nullptr, Constants::CLANGTIDYCLAZY_RUN_MODE);
+    auto runControl = new RunControl(Constants::CLANGTIDYCLAZY_RUN_MODE);
     runControl->setDisplayName(tr("Clang-Tidy and Clazy"));
     runControl->setIcon(ProjectExplorer::Icons::ANALYZER_START_SMALL_TOOLBAR);
 
@@ -452,23 +452,23 @@ void ClangTidyClazyTool::handleStateUpdate()
         if (issuesFound)
             message = tr("Running - %n diagnostics", nullptr, issuesFound);
         else
-            message = tr("Running - No diagnostics", nullptr, issuesFound);
+            message = tr("Running - No diagnostics");
     } else {
         if (issuesFound)
             message = tr("Finished - %n diagnostics", nullptr, issuesFound);
         else
-            message = tr("Finished - No diagnostics", nullptr, issuesFound);
+            message = tr("Finished - No diagnostics");
     }
 
     Debugger::showPermanentStatusMessage(message);
 }
 
 QList<Diagnostic> ClangTidyClazyTool::read(const QString &filePath,
-                                           const Utils::FileName &projectRootDir,
+                                           const QSet<Utils::FilePath> &projectFiles,
                                            const QString &logFilePath,
                                            QString *errorMessage) const
 {
-    return readSerializedDiagnostics(filePath, projectRootDir, logFilePath, errorMessage);
+    return readSerializedDiagnostics(filePath, projectFiles, logFilePath, errorMessage);
 }
 
 void ClangTidyClazyTool::onNewDiagnosticsAvailable(const QList<Diagnostic> &diagnostics)

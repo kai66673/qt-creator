@@ -47,6 +47,7 @@
 #include <QDesktopServices>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QGridLayout>
 #include <QHeaderView>
 #include <QIdentityProxyModel>
@@ -151,17 +152,17 @@ QString ExamplesWelcomePage::copyToAlternativeLocation(const QFileInfo& proFileI
         } else {
             QString error;
             QString targetDir = destBaseDir + QLatin1Char('/') + exampleDirName;
-            if (FileUtils::copyRecursively(FileName::fromString(projectDir),
-                    FileName::fromString(targetDir), &error)) {
+            if (FileUtils::copyRecursively(FilePath::fromString(projectDir),
+                    FilePath::fromString(targetDir), &error)) {
                 // set vars to new location
                 const QStringList::Iterator end = filesToOpen.end();
                 for (QStringList::Iterator it = filesToOpen.begin(); it != end; ++it)
                     it->replace(projectDir, targetDir);
 
                 foreach (const QString &dependency, dependencies) {
-                    FileName targetFile = FileName::fromString(targetDir);
-                    targetFile.appendPath(QDir(dependency).dirName());
-                    if (!FileUtils::copyRecursively(FileName::fromString(dependency), targetFile,
+                    const FilePath targetFile = FilePath::fromString(targetDir)
+                            .pathAppended(QDir(dependency).dirName());
+                    if (!FileUtils::copyRecursively(FilePath::fromString(dependency), targetFile,
                             &error)) {
                         QMessageBox::warning(ICore::mainWindow(), tr("Cannot Copy Project"), error);
                         // do not fail, just warn;
@@ -608,7 +609,7 @@ private:
     const QColor foregroundColor2 = themeColor(Theme::Welcome_ForegroundSecondaryColor); // blacker.
 
     mutable QPersistentModelIndex m_previousIndex;
-    mutable QTime m_startTime;
+    mutable QElapsedTimer m_startTime;
     mutable QRect m_currentArea;
     mutable QPointer<QAbstractItemView> m_currentWidget;
     mutable QVector<QPair<QString, QRect>> m_currentTagRects;
@@ -644,7 +645,7 @@ public:
             ExampleSetModel *exampleSetModel = m_examplesModel->exampleSetModel();
             exampleSetSelector->setModel(exampleSetModel);
             exampleSetSelector->setCurrentIndex(exampleSetModel->selectedExampleSet());
-            connect(exampleSetSelector, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated),
+            connect(exampleSetSelector, QOverload<int>::of(&QComboBox::activated),
                     exampleSetModel, &ExampleSetModel::selectExampleSet);
             connect(exampleSetModel, &ExampleSetModel::selectedExampleSetChanged,
                     exampleSetSelector, &QComboBox::setCurrentIndex);

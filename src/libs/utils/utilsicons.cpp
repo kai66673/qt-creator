@@ -28,7 +28,6 @@
 namespace Utils {
 namespace Icons {
 
-
 const Icon HOME({
         {QLatin1String(":/utils/images/home.png"), Theme::PanelTextColorDark}}, Icon::Tint);
 const Icon HOME_TOOLBAR({
@@ -43,6 +42,8 @@ const Icon LOCKED({
         {QLatin1String(":/utils/images/locked.png"), Theme::PanelTextColorDark}}, Icon::Tint);
 const Icon UNLOCKED_TOOLBAR({
         {QLatin1String(":/utils/images/unlocked.png"), Theme::IconsBaseColor}});
+const Icon PINNED({
+        {QLatin1String(":/utils/images/pinned.png"), Theme::PanelTextColorDark}}, Icon::Tint);
 const Icon NEXT({
         {QLatin1String(":/utils/images/next.png"), Theme::IconsWarningColor}}, Icon::MenuTintedStyle);
 const Icon NEXT_TOOLBAR({
@@ -85,6 +86,8 @@ const Icon SNAPSHOT_TOOLBAR({
 const Icon NEWSEARCH_TOOLBAR({
         {QLatin1String(":/utils/images/zoom.png"), Theme::IconsBaseColor},
         {QLatin1String(":/utils/images/iconoverlay_add_small.png"), Theme::IconsRunColor}});
+const Icon SETTINGS_TOOLBAR({
+    {QLatin1String(":/utils/images/settings.png"), Theme::IconsBaseColor}});
 
 const Icon NEWFILE({
         {QLatin1String(":/utils/images/filenew.png"), Theme::PanelTextColorMid}}, Icon::Tint);
@@ -101,6 +104,11 @@ const Icon EXPORTFILE_TOOLBAR({
         {QLatin1String(":/utils/images/fileexport.png"), Theme::IconsBaseColor}});
 const Icon MULTIEXPORTFILE_TOOLBAR({
         {QLatin1String(":/utils/images/filemultiexport.png"), Theme::IconsBaseColor}});
+
+const Icon UNKNOWN_FILE({
+        {QLatin1String(":/utils/images/unknownfile.png"), Theme::IconsBaseColor}});
+const Icon DIR({
+        {QLatin1String(":/utils/images/dir.png"), Theme::IconsBaseColor}});
 
 const Icon UNDO({
         {QLatin1String(":/utils/images/undo.png"), Theme::PanelTextColorMid}}, Icon::Tint);
@@ -182,6 +190,11 @@ const Icon LINK({
         {QLatin1String(":/utils/images/linkicon.png"), Theme::PanelTextColorMid}}, Icon::Tint);
 const Icon LINK_TOOLBAR({
         {QLatin1String(":/utils/images/linkicon.png"), Theme::IconsBaseColor}});
+const Icon SORT_ALPHABETICALLY_TOOLBAR({
+        {QLatin1String(":/utils/images/sort_alphabetically.png"), Theme::IconsBaseColor}});
+const Icon TOGGLE_PROGRESSDETAILS_TOOLBAR({
+    {QLatin1String(":/utils/images/toggleprogressdetails.png"), Theme::IconsBaseColor}});
+
 const Icon WARNING({
         {QLatin1String(":/utils/images/warningfill.png"), Theme::BackgroundColorNormal},
         {QLatin1String(":/utils/images/warning.png"), Theme::IconsWarningColor}}, Icon::Tint);
@@ -442,6 +455,10 @@ QIcon CodeModelIcon::iconForType(CodeModelIcon::Type type)
         const static QIcon icon(Icon({
             variableIcon, propertyBackgroundIcon, propertyIcon
         }, Icon::Tint).icon());
+        return icon;
+    }
+    case Unknown: {
+        const static QIcon icon(Icons::EMPTY16.icon());
         return icon;
     }
     default:

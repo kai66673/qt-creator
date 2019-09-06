@@ -270,6 +270,7 @@ class DumperBase:
         # Later set, or not set:
         self.stringCutOff = 10000
         self.displayStringLimit = 100
+        self.useTimeStamps = False
 
         self.typesReported = {}
         self.typesToReport = {}
@@ -329,6 +330,7 @@ class DumperBase:
         self.showQObjectNames = int(args.get('qobjectnames', '1'))
         self.nativeMixed = int(args.get('nativemixed', '0'))
         self.autoDerefPointers = int(args.get('autoderef', '0'))
+        self.useTimeStamps = int(args.get('timestamps', '0'))
         self.partialVariable = args.get('partialvar', '')
         self.uninitialized = args.get('uninitialized', [])
         self.uninitialized = list(map(lambda x: self.hexdecode(x), self.uninitialized))
@@ -422,6 +424,8 @@ class DumperBase:
         self.currentIName = item.iname
         self.currentValue = ReportItem();
         self.currentType = ReportItem();
+        if self.useTimeStamps:
+            item.startTime = time.time()
 
     def exitSubItem(self, item, exType, exValue, exTraceBack):
         #warn('CURRENT VALUE: %s: %s %s' %
@@ -431,6 +435,8 @@ class DumperBase:
                 showException('SUBITEM', exType, exValue, exTraceBack)
             self.putSpecialValue('notaccessible')
             self.putNumChild(0)
+        if self.useTimeStamps:
+            self.put('time="%s",' % (time.time() - item.startTime))
         if not self.isCli:
             try:
                 if self.currentType.value:
@@ -1072,7 +1078,7 @@ class DumperBase:
 
         reslist = []
         for item in res.get('variables', {}):
-            if not 'iname' in item:
+            if 'iname' not in item:
                 item['iname'] = '.' + item.get('name')
             reslist.append(self.variablesToMi(item, 'local'))
 
@@ -1224,12 +1230,28 @@ class DumperBase:
         ns = self.qtNamespace()
         if len(ns) > 0 and typeName.startswith(ns):
             typeName = typeName[len(ns):]
-        pos = typeName.find('<')
-        # FIXME: make it recognize  foo<A>::bar<B>::iterator?
-        while pos != -1:
-            pos1 = typeName.rfind('>', pos)
-            typeName = typeName[0:pos] + typeName[pos1+1:]
-            pos = typeName.find('<')
+        # warn( 'stripping %s' % typeName )
+        lvl = 0
+        pos = None
+        stripChunks = []
+        sz = len(typeName)
+        for index in range(0, sz):
+            s = typeName[index]
+            if s == '<':
+                lvl += 1
+                if lvl == 1:
+                    pos = index
+                continue
+            elif s == '>':
+                lvl -= 1
+                if lvl < 0 :
+                    error("Unbalanced '<' in type, @index %d" % index)
+                if lvl == 0:
+                    stripChunks.append((pos, index+1))
+        if lvl != 0:
+            error("unbalanced at end of type name")
+        for (f, l) in reversed(stripChunks):
+            typeName = typeName[:f] + typeName[l:]
         return typeName
 
     def tryPutPrettyItem(self, typeName, value):
@@ -1889,10 +1911,14 @@ class DumperBase:
 
         if qobjectPtr:
             qobjectType = self.createType('QObject')
-            qobjectPtrType = self.createType('QObject') # FIXME.
             with SubItem(self, '[parent]'):
                 self.putField('sortgroup', 9)
-                self.putItem(self.createValue(parentPtr, qobjectPtrType))
+                if parentPtr:
+                    self.putItem(self.createValue(parentPtr, qobjectType))
+                else:
+                    self.putValue('0x0')
+                    self.putType('QObject *')
+                    self.putNumChild(0)
             with SubItem(self, '[children]'):
                 self.putField('sortgroup', 8)
                 base = self.extractPointer(dd + 3 * ptrSize) # It's a QList<QObject *>
@@ -1968,14 +1994,16 @@ class DumperBase:
                                 with Children(self):
                                     self.putQObjectGutsHelper(0, 0, -1, metaObjectPtr, 'QMetaObject')
 
-                        with SubItem(self, '[connections]'):
+                        if False:
+                          with SubItem(self, '[connections]'):
                             if connectionListsPtr:
                                 typeName = '@QObjectConnectionListVector'
                                 self.putItem(self.createValue(connectionListsPtr, typeName))
                             else:
                                 self.putItemCount(0)
 
-                        with SubItem(self, '[signals]'):
+                        if False:
+                          with SubItem(self, '[signals]'):
                             self.putItemCount(signalCount)
                             if self.isExpanded():
                                 with Children(self):

@@ -70,6 +70,8 @@ signals:
     void testRunFinished();
     void requestStopTestRun();
     void testResultReady(const TestResultPtr &result);
+    void hadDisabledTests(int disabled);
+    void reportSummary(const QString &id, const QHash<ResultType, int> &summary);
 
 private:
     void buildProject(ProjectExplorer::Project *project);
@@ -85,6 +87,7 @@ private:
     void runTests();
     void debugTests();
     void runOrDebugTests();
+    void reportResult(ResultType type, const QString &description);
     explicit TestRunner(QObject *parent = nullptr);
 
     QFutureWatcher<TestResultPtr> m_futureWatcher;

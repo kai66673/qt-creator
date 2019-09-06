@@ -24,31 +24,40 @@
 **
 ****************************************************************************/
 
-#include "baremetalplugin.h"
 #include "baremetalconstants.h"
 #include "baremetalcustomrunconfiguration.h"
-#include "baremetaldevice.h"
 #include "baremetaldebugsupport.h"
+#include "baremetaldevice.h"
+#include "baremetalplugin.h"
 #include "baremetalrunconfiguration.h"
 
-#include "gdbserverproviderssettingspage.h"
 #include "gdbserverprovidermanager.h"
+#include "gdbserverproviderssettingspage.h"
 
-#include <coreplugin/icore.h>
-#include <coreplugin/icontext.h>
+#include "iarewtoolchain.h"
+#include "keiltoolchain.h"
+#include "sdcctoolchain.h"
+
+#include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/actionmanager.h>
 #include <coreplugin/actionmanager/command.h>
-#include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/coreconstants.h>
+#include <coreplugin/icontext.h>
+#include <coreplugin/icore.h>
 
 using namespace ProjectExplorer;
 
 namespace BareMetal {
 namespace Internal {
 
-class BareMetalPluginRunData
+// BareMetalPluginPrivate
+
+class BareMetalPluginPrivate
 {
 public:
+    IarToolChainFactory iarToolChainFactory;
+    KeilToolchainFactory keilToolChainFactory;
+    SdccToolChainFactory sdccToolChainFactory;
     BareMetalDeviceFactory deviceFactory;
     BareMetalRunConfigurationFactory runConfigurationFactory;
     BareMetalCustomRunConfigurationFactory customRunConfigurationFactory;
@@ -56,14 +65,11 @@ public:
     GdbServerProviderManager gdbServerProviderManager;
 };
 
-BareMetalPlugin::BareMetalPlugin()
-{
-    setObjectName(QLatin1String("BareMetalPlugin"));
-}
+// BareMetalPlugin
 
 BareMetalPlugin::~BareMetalPlugin()
 {
-    delete m_runData;
+    delete d;
 }
 
 bool BareMetalPlugin::initialize(const QStringList &arguments, QString *errorString)
@@ -71,7 +77,7 @@ bool BareMetalPlugin::initialize(const QStringList &arguments, QString *errorStr
     Q_UNUSED(arguments)
     Q_UNUSED(errorString)
 
-    m_runData = new BareMetalPluginRunData;
+    d = new BareMetalPluginPrivate;
 
     auto constraint = [](RunConfiguration *runConfig) {
         const QByteArray idStr = runConfig->id().name();

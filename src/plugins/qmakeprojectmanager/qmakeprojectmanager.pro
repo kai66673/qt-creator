@@ -12,17 +12,13 @@ HEADERS += \
     qmakeprojectmanagerplugin.h \
     qmakeprojectmanager.h \
     qmakeproject.h \
+    qmakesettings.h \
     qmakenodes.h \
     qmakenodetreebuilder.h \
     profileeditor.h \
     profilehighlighter.h \
     profilehoverhandler.h \
     wizards/qtprojectparameters.h \
-    wizards/guiappwizard.h \
-    wizards/libraryparameters.h \
-    wizards/librarywizard.h \
-    wizards/librarywizarddialog.h \
-    wizards/guiappwizarddialog.h \
     wizards/modulespage.h \
     wizards/filespage.h \
     wizards/qtwizard.h \
@@ -52,16 +48,12 @@ SOURCES += \
     qmakeprojectmanager.cpp \
     qmakeproject.cpp \
     qmakenodes.cpp \
+    qmakesettings.cpp \
     qmakenodetreebuilder.cpp \
     profileeditor.cpp \
     profilehighlighter.cpp \
     profilehoverhandler.cpp \
     wizards/qtprojectparameters.cpp \
-    wizards/guiappwizard.cpp \
-    wizards/libraryparameters.cpp \
-    wizards/librarywizard.cpp \
-    wizards/librarywizarddialog.cpp \
-    wizards/guiappwizarddialog.cpp \
     wizards/modulespage.cpp \
     wizards/filespage.cpp \
     wizards/qtwizard.cpp \
@@ -83,7 +75,6 @@ SOURCES += \
 
 FORMS += \
     qmakestep.ui \
-    qmakeprojectconfigwidget.ui \
     librarydetailswidget.ui
 
 RESOURCES += qmakeprojectmanager.qrc \

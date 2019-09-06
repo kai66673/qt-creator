@@ -83,11 +83,11 @@ public:
         return m_buildDependency.sourceDependencies;
     }
 
-    const SourceEntries &includeIds()
-    {
-        std::sort(m_buildDependency.includes.begin(), m_buildDependency.includes.end());
+    const SourceEntries &sourceEntries() {
+        std::sort(m_buildDependency.sources.begin(),
+                  m_buildDependency.sources.end());
 
-        return std::move(m_buildDependency.includes);
+        return std::move(m_buildDependency.sources);
     }
 
 private:
@@ -95,7 +95,6 @@ private:
     BuildDependency m_buildDependency;
     ClangBackEnd::FilePaths m_excludedFilePaths;
     Utils::SmallStringVector m_directories;
-    SourcesManager m_sourcesManager;
     const FilePathCachingInterface &m_filePathCache;
     const GeneratedFilesInterface &m_generatedFiles;
     const Environment &m_environment;

@@ -112,7 +112,7 @@ QVariant StackHandler::data(const QModelIndex &index, int role) const
         case StackFunctionNameColumn:
             return simplifyType(frame.function);
         case StackFileNameColumn:
-            return frame.file.isEmpty() ? frame.module : FileName::fromString(frame.file).fileName();
+            return frame.file.isEmpty() ? frame.module : FilePath::fromString(frame.file).fileName();
         case StackLineNumberColumn:
             return frame.line > 0 ? QVariant(frame.line) : QVariant();
         case StackAddressColumn:
@@ -367,7 +367,7 @@ bool StackHandler::contextMenuEvent(const ItemViewEvent &ev)
 {
     auto menu = new QMenu;
 
-    const int row = ev.index().row();
+    const int row = ev.sourceModelIndex().row();
     StackFrame frame;
     if (row >= 0 && row < stackSize())
         frame = frameAt(row);

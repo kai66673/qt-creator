@@ -34,7 +34,7 @@
 
 #include <coreplugin/icontext.h>
 #include <projectexplorer/devicesupport/idevice.h>
-#include <projectexplorer/runconfiguration.h>
+#include <projectexplorer/runcontrol.h>
 #include <texteditor/textmark.h>
 #include <utils/fileutils.h>
 
@@ -147,13 +147,13 @@ public:
     // Used by Android to avoid false positives on warnOnRelease
     bool skipExecutableValidation = false;
     bool useTargetAsync = false;
-    Utils::FileNameList additionalSearchDirectories;
+    Utils::FilePathList additionalSearchDirectories;
 
     // Used by iOS.
     QString platform;
     QString deviceSymbolsRoot;
     bool continueAfterAttach = false;
-    Utils::FileName sysRoot;
+    Utils::FilePath sysRoot;
 
     // Used by general core file debugging. Public access requested in QTCREATORBUG-17158.
     QString coreFile;
@@ -177,8 +177,8 @@ public:
     bool isSnapshot = false; // Set if created internally.
     ProjectExplorer::Abi toolChainAbi;
 
-    Utils::FileName projectSourceDirectory;
-    Utils::FileNameList projectSourceFiles;
+    Utils::FilePath projectSourceDirectory;
+    Utils::FilePathList projectSourceFiles;
 
     // Used by Script debugging
     QString interpreter;
@@ -267,7 +267,6 @@ public:
     QString runId() const;
 
     const DebuggerRunParameters &runParameters() const;
-    bool isStartupRunConfiguration() const;
     void setCompanionEngine(DebuggerEngine *engine);
     void setSecondaryEngine();
 
@@ -446,7 +445,7 @@ protected:
     void notifyInferiorStopFailed();
 
 public:
-    void updateState(bool alsoUpdateCompanion);
+    void updateState();
     QString formatStartParameters() const;
     WatchTreeView *inspectorView();
     void updateLocalsWindow(bool showReturn);
@@ -568,7 +567,7 @@ public:
 class LocationMark : public TextEditor::TextMark
 {
 public:
-    LocationMark(DebuggerEngine *engine, const Utils::FileName &file, int line);
+    LocationMark(DebuggerEngine *engine, const Utils::FilePath &file, int line);
     void removedFromEditor() override { updateLineNumber(0); }
 
     void updateIcon();

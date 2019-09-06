@@ -62,6 +62,9 @@ public:
     virtual void clear() {}
     void setBoldFontEnabled(bool enabled);
 
+signals:
+    void contentChanged();
+
 protected:
     void initFormats();
     virtual void clearLastLine();

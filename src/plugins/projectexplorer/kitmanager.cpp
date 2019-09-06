@@ -25,12 +25,16 @@
 
 #include "kitmanager.h"
 
+#include "abi.h"
 #include "devicesupport/idevicefactory.h"
 #include "kit.h"
 #include "kitfeatureprovider.h"
+#include "kitinformation.h"
 #include "kitmanagerconfigwidget.h"
 #include "project.h"
+#include "projectexplorerconstants.h"
 #include "task.h"
+#include "toolchainmanager.h"
 
 #include <coreplugin/icore.h>
 
@@ -40,6 +44,7 @@
 #include <utils/qtcassert.h>
 #include <utils/stringutils.h>
 
+#include <QHash>
 #include <QSettings>
 #include <QStyle>
 
@@ -48,6 +53,16 @@ using namespace Utils;
 using namespace ProjectExplorer::Internal;
 
 namespace ProjectExplorer {
+
+class KitList
+{
+public:
+    Core::Id defaultKit;
+    std::vector<std::unique_ptr<Kit>> kits;
+};
+
+static KitList restoreKitsHelper(const Utils::FilePath &fileName);
+
 namespace Internal {
 
 const char KIT_DATA_KEY[] = "Profile.";
@@ -57,9 +72,9 @@ const char KIT_DEFAULT_KEY[] = "Profile.Default";
 const char KIT_IRRELEVANT_ASPECTS_KEY[] = "Kit.IrrelevantAspects";
 const char KIT_FILENAME[] = "/profiles.xml";
 
-static FileName settingsFileName()
+static FilePath settingsFileName()
 {
-    return FileName::fromString(ICore::userResourcePath() + KIT_FILENAME);
+    return FilePath::fromString(ICore::userResourcePath() + KIT_FILENAME);
 }
 
 // --------------------------------------------------------------------------
@@ -71,10 +86,39 @@ class KitManagerPrivate
 public:
     Kit *m_defaultKit = nullptr;
     bool m_initialized = false;
-    std::vector<std::unique_ptr<KitAspect>> m_informationList;
     std::vector<std::unique_ptr<Kit>> m_kitList;
     std::unique_ptr<PersistentSettingsWriter> m_writer;
     QSet<Id> m_irrelevantAspects;
+
+    void addKitAspect(KitAspect *ki)
+    {
+        QTC_ASSERT(!m_aspectList.contains(ki), return);
+        m_aspectList.append(ki);
+        m_aspectListIsSorted = false;
+    }
+
+    void removeKitAspect(KitAspect *ki)
+    {
+        int removed = m_aspectList.removeAll(ki);
+        QTC_CHECK(removed == 1);
+    }
+
+    const QList<KitAspect *> kitAspects()
+    {
+        if (!m_aspectListIsSorted) {
+            Utils::sort(m_aspectList, [](const KitAspect *a, const KitAspect *b) {
+                return a->priority() > b->priority();
+            });
+            m_aspectListIsSorted = true;
+        }
+        return m_aspectList;
+    }
+
+private:
+    // Sorted by priority, in descending order...
+    QList<KitAspect *> m_aspectList;
+    // ... if this here is set:
+    bool m_aspectListIsSorted = true;
 };
 
 } // namespace Internal
@@ -88,11 +132,12 @@ static KitManager *m_instance = nullptr;
 
 KitManager *KitManager::instance()
 {
+    if (!m_instance)
+        m_instance = new KitManager;
     return m_instance;
 }
 
-KitManager::KitManager(QObject *parent)
-    : QObject(parent)
+KitManager::KitManager()
 {
     d = new KitManagerPrivate;
     QTC_CHECK(!m_instance);
@@ -105,6 +150,14 @@ KitManager::KitManager(QObject *parent)
     connect(this, &KitManager::kitUpdated, this, &KitManager::kitsChanged);
 }
 
+void KitManager::destroy()
+{
+    delete d;
+    d = nullptr;
+    delete m_instance;
+    m_instance = nullptr;
+}
+
 void KitManager::restoreKits()
 {
     QTC_ASSERT(!d->m_initialized, return );
@@ -115,7 +168,7 @@ void KitManager::restoreKits()
     Core::Id defaultUserKit;
     std::vector<std::unique_ptr<Kit>> kitsToCheck;
     {
-        KitList userKits = restoreKits(settingsFileName());
+        KitList userKits = restoreKitsHelper(settingsFileName());
         defaultUserKit = userKits.defaultKit;
 
         for (auto &k : userKits.kits) {
@@ -130,8 +183,8 @@ void KitManager::restoreKits()
 
     // read all kits from SDK
     {
-        KitList system
-                = restoreKits(FileName::fromString(ICore::installerResourcePath() + KIT_FILENAME));
+        KitList system = restoreKitsHelper
+                (FilePath::fromString(ICore::installerResourcePath() + KIT_FILENAME));
 
         // SDK kits need to get updated with the user-provided extra settings:
         for (auto &current : system.kits) {
@@ -172,16 +225,69 @@ void KitManager::restoreKits()
     // Delete all loaded autodetected kits that were not rediscovered:
     kitsToCheck.clear();
 
-    if (resultList.size() == 0) {
-        auto defaultKit = std::make_unique<Kit>(); // One kit using default values
-        defaultKit->setUnexpandedDisplayName(tr("Desktop"));
-        defaultKit->setSdkProvided(false);
-        defaultKit->setAutoDetected(false);
+    if (resultList.empty()) {
+        // No kits exist yet, so let's try to autoconfigure some from the toolchains we know.
+        // We consider only host toolchains, because for other ones we lack the knowledge how to
+        // map them to their respective device type.
+        static const auto isHostToolchain = [](const ToolChain *tc) {
+            static const Abi hostAbi = Abi::hostAbi();
+            const Abi tcAbi = tc->targetAbi();
+            return tcAbi.os() == hostAbi.os() && tcAbi.architecture() == hostAbi.architecture()
+                    && (tcAbi.os() != Abi::LinuxOS || tcAbi.osFlavor() == hostAbi.osFlavor());
+        };
+        const QList<ToolChain *> allToolchains = ToolChainManager::toolChains(isHostToolchain);
+        QHash<Abi, QHash<Core::Id, ToolChain *>> uniqueToolchains;
 
-        defaultKit->setup();
+        // On Linux systems, we usually detect a plethora of same-ish toolchains. The following
+        // algorithm gives precedence to icecc and ccache and otherwise simply chooses the one with
+        // the shortest path. This should also take care of ensuring matching C/C++ pairs.
+        // TODO: This should not need to be done here. Instead, it should be a convenience
+        // operation on some lower level, e.g. in the toolchain class(es).
+        // Also, we shouldn't detect so many doublets in the first place.
+        for (ToolChain * const tc : allToolchains) {
+            ToolChain *&bestTc = uniqueToolchains[tc->targetAbi()][tc->language()];
+            if (!bestTc) {
+                bestTc = tc;
+                continue;
+            }
+            const QString bestFilePath = bestTc->compilerCommand().toString();
+            const QString currentFilePath = tc->compilerCommand().toString();
+            if (bestFilePath.contains("icecc"))
+                continue;
+            if (currentFilePath.contains("icecc")) {
+                bestTc = tc;
+                continue;
+            }
 
-        completeKit(defaultKit.get()); // Store manual kits
-        resultList.emplace_back(std::move(defaultKit));
+            if (bestFilePath.contains("ccache"))
+                continue;
+            if (currentFilePath.contains("ccache")) {
+                bestTc = tc;
+                continue;
+            }
+            if (bestFilePath.length() > currentFilePath.length())
+                bestTc = tc;
+        }
+
+        int maxWeight = 0;
+        for (auto it = uniqueToolchains.cbegin(); it != uniqueToolchains.cend(); ++it) {
+            auto kit = std::make_unique<Kit>();
+            kit->setSdkProvided(false);
+            kit->setAutoDetected(false); // TODO: Why false? What does autodetected mean here?
+            for (ToolChain * const tc : it.value())
+                ToolChainKitAspect::setToolChain(kit.get(), tc);
+            kit->setUnexpandedDisplayName(tr("Desktop (%1)").arg(it.key().toString()));
+            kit->setup();
+            if (kit->weight() < maxWeight)
+                continue;
+            if (kit->weight() > maxWeight) {
+                maxWeight = kit->weight();
+                resultList.clear();
+            }
+            resultList.emplace_back(std::move(kit));
+        }
+        if (resultList.size() == 1)
+            resultList.front()->setUnexpandedDisplayName(tr("Desktop"));
     }
 
     Kit *k = Utils::findOrDefault(resultList, Utils::equal(&Kit::id, defaultUserKit));
@@ -192,19 +298,17 @@ void KitManager::restoreKits()
 
     d->m_writer = std::make_unique<PersistentSettingsWriter>(settingsFileName(), "QtCreatorProfiles");
     d->m_initialized = true;
-    emit kitsLoaded();
-    emit kitsChanged();
+    emit m_instance->kitsLoaded();
+    emit m_instance->kitsChanged();
 }
 
 KitManager::~KitManager()
 {
-    delete d;
-    d = nullptr;
-    m_instance = nullptr;
 }
 
 void KitManager::saveKits()
 {
+    QTC_ASSERT(d, return);
     if (!d->m_writer) // ignore save requests while we are not initialized.
         return;
 
@@ -232,28 +336,27 @@ bool KitManager::isLoaded()
     return d->m_initialized;
 }
 
-void KitManager::registerKitAspect(std::unique_ptr<KitAspect> &&ki)
+void KitManager::registerKitAspect(KitAspect *ki)
 {
-    QTC_ASSERT(ki->id().isValid(), return );
-    QTC_ASSERT(!Utils::contains(d->m_informationList, ki.get()), return );
+    instance();
+    QTC_ASSERT(d, return);
+    d->addKitAspect(ki);
 
-    auto it = std::lower_bound(std::begin(d->m_informationList),
-                               std::end(d->m_informationList),
-                               ki,
-                               [](const std::unique_ptr<KitAspect> &a,
-                                  const std::unique_ptr<KitAspect> &b) {
-                                   return a->priority() > b->priority();
-                               });
-    d->m_informationList.insert(it, std::move(ki));
+    // Adding this aspect to possibly already existing kits is currently not
+    // needed here as kits are only created after all aspects are created
+    // in *Plugin::initialize().
+    // Make sure we notice when this assumption breaks:
+    QTC_CHECK(d->m_kitList.empty());
+}
 
-    foreach (Kit *k, kits()) {
-        if (!k->hasValue(ki->id()))
-            k->setValue(ki->id(), ki->defaultValue(k));
-        else
-            ki->fix(k);
-    }
-
-    return;
+void KitManager::deregisterKitAspect(KitAspect *ki)
+{
+    // Happens regularly for the aspects from the ProjectExplorerPlugin as these
+    // are destroyed after the manual call to KitManager::destroy() there, but as
+    // this here is just for sanity reasons that the KitManager does not access
+    // a destroyed aspect, a destroyed KitManager is not a problem.
+    if (d)
+        d->removeKitAspect(ki);
 }
 
 QSet<Id> KitManager::supportedPlatforms()
@@ -294,7 +397,7 @@ QList<Kit *> KitManager::sortKits(const QList<Kit *> &kits)
     return Utils::transform(sortList, &QPair<QString, Kit *>::second);
 }
 
-KitManager::KitList KitManager::restoreKits(const FileName &fileName)
+static KitList restoreKitsHelper(const FilePath &fileName)
 {
     KitList result;
 
@@ -374,7 +477,7 @@ Kit *KitManager::defaultKit()
 
 const QList<KitAspect *> KitManager::kitAspects()
 {
-    return Utils::toRawPointer<QList>(d->m_informationList);
+    return d->kitAspects();
 }
 
 const QSet<Id> KitManager::irrelevantAspects()
@@ -398,18 +501,16 @@ void KitManager::notifyAboutUpdate(Kit *k)
         emit m_instance->unmanagedKitUpdated(k);
 }
 
-bool KitManager::registerKit(std::unique_ptr<Kit> &&k)
+Kit *KitManager::registerKit(const std::function<void (Kit *)> &init, Core::Id id)
 {
-    QTC_ASSERT(isLoaded(), return false);
+    QTC_ASSERT(isLoaded(), return nullptr);
 
-    if (!k)
-        return true;
-
-    QTC_ASSERT(k->id().isValid(), return false);
+    auto k = std::make_unique<Kit>(id);
+    QTC_ASSERT(k->id().isValid(), return nullptr);
 
     Kit *kptr = k.get();
-    if (Utils::contains(d->m_kitList, kptr))
-        return false;
+    if (init)
+        init(kptr);
 
     // make sure we have all the information in our kits:
     completeKit(kptr);
@@ -420,7 +521,7 @@ bool KitManager::registerKit(std::unique_ptr<Kit> &&k)
         setDefaultKit(kptr);
 
     emit m_instance->kitAdded(kptr);
-    return true;
+    return kptr;
 }
 
 void KitManager::deregisterKit(Kit *k)
@@ -449,10 +550,10 @@ void KitManager::completeKit(Kit *k)
 {
     QTC_ASSERT(k, return);
     KitGuard g(k);
-    for (const std::unique_ptr<KitAspect> &ki : d->m_informationList) {
+    for (KitAspect *ki : d->kitAspects()) {
         ki->upgrade(k);
         if (!k->hasValue(ki->id()))
-            k->setValue(ki->id(), ki->defaultValue(k));
+            ki->setup(k);
         else
             ki->fix(k);
     }
@@ -461,6 +562,21 @@ void KitManager::completeKit(Kit *k)
 // --------------------------------------------------------------------
 // KitAspect:
 // --------------------------------------------------------------------
+
+KitAspect::KitAspect()
+{
+    KitManager::registerKitAspect(this);
+}
+
+KitAspect::~KitAspect()
+{
+    KitManager::deregisterKitAspect(this);
+}
+
+int KitAspect::weight(const Kit *k) const
+{
+    return k->value(id()).isValid() ? 1 : 0;
+}
 
 void KitAspect::addToEnvironment(const Kit *k, Environment &env) const
 {

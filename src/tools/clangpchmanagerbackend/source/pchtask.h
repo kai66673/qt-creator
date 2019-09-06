@@ -30,6 +30,7 @@
 #include <compilermacro.h>
 #include <filepath.h>
 #include <includesearchpath.h>
+#include <projectpartid.h>
 
 #include <utils/smallstringvector.h>
 #include <utils/cpplanguage_details.h>
@@ -39,11 +40,14 @@ namespace ClangBackEnd {
 class PchTask
 {
 public:
-    PchTask(Utils::SmallString &&projectPartId,
+    PchTask(ProjectPartId projectPartId,
             FilePathIds &&includes,
-            FilePathIds &&allIncludes,
+            FilePathIds &&watchedSystemIncludes,
+            FilePathIds &&watchedProjectIncludes,
+            FilePathIds &&watchedUserIncludes,
+            FilePathIds &&watchedUserSources,
             CompilerMacros &&compilerMacros,
-            Utils::SmallStringVector &&usedMacros,
+            Utils::SmallStringVector &&usedMacros, // TODO remove
             Utils::SmallStringVector toolChainArguments,
             IncludeSearchPaths systemIncludeSearchPaths,
             IncludeSearchPaths projectIncludeSearchPaths,
@@ -52,7 +56,10 @@ public:
             Utils::LanguageExtension languageExtension = Utils::LanguageExtension::None)
         : projectPartIds({projectPartId})
         , includes(includes)
-        , allIncludes(allIncludes)
+        , watchedSystemIncludes(watchedSystemIncludes)
+        , watchedProjectIncludes(watchedProjectIncludes)
+        , watchedUserIncludes(watchedUserIncludes)
+        , watchedUserSources(watchedUserSources)
         , compilerMacros(compilerMacros)
         , systemIncludeSearchPaths(std::move(systemIncludeSearchPaths))
         , projectIncludeSearchPaths(std::move(projectIncludeSearchPaths))
@@ -62,11 +69,14 @@ public:
         , languageExtension(languageExtension)
     {}
 
-    PchTask(Utils::SmallStringVector &&projectPartIds,
+    PchTask(ProjectPartIds &&projectPartIds,
             FilePathIds &&includes,
-            FilePathIds &&allIncludes,
+            FilePathIds &&watchedSystemIncludes,
+            FilePathIds &&watchedProjectIncludes,
+            FilePathIds &&watchedUserIncludes,
+            FilePathIds &&watchedUserSources,
             CompilerMacros &&compilerMacros,
-            Utils::SmallStringVector &&usedMacros,
+            Utils::SmallStringVector &&usedMacros, // TODO remove
             Utils::SmallStringVector toolChainArguments,
             IncludeSearchPaths systemIncludeSearchPaths,
             IncludeSearchPaths projectIncludeSearchPaths,
@@ -75,7 +85,10 @@ public:
             Utils::LanguageExtension languageExtension = Utils::LanguageExtension::None)
         : projectPartIds(std::move(projectPartIds))
         , includes(includes)
-        , allIncludes(allIncludes)
+        , watchedSystemIncludes(watchedSystemIncludes)
+        , watchedProjectIncludes(watchedProjectIncludes)
+        , watchedUserIncludes(watchedUserIncludes)
+        , watchedUserSources(watchedUserSources)
         , compilerMacros(compilerMacros)
         , systemIncludeSearchPaths(std::move(systemIncludeSearchPaths))
         , projectIncludeSearchPaths(std::move(projectIncludeSearchPaths))
@@ -89,26 +102,34 @@ public:
     {
         return first.systemPchPath == second.systemPchPath
                && first.projectPartIds == second.projectPartIds && first.includes == second.includes
+               && first.watchedSystemIncludes == second.watchedSystemIncludes
+               && first.watchedProjectIncludes == second.watchedProjectIncludes
+               && first.watchedUserIncludes == second.watchedUserIncludes
+               && first.watchedUserSources == second.watchedUserSources
                && first.compilerMacros == second.compilerMacros
                && first.systemIncludeSearchPaths == second.systemIncludeSearchPaths
                && first.projectIncludeSearchPaths == second.projectIncludeSearchPaths
                && first.toolChainArguments == second.toolChainArguments
-               && first.language == second.language
-               && first.languageVersion == second.languageVersion
+               && first.preIncludeSearchPath == second.preIncludeSearchPath
+               && first.language == second.language && first.languageVersion == second.languageVersion
                && first.languageExtension == second.languageExtension;
     }
 
-    Utils::SmallStringView projectPartId() const { return projectPartIds.front(); }
+    ProjectPartId projectPartId() const { return projectPartIds.front(); }
 
 public:
     FilePath systemPchPath;
-    Utils::SmallStringVector projectPartIds;
+    ProjectPartIds projectPartIds;
     FilePathIds includes;
-    FilePathIds allIncludes;
+    FilePathIds watchedSystemIncludes;
+    FilePathIds watchedProjectIncludes;
+    FilePathIds watchedUserIncludes;
+    FilePathIds watchedUserSources;
     CompilerMacros compilerMacros;
     IncludeSearchPaths systemIncludeSearchPaths;
     IncludeSearchPaths projectIncludeSearchPaths;
     Utils::SmallStringVector toolChainArguments;
+    NativeFilePathView preIncludeSearchPath;
     Utils::Language language = Utils::Language::Cxx;
     Utils::LanguageVersion languageVersion = Utils::LanguageVersion::CXX98;
     Utils::LanguageExtension languageExtension = Utils::LanguageExtension::None;

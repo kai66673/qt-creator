@@ -127,7 +127,9 @@ Core::GeneratedFile JsonWizardFileGenerator::generateFile(const File &file,
                 *ret = options.value(n);
                 return true;
             });
-            nested.registerExtraResolver([expander](QString n, QString *ret) { return expander->resolveMacro(n, ret); });
+            nested.registerExtraResolver([expander](QString n, QString *ret) {
+                return expander->resolveMacro(n, ret);
+            });
 
             gf.setContents(Utils::TemplateEngine::processText(&nested, QString::fromUtf8(reader.data()),
                                                               errorMessage));
@@ -188,8 +190,7 @@ Core::GeneratedFiles JsonWizardFileGenerator::fileList(Utils::MacroExpander *exp
     std::tie(fileList, dirList)
             = Utils::partition(concreteFiles, [](const File &f) { return !QFileInfo(f.source).isDir(); });
 
-    const QSet<QString> knownFiles
-            = QSet<QString>::fromList(Utils::transform(fileList, &File::target));
+    const QSet<QString> knownFiles = Utils::transform<QSet>(fileList, &File::target);
 
     foreach (const File &dir, dirList) {
         QDir sourceDir(dir.source);

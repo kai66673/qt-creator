@@ -41,6 +41,7 @@
 #include <QDebug>
 #include <QLoggingCategory>
 #include <QRegExp>
+#include <QRegularExpression>
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTime>
@@ -76,6 +77,7 @@ public:
 
 private:
     CompletionItem m_item;
+    mutable QChar m_triggeredCommitCharacter;
     mutable QString m_sortText;
 };
 
@@ -89,8 +91,14 @@ QString LanguageClientCompletionItem::text() const
 bool LanguageClientCompletionItem::implicitlyApplies() const
 { return false; }
 
-bool LanguageClientCompletionItem::prematurelyApplies(const QChar &/*typedCharacter*/) const
-{ return false; }
+bool LanguageClientCompletionItem::prematurelyApplies(const QChar &typedCharacter) const
+{
+    if (m_item.commitCharacters().has_value() && m_item.commitCharacters().value().contains(typedCharacter)) {
+        m_triggeredCommitCharacter = typedCharacter;
+        return true;
+    }
+    return false;
+}
 
 void LanguageClientCompletionItem::apply(TextDocumentManipulatorInterface &manipulator,
                                          int /*basePosition*/) const
@@ -101,13 +109,20 @@ void LanguageClientCompletionItem::apply(TextDocumentManipulatorInterface &manip
     } else {
         const QString textToInsert(m_item.insertText().value_or(text()));
         int length = 0;
-        for (auto it = textToInsert.crbegin(); it != textToInsert.crend(); ++it) {
-            auto ch = *it;
-            if (ch == manipulator.characterAt(pos - length - 1))
-                ++length;
-            else if (length != 0)
+        for (auto it = textToInsert.crbegin(), end = textToInsert.crend(); it != end; ++it) {
+            if (it->toLower() != manipulator.characterAt(pos - length - 1).toLower()) {
                 length = 0;
+                break;
+            }
+            ++length;
         }
+        QTextCursor cursor = manipulator.textCursorAt(pos);
+        cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::KeepAnchor);
+        const QString blockTextUntilPosition = cursor.selectedText();
+        static QRegularExpression identifier("[a-zA-Z_][a-zA-Z0-9_]*$");
+        QRegularExpressionMatch match = identifier.match(blockTextUntilPosition);
+        int matchLength = match.hasMatch() ? match.capturedLength(0) : 0;
+        length = qMax(length, matchLength);
         manipulator.replace(pos - length, length, textToInsert);
     }
 
@@ -115,6 +130,8 @@ void LanguageClientCompletionItem::apply(TextDocumentManipulatorInterface &manip
         for (const auto &edit : *additionalEdits)
             applyTextEdit(manipulator, edit);
     }
+    if (!m_triggeredCommitCharacter.isNull())
+        manipulator.insertCodeSnippet(manipulator.currentPosition(), m_triggeredCommitCharacter);
 }
 
 QIcon LanguageClientCompletionItem::icon() const
@@ -136,8 +153,7 @@ QIcon LanguageClientCompletionItem::icon() const
     case CompletionItemKind::Snippet: icon = QIcon(":/texteditor/images/snippet.png"); break;
     case CompletionItemKind::EnumMember: icon = iconForType(Enumerator); break;
     case CompletionItemKind::Struct: icon = iconForType(Struct); break;
-    default:
-        break;
+    default: icon = iconForType(Unknown); break;
     }
     return icon;
 }
@@ -312,8 +328,9 @@ IAssistProposal *LanguageClientCompletionAssistProcessor::perform(const AssistIn
     --line; // line is 0 based in the protocol
     --column; // column is 0 based in the protocol
     params.setPosition({line, column});
+    params.setContext(context);
     params.setTextDocument(
-                DocumentUri::fromFileName(Utils::FileName::fromString(interface->fileName())));
+                DocumentUri::fromFileName(Utils::FilePath::fromString(interface->fileName())));
     completionRequest.setResponseCallback([this](auto response) {
         this->handleCompletionResponse(response);
     });

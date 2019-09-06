@@ -79,8 +79,7 @@ static void stopRunningRunControl(RunControl *runControl)
 {
     static QMap<Core::Id, QPointer<RunControl>> activeRunControls;
 
-    RunConfiguration *runConfig = runControl->runConfiguration();
-    Target *target = runConfig->target();
+    Target *target = runControl->target();
     Core::Id devId = DeviceKitAspect::deviceId(target->kit());
 
     // The device can only run an application at a time, if an app is running stop it.
@@ -100,8 +99,8 @@ IosRunner::IosRunner(RunControl *runControl)
     stopRunningRunControl(runControl);
     auto runConfig = qobject_cast<IosRunConfiguration *>(runControl->runConfiguration());
     m_bundleDir = runConfig->bundleDirectory().toString();
-    m_arguments = runConfig->aspect<ArgumentsAspect>()->arguments(runConfig->macroExpander());
-    m_device = DeviceKitAspect::device(runConfig->target()->kit());
+    m_arguments = runControl->aspect<ArgumentsAspect>()->arguments(runConfig->macroExpander());
+    m_device = DeviceKitAspect::device(runControl->target()->kit());
     m_deviceType = runConfig->deviceType();
 }
 
@@ -387,7 +386,7 @@ IosQmlProfilerSupport::IosQmlProfilerSupport(RunControl *runControl)
     Runnable runnable;
     runnable.executable = iosRunConfig->localExecutable().toUserOutput();
     runnable.commandLineArguments =
-            iosRunConfig->aspect<ArgumentsAspect>()->arguments(iosRunConfig->macroExpander());
+            runControl->aspect<ArgumentsAspect>()->arguments(iosRunConfig->macroExpander());
     runControl->setDisplayName(iosRunConfig->applicationName());
     runControl->setRunnable(runnable);
 
@@ -438,23 +437,21 @@ void IosDebugSupport::start()
         return;
     }
 
-    RunConfiguration *runConfig = runControl()->runConfiguration();
-
     if (device()->type() == Ios::Constants::IOS_DEVICE_TYPE) {
         IosDevice::ConstPtr dev = device().dynamicCast<const IosDevice>();
         setStartMode(AttachToRemoteProcess);
         setIosPlatform("remote-ios");
         QString osVersion = dev->osVersion();
-        FileName deviceSdk1 = FileName::fromString(QDir::homePath()
+        FilePath deviceSdk1 = FilePath::fromString(QDir::homePath()
                                              + "/Library/Developer/Xcode/iOS DeviceSupport/"
                                              + osVersion + "/Symbols");
         QString deviceSdk;
         if (deviceSdk1.toFileInfo().isDir()) {
             deviceSdk = deviceSdk1.toString();
         } else {
-            FileName deviceSdk2 = IosConfigurations::developerPath()
-                    .appendPath("Platforms/iPhoneOS.platform/DeviceSupport/")
-                    .appendPath(osVersion).appendPath("Symbols");
+            const FilePath deviceSdk2 = IosConfigurations::developerPath()
+                    .pathAppended("Platforms/iPhoneOS.platform/DeviceSupport/"
+                                  + osVersion + "/Symbols");
             if (deviceSdk2.toFileInfo().isDir()) {
                 deviceSdk = deviceSdk2.toString();
             } else {
@@ -472,7 +469,7 @@ void IosDebugSupport::start()
         setIosPlatform("ios-simulator");
     }
 
-    auto iosRunConfig = qobject_cast<IosRunConfiguration *>(runConfig);
+    auto iosRunConfig = qobject_cast<IosRunConfiguration *>(runControl()->runConfiguration());
     setRunControlName(iosRunConfig->applicationName());
     setContinueAfterAttach(true);
 
@@ -488,7 +485,7 @@ void IosDebugSupport::start()
 
         QString bundlePath = iosRunConfig->bundleDirectory().toString();
         bundlePath.chop(4);
-        FileName dsymPath = FileName::fromString(bundlePath.append(".dSYM"));
+        FilePath dsymPath = FilePath::fromString(bundlePath.append(".dSYM"));
         if (dsymPath.exists() && dsymPath.toFileInfo().lastModified()
                 < QFileInfo(iosRunConfig->localExecutable().toUserOutput()).lastModified()) {
             TaskHub::addTask(Task::Warning,

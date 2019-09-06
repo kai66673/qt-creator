@@ -287,10 +287,10 @@ void QmlProfilerTool::updateRunActions()
         d->m_startAction->setToolTip(tr("A QML Profiler analysis is still in progress."));
         d->m_stopAction->setEnabled(true);
     } else {
-        QString whyNot = tr("Start QML Profiler analysis.");
+        QString tooltip = tr("Start QML Profiler analysis.");
         bool canRun = ProjectExplorerPlugin::canRunStartupProject
-                (ProjectExplorer::Constants::QML_PROFILER_RUN_MODE, &whyNot);
-        d->m_startAction->setToolTip(whyNot);
+                (ProjectExplorer::Constants::QML_PROFILER_RUN_MODE, &tooltip);
+        d->m_startAction->setToolTip(tooltip);
         d->m_startAction->setEnabled(canRun);
         d->m_stopAction->setEnabled(false);
     }
@@ -300,16 +300,12 @@ void QmlProfilerTool::finalizeRunControl(QmlProfilerRunner *runWorker)
 {
     d->m_toolBusy = true;
     auto runControl = runWorker->runControl();
-    auto runConfiguration = runControl->runConfiguration();
-    if (runConfiguration) {
-        auto aspect = static_cast<QmlProfilerRunConfigurationAspect *>(
-                    runConfiguration->aspect(Constants::SETTINGS));
-        if (aspect) {
-            if (auto settings = static_cast<const QmlProfilerSettings *>(aspect->currentSettings())) {
-                d->m_profilerConnections->setFlushInterval(settings->flushEnabled() ?
-                                                               settings->flushInterval() : 0);
-                d->m_profilerModelManager->setAggregateTraces(settings->aggregateTraces());
-            }
+    if (auto aspect = static_cast<QmlProfilerRunConfigurationAspect *>(
+                runControl->aspect(Constants::SETTINGS))) {
+        if (auto settings = static_cast<const QmlProfilerSettings *>(aspect->currentSettings())) {
+            d->m_profilerConnections->setFlushInterval(settings->flushEnabled() ?
+                                                           settings->flushInterval() : 0);
+            d->m_profilerModelManager->setAggregateTraces(settings->aggregateTraces());
         }
     }
 
@@ -322,8 +318,8 @@ void QmlProfilerTool::finalizeRunControl(QmlProfilerRunner *runWorker)
         if (d->m_profilerConnections->isConnecting()) {
             showNonmodalWarning(tr("The application finished before a connection could be "
                                    "established. No data was loaded."));
-            d->m_profilerConnections->disconnectFromServer();
         }
+        d->m_profilerConnections->disconnectFromServer();
     };
 
     connect(runControl, &RunControl::stopped, this, handleStop);
@@ -341,8 +337,7 @@ void QmlProfilerTool::finalizeRunControl(QmlProfilerRunner *runWorker)
     // Initialize m_projectFinder
     //
 
-    d->m_profilerModelManager->populateFileFinder(runConfiguration ? runConfiguration->target()
-                                                                   : nullptr);
+    d->m_profilerModelManager->populateFileFinder(runControl->target());
 
     connect(d->m_profilerConnections, &QmlProfilerClientManager::connectionFailed,
             runWorker, [this, runWorker]() {
@@ -552,8 +547,8 @@ ProjectExplorer::RunControl *QmlProfilerTool::attachToWaitingApplication()
 
     d->m_viewContainer->perspective()->select();
 
-    auto runConfig = RunConfiguration::startupRunConfiguration();
-    auto runControl = new RunControl(runConfig, ProjectExplorer::Constants::QML_PROFILER_RUN_MODE);
+    auto runControl = new RunControl(ProjectExplorer::Constants::QML_PROFILER_RUN_MODE);
+    runControl->setRunConfiguration(RunConfiguration::startupRunConfiguration());
     auto profiler = new QmlProfilerRunner(runControl);
     profiler->setServerUrl(serverUrl);
     connect(profiler, &QmlProfilerRunner::starting, this, &QmlProfilerTool::finalizeRunControl);
@@ -687,11 +682,9 @@ void QmlProfilerTool::clientsDisconnected()
             d->m_profilerModelManager->finalize();
         } else if (d->m_profilerState->serverRecording()) {
             // If the application stopped by itself, check if we have all the data
-            if (d->m_profilerState->currentState() == QmlProfilerStateManager::AppDying ||
-                    d->m_profilerState->currentState() == QmlProfilerStateManager::Idle) {
+            if (d->m_profilerState->currentState() != QmlProfilerStateManager::AppStopRequested) {
                 showNonmodalWarning(tr("Application finished before loading profiled data.\n"
                                        "Please use the stop button instead."));
-                d->m_profilerModelManager->clearAll();
             }
         }
     }

@@ -23,24 +23,25 @@
 **
 ****************************************************************************/
 
-#include "openocdgdbserverprovider.h"
 #include "baremetalconstants.h"
-#include "gdbserverprovidermanager.h"
 
+#include "gdbserverprovidermanager.h"
+#include "openocdgdbserverprovider.h"
+
+#include <utils/fileutils.h>
 #include <utils/pathchooser.h>
 #include <utils/qtcassert.h>
-#include <utils/fileutils.h>
 #include <utils/qtcprocess.h>
 
 #include <coreplugin/variablechooser.h>
 
-#include <QString>
+#include <QComboBox>
 #include <QFileInfo>
-
 #include <QFormLayout>
 #include <QLineEdit>
-#include <QComboBox>
 #include <QPlainTextEdit>
+
+using namespace Utils;
 
 namespace BareMetal {
 namespace Internal {
@@ -52,11 +53,10 @@ const char rootScriptsDirKeyC[] = "BareMetal.OpenOcdGdbServerProvider.RootScript
 const char configurationFileKeyC[] = "BareMetal.OpenOcdGdbServerProvider.ConfigurationPath";
 const char additionalArgumentsKeyC[] = "BareMetal.OpenOcdGdbServerProvider.AdditionalArguments";
 
+// OpenOcdGdbServerProvider
+
 OpenOcdGdbServerProvider::OpenOcdGdbServerProvider()
     : GdbServerProvider(QLatin1String(Constants::OPENOCD_PROVIDER_ID))
-    , m_host(QLatin1String("localhost"))
-    , m_port(3333)
-    , m_executableFile(QLatin1String("openocd"))
 {
     setInitCommands(defaultInitCommands());
     setResetCommands(defaultResetCommands());
@@ -93,48 +93,43 @@ QString OpenOcdGdbServerProvider::channel() const
         // Just return as "host:port" form.
         return m_host + QLatin1Char(':') + QString::number(m_port);
     case StartupOnPipe: {
-        QStringList args;
         // In the pipe mode need to add quotes to each item of arguments;
         // otherwise running will be stuck.
-        foreach (const QString &a, arguments()) {
-            if (a.startsWith(QLatin1Char('\"')) && a.endsWith(QLatin1Char('\"')))
-                continue;
-            args << (QLatin1Char('\"') + a + QLatin1Char('\"'));
+        CommandLine cmd = command();
+        QStringList args = {"|", cmd.executable().toString()};
+        for (const QString &a : QtcProcess::splitArgs(cmd.arguments())) {
+            if (a.startsWith('\"') && a.endsWith('\"'))
+                args << a;
+            else
+                args << ('\"' + a + '\"');
         }
-        args.prepend(executable());
-        args.prepend(QLatin1String("|"));
-        return args.join(QLatin1Char(' '));
+        return args.join(' ');
     }
     default: // wrong
-        return QString();
+        return {};
     }
 }
 
-QString OpenOcdGdbServerProvider::executable() const
+CommandLine OpenOcdGdbServerProvider::command() const
 {
-    return m_executableFile;
-}
+    CommandLine cmd{m_executableFile, {}};
 
-QStringList OpenOcdGdbServerProvider::arguments() const
-{
-    QStringList args;
-
-    args << QLatin1String("-c");
+    cmd.addArg("-c");
     if (startupMode() == StartupOnPipe)
-        args << QLatin1String("gdb_port pipe");
+        cmd.addArg("gdb_port pipe");
     else
-        args << (QLatin1String("gdb_port ") + QString::number(m_port));
+        cmd.addArg("gdb_port " + QString::number(m_port));
 
     if (!m_rootScriptsDir.isEmpty())
-        args << QLatin1String("-s") << m_rootScriptsDir;
+        cmd.addArgs({"-s", m_rootScriptsDir});
 
     if (!m_configurationFile.isEmpty())
-        args << QLatin1String("-f") << m_configurationFile;
+        cmd.addArgs({"-f", m_configurationFile});
 
     if (!m_additionalArguments.isEmpty())
-        args << Utils::QtcProcess::splitArgs(m_additionalArguments);
+        cmd.addArgs(m_additionalArguments);
 
-    return args;
+    return cmd;
 }
 
 bool OpenOcdGdbServerProvider::canStartupMode(StartupMode m) const
@@ -172,7 +167,7 @@ QVariantMap OpenOcdGdbServerProvider::toMap() const
     QVariantMap data = GdbServerProvider::toMap();
     data.insert(QLatin1String(hostKeyC), m_host);
     data.insert(QLatin1String(portKeyC), m_port);
-    data.insert(QLatin1String(executableFileKeyC), m_executableFile);
+    data.insert(QLatin1String(executableFileKeyC), m_executableFile.toVariant());
     data.insert(QLatin1String(rootScriptsDirKeyC), m_rootScriptsDir);
     data.insert(QLatin1String(configurationFileKeyC), m_configurationFile);
     data.insert(QLatin1String(additionalArgumentsKeyC), m_additionalArguments);
@@ -186,7 +181,7 @@ bool OpenOcdGdbServerProvider::fromMap(const QVariantMap &data)
 
     m_host = data.value(QLatin1String(hostKeyC)).toString();
     m_port = data.value(QLatin1String(portKeyC)).toInt();
-    m_executableFile = data.value(QLatin1String(executableFileKeyC)).toString();
+    m_executableFile = FilePath::fromVariant(data.value(QLatin1String(executableFileKeyC)));
     m_rootScriptsDir = data.value(QLatin1String(rootScriptsDirKeyC)).toString();
     m_configurationFile = data.value(QLatin1String(configurationFileKeyC)).toString();
     m_additionalArguments = data.value(QLatin1String(additionalArgumentsKeyC)).toString();
@@ -212,6 +207,8 @@ GdbServerProviderConfigWidget *OpenOcdGdbServerProvider::configurationWidget()
     return new OpenOcdGdbServerProviderConfigWidget(this);
 }
 
+// OpenOcdGdbServerProviderFactory
+
 OpenOcdGdbServerProviderFactory::OpenOcdGdbServerProviderFactory()
 {
     setId(QLatin1String(Constants::OPENOCD_PROVIDER_ID));
@@ -232,13 +229,15 @@ bool OpenOcdGdbServerProviderFactory::canRestore(const QVariantMap &data) const
 
 GdbServerProvider *OpenOcdGdbServerProviderFactory::restore(const QVariantMap &data)
 {
-    auto p = new OpenOcdGdbServerProvider;
-    auto updated = data;
+    const auto p = new OpenOcdGdbServerProvider;
+    const auto updated = data;
     if (p->fromMap(updated))
         return p;
     delete p;
     return nullptr;
 }
+
+// OpenOcdGdbServerProviderConfigWidget
 
 OpenOcdGdbServerProviderConfigWidget::OpenOcdGdbServerProviderConfigWidget(
         OpenOcdGdbServerProvider *p)
@@ -276,7 +275,7 @@ OpenOcdGdbServerProviderConfigWidget::OpenOcdGdbServerProviderConfigWidget(
     addErrorLabel();
     setFromProvider();
 
-    auto chooser = new Core::VariableChooser(this);
+    const auto chooser = new Core::VariableChooser(this);
     chooser->addSupportedWidget(m_initCommandsTextEdit);
     chooser->addSupportedWidget(m_resetCommandsTextEdit);
 
@@ -295,7 +294,7 @@ OpenOcdGdbServerProviderConfigWidget::OpenOcdGdbServerProviderConfigWidget(
     connect(m_resetCommandsTextEdit, &QPlainTextEdit::textChanged,
             this, &GdbServerProviderConfigWidget::dirty);
 
-    connect(m_startupModeComboBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_startupModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &OpenOcdGdbServerProviderConfigWidget::startupModeChanged);
 }
 
@@ -318,12 +317,12 @@ void OpenOcdGdbServerProviderConfigWidget::startupModeChanged()
 
 void OpenOcdGdbServerProviderConfigWidget::applyImpl()
 {
-    auto p = static_cast<OpenOcdGdbServerProvider *>(provider());
+    const auto p = static_cast<OpenOcdGdbServerProvider *>(provider());
     Q_ASSERT(p);
 
     p->m_host = m_hostWidget->host();
     p->m_port = m_hostWidget->port();
-    p->m_executableFile = m_executableFileChooser->fileName().toString();
+    p->m_executableFile = m_executableFileChooser->fileName();
     p->m_rootScriptsDir = m_rootScriptsDirChooser->fileName().toString();
     p->m_configurationFile = m_configurationFileChooser->fileName().toString();
     p->m_additionalArguments = m_additionalArgumentsLineEdit->text();
@@ -341,13 +340,13 @@ void OpenOcdGdbServerProviderConfigWidget::setFromProvider()
     const auto p = static_cast<OpenOcdGdbServerProvider *>(provider());
     Q_ASSERT(p);
 
-    QSignalBlocker blocker(this);
+    const QSignalBlocker blocker(this);
     startupModeChanged();
     m_hostWidget->setHost(p->m_host);
     m_hostWidget->setPort(p->m_port);
-    m_executableFileChooser->setFileName(Utils::FileName::fromString(p->m_executableFile));
-    m_rootScriptsDirChooser->setFileName(Utils::FileName::fromString(p->m_rootScriptsDir));
-    m_configurationFileChooser->setFileName(Utils::FileName::fromString(p->m_configurationFile));
+    m_executableFileChooser->setFileName(p->m_executableFile);
+    m_rootScriptsDirChooser->setFileName(Utils::FilePath::fromString(p->m_rootScriptsDir));
+    m_configurationFileChooser->setFileName(Utils::FilePath::fromString(p->m_configurationFile));
     m_additionalArgumentsLineEdit->setText(p->m_additionalArguments);
     m_initCommandsTextEdit->setPlainText(p->initCommands());
     m_resetCommandsTextEdit->setPlainText(p->resetCommands());

@@ -33,11 +33,13 @@
 #include <coreplugin/documentmanager.h>
 #include <coreplugin/fileiconprovider.h>
 #include <coreplugin/id.h>
+#include <coreplugin/messagemanager.h>
 #include <coreplugin/editormanager/editormanager.h>
 
 #include <projectexplorer/buildtargetinfo.h>
 #include <projectexplorer/kitmanager.h>
 #include <projectexplorer/localenvironmentaspect.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/runconfiguration.h>
 #include <projectexplorer/runconfigurationaspects.h>
 #include <projectexplorer/project.h>
@@ -61,6 +63,7 @@
 #include <QTextCursor>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QJsonValue>
 #include <QJsonArray>
 
@@ -80,7 +83,7 @@ class PythonProject : public Project
 {
     Q_OBJECT
 public:
-    explicit PythonProject(const Utils::FileName &filename);
+    explicit PythonProject(const Utils::FilePath &filename);
 
     bool addFiles(const QStringList &filePaths);
     bool removeFiles(const QStringList &filePaths);
@@ -90,6 +93,9 @@ public:
 
     bool needsConfiguration() const final { return false; }
     bool needsBuildConfigurations() const final { return false; }
+
+    bool writePyProjectFile(const QString &fileName, QString &content,
+                            const QStringList &rawList, QString *errorMessage);
 
 private:
     RestoreResult fromMap(const QVariantMap &map, QString *errorMessage) override;
@@ -115,8 +121,6 @@ class PythonProjectNode : public ProjectNode
 public:
     PythonProjectNode(PythonProject *project);
 
-    bool showInSimpleTree() const override;
-    QString addFileFilter() const override;
     bool supportsAction(ProjectAction action, const Node *node) const override;
     bool addFiles(const QStringList &filePaths, QStringList *) override;
     bool removeFiles(const QStringList &filePaths, QStringList *) override;
@@ -174,7 +178,7 @@ private:
                 tc.insertText('\n' + match.captured(1));
                 tc.insertText(match.captured(2), linkFormat(frm, match.captured(2)));
 
-                const auto fileName = FileName::fromString(match.captured(3));
+                const auto fileName = FilePath::fromString(match.captured(3));
                 const int lineNumber = match.capturedRef(4).toInt();
                 Task task(Task::Warning,
                                            QString(), fileName, lineNumber, id);
@@ -270,11 +274,14 @@ PythonRunConfiguration::PythonRunConfiguration(Target *target, Core::Id id)
     scriptAspect->setLabelText(tr("Script:"));
     scriptAspect->setDisplayStyle(BaseStringAspect::LabelDisplay);
 
-    addAspect<LocalEnvironmentAspect>(target, LocalEnvironmentAspect::BaseEnvironmentModifier());
+    addAspect<LocalEnvironmentAspect>(target);
     addAspect<ArgumentsAspect>();
     addAspect<TerminalAspect>();
 
     setOutputFormatter<PythonOutputFormatter>();
+    setExecutableGetter([this] {
+        return FilePath::fromString(aspect<InterpreterAspect>()->value());
+    });
 
     connect(target, &Target::applicationTargetsChanged,
             this, &PythonRunConfiguration::updateTargetInformation);
@@ -292,11 +299,12 @@ void PythonRunConfiguration::updateTargetInformation()
 
 Runnable PythonRunConfiguration::runnable() const
 {
+    CommandLine cmd{executable(), {}};
+    cmd.addArg(mainScript());
+    cmd.addArgs(aspect<ArgumentsAspect>()->arguments(macroExpander()));
+
     Runnable r;
-    QtcProcess::addArg(&r.commandLineArguments, mainScript());
-    QtcProcess::addArgs(&r.commandLineArguments,
-                        aspect<ArgumentsAspect>()->arguments(macroExpander()));
-    r.executable = aspect<InterpreterAspect>()->value();
+    r.setCommandLine(cmd);
     r.environment = aspect<EnvironmentAspect>()->environment();
     return r;
 }
@@ -308,11 +316,10 @@ public:
     {
         registerRunConfiguration<PythonRunConfiguration>("PythonEditor.RunConfiguration.");
         addSupportedProjectType(PythonProjectId);
-        addRunWorkerFactory<SimpleTargetRunner>(ProjectExplorer::Constants::NORMAL_RUN_MODE);
     }
 };
 
-PythonProject::PythonProject(const FileName &fileName) :
+PythonProject::PythonProject(const FilePath &fileName) :
     Project(Constants::C_PY_MIMETYPE, fileName, [this]() { refresh(); })
 {
     setId(PythonProjectId);
@@ -320,7 +327,7 @@ PythonProject::PythonProject(const FileName &fileName) :
     setDisplayName(fileName.toFileInfo().completeBaseName());
 }
 
-static QStringList readLines(const Utils::FileName &projectFile)
+static QStringList readLines(const Utils::FilePath &projectFile)
 {
     const QString projectFileName = projectFile.fileName();
     QSet<QString> visited = { projectFileName };
@@ -330,8 +337,8 @@ static QStringList readLines(const Utils::FileName &projectFile)
     if (file.open(QFile::ReadOnly)) {
         QTextStream stream(&file);
 
-        forever {
-            QString line = stream.readLine();
+        while (true) {
+            const QString line = stream.readLine();
             if (line.isNull())
                 break;
             if (visited.contains(line))
@@ -344,30 +351,48 @@ static QStringList readLines(const Utils::FileName &projectFile)
     return lines;
 }
 
-static QStringList readLinesJson(const Utils::FileName &projectFile)
+static QStringList readLinesJson(const Utils::FilePath &projectFile,
+                                 QString *errorMessage)
 {
     const QString projectFileName = projectFile.fileName();
     QStringList lines = { projectFileName };
 
     QFile file(projectFile.toString());
-    if (!file.open(QFile::ReadOnly))
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        *errorMessage = PythonProject::tr("Unable to open \"%1\" for reading: %2")
+                        .arg(projectFile.toUserOutput(), file.errorString());
         return lines;
+    }
+
     const QByteArray content = file.readAll();
 
     // This assumes te project file is formed with only one field called
     // 'files' that has a list associated of the files to include in the project.
-    if (!content.isEmpty()) {
-        const QJsonDocument doc = QJsonDocument::fromJson(content);
-        const QJsonObject obj = doc.object();
-        if (obj.contains("files")) {
-            QJsonValue files = obj.value("files");
-            QJsonArray files_array = files.toArray();
-            QSet<QString> visited;
-            for (const auto &file : files_array)
-                visited.insert(file.toString());
+    if (content.isEmpty()) {
+        *errorMessage = PythonProject::tr("Unable to read \"%1\": The file is empty.")
+                        .arg(projectFile.toUserOutput());
+        return lines;
+    }
 
-            lines.append(visited.toList());
-        }
+    QJsonParseError error;
+    const QJsonDocument doc = QJsonDocument::fromJson(content, &error);
+    if (doc.isNull()) {
+        const int line = content.left(error.offset).count('\n') + 1;
+        *errorMessage = PythonProject::tr("Unable to parse \"%1\":%2: %3")
+                        .arg(projectFile.toUserOutput()).arg(line)
+                        .arg(error.errorString());
+        return lines;
+    }
+
+    const QJsonObject obj = doc.object();
+    if (obj.contains("files")) {
+        const QJsonValue files = obj.value("files");
+        const QJsonArray files_array = files.toArray();
+        QSet<QString> visited;
+        for (const auto &file : files_array)
+            visited.insert(file.toString());
+
+        lines.append(Utils::toList(visited));
     }
 
     return lines;
@@ -375,7 +400,7 @@ static QStringList readLinesJson(const Utils::FileName &projectFile)
 
 bool PythonProject::saveRawFileList(const QStringList &rawFileList)
 {
-    bool result = saveRawList(rawFileList, projectFilePath().toString());
+    const bool result = saveRawList(rawFileList, projectFilePath().toString());
 //    refresh(PythonProject::Files);
     return result;
 }
@@ -383,38 +408,78 @@ bool PythonProject::saveRawFileList(const QStringList &rawFileList)
 bool PythonProject::saveRawList(const QStringList &rawList, const QString &fileName)
 {
     FileChangeBlocker changeGuarg(fileName);
-    // Make sure we can open the file for writing
-    FileSaver saver(fileName, QIODevice::Text);
-    if (!saver.hasError()) {
-        QTextStream stream(saver.file());
-        foreach (const QString &filePath, rawList)
-            stream << filePath << '\n';
-        saver.setResult(&stream);
+    bool result = false;
+
+    // New project file
+    if (fileName.endsWith(".pyproject")) {
+        FileSaver saver(fileName, QIODevice::ReadOnly | QIODevice::Text);
+        if (!saver.hasError()) {
+            QString content = QTextStream(saver.file()).readAll();
+            if (saver.finalize(ICore::mainWindow())) {
+                QString errorMessage;
+                result = writePyProjectFile(fileName, content, rawList, &errorMessage);
+                if (!errorMessage.isEmpty())
+                    Core::MessageManager::write(errorMessage);
+                }
+        }
+    } else { // Old project file
+        FileSaver saver(fileName, QIODevice::WriteOnly | QIODevice::Text);
+        if (!saver.hasError()) {
+            QTextStream stream(saver.file());
+            for (const QString &filePath : rawList)
+                stream << filePath << '\n';
+            saver.setResult(&stream);
+            result = saver.finalize(ICore::mainWindow());
+        }
     }
-    bool result = saver.finalize(ICore::mainWindow());
+
     return result;
+}
+
+bool PythonProject::writePyProjectFile(const QString &fileName, QString &content,
+                                       const QStringList &rawList, QString *errorMessage)
+{
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        *errorMessage = PythonProject::tr("Unable to open \"%1\" for reading: %2")
+                        .arg(fileName, file.errorString());
+        return false;
+    }
+
+    // Build list of files with the current rawList for the JSON file
+    QString files("[");
+    for (const QString &f : rawList)
+        if (!f.endsWith(".pyproject"))
+            files += QString("\"%1\",").arg(f);
+    files = files.left(files.lastIndexOf(',')); // Removing leading comma
+    files += ']';
+
+    // Removing everything inside square parenthesis
+    // to replace it with the new list of files for the JSON file.
+    QRegularExpression pattern(R"(\[.*\])");
+    content.replace(pattern, files);
+    file.write(content.toUtf8());
+
+    return true;
 }
 
 bool PythonProject::addFiles(const QStringList &filePaths)
 {
     QStringList newList = m_rawFileList;
 
-    QDir baseDir(projectDirectory().toString());
-    foreach (const QString &filePath, filePaths)
+    const QDir baseDir(projectDirectory().toString());
+    for (const QString &filePath : filePaths)
         newList.append(baseDir.relativeFilePath(filePath));
 
-    bool result = saveRawList(newList, projectFilePath().toString());
-    refresh();
-
-    return result;
+    return saveRawFileList(newList);
 }
 
 bool PythonProject::removeFiles(const QStringList &filePaths)
 {
     QStringList newList = m_rawFileList;
 
-    foreach (const QString &filePath, filePaths) {
-        QHash<QString, QString>::iterator i = m_rawListEntries.find(filePath);
+    for (const QString &filePath : filePaths) {
+        const QHash<QString, QString>::iterator i = m_rawListEntries.find(filePath);
         if (i != m_rawListEntries.end())
             newList.removeOne(i.value());
     }
@@ -425,8 +490,8 @@ bool PythonProject::removeFiles(const QStringList &filePaths)
 bool PythonProject::setFiles(const QStringList &filePaths)
 {
     QStringList newList;
-    QDir baseDir(projectDirectory().toString());
-    foreach (const QString &filePath, filePaths)
+    const QDir baseDir(projectDirectory().toString());
+    for (const QString &filePath : filePaths)
         newList.append(baseDir.relativeFilePath(filePath));
 
     return saveRawFileList(newList);
@@ -436,11 +501,11 @@ bool PythonProject::renameFile(const QString &filePath, const QString &newFilePa
 {
     QStringList newList = m_rawFileList;
 
-    QHash<QString, QString>::iterator i = m_rawListEntries.find(filePath);
+    const QHash<QString, QString>::iterator i = m_rawListEntries.find(filePath);
     if (i != m_rawListEntries.end()) {
-        int index = newList.indexOf(i.value());
+        const int index = newList.indexOf(i.value());
         if (index != -1) {
-            QDir baseDir(projectDirectory().toString());
+            const QDir baseDir(projectDirectory().toString());
             newList.replace(index, baseDir.relativeFilePath(newFilePath));
         }
     }
@@ -451,10 +516,14 @@ bool PythonProject::renameFile(const QString &filePath, const QString &newFilePa
 void PythonProject::parseProject()
 {
     m_rawListEntries.clear();
-    const Utils::FileName filePath = projectFilePath();
+    const Utils::FilePath filePath = projectFilePath();
     // The PySide project file is JSON based
-    if (filePath.endsWith(".pyproject"))
-        m_rawFileList = readLinesJson(filePath);
+    if (filePath.endsWith(".pyproject")) {
+        QString errorMessage;
+        m_rawFileList = readLinesJson(filePath, &errorMessage);
+        if (!errorMessage.isEmpty())
+            Core::MessageManager::write(errorMessage);
+    }
     // To keep compatibility with PyQt we keep the compatibility with plain
     // text files as project files.
     else if (filePath.endsWith(".pyqtc"))
@@ -469,9 +538,9 @@ void PythonProject::parseProject()
 class PythonFileNode : public FileNode
 {
 public:
-    PythonFileNode(const Utils::FileName &filePath, const QString &nodeDisplayName,
+    PythonFileNode(const Utils::FilePath &filePath, const QString &nodeDisplayName,
                    FileType fileType = FileType::Source)
-        : FileNode(filePath, fileType, false)
+        : FileNode(filePath, fileType)
         , m_displayName(nodeDisplayName)
     {}
 
@@ -485,20 +554,21 @@ void PythonProject::refresh(Target *target)
     emitParsingStarted();
     parseProject();
 
-    QDir baseDir(projectDirectory().toString());
-    BuildTargetInfoList appTargets;
+    const QDir baseDir(projectDirectory().toString());
+    QList<BuildTargetInfo> appTargets;
     auto newRoot = std::make_unique<PythonProjectNode>(this);
-    for (const QString &f : m_files) {
+    for (const QString &f : qAsConst(m_files)) {
         const QString displayName = baseDir.relativeFilePath(f);
-        FileType fileType = f.endsWith(".pyproject") || f.endsWith(".pyqtc") ? FileType::Project : FileType::Source;
-        newRoot->addNestedNode(std::make_unique<PythonFileNode>(FileName::fromString(f),
+        const FileType fileType = f.endsWith(".pyproject") || f.endsWith(".pyqtc") ? FileType::Project
+                                                                                   : FileType::Source;
+        newRoot->addNestedNode(std::make_unique<PythonFileNode>(FilePath::fromString(f),
                                                                 displayName, fileType));
         if (fileType == FileType::Source) {
             BuildTargetInfo bti;
             bti.buildKey = f;
-            bti.targetFilePath = FileName::fromString(f);
+            bti.targetFilePath = FilePath::fromString(f);
             bti.projectFilePath = projectFilePath();
-            appTargets.list.append(bti);
+            appTargets.append(bti);
         }
     }
     setRootProjectNode(std::move(newRoot));
@@ -545,14 +615,14 @@ QStringList PythonProject::processEntries(const QStringList &paths,
 
     QFileInfo fileInfo;
     QStringList absolutePaths;
-    foreach (const QString &path, paths) {
+    for (const QString &path : paths) {
         QString trimmedPath = path.trimmed();
         if (trimmedPath.isEmpty())
             continue;
 
         expandEnvironmentVariables(env, trimmedPath);
 
-        trimmedPath = FileName::fromUserInput(trimmedPath).toString();
+        trimmedPath = FilePath::fromUserInput(trimmedPath).toString();
 
         fileInfo.setFile(projectDir, trimmedPath);
         if (fileInfo.exists()) {
@@ -585,6 +655,7 @@ PythonProjectNode::PythonProjectNode(PythonProject *project)
     , m_project(project)
 {
     setDisplayName(project->projectFilePath().toFileInfo().completeBaseName());
+    setAddFileFilter("*.py");
 }
 
 QHash<QString, QStringList> sortFilesIntoPaths(const QString &base, const QSet<QString> &files)
@@ -592,13 +663,13 @@ QHash<QString, QStringList> sortFilesIntoPaths(const QString &base, const QSet<Q
     QHash<QString, QStringList> filesInPath;
     const QDir baseDir(base);
 
-    foreach (const QString &absoluteFileName, files) {
-        QFileInfo fileInfo(absoluteFileName);
-        FileName absoluteFilePath = FileName::fromString(fileInfo.path());
+    for (const QString &absoluteFileName : files) {
+        const QFileInfo fileInfo(absoluteFileName);
+        const FilePath absoluteFilePath = FilePath::fromString(fileInfo.path());
         QString relativeFilePath;
 
         if (absoluteFilePath.isChildOf(baseDir)) {
-            relativeFilePath = absoluteFilePath.relativeChildPath(FileName::fromString(base)).toString();
+            relativeFilePath = absoluteFilePath.relativeChildPath(FilePath::fromString(base)).toString();
         } else {
             // 'file' is not part of the project.
             relativeFilePath = baseDir.relativeFilePath(absoluteFilePath.toString());
@@ -611,30 +682,18 @@ QHash<QString, QStringList> sortFilesIntoPaths(const QString &base, const QSet<Q
     return filesInPath;
 }
 
-bool PythonProjectNode::showInSimpleTree() const
-{
-    return true;
-}
-
-QString PythonProjectNode::addFileFilter() const
-{
-    return QLatin1String("*.py");
-}
-
 bool PythonProjectNode::supportsAction(ProjectAction action, const Node *node) const
 {
-    switch (node->nodeType()) {
-    case NodeType::File:
+    if (node->asFileNode())  {
         return action == ProjectAction::Rename
             || action == ProjectAction::RemoveFile;
-    case NodeType::Folder:
-    case NodeType::Project:
+    }
+    if (node->isFolderNodeType() || node->isProjectNodeType()) {
         return action == ProjectAction::AddNewFile
             || action == ProjectAction::RemoveFile
             || action == ProjectAction::AddExistingFile;
-    default:
-        return ProjectNode::supportsAction(action, node);
     }
+    return ProjectNode::supportsAction(action, node);
 }
 
 bool PythonProjectNode::addFiles(const QStringList &filePaths, QStringList *)
@@ -668,6 +727,7 @@ class PythonEditorPluginPrivate
 public:
     PythonEditorFactory editorFactory;
     PythonRunConfigurationFactory runConfigFactory;
+    SimpleRunWorkerFactory<SimpleTargetRunner, PythonRunConfiguration> runWorkerFactory;
 };
 
 PythonEditorPlugin::~PythonEditorPlugin()
@@ -689,11 +749,10 @@ bool PythonEditorPlugin::initialize(const QStringList &arguments, QString *error
 
 void PythonEditorPlugin::extensionsInitialized()
 {
-    // Initialize editor actions handler
     // Add MIME overlay icons (these icons displayed at Project dock panel)
-    const QIcon icon = QIcon::fromTheme(C_PY_MIME_ICON);
-    if (!icon.isNull())
-        Core::FileIconProvider::registerIconOverlayForMimeType(icon, C_PY_MIMETYPE);
+    QString imageFile = creatorTheme()->imageFile(Theme::IconOverlayPro,
+                                                  ProjectExplorer::Constants::FILEOVERLAY_PY);
+    FileIconProvider::registerIconOverlayForSuffix(imageFile, "py");
 
     TaskHub::addCategory(PythonErrorTaskCategory, "Python", true);
 }

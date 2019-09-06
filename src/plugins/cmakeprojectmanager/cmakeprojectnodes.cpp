@@ -25,21 +25,30 @@
 
 #include "cmakeprojectnodes.h"
 
+#include "cmakeconfigitem.h"
 #include "cmakeprojectconstants.h"
 #include "cmakeprojectplugin.h"
+
+#include <android/androidconstants.h>
+
 #include <coreplugin/fileiconprovider.h>
 #include <coreplugin/icore.h>
 #include <cpptools/cpptoolsconstants.h>
+
+#include <projectexplorer/target.h>
+
 #include <utils/algorithm.h>
 #include <utils/checkablemessagebox.h>
 #include <utils/mimetypes/mimedatabase.h>
 #include <utils/optional.h>
-
+#include <utils/qtcassert.h>
 
 #include <QClipboard>
 #include <QDir>
 #include <QGuiApplication>
 #include <QMessageBox>
+
+using namespace ProjectExplorer;
 
 using namespace CMakeProjectManager;
 using namespace CMakeProjectManager::Internal;
@@ -106,8 +115,8 @@ void noAutoAdditionNotify(const QStringList &filePaths, const ProjectExplorer::P
 
 }
 
-CMakeInputsNode::CMakeInputsNode(const Utils::FileName &cmakeLists) :
-    ProjectExplorer::ProjectNode(cmakeLists, generateId(cmakeLists))
+CMakeInputsNode::CMakeInputsNode(const Utils::FilePath &cmakeLists) :
+    ProjectExplorer::ProjectNode(cmakeLists)
 {
     setPriority(Node::DefaultPriority - 10); // Bottom most!
     setDisplayName(QCoreApplication::translate("CMakeFilesProjectNode", "CMake Modules"));
@@ -115,17 +124,7 @@ CMakeInputsNode::CMakeInputsNode(const Utils::FileName &cmakeLists) :
     setListInProject(false);
 }
 
-QByteArray CMakeInputsNode::generateId(const Utils::FileName &inputFile)
-{
-    return inputFile.toString().toUtf8() + "/cmakeInputs";
-}
-
-bool CMakeInputsNode::showInSimpleTree() const
-{
-    return true;
-}
-
-CMakeListsNode::CMakeListsNode(const Utils::FileName &cmakeListPath) :
+CMakeListsNode::CMakeListsNode(const Utils::FilePath &cmakeListPath) :
     ProjectExplorer::ProjectNode(cmakeListPath)
 {
     static QIcon folderIcon = Core::FileIconProvider::directoryIcon(Constants::FILEOVERLAY_CMAKE);
@@ -143,23 +142,17 @@ bool CMakeListsNode::supportsAction(ProjectExplorer::ProjectAction action, const
     return action == ProjectExplorer::ProjectAction::AddNewFile;
 }
 
-Utils::optional<Utils::FileName> CMakeListsNode::visibleAfterAddFileAction() const
+Utils::optional<Utils::FilePath> CMakeListsNode::visibleAfterAddFileAction() const
 {
-    Utils::FileName projFile{filePath()};
-    return projFile.appendPath("CMakeLists.txt");
+    return filePath().pathAppended("CMakeLists.txt");
 }
 
-CMakeProjectNode::CMakeProjectNode(const Utils::FileName &directory) :
+CMakeProjectNode::CMakeProjectNode(const Utils::FilePath &directory) :
     ProjectExplorer::ProjectNode(directory)
 {
     setPriority(Node::DefaultProjectPriority + 1000);
     setIcon(QIcon(":/projectexplorer/images/projectexplorer.png")); // TODO: Use proper icon!
     setListInProject(false);
-}
-
-bool CMakeProjectNode::showInSimpleTree() const
-{
-    return true;
 }
 
 QString CMakeProjectNode::tooltip() const
@@ -173,22 +166,19 @@ bool CMakeProjectNode::addFiles(const QStringList &filePaths, QStringList *)
     return true; // Return always true as autoadd is not supported!
 }
 
-CMakeTargetNode::CMakeTargetNode(const Utils::FileName &directory, const QString &target) :
-    ProjectExplorer::ProjectNode(directory, generateId(directory, target))
+CMakeTargetNode::CMakeTargetNode(const Utils::FilePath &directory, const QString &target) :
+    ProjectExplorer::ProjectNode(directory)
 {
+    m_target = target;
     setPriority(Node::DefaultProjectPriority + 900);
     setIcon(QIcon(":/projectexplorer/images/build.png")); // TODO: Use proper icon!
     setListInProject(false);
+    setIsProduct();
 }
 
-QByteArray CMakeTargetNode::generateId(const Utils::FileName &directory, const QString &target)
+QString CMakeTargetNode::generateId(const Utils::FilePath &directory, const QString &target)
 {
-    return directory.toString().toUtf8() + "///::///" + target.toUtf8();
-}
-
-bool CMakeTargetNode::showInSimpleTree() const
-{
-    return true;
+    return directory.toString() + "///::///" + target;
 }
 
 QString CMakeTargetNode::tooltip() const
@@ -198,7 +188,63 @@ QString CMakeTargetNode::tooltip() const
 
 QString CMakeTargetNode::buildKey() const
 {
-    return QString::fromUtf8(id());
+    return generateId(filePath(), m_target);
+}
+
+Utils::FilePath CMakeTargetNode::buildDirectory() const
+{
+    return m_buildDirectory;
+}
+
+void CMakeTargetNode::setBuildDirectory(const Utils::FilePath &directory)
+{
+    m_buildDirectory = directory;
+}
+
+QVariant CMakeTargetNode::data(Core::Id role) const
+{
+    auto value = [this](const QByteArray &key) -> QVariant {
+        for (const CMakeConfigItem &configItem : m_config) {
+            if (configItem.key == key)
+                return configItem.value;
+        }
+        return {};
+    };
+
+    auto values = [this](const QByteArray &key) -> QVariant {
+        for (const CMakeConfigItem &configItem : m_config) {
+            if (configItem.key == key)
+                return configItem.values;
+        }
+        return {};
+    };
+
+    if (role == Android::Constants::AndroidPackageSourceDir)
+        return value("ANDROID_PACKAGE_SOURCE_DIR");
+
+    if (role == Android::Constants::AndroidDeploySettingsFile)
+        return value("ANDROID_DEPLOYMENT_SETTINGS_FILE");
+
+    if (role == Android::Constants::AndroidExtraLibs)
+        return value("ANDROID_EXTRA_LIBS");
+
+    if (role == Android::Constants::AndroidArch)
+        return value("ANDROID_ABI");
+
+    if (role == Android::Constants::AndroidSoLibPath)
+        return values("ANDROID_SO_LIBS_PATHS");
+
+    if (role == Android::Constants::AndroidTargets)
+        return values("TARGETS_BUILD_PATH");
+
+    QTC_CHECK(false);
+    // Better guess than "not present".
+    return value(role.toString().toUtf8());
+}
+
+void CMakeTargetNode::setConfig(const CMakeConfig &config)
+{
+    m_config = config;
 }
 
 bool CMakeTargetNode::supportsAction(ProjectExplorer::ProjectAction action,
@@ -213,20 +259,19 @@ bool CMakeTargetNode::addFiles(const QStringList &filePaths, QStringList *)
     return true; // Return always true as autoadd is not supported!
 }
 
-Utils::optional<Utils::FileName> CMakeTargetNode::visibleAfterAddFileAction() const
+Utils::optional<Utils::FilePath> CMakeTargetNode::visibleAfterAddFileAction() const
 {
-    Utils::FileName projFile{filePath()};
-    return projFile.appendPath("CMakeLists.txt");
+    return filePath().pathAppended("CMakeLists.txt");
 }
 
-void CMakeTargetNode::setTargetInformation(const QList<Utils::FileName> &artifacts,
+void CMakeTargetNode::setTargetInformation(const QList<Utils::FilePath> &artifacts,
                                            const QString &type)
 {
     m_tooltip = QCoreApplication::translate("CMakeTargetNode", "Target type: ") + type + "<br>";
     if (artifacts.isEmpty()) {
         m_tooltip += QCoreApplication::translate("CMakeTargetNode", "No build artifacts");
     } else {
-        const QStringList tmp = Utils::transform(artifacts, &Utils::FileName::toUserOutput);
+        const QStringList tmp = Utils::transform(artifacts, &Utils::FilePath::toUserOutput);
         m_tooltip += QCoreApplication::translate("CMakeTargetNode", "Build artifacts:") + "<br>"
                 + tmp.join("<br>");
     }

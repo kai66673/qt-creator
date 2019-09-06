@@ -143,6 +143,8 @@ void BuildManager::extensionsInitialized()
                          tr("Build System", "Category for build system issues listed under 'Issues'"));
     TaskHub::addCategory(Constants::TASK_CATEGORY_DEPLOYMENT,
                          tr("Deployment", "Category for deployment issues listed under 'Issues'"));
+    TaskHub::addCategory(Constants::TASK_CATEGORY_AUTOTEST,
+                         tr("Autotests", "Category for autotest issues listed under 'Issues'"));
 }
 
 BuildManager::~BuildManager()
@@ -184,6 +186,16 @@ int BuildManager::getErrorTaskCount()
             + d->m_taskWindow->errorTaskCount(Constants::TASK_CATEGORY_COMPILE)
             + d->m_taskWindow->errorTaskCount(Constants::TASK_CATEGORY_DEPLOYMENT);
     return errors;
+}
+
+void BuildManager::setCompileOutputSettings(const Internal::CompileOutputSettings &settings)
+{
+    d->m_outputWindow->setSettings(settings);
+}
+
+const Internal::CompileOutputSettings &BuildManager::compileOutputSettings()
+{
+    return d->m_outputWindow->settings();
 }
 
 void BuildManager::cancel()
@@ -364,7 +376,7 @@ void BuildManager::nextBuildQueue()
         const QString projectName = d->m_currentBuildStep->project()->displayName();
         const QString targetName = t->displayName();
         addToOutputWindow(tr("Error while building/deploying project %1 (kit: %2)").arg(projectName, targetName), BuildStep::OutputFormat::Stderr);
-        const QList<Task> kitTasks = t->kit()->validate();
+        const Tasks kitTasks = t->kit()->validate();
         if (!kitTasks.isEmpty()) {
             addToOutputWindow(tr("The kit %1 has configuration issues which might be the root cause for this problem.")
                               .arg(targetName), BuildStep::OutputFormat::Stderr);
@@ -434,9 +446,12 @@ bool BuildManager::buildQueueAppend(const QList<BuildStep *> &steps, QStringList
 {
     if (!d->m_running) {
         d->m_outputWindow->clearContents();
-        TaskHub::clearTasks(Constants::TASK_CATEGORY_COMPILE);
-        TaskHub::clearTasks(Constants::TASK_CATEGORY_BUILDSYSTEM);
-        TaskHub::clearTasks(Constants::TASK_CATEGORY_DEPLOYMENT);
+        if (ProjectExplorerPlugin::projectExplorerSettings().clearIssuesOnRebuild) {
+            TaskHub::clearTasks(Constants::TASK_CATEGORY_COMPILE);
+            TaskHub::clearTasks(Constants::TASK_CATEGORY_BUILDSYSTEM);
+            TaskHub::clearTasks(Constants::TASK_CATEGORY_DEPLOYMENT);
+            TaskHub::clearTasks(Constants::TASK_CATEGORY_AUTOTEST);
+        }
 
         foreach (const QString &str, preambleMessage)
             addToOutputWindow(str, BuildStep::OutputFormat::NormalMessage, BuildStep::DontAppendNewline);
@@ -511,7 +526,7 @@ bool BuildManager::buildLists(QList<BuildStepList *> bsls, const QStringList &pr
         return false;
     }
 
-    if (ProjectExplorerPlugin::projectExplorerSettings().showCompilerOutput)
+    if (d->m_outputWindow->settings().popUp)
         d->m_outputWindow->popup(IOutputPane::NoModeSwitch);
     startBuildQueue();
     return true;
@@ -524,7 +539,7 @@ void BuildManager::appendStep(BuildStep *step, const QString &name)
         d->m_outputWindow->popup(IOutputPane::NoModeSwitch);
         return;
     }
-    if (ProjectExplorerPlugin::projectExplorerSettings().showCompilerOutput)
+    if (d->m_outputWindow->settings().popUp)
         d->m_outputWindow->popup(IOutputPane::NoModeSwitch);
     startBuildQueue();
 }

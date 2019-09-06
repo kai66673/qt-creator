@@ -23,11 +23,11 @@
 **
 ****************************************************************************/
 
-#include "gdbserverproviderchooser.h"
-
-#include "gdbserverprovidermanager.h"
-#include "gdbserverprovider.h"
 #include "baremetalconstants.h"
+
+#include "gdbserverprovider.h"
+#include "gdbserverproviderchooser.h"
+#include "gdbserverprovidermanager.h"
 
 #include <coreplugin/icore.h>
 
@@ -39,6 +39,8 @@
 namespace BareMetal {
 namespace Internal {
 
+// GdbServerProviderChooser
+
 GdbServerProviderChooser::GdbServerProviderChooser(
         bool useManageButton, QWidget *parent)
     : QWidget(parent)
@@ -49,13 +51,13 @@ GdbServerProviderChooser::GdbServerProviderChooser(
     m_manageButton->setEnabled(useManageButton);
     m_manageButton->setVisible(useManageButton);
 
-    auto layout = new QHBoxLayout(this);
+    const auto layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_chooser);
     layout->addWidget(m_manageButton);
     setFocusProxy(m_manageButton);
 
-    connect(m_chooser, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_chooser, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &GdbServerProviderChooser::currentIndexChanged);
     connect(m_manageButton, &QAbstractButton::clicked,
             this, &GdbServerProviderChooser::manageButtonClicked);
@@ -101,14 +103,14 @@ QString GdbServerProviderChooser::providerText(const GdbServerProvider *provider
 
 void GdbServerProviderChooser::populate()
 {
-    QSignalBlocker blocker(m_chooser);
+    const QSignalBlocker blocker(m_chooser);
     m_chooser->clear();
     m_chooser->addItem(tr("None"));
 
     for (const GdbServerProvider *p : GdbServerProviderManager::providers()) {
         if (!providerMatches(p))
             continue;
-        m_chooser->addItem(providerText(p), qVariantFromValue(p->id()));
+        m_chooser->addItem(providerText(p), QVariant::fromValue(p->id()));
     }
 }
 

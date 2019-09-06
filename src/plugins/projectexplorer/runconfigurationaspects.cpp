@@ -56,6 +56,9 @@ TerminalAspect::TerminalAspect()
     setDisplayName(tr("Terminal"));
     setId("TerminalAspect");
     setSettingsKey("RunConfiguration.UseTerminal");
+    calculateUseTerminal();
+    connect(ProjectExplorerPlugin::instance(), &ProjectExplorerPlugin::settingsChanged,
+            this, &TerminalAspect::calculateUseTerminal);
 }
 
 void TerminalAspect::addToConfigurationLayout(QFormLayout *layout)
@@ -90,19 +93,33 @@ void TerminalAspect::toMap(QVariantMap &data) const
         data.insert(settingsKey(), m_useTerminal);
 }
 
-bool TerminalAspect::useTerminal() const
+void TerminalAspect::calculateUseTerminal()
 {
-    return m_useTerminal;
-}
-
-void TerminalAspect::setUseTerminal(bool useTerminal)
-{
+    if (m_userSet)
+        return;
+    bool useTerminal;
+    switch (ProjectExplorerPlugin::projectExplorerSettings().terminalMode) {
+    case Internal::TerminalMode::On: useTerminal = true; break;
+    case Internal::TerminalMode::Off: useTerminal = false; break;
+    case Internal::TerminalMode::Smart: useTerminal = m_useTerminalHint;
+    }
     if (m_useTerminal != useTerminal) {
         m_useTerminal = useTerminal;
         emit changed();
     }
     if (m_checkBox)
         m_checkBox->setChecked(m_useTerminal);
+}
+
+bool TerminalAspect::useTerminal() const
+{
+    return m_useTerminal;
+}
+
+void TerminalAspect::setUseTerminalHint(bool hint)
+{
+    m_useTerminalHint = hint;
+    calculateUseTerminal();
 }
 
 bool TerminalAspect::isUserSet() const
@@ -114,8 +131,7 @@ bool TerminalAspect::isUserSet() const
     \class ProjectExplorer::WorkingDirectoryAspect
 */
 
-WorkingDirectoryAspect::WorkingDirectoryAspect(EnvironmentAspect *envAspect)
-    : m_envAspect(envAspect)
+WorkingDirectoryAspect::WorkingDirectoryAspect()
 {
     setDisplayName(tr("Working Directory"));
     setId("WorkingDirectoryAspect");
@@ -125,11 +141,6 @@ WorkingDirectoryAspect::WorkingDirectoryAspect(EnvironmentAspect *envAspect)
 void WorkingDirectoryAspect::addToConfigurationLayout(QFormLayout *layout)
 {
     QTC_CHECK(!m_chooser);
-    m_resetButton = new QToolButton(layout->parentWidget());
-    m_resetButton->setToolTip(tr("Reset to Default"));
-    m_resetButton->setIcon(Utils::Icons::RESET.icon());
-    connect(m_resetButton.data(), &QAbstractButton::clicked, this, &WorkingDirectoryAspect::resetPath);
-
     m_chooser = new PathChooser(layout->parentWidget());
     m_chooser->setHistoryCompleter(settingsKey());
     m_chooser->setExpectedKind(Utils::PathChooser::Directory);
@@ -142,6 +153,10 @@ void WorkingDirectoryAspect::addToConfigurationLayout(QFormLayout *layout)
                 m_resetButton->setEnabled(m_workingDirectory != m_defaultWorkingDirectory);
             });
 
+    m_resetButton = new QToolButton(layout->parentWidget());
+    m_resetButton->setToolTip(tr("Reset to Default"));
+    m_resetButton->setIcon(Utils::Icons::RESET.icon());
+    connect(m_resetButton.data(), &QAbstractButton::clicked, this, &WorkingDirectoryAspect::resetPath);
     m_resetButton->setEnabled(m_workingDirectory != m_defaultWorkingDirectory);
 
     if (m_envAspect) {
@@ -157,6 +172,11 @@ void WorkingDirectoryAspect::addToConfigurationLayout(QFormLayout *layout)
     layout->addRow(tr("Working directory:"), hbox);
 }
 
+void WorkingDirectoryAspect::acquaintSiblings(const ProjectConfigurationAspects &siblings)
+{
+    m_envAspect = siblings.aspect<EnvironmentAspect>();
+}
+
 QString WorkingDirectoryAspect::keyForDefaultWd() const
 {
     return settingsKey() + ".default";
@@ -169,8 +189,8 @@ void WorkingDirectoryAspect::resetPath()
 
 void WorkingDirectoryAspect::fromMap(const QVariantMap &map)
 {
-    m_workingDirectory = FileName::fromString(map.value(settingsKey()).toString());
-    m_defaultWorkingDirectory = FileName::fromString(map.value(keyForDefaultWd()).toString());
+    m_workingDirectory = FilePath::fromString(map.value(settingsKey()).toString());
+    m_defaultWorkingDirectory = FilePath::fromString(map.value(keyForDefaultWd()).toString());
 
     if (m_workingDirectory.isEmpty())
         m_workingDirectory = m_defaultWorkingDirectory;
@@ -187,32 +207,32 @@ void WorkingDirectoryAspect::toMap(QVariantMap &data) const
     data.insert(keyForDefaultWd(), m_defaultWorkingDirectory.toString());
 }
 
-FileName WorkingDirectoryAspect::workingDirectory(const MacroExpander *expander) const
+FilePath WorkingDirectoryAspect::workingDirectory(const MacroExpander *expander) const
 {
     const Utils::Environment env = m_envAspect ? m_envAspect->environment()
                                                : Utils::Environment::systemEnvironment();
     QString workingDir = m_workingDirectory.toUserOutput();
     if (expander)
         workingDir = expander->expandProcessArgs(workingDir);
-    return FileName::fromString(PathChooser::expandedDirectory(workingDir, env, QString()));
+    return FilePath::fromString(PathChooser::expandedDirectory(workingDir, env, QString()));
 }
 
-FileName WorkingDirectoryAspect::defaultWorkingDirectory() const
+FilePath WorkingDirectoryAspect::defaultWorkingDirectory() const
 {
     return m_defaultWorkingDirectory;
 }
 
-FileName WorkingDirectoryAspect::unexpandedWorkingDirectory() const
+FilePath WorkingDirectoryAspect::unexpandedWorkingDirectory() const
 {
     return m_workingDirectory;
 }
 
-void WorkingDirectoryAspect::setDefaultWorkingDirectory(const FileName &defaultWorkingDir)
+void WorkingDirectoryAspect::setDefaultWorkingDirectory(const FilePath &defaultWorkingDir)
 {
     if (defaultWorkingDir == m_defaultWorkingDirectory)
         return;
 
-    Utils::FileName oldDefaultDir = m_defaultWorkingDirectory;
+    Utils::FilePath oldDefaultDir = m_defaultWorkingDirectory;
     m_defaultWorkingDirectory = defaultWorkingDir;
     if (m_chooser)
         m_chooser->setBaseFileName(m_defaultWorkingDirectory);
@@ -360,7 +380,7 @@ void ExecutableAspect::makeOverridable(const QString &overridingKey, const QStri
             this, &ExecutableAspect::changed);
 }
 
-FileName ExecutableAspect::executable() const
+FilePath ExecutableAspect::executable() const
 {
     if (m_alternativeExecutable && m_alternativeExecutable->isChecked())
         return m_alternativeExecutable->fileName();
@@ -385,7 +405,7 @@ void ExecutableAspect::setPlaceHolderText(const QString &placeHolderText)
     m_executable.setPlaceHolderText(placeHolderText);
 }
 
-void ExecutableAspect::setExecutable(const FileName &executable)
+void ExecutableAspect::setExecutable(const FilePath &executable)
 {
    m_executable.setValue(executable.toString());
 }

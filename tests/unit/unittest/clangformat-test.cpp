@@ -32,9 +32,8 @@
 
 namespace TextEditor {
 class TabSettings
-{
-};
-}
+{};
+} // namespace TextEditor
 
 namespace {
 
@@ -58,10 +57,7 @@ public:
         : ClangFormatIndenter(doc)
     {}
 
-    bool formatWhileTyping() const override
-    {
-        return true;
-    }
+    bool formatWhileTyping() const override { return true; }
 };
 
 class ClangFormat : public ::testing::Test
@@ -69,13 +65,14 @@ class ClangFormat : public ::testing::Test
 protected:
     void SetUp() final
     {
-        indenter.setFileName(Utils::FileName::fromString(TESTDATA_DIR "/clangformat/test.cpp"));
+        indenter.setFileName(Utils::FilePath::fromString(TESTDATA_DIR "/clangformat/test.cpp"));
         extendedIndenter.setFileName(
-            Utils::FileName::fromString(TESTDATA_DIR "/clangformat/test.cpp"));
+            Utils::FilePath::fromString(TESTDATA_DIR "/clangformat/test.cpp"));
     }
 
     void insertLines(const std::vector<QString> &lines)
     {
+        doc.clear();
         cursor.setPosition(0);
         for (size_t lineNumber = 1; lineNumber <= lines.size(); ++lineNumber) {
             if (lineNumber > 1)
@@ -104,6 +101,7 @@ protected:
     QTextCursor cursor{&doc};
 };
 
+// clang-format off
 TEST_F(ClangFormat, IndentBasicFile)
 {
     insertLines({"int main()",
@@ -121,14 +119,14 @@ TEST_F(ClangFormat, IndentBasicFile)
 
 TEST_F(ClangFormat, IndentEmptyLine)
 {
-    insertLines({"int main",
+    insertLines({"int main()",
                  "{",
                  "",
                  "}"});
 
     indenter.indent(cursor, QChar::Null, TextEditor::TabSettings());
 
-    ASSERT_THAT(documentLines(), ElementsAre("int main",
+    ASSERT_THAT(documentLines(), ElementsAre("int main()",
                                              "{",
                                              "    ",
                                              "}"));
@@ -365,7 +363,302 @@ TEST_F(ClangFormat, IndentEmptyLineAndKeepPreviousEmptyLines)
                                              "}"));
 }
 
-TEST_F(ClangFormat, IndentFunctionBodyAndFormatBeforeIt)
+TEST_F(ClangFormat, IndentOnElectricCharacterButNotRemoveEmptyLinesBefore)
+{
+    insertLines({"{",
+                 "    ",
+                 "    ",
+                 "if ()",
+                 "}"});
+
+    indenter.indentBlock(doc.findBlockByNumber(3), '(', TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("{",
+                                             "    ",
+                                             "    ",
+                                             "    if ()",
+                                             "}"));
+}
+
+TEST_F(ClangFormat, IndentAfterExtraSpaceInpreviousLine)
+{
+    insertLines({"if (a ",
+                 "&& b)"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a",
+                                             "    && b)"));
+}
+
+TEST_F(ClangFormat, IndentEmptyLineInsideParantheses)
+{
+    insertLines({"if (a ",
+                 "",
+                 "    && b)"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a",
+                                             "    ",
+                                             "    && b)"));
+}
+
+TEST_F(ClangFormat, IndentInsideIf)
+{
+    insertLines({"if (a && b",
+                 ")"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a && b",
+                                             "    )"));
+}
+
+TEST_F(ClangFormat, IndentInsideIf2)
+{
+    insertLines({"if (a && b &&",
+                 ")"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a && b &&",
+                                             "    )"));
+}
+
+TEST_F(ClangFormat, IndentInsideIf3)
+{
+    insertLines({"if (a || b",
+                 ")"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a || b",
+                                             "    )"));
+}
+
+TEST_F(ClangFormat, EmptyLineInInitializerList)
+{
+    insertLines({"Bar foo{a,",
+                 "",
+                 "};"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("Bar foo{a,",
+                                             "        ",
+                                             "};"));
+}
+
+TEST_F(ClangFormat, IndentClosingBraceAfterComma)
+{
+    insertLines({"Bar foo{a,",
+                 "}"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("Bar foo{a,",
+                                             "        }"));
+}
+
+TEST_F(ClangFormat, DoNotIndentClosingBraceAfterSemicolon)
+{
+    insertLines({"{",
+                 "    a;"
+                 "}"});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("{",
+                                             "    a;"
+                                             "}"));
+}
+
+TEST_F(ClangFormat, IndentAfterIf)
+{
+    insertLines({"if (a)",
+                 ""});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a)",
+                                             "    "));
+}
+
+TEST_F(ClangFormat, IndentAfterElse)
+{
+    insertLines({"if (a)",
+                 "    foo();",
+                 "else",
+                 ""});
+    indenter.indentBlock(doc.findBlockByNumber(3), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a)",
+                                             "    foo();",
+                                             "else",
+                                             "    "));
+}
+
+TEST_F(ClangFormat, SameIndentAfterSecondNewLineAfterIf)
+{
+    insertLines({"if (a)",
+                 "    ",
+                 ""});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (a)",
+                                             "    ",
+                                             "    "));
+}
+
+TEST_F(ClangFormat, IndentAfterNewLineInsideIfWithFunctionCall)
+{
+    insertLines({"if (foo()",
+                 ")"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (foo()",
+                                             "    )"));
+}
+
+TEST_F(ClangFormat, SameIndentAfterSecondNewLineInsideIfWithFunctionCall)
+{
+    insertLines({"if (foo()",
+                 "    ",
+                 ")"});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (foo()",
+                                             "    ",
+                                             "    )"));
+}
+
+TEST_F(ClangFormat, SameIndentAfterSecondNonEmptyNewLineInsideIfWithFunctionCall)
+{
+    insertLines({"if (foo()",
+                 "    ",
+                 "bar)"});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("if (foo()",
+                                             "    ",
+                                             "    bar)"));
+}
+
+TEST_F(ClangFormat, SameIndentsOnNewLinesAfterComments)
+{
+    insertLines({"namespace {} //comment",
+                 "",
+                 ""});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("namespace {} //comment",
+                                             "",
+                                             ""));
+}
+
+TEST_F(ClangFormat, IndentAfterEmptyLineAfterAngledIncludeDirective)
+{
+    insertLines({"#include <string>",
+                 "",
+                 "using namespace std;"});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("#include <string>",
+                                             "",
+                                             "using namespace std;"));
+}
+
+TEST_F(ClangFormat, IndentAfterEmptyLineAfterQuotedIncludeDirective)
+{
+    insertLines({"#include \"foo.h\"",
+                 "",
+                 "using namespace std;"});
+
+    indenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("#include \"foo.h\"",
+                                             "",
+                                             "using namespace std;"));
+}
+
+TEST_F(ClangFormat, IndentAfterLineComment)
+{
+    insertLines({"int foo()",
+                 "{",
+                 "    // Comment",
+                 "    ",
+                 "    if (",
+                 "}"});
+
+    indenter.indentBlock(doc.findBlockByNumber(4), '(', TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("int foo()",
+                                             "{",
+                                             "    // Comment",
+                                             "    ",
+                                             "    if (",
+                                             "}"));
+}
+
+TEST_F(ClangFormat, IndentAfterBlockComment)
+{
+    insertLines({"int foo()",
+                 "{",
+                 "    bar(); /* Comment */",
+                 "    ",
+                 "    if (",
+                 "}"});
+
+    indenter.indentBlock(doc.findBlockByNumber(4), '(', TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("int foo()",
+                                             "{",
+                                             "    bar(); /* Comment */",
+                                             "    ",
+                                             "    if (",
+                                             "}"));
+}
+
+TEST_F(ClangFormat, IndentAfterIfdef)
+{
+    insertLines({"int foo()",
+                 "{",
+                 "#ifdef FOO",
+                 "#endif",
+                 "    ",
+                 "    if (",
+                 "}"});
+
+    indenter.indentBlock(doc.findBlockByNumber(5), '(', TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("int foo()",
+                                             "{",
+                                             "#ifdef FOO",
+                                             "#endif",
+                                             "    ",
+                                             "    if (",
+                                             "}"));
+}
+
+TEST_F(ClangFormat, IndentAfterEmptyLineInTheFileBeginning)
+{
+    insertLines({"",
+                 "void foo()"});
+
+    indenter.indentBlock(doc.findBlockByNumber(1), ')', TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("",
+                                             "void foo()"));
+}
+
+TEST_F(ClangFormat, IndentFunctionBodyButNotFormatBeforeIt)
 {
     insertLines({"int foo(int a, int b,",
                  "        int c, int d",
@@ -375,8 +668,9 @@ TEST_F(ClangFormat, IndentFunctionBodyAndFormatBeforeIt)
 
     extendedIndenter.indentBlock(doc.findBlockByNumber(3), QChar::Null, TextEditor::TabSettings());
 
-    ASSERT_THAT(documentLines(), ElementsAre("int foo(int a, int b, int c, int d)",
-                                             "{",
+    ASSERT_THAT(documentLines(), ElementsAre("int foo(int a, int b,",
+                                             "        int c, int d",
+                                             "        ) {",
                                              "    ",
                                              "}"));
 }
@@ -404,13 +698,11 @@ TEST_F(ClangFormat, ReformatToEmptyFunction)
     insertLines({"int foo(int a, int b, int c, int d)",
                  "{",
                  "    ",
-                 "}",
-                 ""});
+                 "}"});
 
-    extendedIndenter.indentBlock(doc.findBlockByNumber(4), QChar::Null, TextEditor::TabSettings());
+    extendedIndenter.indentBlock(doc.findBlockByNumber(3), '}', TextEditor::TabSettings());
 
-    ASSERT_THAT(documentLines(), ElementsAre("int foo(int a, int b, int c, int d) {}",
-                                             ""));
+    ASSERT_THAT(documentLines(), ElementsAre("int foo(int a, int b, int c, int d) {}"));
 }
 
 TEST_F(ClangFormat, ReformatToNonEmptyFunction)
@@ -421,13 +713,12 @@ TEST_F(ClangFormat, ReformatToNonEmptyFunction)
 
     extendedIndenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
 
-    ASSERT_THAT(documentLines(), ElementsAre("int foo(int a, int b)",
-                                             "{",
+    ASSERT_THAT(documentLines(), ElementsAre("int foo(int a, int b) {",
                                              "    ",
                                              "}"));
 }
 
-TEST_F(ClangFormat, IndentIfBodyAndFormatBeforeIt)
+TEST_F(ClangFormat, IndentClosingScopeAndFormatBeforeIt)
 {
     insertLines({"if(a && b",
                  "   &&c && d",
@@ -435,10 +726,9 @@ TEST_F(ClangFormat, IndentIfBodyAndFormatBeforeIt)
                  "",
                  "}"});
 
-    extendedIndenter.indentBlock(doc.findBlockByNumber(3), QChar::Null, TextEditor::TabSettings());
+    extendedIndenter.indentBlock(doc.findBlockByNumber(4), '}', TextEditor::TabSettings());
 
     ASSERT_THAT(documentLines(), ElementsAre("if (a && b && c && d) {",
-                                             "    ",
                                              "}"));
 }
 
@@ -494,6 +784,37 @@ TEST_F(ClangFormat, IndentAndFormatCompleteStatementOnClosingScope)
                                              "    bar();",
                                              "    foo();",
                                              "}"));
+}
+
+TEST_F(ClangFormat, OnlyIndentClosingParenthesis)
+{
+    insertLines({"foo(a,",
+                 "    ",
+                 ")"});
+
+    extendedIndenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(documentLines(), ElementsAre("foo(a,",
+                                             "    ",
+                                             "    )"));
+}
+
+TEST_F(ClangFormat, EquallyIndentInsideParenthesis)
+{
+    insertLines({"if (a",
+                 ")"});
+    extendedIndenter.indentBlock(doc.findBlockByNumber(1), QChar::Null, TextEditor::TabSettings());
+    auto linesAfterFirstLineBreak = documentLines();
+    insertLines({"if (a",
+                 "    ",
+                 ")"});
+    extendedIndenter.indentBlock(doc.findBlockByNumber(2), QChar::Null, TextEditor::TabSettings());
+
+    ASSERT_THAT(linesAfterFirstLineBreak, ElementsAre("if (a",
+                                                      "    )"));
+    ASSERT_THAT(documentLines(), ElementsAre("if (a",
+                                             "    ",
+                                             "    )"));
 }
 
 TEST_F(ClangFormat, FormatBasicFile)
@@ -610,4 +931,22 @@ TEST_F(ClangFormat, FormatTemplateparameters)
     ASSERT_THAT(documentLines(), ElementsAre("using Alias = Template<A, B, C>"));
 }
 
+TEST_F(ClangFormat, SortIncludes)
+{
+    insertLines({"#include \"b.h\"",
+                 "#include \"a.h\"",
+                 "",
+                 "#include <bb.h>",
+                 "#include <aa.h>"});
+
+    indenter.format({{1, 5}});
+
+    ASSERT_THAT(documentLines(), ElementsAre("#include \"a.h\"",
+                                             "#include \"b.h\"",
+                                             "",
+                                             "#include <aa.h>",
+                                             "#include <bb.h>"));
 }
+// clang-format on
+
+} // namespace

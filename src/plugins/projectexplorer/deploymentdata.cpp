@@ -33,7 +33,7 @@
 
 namespace ProjectExplorer {
 
-void DeploymentData::setLocalInstallRoot(const Utils::FileName &installRoot)
+void DeploymentData::setLocalInstallRoot(const Utils::FilePath &installRoot)
 {
     m_localInstallRoot = installRoot;
 }
@@ -64,7 +64,7 @@ DeployableFile DeploymentData::deployableForLocalFile(const QString &localFilePa
 
 bool DeploymentData::operator==(const DeploymentData &other) const
 {
-    return m_files.toSet() == other.m_files.toSet()
+    return Utils::toSet(m_files) == Utils::toSet(other.m_files)
             && m_localInstallRoot == other.m_localInstallRoot;
 }
 

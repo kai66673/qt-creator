@@ -32,7 +32,7 @@
 
 namespace ProjectExplorer {
 
-static inline QByteArray msgFileComparisonFail(const Utils::FileName &f1, const Utils::FileName &f2)
+static inline QByteArray msgFileComparisonFail(const Utils::FilePath &f1, const Utils::FilePath &f2)
 {
     const QString result = '"' + f1.toUserOutput() + "\" != \"" + f2.toUserOutput() + '"';
     return result.toLocal8Bit();
@@ -43,7 +43,7 @@ OutputParserTester::OutputParserTester() = default;
 // test functions:
 void OutputParserTester::testParsing(const QString &lines,
                                      Channel inputChannel,
-                                     QList<Task> tasks,
+                                     Tasks tasks,
                                      const QString &childStdOutLines,
                                      const QString &childStdErrLines,
                                      const QString &outputLines)

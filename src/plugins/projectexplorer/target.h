@@ -36,11 +36,11 @@ QT_FORWARD_DECLARE_CLASS(QIcon)
 
 namespace ProjectExplorer {
 class BuildConfiguration;
-class BuildTargetInfoList;
 class BuildTargetInfo;
 class DeployConfiguration;
 class DeploymentData;
 class Kit;
+class MakeInstallCommand;
 class Project;
 class RunConfiguration;
 
@@ -81,10 +81,9 @@ public:
     void setDeploymentData(const DeploymentData &deploymentData);
     DeploymentData deploymentData() const;
 
-    void setApplicationTargets(const BuildTargetInfoList &appTargets);
-    BuildTargetInfoList applicationTargets() const;
+    void setApplicationTargets(const QList<BuildTargetInfo> &appTargets);
+    const QList<BuildTargetInfo> applicationTargets() const;
     BuildTargetInfo buildTarget(const QString &buildKey) const;
-    bool hasBuildTarget(const QString &buildKey) const;
 
     QList<ProjectConfiguration *> projectConfigurations() const;
 
@@ -118,6 +117,7 @@ public:
     void setNamedSettings(const QString &name, const QVariant &value);
 
     QVariant additionalData(Core::Id id) const;
+    MakeInstallCommand makeInstallCommand(const QString &installRoot) const;
 
     template<typename S, typename R, typename T>
     void subscribeSignal(void (S::*sig)(), R*recv, T (R::*sl)()) {

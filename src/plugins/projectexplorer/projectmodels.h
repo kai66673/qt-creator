@@ -78,6 +78,7 @@ public:
 
     bool projectFilterEnabled();
     bool generatedFilesFilterEnabled();
+    bool trimEmptyDirectoriesEnabled();
     void setProjectFilterEnabled(bool filter);
     void setGeneratedFilesFilterEnabled(bool filter);
     void setTrimEmptyDirectories(bool filter);
@@ -86,7 +87,7 @@ public:
     void onCollapsed(const QModelIndex &idx);
 
 signals:
-    void renamed(const Utils::FileName &oldName, const Utils::FileName &newName);
+    void renamed(const Utils::FilePath &oldName, const Utils::FilePath &newName);
     void requestExpansion(const QModelIndex &index);
 
 private:

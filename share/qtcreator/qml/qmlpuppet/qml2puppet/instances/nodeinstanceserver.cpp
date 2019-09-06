@@ -88,7 +88,10 @@
 #include <algorithm>
 
 namespace {
-bool testImportStatements(const QStringList &importStatementList, const QUrl &url, QString *errorMessage = 0) {
+
+bool testImportStatements(const QStringList &importStatementList,
+                          const QUrl &url, QString *errorMessage = nullptr)
+{
     if (importStatementList.isEmpty())
         return false;
     // ToDo: move engine outside of this function, this makes it expensive
@@ -455,7 +458,7 @@ void NodeInstanceServer::setupImports(const QVector<AddImportContainer> &contain
 
     delete m_importComponent.data();
     delete m_importComponentObject.data();
-    const QStringList importStatementList(importStatementSet.toList());
+    const QStringList importStatementList = QtHelpers::toList(importStatementSet);
     const QStringList fullImportStatementList(QStringList(qtQuickImport) + importStatementList);
 
     // check possible import statements combinations
@@ -1278,7 +1281,7 @@ void NodeInstanceServer::loadDummyContextObjectFile(const QFileInfo& qmlFileInfo
 void NodeInstanceServer::loadDummyDataFiles(const QString& directory)
 {
     QDir dir(directory, "*.qml");
-    QList<QFileInfo> filePathList = dir.entryInfoList();
+    QFileInfoList filePathList = dir.entryInfoList();
     foreach (const QFileInfo &qmlFileInfo, filePathList) {
         loadDummyDataFile(qmlFileInfo);
     }
@@ -1287,7 +1290,7 @@ void NodeInstanceServer::loadDummyDataFiles(const QString& directory)
 void NodeInstanceServer::loadDummyDataContext(const QString& directory)
 {
     QDir dir(directory+"/context", "*.qml");
-    QList<QFileInfo> filePathList = dir.entryInfoList();
+    QFileInfoList filePathList = dir.entryInfoList();
     QString baseName = QFileInfo(fileUrl().toLocalFile()).completeBaseName();
     foreach (const QFileInfo &qmlFileInfo, filePathList) {
         if (qmlFileInfo.completeBaseName() == baseName)

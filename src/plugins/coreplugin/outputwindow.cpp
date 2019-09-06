@@ -33,6 +33,7 @@
 #include <utils/synchronousprocess.h>
 
 #include <QAction>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QTextBlock>
 
@@ -58,22 +59,28 @@ public:
 
     IContext *outputWindowContext = nullptr;
     Utils::OutputFormatter *formatter = nullptr;
+    QString settingsKey;
 
     bool enforceNewline = false;
     bool scrollToBottom = true;
     bool linksActive = true;
-    Qt::MouseButton mouseButtonPressed = Qt::NoButton;
-    bool m_zoomEnabled = false;
-    float m_originalFontSize = 0.;
+    bool zoomEnabled = false;
+    float originalFontSize = 0.;
+    bool originalReadOnly = false;
     int maxCharCount = Core::Constants::DEFAULT_MAX_CHAR_COUNT;
+    Qt::MouseButton mouseButtonPressed = Qt::NoButton;
     QTextCursor cursor;
+    QString filterText;
+    int lastFilteredBlockNumber = -1;
+    QPalette originalPalette;
+    OutputWindow::FilterModeFlags filterMode = OutputWindow::FilterModeFlag::Default;
 };
 
 } // namespace Internal
 
 /*******************/
 
-OutputWindow::OutputWindow(Context context, QWidget *parent)
+OutputWindow::OutputWindow(Context context, const QString &settingsKey, QWidget *parent)
     : QPlainTextEdit(parent)
     , d(new Internal::OutputWindowPrivate(document()))
 {
@@ -82,6 +89,8 @@ OutputWindow::OutputWindow(Context context, QWidget *parent)
     setFrameShape(QFrame::NoFrame);
     setMouseTracking(true);
     setUndoRedoEnabled(false);
+
+    d->settingsKey = settingsKey;
 
     d->outputWindowContext = new IContext;
     d->outputWindowContext->setContext(context);
@@ -108,11 +117,16 @@ OutputWindow::OutputWindow(Context context, QWidget *parent)
     connect(copyAction, &QAction::triggered, this, &QPlainTextEdit::copy);
     connect(pasteAction, &QAction::triggered, this, &QPlainTextEdit::paste);
     connect(selectAllAction, &QAction::triggered, this, &QPlainTextEdit::selectAll);
+    connect(this, &QPlainTextEdit::blockCountChanged, this, &OutputWindow::filterNewContent);
 
     connect(this, &QPlainTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
     connect(this, &QPlainTextEdit::redoAvailable, redoAction, &QAction::setEnabled);
     connect(this, &QPlainTextEdit::copyAvailable, cutAction, &QAction::setEnabled);  // OutputWindow never read-only
     connect(this, &QPlainTextEdit::copyAvailable, copyAction, &QAction::setEnabled);
+    connect(Core::ICore::instance(), &Core::ICore::saveSettingsRequested, this, [this] {
+        if (!d->settingsKey.isEmpty())
+            Core::ICore::settings()->setValue(d->settingsKey, fontZoom());
+    });
 
     undoAction->setEnabled(false);
     redoAction->setEnabled(false);
@@ -125,7 +139,12 @@ OutputWindow::OutputWindow(Context context, QWidget *parent)
             this, &OutputWindow::scrollToBottom);
     m_lastMessage.start();
 
-    d->m_originalFontSize = font().pointSizeF();
+    d->originalFontSize = font().pointSizeF();
+
+    if (!d->settingsKey.isEmpty()) {
+        float zoom = Core::ICore::settings()->value(d->settingsKey).toFloat();
+        setFontZoom(zoom);
+    }
 }
 
 OutputWindow::~OutputWindow()
@@ -210,9 +229,15 @@ void OutputWindow::showEvent(QShowEvent *e)
 
 void OutputWindow::wheelEvent(QWheelEvent *e)
 {
-    if (d->m_zoomEnabled) {
+    if (d->zoomEnabled) {
         if (e->modifiers() & Qt::ControlModifier) {
             float delta = e->angleDelta().y() / 120.f;
+
+            // Workaround for QTCREATORBUG-22721, remove when properly fixed in Qt
+            const float newSize = float(font().pointSizeF()) + delta;
+            if (delta < 0.f && newSize < 4.f)
+                return;
+
             zoomInF(delta);
             emit wheelZoom();
             return;
@@ -225,31 +250,104 @@ void OutputWindow::wheelEvent(QWheelEvent *e)
 void OutputWindow::setBaseFont(const QFont &newFont)
 {
     float zoom = fontZoom();
-    d->m_originalFontSize = newFont.pointSizeF();
+    d->originalFontSize = newFont.pointSizeF();
     QFont tmp = newFont;
-    float newZoom = qMax(d->m_originalFontSize + zoom, 4.0f);
+    float newZoom = qMax(d->originalFontSize + zoom, 4.0f);
     tmp.setPointSizeF(newZoom);
     setFont(tmp);
 }
 
 float OutputWindow::fontZoom() const
 {
-    return font().pointSizeF() - d->m_originalFontSize;
+    return font().pointSizeF() - d->originalFontSize;
 }
 
 void OutputWindow::setFontZoom(float zoom)
 {
     QFont f = font();
-    if (f.pointSizeF() == d->m_originalFontSize + zoom)
+    if (f.pointSizeF() == d->originalFontSize + zoom)
         return;
-    float newZoom = qMax(d->m_originalFontSize + zoom, 4.0f);
+    float newZoom = qMax(d->originalFontSize + zoom, 4.0f);
     f.setPointSizeF(newZoom);
     setFont(f);
 }
 
 void OutputWindow::setWheelZoomEnabled(bool enabled)
 {
-    d->m_zoomEnabled = enabled;
+    d->zoomEnabled = enabled;
+}
+
+void OutputWindow::updateFilterProperties(const QString &filterText,
+                                          Qt::CaseSensitivity caseSensitivity, bool isRegexp)
+{
+    FilterModeFlags flags;
+    flags.setFlag(FilterModeFlag::CaseSensitive, caseSensitivity == Qt::CaseSensitive)
+            .setFlag(FilterModeFlag::RegExp, isRegexp);
+    if (d->filterMode == flags && d->filterText == filterText)
+        return;
+    d->lastFilteredBlockNumber = -1;
+    if (d->filterText != filterText) {
+        const bool filterTextWasEmpty = d->filterText.isEmpty();
+        d->filterText = filterText;
+
+        // Update textedit's background color
+        if (filterText.isEmpty() && !filterTextWasEmpty) {
+            setPalette(d->originalPalette);
+            setReadOnly(d->originalReadOnly);
+        }
+        if (!filterText.isEmpty() && filterTextWasEmpty) {
+            d->originalReadOnly = isReadOnly();
+            setReadOnly(true);
+            const auto newBgColor = [this] {
+                const QColor currentColor = palette().color(QPalette::Base);
+                const int factor = 120;
+                return currentColor.value() < 128 ? currentColor.lighter(factor)
+                                                  : currentColor.darker(factor);
+            };
+            QPalette p = palette();
+            p.setColor(QPalette::Base, newBgColor());
+            setPalette(p);
+        }
+    }
+    d->filterMode = flags;
+    filterNewContent();
+}
+
+void OutputWindow::filterNewContent()
+{
+    bool atBottom = isScrollbarAtBottom();
+
+    QTextBlock lastBlock = document()->findBlockByNumber(d->lastFilteredBlockNumber);
+    if (!lastBlock.isValid())
+        lastBlock = document()->begin();
+
+    if (d->filterMode.testFlag(OutputWindow::FilterModeFlag::RegExp)) {
+        QRegularExpression regExp(d->filterText);
+        if (!d->filterMode.testFlag(OutputWindow::FilterModeFlag::CaseSensitive))
+            regExp.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+
+        for (; lastBlock != document()->end(); lastBlock = lastBlock.next())
+            lastBlock.setVisible(d->filterText.isEmpty()
+                                 || regExp.match(lastBlock.text()).hasMatch());
+    } else {
+        if (d->filterMode.testFlag(OutputWindow::FilterModeFlag::CaseSensitive)) {
+            for (; lastBlock != document()->end(); lastBlock = lastBlock.next())
+                lastBlock.setVisible(d->filterText.isEmpty()
+                                     || lastBlock.text().contains(d->filterText));
+        } else {
+            for (; lastBlock != document()->end(); lastBlock = lastBlock.next())
+                lastBlock.setVisible(d->filterText.isEmpty()
+                                     || lastBlock.text().toLower().contains(d->filterText.toLower()));
+        }
+    }
+
+    d->lastFilteredBlockNumber = document()->lastBlock().blockNumber();
+
+    // FIXME: Why on earth is this necessary? We should probably do something else instead...
+    setDocument(document());
+
+    if (atBottom)
+        scrollToBottom();
 }
 
 QString OutputWindow::doNewlineEnforcement(const QString &out)

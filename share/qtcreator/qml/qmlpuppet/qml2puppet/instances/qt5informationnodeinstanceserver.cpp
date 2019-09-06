@@ -166,13 +166,14 @@ void Qt5InformationNodeInstanceServer::collectItemChangesAndSendChangeCommands()
             sendTokenBack();
 
             if (!informationChangedInstanceSet.isEmpty())
-                nodeInstanceClient()->informationChanged(createAllInformationChangedCommand(informationChangedInstanceSet.toList()));
+                nodeInstanceClient()->informationChanged(
+                    createAllInformationChangedCommand(QtHelpers::toList(informationChangedInstanceSet)));
 
             if (!propertyChangedList.isEmpty())
                 nodeInstanceClient()->valuesChanged(createValuesChangedCommand(propertyChangedList));
 
             if (!m_parentChangedSet.isEmpty()) {
-                sendChildrenChangedCommand(m_parentChangedSet.toList());
+                sendChildrenChangedCommand(QtHelpers::toList(m_parentChangedSet));
                 m_parentChangedSet.clear();
             }
 

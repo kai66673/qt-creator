@@ -35,7 +35,6 @@
 using namespace LanguageServerProtocol;
 
 static Q_LOGGING_CATEGORY(LOGLSPCLIENTV, "qtc.languageclient.messages", QtWarningMsg);
-static Q_LOGGING_CATEGORY(LOGLSPCLIENTPARSE, "qtc.languageclient.parse", QtWarningMsg);
 
 namespace LanguageClient {
 
@@ -64,8 +63,8 @@ void BaseClientInterface::resetBuffer()
 void BaseClientInterface::parseData(const QByteArray &data)
 {
     const qint64 preWritePosition = m_buffer.pos();
-    qCDebug(LOGLSPCLIENTPARSE) << "parse buffer pos: " << preWritePosition;
-    qCDebug(LOGLSPCLIENTPARSE) << "  data: " << data;
+    qCDebug(parseLog) << "parse buffer pos: " << preWritePosition;
+    qCDebug(parseLog) << "  data: " << data;
     if (!m_buffer.atEnd())
         m_buffer.seek(preWritePosition + m_buffer.bytesAvailable());
     m_buffer.write(data);
@@ -73,9 +72,9 @@ void BaseClientInterface::parseData(const QByteArray &data)
     while (!m_buffer.atEnd()) {
         QString parseError;
         BaseMessage::parse(&m_buffer, parseError, m_currentMessage);
-        qCDebug(LOGLSPCLIENTPARSE) << "  complete: " << m_currentMessage.isComplete();
-        qCDebug(LOGLSPCLIENTPARSE) << "  length: " << m_currentMessage.contentLength;
-        qCDebug(LOGLSPCLIENTPARSE) << "  content: " << m_currentMessage.content;
+        qCDebug(parseLog) << "  complete: " << m_currentMessage.isComplete();
+        qCDebug(parseLog) << "  length: " << m_currentMessage.contentLength;
+        qCDebug(parseLog) << "  content: " << m_currentMessage.content;
         if (!parseError.isEmpty())
             emit error(parseError);
         if (!m_currentMessage.isComplete())
@@ -110,9 +109,9 @@ StdIOClientInterface::~StdIOClientInterface()
     Utils::SynchronousProcess::stopProcess(m_process);
 }
 
-bool StdIOClientInterface::needsRestart(const StdIOSettings *settings)
+bool StdIOClientInterface::needsRestart(const StdIOSettings *settings) const
 {
-    return m_executable != settings->m_executable || m_arguments != settings->m_arguments;
+    return m_executable != settings->m_executable || m_arguments != settings->arguments();
 }
 
 bool StdIOClientInterface::start()
@@ -144,7 +143,7 @@ void StdIOClientInterface::sendData(const QByteArray &data)
 void StdIOClientInterface::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (exitStatus == QProcess::CrashExit)
-        emit error(tr("Crashed with exit code %1: %2").arg(exitCode, m_process.error()));
+        emit error(tr("Crashed with exit code %1: %2").arg(exitCode).arg(m_process.errorString()));
     emit finished();
 }
 

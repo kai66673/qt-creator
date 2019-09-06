@@ -376,7 +376,7 @@ public:
 
         m_projectSelection = new QComboBox;
         m_projectSelection->setModel(&m_comboBoxModel);
-        connect(m_projectSelection, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated),
+        connect(m_projectSelection, QOverload<int>::of(&QComboBox::activated),
                 this, &ProjectWindowPrivate::projectSelected, Qt::QueuedConnection);
 
         SessionManager *sessionManager = SessionManager::instance();
@@ -546,7 +546,7 @@ public:
         QString importDir = QFileDialog::getExistingDirectory(ICore::mainWindow(),
                                                               ProjectWindow::tr("Import Directory"),
                                                               dir);
-        FileName path = FileName::fromString(importDir);
+        FilePath path = FilePath::fromString(importDir);
 
         Target *lastTarget = nullptr;
         BuildConfiguration *lastBc = nullptr;

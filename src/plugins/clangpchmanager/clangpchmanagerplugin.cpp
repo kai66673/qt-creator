@@ -31,6 +31,7 @@
 #include "qtcreatorprojectupdater.h"
 
 #include <filepathcaching.h>
+#include <projectpartsstorage.h>
 #include <refactoringdatabaseinitializer.h>
 #include <sqlitedatabase.h>
 
@@ -62,19 +63,30 @@ QString backendProcessPath()
 class ClangPchManagerPluginData
 {
 public:
-    Sqlite::Database database{Utils::PathString{Core::ICore::userResourcePath() + "/symbol-experimental-v1.db"}, 1000ms};
+    Sqlite::Database database{Utils::PathString{Core::ICore::cacheResourcePath()
+                                                + "/symbol-experimental-v1.db"},
+                              1000ms};
     ClangBackEnd::RefactoringDatabaseInitializer<Sqlite::Database> databaseInitializer{database};
     ClangBackEnd::FilePathCaching filePathCache{database};
-    ClangPchManager::ProgressManager progressManager{
-        [] (QFutureInterface<void> &promise) {
-            auto title = QCoreApplication::translate("ClangPchProgressManager", "Creating PCHs", "PCH stands for precompiled header");
-            Core::ProgressManager::addTask(promise.future(), title, "pch creation", nullptr);
+    ClangPchManager::ProgressManager pchCreationProgressManager{[](QFutureInterface<void> &promise) {
+        auto title = QCoreApplication::translate("ClangPchProgressManager",
+                                                 "Creating PCHs",
+                                                 "PCH stands for precompiled header");
+        Core::ProgressManager::addTask(promise.future(), title, "pch creation", nullptr);
     }};
-    PchManagerClient pchManagerClient{progressManager};
+    ClangPchManager::ProgressManager dependencyCreationProgressManager{
+        [](QFutureInterface<void> &promise) {
+            auto title = QCoreApplication::translate("ClangPchProgressManager",
+                                                     "Creating Dependencies");
+            Core::ProgressManager::addTask(promise.future(), title, "dependency creation", nullptr);
+        }};
+    ClangBackEnd::ProjectPartsStorage<Sqlite::Database> projectPartsStorage{database};
+    PchManagerClient pchManagerClient{pchCreationProgressManager, dependencyCreationProgressManager};
     PchManagerConnectionClient connectionClient{&pchManagerClient};
     QtCreatorProjectUpdater<PchManagerProjectUpdater> projectUpdate{connectionClient.serverProxy(),
                                                                     pchManagerClient,
-                                                                    filePathCache};
+                                                                    filePathCache,
+                                                                    projectPartsStorage};
 };
 
 std::unique_ptr<ClangPchManagerPluginData> ClangPchManagerPlugin::d;
@@ -84,6 +96,8 @@ ClangPchManagerPlugin::~ClangPchManagerPlugin() = default;
 
 bool ClangPchManagerPlugin::initialize(const QStringList & /*arguments*/, QString * /*errorMessage*/)
 {
+    QDir{}.mkpath(Core::ICore::cacheResourcePath());
+
     d = std::make_unique<ClangPchManagerPluginData>();
 
     startBackend();

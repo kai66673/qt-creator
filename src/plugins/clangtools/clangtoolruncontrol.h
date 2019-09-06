@@ -27,7 +27,7 @@
 
 #include "clangfileinfo.h"
 
-#include <projectexplorer/runconfiguration.h>
+#include <projectexplorer/runcontrol.h>
 #include <cpptools/projectinfo.h>
 #include <utils/environment.h>
 #include <utils/temporarydirectory.h>
@@ -104,6 +104,7 @@ private:
 
     QFutureInterface<void> m_progress;
     AnalyzeUnits m_unitsToProcess;
+    QSet<Utils::FilePath> m_projectFiles;
     QSet<ClangToolRunner *> m_runners;
     int m_initialFilesToProcessSize = 0;
     int m_filesAnalyzed = 0;

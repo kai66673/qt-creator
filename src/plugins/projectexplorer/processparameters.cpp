@@ -44,7 +44,9 @@
     \sa ProjectExplorer::AbstractProcessStep
 */
 
-using namespace ProjectExplorer;
+using namespace Utils;
+
+namespace ProjectExplorer {
 
 ProcessParameters::ProcessParameters() :
     m_macroExpander(nullptr),
@@ -52,11 +54,19 @@ ProcessParameters::ProcessParameters() :
 {
 }
 
+void ProcessParameters::setCommandLine(const CommandLine &cmdLine)
+{
+    m_command = cmdLine.executable();
+    m_arguments = cmdLine.arguments();
+    m_effectiveCommand.clear();
+    m_effectiveArguments.clear();
+}
+
 /*!
     Sets the executable to run.
 */
 
-void ProcessParameters::setCommand(const QString &cmd)
+void ProcessParameters::setCommand(const Utils::FilePath &cmd)
 {
     m_command = cmd;
     m_effectiveCommand.clear();
@@ -78,7 +88,7 @@ void ProcessParameters::setArguments(const QString &arguments)
     Should be called from init().
 */
 
-void ProcessParameters::setWorkingDirectory(const QString &workingDirectory)
+void ProcessParameters::setWorkingDirectory(const FilePath &workingDirectory)
 {
     m_workingDirectory = workingDirectory;
     m_effectiveWorkingDirectory.clear();
@@ -103,13 +113,14 @@ void ProcessParameters::setWorkingDirectory(const QString &workingDirectory)
     Gets the fully expanded working directory.
 */
 
-QString ProcessParameters::effectiveWorkingDirectory() const
+FilePath ProcessParameters::effectiveWorkingDirectory() const
 {
     if (m_effectiveWorkingDirectory.isEmpty()) {
-        QString wds = m_workingDirectory;
+        QString wds = m_workingDirectory.toString();
         if (m_macroExpander)
             wds = m_macroExpander->expand(wds);
-        m_effectiveWorkingDirectory = QDir::cleanPath(m_environment.expandVariables(wds));
+        m_effectiveWorkingDirectory
+                = FilePath::fromString(QDir::cleanPath(m_environment.expandVariables(wds)));
     }
     return m_effectiveWorkingDirectory;
 }
@@ -118,14 +129,15 @@ QString ProcessParameters::effectiveWorkingDirectory() const
     Gets the fully expanded command name to run.
 */
 
-QString ProcessParameters::effectiveCommand() const
+FilePath ProcessParameters::effectiveCommand() const
 {
     if (m_effectiveCommand.isEmpty()) {
-        QString cmd = m_command;
+        FilePath cmd = m_command;
         if (m_macroExpander)
             cmd = m_macroExpander->expand(cmd);
         m_effectiveCommand =
-                m_environment.searchInPath(cmd, {Utils::FileName::fromString(effectiveWorkingDirectory())}).toString();
+                m_environment.searchInPath(cmd.toString(),
+                    {effectiveWorkingDirectory()});
         m_commandMissing = m_effectiveCommand.isEmpty();
         if (m_commandMissing)
             m_effectiveCommand = cmd;
@@ -155,16 +167,16 @@ QString ProcessParameters::effectiveArguments() const
 
 QString ProcessParameters::prettyCommand() const
 {
-    QString cmd = m_command;
+    QString cmd = m_command.toString();
     if (m_macroExpander)
         cmd = m_macroExpander->expand(cmd);
-    return Utils::FileName::fromString(cmd).fileName();
+    return Utils::FilePath::fromString(cmd).fileName();
 }
 
 QString ProcessParameters::prettyArguments() const
 {
     QString margs = effectiveArguments();
-    QString workDir = effectiveWorkingDirectory();
+    QString workDir = effectiveWorkingDirectory().toString();
     Utils::QtcProcess::SplitError err;
     Utils::QtcProcess::Arguments args =
             Utils::QtcProcess::prepareArgs(margs, &err, Utils::HostOsInfo::hostOs(), &m_environment, &workDir);
@@ -187,7 +199,7 @@ QString ProcessParameters::summaryInWorkdir(const QString &displayName) const
             .arg(displayName,
                  Utils::QtcProcess::quoteArg(prettyCommand()),
                  prettyArguments(),
-                 QDir::toNativeSeparators(effectiveWorkingDirectory()));
+                 QDir::toNativeSeparators(effectiveWorkingDirectory().toString()));
 }
 
 void ProcessParameters::resolveAll()
@@ -196,3 +208,5 @@ void ProcessParameters::resolveAll()
     effectiveArguments();
     effectiveWorkingDirectory();
 }
+
+} // ProcessExplorer

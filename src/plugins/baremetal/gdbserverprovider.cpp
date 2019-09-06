@@ -23,22 +23,21 @@
 **
 ****************************************************************************/
 
+#include "baremetaldevice.h"
 #include "gdbserverprovider.h"
 #include "gdbserverprovidermanager.h"
-#include "baremetaldevice.h"
 
-#include <utils/qtcassert.h>
 #include <utils/environment.h>
+#include <utils/qtcassert.h>
 
-#include <QCoreApplication>
-#include <QUuid>
-
-#include <QFormLayout>
-#include <QLineEdit>
-#include <QLabel>
 #include <QComboBox>
-#include <QSpinBox>
+#include <QCoreApplication>
+#include <QFormLayout>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QSpinBox>
+#include <QUuid>
 
 namespace BareMetal {
 namespace Internal {
@@ -48,6 +47,7 @@ const char displayNameKeyC[] = "BareMetal.GdbServerProvider.DisplayName";
 const char startupModeKeyC[] = "BareMetal.GdbServerProvider.Mode";
 const char initCommandsKeyC[] = "BareMetal.GdbServerProvider.InitCommands";
 const char resetCommandsKeyC[] = "BareMetal.GdbServerProvider.ResetCommands";
+const char useExtendedRemoteKeyC[] = "BareMetal.GdbServerProvider.UseExtendedRemote";
 
 static QString createId(const QString &id)
 {
@@ -56,9 +56,10 @@ static QString createId(const QString &id)
     return newId;
 }
 
+// GdbServerProvider
+
 GdbServerProvider::GdbServerProvider(const QString &id)
     : m_id(createId(id))
-    , m_startupMode(NoStartup)
 {
 }
 
@@ -67,6 +68,7 @@ GdbServerProvider::GdbServerProvider(const GdbServerProvider &other)
     , m_startupMode(other.m_startupMode)
     , m_initCommands(other.m_initCommands)
     , m_resetCommands(other.m_resetCommands)
+    , m_useExtendedRemote(other.useExtendedRemote())
 {
     m_displayName = QCoreApplication::translate(
                 "BareMetal::GdbServerProvider", "Clone of %1")
@@ -121,6 +123,16 @@ void GdbServerProvider::setInitCommands(const QString &cmds)
     m_initCommands = cmds;
 }
 
+bool GdbServerProvider::useExtendedRemote() const
+{
+    return m_useExtendedRemote;
+}
+
+void GdbServerProvider::setUseExtendedRemote(bool useExtendedRemote)
+{
+    m_useExtendedRemote = useExtendedRemote;
+}
+
 QString GdbServerProvider::resetCommands() const
 {
     return m_resetCommands;
@@ -131,14 +143,9 @@ void GdbServerProvider::setResetCommands(const QString &cmds)
     m_resetCommands = cmds;
 }
 
-QString GdbServerProvider::executable() const
+Utils::CommandLine GdbServerProvider::command() const
 {
-    return QString();
-}
-
-QStringList GdbServerProvider::arguments() const
-{
-    return QStringList();
+    return {};
 }
 
 bool GdbServerProvider::operator==(const GdbServerProvider &other) const
@@ -153,7 +160,8 @@ bool GdbServerProvider::operator==(const GdbServerProvider &other) const
     return thisId == otherId
             && m_startupMode == other.m_startupMode
             && m_initCommands == other.m_initCommands
-            && m_resetCommands == other.m_resetCommands;
+            && m_resetCommands == other.m_resetCommands
+            && m_useExtendedRemote == other.m_useExtendedRemote;
 }
 
 QVariantMap GdbServerProvider::toMap() const
@@ -163,7 +171,8 @@ QVariantMap GdbServerProvider::toMap() const
         {QLatin1String(displayNameKeyC), m_displayName},
         {QLatin1String(startupModeKeyC), m_startupMode},
         {QLatin1String(initCommandsKeyC), m_initCommands},
-        {QLatin1String(resetCommandsKeyC), m_resetCommands}
+        {QLatin1String(resetCommandsKeyC), m_resetCommands},
+        {QLatin1String(useExtendedRemoteKeyC), m_useExtendedRemote},
     };
 }
 
@@ -201,8 +210,11 @@ bool GdbServerProvider::fromMap(const QVariantMap &data)
     m_startupMode = static_cast<StartupMode>(data.value(QLatin1String(startupModeKeyC)).toInt());
     m_initCommands = data.value(QLatin1String(initCommandsKeyC)).toString();
     m_resetCommands = data.value(QLatin1String(resetCommandsKeyC)).toString();
+    m_useExtendedRemote = data.value(QLatin1String(useExtendedRemoteKeyC)).toBool();
     return true;
 }
+
+// GdbServerProviderFactory
 
 QString GdbServerProviderFactory::id() const
 {
@@ -234,6 +246,8 @@ void GdbServerProviderFactory::idToMap(QVariantMap &data, const QString &id)
     data.insert(QLatin1String(idKeyC), id);
 }
 
+// GdbServerProviderConfigWidget
+
 GdbServerProviderConfigWidget::GdbServerProviderConfigWidget(
         GdbServerProvider *provider)
     : m_provider(provider)
@@ -258,7 +272,7 @@ GdbServerProviderConfigWidget::GdbServerProviderConfigWidget(
     connect(m_nameLineEdit, &QLineEdit::textChanged,
             this, &GdbServerProviderConfigWidget::dirty);
     connect(m_startupModeComboBox,
-            static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &GdbServerProviderConfigWidget::dirty);
 }
 
@@ -354,7 +368,7 @@ void GdbServerProviderConfigWidget::clearErrorMessage()
 
 void GdbServerProviderConfigWidget::setFromProvider()
 {
-    QSignalBlocker blocker(this);
+    const QSignalBlocker blocker(this);
     m_nameLineEdit->setText(m_provider->displayName());
     setStartupMode(m_provider->startupMode());
 }
@@ -373,6 +387,8 @@ QString GdbServerProviderConfigWidget::defaultResetCommandsTooltip()
                                        "The MCU should be halted after these commands.");
 }
 
+// HostWidget
+
 HostWidget::HostWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -383,20 +399,20 @@ HostWidget::HostWidget(QWidget *parent)
     m_portSpinBox->setRange(0, 65535);
     m_portSpinBox->setToolTip(tr("Enter TCP/IP port which will be listened by "
                                  "the GDB server provider."));
-    auto layout = new QHBoxLayout(this);
+    const auto layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_hostLineEdit);
     layout->addWidget(m_portSpinBox);
 
     connect(m_hostLineEdit, &QLineEdit::textChanged,
             this, &HostWidget::dataChanged);
-    connect(m_portSpinBox, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+    connect(m_portSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &HostWidget::dataChanged);
 }
 
 void HostWidget::setHost(const QString &host)
 {
-    QSignalBlocker blocker(this);
+    const QSignalBlocker blocker(this);
     m_hostLineEdit->setText(host);
 }
 
@@ -407,7 +423,7 @@ QString HostWidget::host() const
 
 void HostWidget::setPort(const quint16 &port)
 {
-    QSignalBlocker blocker(this);
+    const QSignalBlocker blocker(this);
     m_portSpinBox->setValue(port);
 }
 

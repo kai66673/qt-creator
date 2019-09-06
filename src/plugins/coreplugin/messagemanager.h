@@ -27,9 +27,13 @@
 
 #include "core_global.h"
 #include "ioutputpane.h"
-#include <QMetaType>
 
+#include <QMetaType>
 #include <QObject>
+
+QT_BEGIN_NAMESPACE
+class QFont;
+QT_END_NAMESPACE
 
 namespace Core {
 
@@ -54,6 +58,9 @@ public:
     Q_DECLARE_FLAGS(PrintToOutputPaneFlags, PrintToOutputPaneFlag)
 
     static void showOutputPane(Core::MessageManager::PrintToOutputPaneFlags flags = NoModeSwitch);
+
+    static void setFont(const QFont &font);
+    static void setWheelZoomEnabled(bool enabled);
 
 public slots:
     static void write(const QString &text,

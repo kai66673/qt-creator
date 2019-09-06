@@ -34,12 +34,10 @@
 #include <projectexplorer/deployconfiguration.h>
 #include <projectexplorer/devicesupport/devicemanager.h>
 #include <projectexplorer/kitinformation.h>
+#include <projectexplorer/project.h>
+#include <projectexplorer/projectnodes.h>
 #include <projectexplorer/runconfigurationaspects.h>
 #include <projectexplorer/target.h>
-
-#include <qmakeprojectmanager/qmakenodes.h>
-#include <qmakeprojectmanager/qmakeproject.h>
-#include <qmakeprojectmanager/qmakeprojectmanagerconstants.h>
 
 #include <qtsupport/qtoutputformatter.h>
 #include <qtsupport/qtkitinformation.h>
@@ -62,7 +60,6 @@
 #include <QWidget>
 
 using namespace ProjectExplorer;
-using namespace QmakeProjectManager;
 using namespace Utils;
 
 namespace Ios {
@@ -70,11 +67,16 @@ namespace Internal {
 
 static const QLatin1String deviceTypeKey("Ios.device_type");
 
+static QString displayName(const SimulatorInfo &device)
+{
+    return QString("%1, %2").arg(device.name).arg(device.runtimeName);
+}
+
 static IosDeviceType toIosDeviceType(const SimulatorInfo &device)
 {
     IosDeviceType iosDeviceType(IosDeviceType::SimulatedDevice,
                                 device.identifier,
-                                QString("%1, %2").arg(device.name).arg(device.runtimeName));
+                                displayName(device));
     return iosDeviceType;
 }
 
@@ -157,68 +159,56 @@ void IosRunConfiguration::updateEnabledState()
     return RunConfiguration::updateEnabledState();
 }
 
-bool IosRunConfiguration::canRunForNode(const Node *node) const
-{
-    return node->filePath().toString() == buildKey();
-}
-
 QString IosRunConfiguration::applicationName() const
 {
     Project *project = target()->project();
-    if (auto pro = dynamic_cast<const QmakeProFileNode *>(project->findNodeForBuildKey(buildKey()))) {
-        TargetInformation ti = pro->targetInformation();
-        if (ti.valid)
-            return ti.target;
-    }
+    if (ProjectNode *node = project->findNodeForBuildKey(buildKey()))
+        return node->data(Constants::IosTarget).toString();
+
     return QString();
 }
 
-FileName IosRunConfiguration::bundleDirectory() const
+FilePath IosRunConfiguration::bundleDirectory() const
 {
-    FileName res;
     Core::Id devType = DeviceTypeKitAspect::deviceTypeId(target()->kit());
     bool isDevice = (devType == Constants::IOS_DEVICE_TYPE);
     if (!isDevice && devType != Constants::IOS_SIMULATOR_TYPE) {
         qCWarning(iosLog) << "unexpected device type in bundleDirForTarget: " << devType.toString();
-        return res;
+        return {};
     }
+    FilePath res;
     if (BuildConfiguration *bc = target()->activeBuildConfiguration()) {
         Project *project = target()->project();
-        auto pro = dynamic_cast<const QmakeProFileNode *>(project->findNodeForBuildKey(buildKey()));
-        if (pro) {
-            TargetInformation ti = pro->targetInformation();
-            if (ti.valid)
-                res = ti.buildDir;
-        }
+        if (ProjectNode *node = project->findNodeForBuildKey(buildKey()))
+            res = FilePath::fromString(node->data(Constants::IosBuildDir).toString());
         if (res.isEmpty())
             res = bc->buildDirectory();
         switch (bc->buildType()) {
         case BuildConfiguration::Debug :
         case BuildConfiguration::Unknown :
             if (isDevice)
-                res.appendPath(QLatin1String("Debug-iphoneos"));
+                res = res.pathAppended("Debug-iphoneos");
             else
-                res.appendPath(QLatin1String("Debug-iphonesimulator"));
+                res = res.pathAppended("Debug-iphonesimulator");
             break;
         case BuildConfiguration::Profile :
         case BuildConfiguration::Release :
             if (isDevice)
-                res.appendPath(QLatin1String("Release-iphoneos"));
+                res = res.pathAppended("Release-iphoneos");
             else
-                res.appendPath(QLatin1String("Release-iphonesimulator"));
+                res = res.pathAppended("Release-iphonesimulator");
             break;
         default:
             qCWarning(iosLog) << "IosBuildStep had an unknown buildType "
                      << target()->activeBuildConfiguration()->buildType();
         }
     }
-    res.appendPath(applicationName() + QLatin1String(".app"));
-    return res;
+    return res.pathAppended(applicationName() + ".app");
 }
 
-FileName IosRunConfiguration::localExecutable() const
+FilePath IosRunConfiguration::localExecutable() const
 {
-    return bundleDirectory().appendPath(applicationName());
+    return bundleDirectory().pathAppended(applicationName());
 }
 
 void IosDeviceTypeAspect::fromMap(const QVariantMap &map)
@@ -347,7 +337,7 @@ void IosDeviceTypeAspect::addToConfigurationLayout(QFormLayout *layout)
 
     updateValues();
 
-    connect(m_deviceTypeComboBox, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_deviceTypeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &IosDeviceTypeAspect::setDeviceTypeIndex);
 }
 
@@ -366,8 +356,7 @@ void IosDeviceTypeAspect::updateValues()
     m_deviceTypeComboBox->setVisible(showDeviceSelector);
     if (showDeviceSelector && m_deviceTypeModel.rowCount() == 0) {
         foreach (const SimulatorInfo &device, SimulatorControl::availableSimulators()) {
-            QStandardItem *item = new QStandardItem(QString("%1, %2").arg(device.name)
-                                                    .arg(device.runtimeName));
+            QStandardItem *item = new QStandardItem(Internal::displayName(device));
             QVariant v;
             v.setValue(device);
             item->setData(v);
@@ -405,7 +394,6 @@ IosRunConfigurationFactory::IosRunConfigurationFactory()
     registerRunConfiguration<IosRunConfiguration>("Qt4ProjectManager.IosRunConfiguration:");
     addSupportedTargetDeviceType(Constants::IOS_DEVICE_TYPE);
     addSupportedTargetDeviceType(Constants::IOS_SIMULATOR_TYPE);
-    addSupportedProjectType(QmakeProjectManager::Constants::QMAKEPROJECT_ID);
 }
 
 } // namespace Internal

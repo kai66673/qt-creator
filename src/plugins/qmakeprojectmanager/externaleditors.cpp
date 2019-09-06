@@ -168,7 +168,7 @@ bool ExternalQtEditor::getEditorLaunchData(const QString &fileName,
     // As fallback check PATH
     data->workingDirectory.clear();
     QVector<QtSupport::BaseQtVersion *> qtVersionsToCheck; // deduplicated after being filled
-    if (const Project *project = SessionManager::projectForFile(Utils::FileName::fromString(fileName))) {
+    if (const Project *project = SessionManager::projectForFile(Utils::FilePath::fromString(fileName))) {
         data->workingDirectory = project->projectDirectory().toString();
         // active kit
         if (const Target *target = project->activeTarget()) {
@@ -288,8 +288,7 @@ bool DesignerExternalEditor::startEditor(const QString &fileName, QString *error
         m_processCache.insert(binary, socket);
         auto mapSlot = [this, binary] { processTerminated(binary); };
         connect(socket, &QAbstractSocket::disconnected, this, mapSlot);
-        connect(socket,
-                static_cast<void (QAbstractSocket::*)(QAbstractSocket::SocketError)>(&QAbstractSocket::error),
+        connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
                 this, mapSlot);
     }
     return true;

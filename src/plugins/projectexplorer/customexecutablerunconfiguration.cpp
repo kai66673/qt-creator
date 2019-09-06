@@ -31,7 +31,7 @@
 #include "environmentaspect.h"
 #include "localenvironmentaspect.h"
 #include "project.h"
-#include "runconfigurationaspects.h"
+#include "runcontrol.h"
 #include "target.h"
 
 #include <coreplugin/icore.h>
@@ -94,8 +94,7 @@ private:
 
 CustomExecutableDialog::CustomExecutableDialog(RunConfiguration *rc)
     : QDialog(Core::ICore::dialogParent()),
-      m_rc(rc),
-      m_workingDirectory(rc->aspect<EnvironmentAspect>())
+      m_rc(rc)
 {
     auto vbox = new QVBoxLayout(this);
     vbox->addWidget(new QLabel(tr("Could not find the executable, please specify one.")));
@@ -146,7 +145,7 @@ CustomExecutableDialog::CustomExecutableDialog(RunConfiguration *rc)
 
 void CustomExecutableDialog::accept()
 {
-    auto executable = FileName::fromString(m_executableChooser->path());
+    auto executable = FilePath::fromString(m_executableChooser->path());
     m_rc->aspect<ExecutableAspect>()->setExecutable(executable);
     copyAspect(&m_arguments, m_rc->aspect<ArgumentsAspect>());
     copyAspect(&m_workingDirectory, m_rc->aspect<WorkingDirectoryAspect>());
@@ -184,8 +183,7 @@ CustomExecutableRunConfiguration::CustomExecutableRunConfiguration(Target *targe
 CustomExecutableRunConfiguration::CustomExecutableRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto envAspect = addAspect<LocalEnvironmentAspect>
-            (target, LocalEnvironmentAspect::BaseEnvironmentModifier());
+    auto envAspect = addAspect<LocalEnvironmentAspect>(target);
 
     auto exeAspect = addAspect<ExecutableAspect>();
     exeAspect->setSettingsKey("ProjectExplorer.CustomExecutableRunConfiguration.Executable");
@@ -195,7 +193,7 @@ CustomExecutableRunConfiguration::CustomExecutableRunConfiguration(Target *targe
     exeAspect->setEnvironment(envAspect->environment());
 
     addAspect<ArgumentsAspect>();
-    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<WorkingDirectoryAspect>();
     addAspect<TerminalAspect>();
 
     connect(envAspect, &EnvironmentAspect::environmentChanged,
@@ -253,11 +251,11 @@ bool CustomExecutableRunConfiguration::isConfigured() const
 
 Runnable CustomExecutableRunConfiguration::runnable() const
 {
-    FileName workingDirectory =
+    FilePath workingDirectory =
             aspect<WorkingDirectoryAspect>()->workingDirectory(macroExpander());
 
     Runnable r;
-    r.executable = aspect<ExecutableAspect>()->executable().toString();
+    r.executable = executable().toString();
     r.commandLineArguments = aspect<ArgumentsAspect>()->arguments(macroExpander());
     r.environment = aspect<EnvironmentAspect>()->environment();
     r.workingDirectory = workingDirectory.toString();
@@ -285,8 +283,6 @@ CustomExecutableRunConfigurationFactory::CustomExecutableRunConfigurationFactory
     FixedRunConfigurationFactory(CustomExecutableRunConfiguration::tr("Custom Executable"))
 {
     registerRunConfiguration<CustomExecutableRunConfiguration>(CUSTOM_EXECUTABLE_ID);
-
-    addRunWorkerFactory<SimpleTargetRunner>(ProjectExplorer::Constants::NORMAL_RUN_MODE);
 }
 
 } // namespace ProjectExplorer

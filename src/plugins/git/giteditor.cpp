@@ -26,6 +26,7 @@
 #include "giteditor.h"
 
 #include "annotationhighlighter.h"
+#include "branchadddialog.h"
 #include "gitplugin.h"
 #include "gitclient.h"
 #include "gitsettings.h"
@@ -290,34 +291,46 @@ bool GitEditorWidget::isValidRevision(const QString &revision) const
 void GitEditorWidget::addChangeActions(QMenu *menu, const QString &change)
 {
     m_currentChange = change;
-    if (contentType() != OtherContent) {
-        connect(menu->addAction(tr("Cherr&y-Pick Change %1").arg(change)), &QAction::triggered,
-                this, [this]() {
-            GitPlugin::client()->synchronousCherryPick(sourceWorkingDirectory(), m_currentChange);
-        });
-        connect(menu->addAction(tr("Re&vert Change %1").arg(change)), &QAction::triggered,
-                this, [this]() {
-            GitPlugin::client()->synchronousRevert(sourceWorkingDirectory(), m_currentChange);
-        });
-        connect(menu->addAction(tr("C&heckout Change %1").arg(change)), &QAction::triggered,
-                this, [this]() {
-            GitPlugin::client()->checkout(sourceWorkingDirectory(), m_currentChange);
-        });
-        connect(menu->addAction(tr("&Log for Change %1").arg(change)), &QAction::triggered,
-                this, [this]() {
-            GitPlugin::client()->log(
-                        sourceWorkingDirectory(), QString(), false, {m_currentChange});
-        });
+    if (contentType() == OtherContent)
+        return;
 
-        QMenu *resetMenu = new QMenu(tr("&Reset to Change %1").arg(change), menu);
-        connect(resetMenu->addAction(tr("&Hard")), &QAction::triggered,
-                this, [this]() { resetChange("hard"); });
-        connect(resetMenu->addAction(tr("&Mixed")), &QAction::triggered,
-                this, [this]() { resetChange("mixed"); });
-        connect(resetMenu->addAction(tr("&Soft")), &QAction::triggered,
-                this, [this]() { resetChange("soft"); });
-        menu->addMenu(resetMenu);
-    }
+    menu->addAction(tr("Cherr&y-Pick Change %1").arg(change), this, [this] {
+        GitPlugin::client()->synchronousCherryPick(sourceWorkingDirectory(), m_currentChange);
+    });
+    menu->addAction(tr("Re&vert Change %1").arg(change), this, [this] {
+        GitPlugin::client()->synchronousRevert(sourceWorkingDirectory(), m_currentChange);
+    });
+    menu->addAction(tr("C&heckout Change %1").arg(change), this, [this] {
+        GitPlugin::client()->checkout(sourceWorkingDirectory(), m_currentChange);
+    });
+    menu->addAction(tr("&Log for Change %1").arg(change), this, [this] {
+        GitPlugin::client()->log(sourceWorkingDirectory(), QString(), false, {m_currentChange});
+    });
+    menu->addAction(tr("Add &Tag for Change %1...").arg(change), this, [this] {
+        QString output;
+        QString errorMessage;
+        GitPlugin::client()->synchronousTagCmd(sourceWorkingDirectory(), QStringList(),
+                                               &output, &errorMessage);
+
+        const QStringList tags = output.split('\n');
+        BranchAddDialog dialog(tags, BranchAddDialog::Type::AddTag, Core::ICore::dialogParent());
+
+        if (dialog.exec() == QDialog::Rejected)
+            return;
+
+        GitPlugin::client()->synchronousTagCmd(sourceWorkingDirectory(),
+                                               {dialog.branchName(), m_currentChange},
+                                               &output, &errorMessage);
+        VcsOutputWindow::append(output);
+        if (!errorMessage.isEmpty())
+            VcsOutputWindow::append(errorMessage, VcsOutputWindow::MessageStyle::Error);
+    });
+
+    auto resetMenu = new QMenu(tr("&Reset to Change %1").arg(change), menu);
+    resetMenu->addAction(tr("&Hard"), this, [this] { resetChange("hard"); });
+    resetMenu->addAction(tr("&Mixed"), this, [this] { resetChange("mixed"); });
+    resetMenu->addAction(tr("&Soft"), this, [this] { resetChange("soft"); });
+    menu->addMenu(resetMenu);
 }
 
 QString GitEditorWidget::revisionSubject(const QTextBlock &inBlock) const
@@ -355,7 +368,7 @@ QString GitEditorWidget::fileNameForLine(int line) const
 
 QString GitEditorWidget::sourceWorkingDirectory() const
 {
-    Utils::FileName path = Utils::FileName::fromString(source());
+    Utils::FilePath path = Utils::FilePath::fromString(source());
     if (!path.isEmpty() && !path.toFileInfo().isDir())
         path = path.parentDir();
     while (!path.isEmpty() && !path.exists())

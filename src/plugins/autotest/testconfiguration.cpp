@@ -53,9 +53,8 @@ TestConfiguration::~TestConfiguration()
     m_testCases.clear();
 }
 
-static bool isLocal(RunConfiguration *runConfiguration)
+static bool isLocal(Target *target)
 {
-    Target *target = runConfiguration ? runConfiguration->target() : nullptr;
     Kit *kit = target ? target->kit() : nullptr;
     return DeviceTypeKitAspect::deviceTypeId(kit) == ProjectExplorer::Constants::DESKTOP_DEVICE_TYPE;
 }
@@ -141,7 +140,7 @@ void TestConfiguration::completeTestInformation(TestRunMode runMode)
     const QSet<QString> buildSystemTargets = m_buildTargets;
     qCDebug(LOG) << "BuildSystemTargets\n    " << buildSystemTargets;
     BuildTargetInfo targetInfo
-            = Utils::findOrDefault(target->applicationTargets().list,
+            = Utils::findOrDefault(target->applicationTargets(),
                                    [&buildSystemTargets] (const BuildTargetInfo &bti) {
         return buildSystemTargets.contains(bti.buildKey);
     });
@@ -149,7 +148,7 @@ void TestConfiguration::completeTestInformation(TestRunMode runMode)
     // there would be no BuildTargetInfo that could match
     if (targetInfo.targetFilePath.isEmpty()) {
         qCDebug(LOG) << "BuildTargetInfos";
-        const QList<BuildTargetInfo> buildTargets = target->applicationTargets().list;
+        const QList<BuildTargetInfo> buildTargets = target->applicationTargets();
         // if there is only one build target just use it (but be honest that we're deducing)
         if (buildTargets.size() == 1) {
             targetInfo = buildTargets.first();
@@ -183,7 +182,7 @@ void TestConfiguration::completeTestInformation(TestRunMode runMode)
     qCDebug(LOG) << "Iterating run configurations";
     for (RunConfiguration *runConfig : target->runConfigurations()) {
         qCDebug(LOG) << "RunConfiguration" << runConfig->id();
-        if (!isLocal(runConfig)) { // TODO add device support
+        if (!isLocal(target)) { // TODO add device support
             qCDebug(LOG) << " Skipped as not being local";
             continue;
         }
@@ -204,7 +203,7 @@ void TestConfiguration::completeTestInformation(TestRunMode runMode)
             m_runnable.executable = currentExecutable;
             m_displayName = runConfig->displayName();
             if (runMode == TestRunMode::Debug || runMode == TestRunMode::DebugWithoutDeploy)
-                m_runConfig = new TestRunConfiguration(runConfig->target(), this);
+                m_runConfig = new TestRunConfiguration(target, this);
             break;
         }
     }
@@ -219,7 +218,7 @@ void TestConfiguration::completeTestInformation(TestRunMode runMode)
         qCDebug(LOG) << "   Fallback";
         // we failed to find a valid runconfiguration - but we've got the executable already
         if (auto rc = target->activeRunConfiguration()) {
-            if (isLocal(rc)) { // FIXME for now only Desktop support
+            if (isLocal(target)) { // FIXME for now only Desktop support
                 const Runnable runnable = rc->runnable();
                 m_runnable.environment = runnable.environment;
                 m_deducedConfiguration = true;

@@ -42,10 +42,10 @@ public:
     bool isValid() const override;
     void addToEnvironment(Utils::Environment &env) const override;
 
-    Utils::FileName suggestedDebugger() const override;
-    Utils::FileName suggestedGdbServer() const;
-    Utils::FileNameList suggestedMkspecList() const override;
-    QString makeCommand(const Utils::Environment &environment) const override;
+    Utils::FilePath suggestedDebugger() const override;
+    Utils::FilePath suggestedGdbServer() const;
+    QStringList suggestedMkspecList() const override;
+    Utils::FilePath makeCommand(const Utils::Environment &environment) const override;
     bool fromMap(const QVariantMap &data) override;
 
 protected:
@@ -53,7 +53,6 @@ protected:
 
 private:
     explicit AndroidToolChain();
-    AndroidToolChain(const QString &target, Core::Id languageId);
 
     friend class AndroidToolChainFactory;
 };
@@ -64,17 +63,14 @@ class AndroidToolChainFactory : public ProjectExplorer::ToolChainFactory
 
 public:
     AndroidToolChainFactory();
-    QSet<Core::Id> supportedLanguages() const override;
 
     ToolChainList autoDetect(CToolChainList &alreadyKnown) override;
-    bool canRestore(const QVariantMap &data) override;
-    ProjectExplorer::ToolChain *restore(const QVariantMap &data) override;
 
     class AndroidToolChainInformation
     {
     public:
         Core::Id language;
-        Utils::FileName compilerCommand;
+        Utils::FilePath compilerCommand;
         ProjectExplorer::Abi abi;
         QString version;
     };

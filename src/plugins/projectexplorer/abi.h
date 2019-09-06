@@ -34,13 +34,16 @@
 
 #include <vector>
 
-namespace Utils { class FileName; }
+namespace Utils { class FilePath; }
 
 namespace ProjectExplorer {
 
 // --------------------------------------------------------------------------
 // ABI (documentation inside)
 // --------------------------------------------------------------------------
+
+class Abi;
+using Abis = QVector<Abi>;
 
 class PROJECTEXPLORER_EXPORT Abi
 {
@@ -54,6 +57,7 @@ public:
         ShArchitecture,
         AvrArchitecture,
         XtensaArchitecture,
+        Mcs51Architecture,
         UnknownArchitecture
     };
 
@@ -108,6 +112,8 @@ public:
         MachOFormat,
         PEFormat,
         RuntimeQmlFormat,
+        UbrofFormat,
+        OmfFormat,
         UnknownFormat
     };
 
@@ -154,7 +160,7 @@ public:
 
     static Abi fromString(const QString &abiString);
     static Abi hostAbi();
-    static QList<Abi> abisOfBinary(const Utils::FileName &path);
+    static Abis abisOfBinary(const Utils::FilePath &path);
 
 
 private:

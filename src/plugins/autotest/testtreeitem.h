@@ -42,7 +42,7 @@ namespace {
 }
 
 namespace CppTools { class CppModelManager; }
-namespace Utils { class FileName; }
+namespace Utils { class FilePath; }
 
 namespace Autotest {
 namespace Internal {
@@ -59,8 +59,9 @@ public:
     {
         Root,
         GroupNode,
+        TestSuite,
         TestCase,
-        TestFunctionOrSet,
+        TestFunction,
         TestDataTag,
         TestDataFunction,
         TestSpecialFunction
@@ -78,7 +79,7 @@ public:
     virtual QVariant data(int column, int role) const override;
     virtual bool setData(int column, const QVariant &data, int role) override;
     virtual Qt::ItemFlags flags(int column) const override;
-    bool modifyTestCaseContent(const TestParseResult *result);
+    bool modifyTestCaseOrSuiteContent(const TestParseResult *result);
     bool modifyTestFunctionContent(const TestParseResult *result);
     bool modifyDataTagContent(const TestParseResult *result);
     bool modifyLineAndColumn(const TestParseResult *result);
@@ -115,7 +116,7 @@ public:
     TestConfiguration *asConfiguration(TestRunMode mode) const;
     virtual QList<TestConfiguration *> getAllTestConfigurations() const;
     virtual QList<TestConfiguration *> getSelectedTestConfigurations() const;
-    virtual QList<TestConfiguration *> getTestConfigurationsForFile(const Utils::FileName &fileName) const;
+    virtual QList<TestConfiguration *> getTestConfigurationsForFile(const Utils::FilePath &fileName) const;
     virtual bool lessThan(const TestTreeItem *other, SortMode mode) const;
     virtual TestTreeItem *find(const TestParseResult *result) = 0;
     virtual TestTreeItem *findChild(const TestTreeItem *other) = 0;
@@ -126,6 +127,8 @@ public:
     // based on (internal) filters this will be used to filter out sub items (and remove them)
     // returns a copy of the item that contains the filtered out children or nullptr
     virtual TestTreeItem *applyFilters() { return nullptr; }
+    // decide whether an item should still be added to the treemodel
+    virtual bool shouldBeAddedAfterFiltering() const { return true; }
     virtual QSet<QString> internalTargets() const;
 protected:
     void copyBasicDataFrom(const TestTreeItem *other);

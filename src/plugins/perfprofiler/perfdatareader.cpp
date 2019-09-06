@@ -34,12 +34,15 @@
 #include <coreplugin/messagemanager.h>
 #include <coreplugin/progressmanager/futureprogress.h>
 #include <coreplugin/progressmanager/progressmanager.h>
+
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/project.h>
-#include <projectexplorer/runconfiguration.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/session.h>
+#include <projectexplorer/target.h>
 #include <projectexplorer/toolchain.h>
+
 #include <qtsupport/qtkitinformation.h>
 #include <utils/qtcassert.h>
 
@@ -64,7 +67,7 @@ PerfDataReader::PerfDataReader(QObject *parent) :
     m_remoteProcessStart(std::numeric_limits<qint64>::max()),
     m_lastRemoteTimestamp(0)
 {
-    connect(&m_input, static_cast<void (QProcess::*)(int)>(&QProcess::finished),
+    connect(&m_input, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this](int exitCode) {
         emit processFinished();
         // process any remaining input before signaling finished()
@@ -75,8 +78,8 @@ PerfDataReader::PerfDataReader(QObject *parent) :
         }
         if (exitCode != 0) {
             QMessageBox::warning(Core::ICore::mainWindow(),
-                                 tr("Perf data parser failed"),
-                                 tr("The perf data parser failed to process all the samples. "
+                                 tr("Perf Data Parser Failed"),
+                                 tr("The Perf data parser failed to process all the samples. "
                                     "Your trace is incomplete. The exit code was %1.")
                                  .arg(exitCode));
         }
@@ -101,17 +104,17 @@ PerfDataReader::PerfDataReader(QObject *parent) :
     connect(&m_input, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){
         switch (e) {
         case QProcess::FailedToStart:
-            emit processFailed(tr("perfparser failed to start"));
+            emit processFailed(tr("perfparser failed to start."));
             QMessageBox::warning(Core::ICore::mainWindow(),
-                                 tr("Perf data parser failed"),
-                                 tr("Could not start the 'perfparser' utility program. "
-                                    "Make sure a working perf parser is available at the location "
+                                 tr("Perf Data Parser Failed"),
+                                 tr("Could not start the perfparser utility program. "
+                                    "Make sure a working Perf parser is available at the location "
                                     "given by the PERFPROFILER_PARSER_FILEPATH environment "
                                     "variable."));
             break;
         case QProcess::Crashed:
             QMessageBox::warning(Core::ICore::mainWindow(),
-                                 tr("Perf data parser crashed"),
+                                 tr("Perf Data Parser Crashed"),
                                  tr("This is a bug. Please report it."));
             break;
         case QProcess::ReadError:
@@ -142,8 +145,8 @@ PerfDataReader::~PerfDataReader()
     qDeleteAll(m_buffer);
 }
 
-void PerfDataReader::load(const QString &filePath, const QString &executableDirPath,
-                          ProjectExplorer::Kit *kit)
+void PerfDataReader::loadFromFile(const QString &filePath, const QString &executableDirPath,
+                                  ProjectExplorer::Kit *kit)
 {
     createParser(collectArguments(executableDirPath, kit) << QLatin1String("--input") << filePath);
     m_remoteProcessStart = 0; // Don't try to guess the timestamps
@@ -346,8 +349,8 @@ void PerfDataReader::writeChunk()
                 m_input.kill();
                 emit finished();
                 QMessageBox::warning(Core::ICore::mainWindow(),
-                                     tr("Cannot send data to Perf data parser"),
-                                     tr("The perf data parser doesn't accept further input. "
+                                     tr("Cannot Send Data to Perf Data Parser"),
+                                     tr("The Perf data parser does not accept further input. "
                                         "Your trace is incomplete."));
             }
         }
@@ -392,11 +395,11 @@ bool PerfDataReader::feedParser(const QByteArray &input)
     return true;
 }
 
-QStringList PerfDataReader::findTargetArguments(const ProjectExplorer::RunConfiguration *rc) const
+QStringList PerfDataReader::findTargetArguments(const ProjectExplorer::RunControl *runControl) const
 {
-    ProjectExplorer::Kit *kit = rc->target()->kit();
+    ProjectExplorer::Kit *kit = runControl->kit();
     QTC_ASSERT(kit, return QStringList());
-    ProjectExplorer::BuildConfiguration *buildConfig = rc->target()->activeBuildConfiguration();
+    ProjectExplorer::BuildConfiguration *buildConfig = runControl->target()->activeBuildConfiguration();
     QString buildDir = buildConfig ? buildConfig->buildDirectory().toString() : QString();
     return collectArguments(buildDir, kit);
 }

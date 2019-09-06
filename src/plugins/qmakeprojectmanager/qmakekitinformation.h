@@ -37,8 +37,7 @@ class QmakeKitAspect : public ProjectExplorer::KitAspect
 public:
     QmakeKitAspect();
 
-    QVariant defaultValue(const ProjectExplorer::Kit *k) const override;
-    QList<ProjectExplorer::Task> validate(const ProjectExplorer::Kit *k) const override;
+    ProjectExplorer::Tasks validate(const ProjectExplorer::Kit *k) const override;
     void setup(ProjectExplorer::Kit *k) override;
 
     ProjectExplorer::KitAspectWidget *createConfigWidget(ProjectExplorer::Kit *k) const override;
@@ -48,10 +47,11 @@ public:
     void addToMacroExpander(ProjectExplorer::Kit *kit, Utils::MacroExpander *expander) const override;
 
     static Core::Id id();
-    static void setMkspec(ProjectExplorer::Kit *k, const Utils::FileName &fn);
-    static Utils::FileName mkspec(const ProjectExplorer::Kit *k);
-    static Utils::FileName effectiveMkspec(const ProjectExplorer::Kit *k);
-    static Utils::FileName defaultMkspec(const ProjectExplorer::Kit *k);
+    enum class MkspecSource { User, Code };
+    static void setMkspec(ProjectExplorer::Kit *k, const QString &mkspec, MkspecSource source);
+    static QString mkspec(const ProjectExplorer::Kit *k);
+    static QString effectiveMkspec(const ProjectExplorer::Kit *k);
+    static QString defaultMkspec(const ProjectExplorer::Kit *k);
 };
 
 } // namespace Internal

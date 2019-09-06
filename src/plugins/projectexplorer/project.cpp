@@ -30,6 +30,7 @@
 #include "deployconfiguration.h"
 #include "editorconfiguration.h"
 #include "kit.h"
+#include "makestep.h"
 #include "projectexplorer.h"
 #include "projectnodes.h"
 #include "target.h"
@@ -50,6 +51,8 @@
 #include <utils/pointeralgorithm.h>
 #include <utils/macroexpander.h>
 #include <utils/qtcassert.h>
+
+#include <QFileDialog>
 
 #include <limits>
 #include <memory>
@@ -112,7 +115,7 @@ const Project::NodeMatcher Project::GeneratedFiles = [](const Node *node) {
 // ProjectDocument:
 // --------------------------------------------------------------------
 
-ProjectDocument::ProjectDocument(const QString &mimeType, const Utils::FileName &fileName,
+ProjectDocument::ProjectDocument(const QString &mimeType, const Utils::FilePath &fileName,
                                  const ProjectDocument::ProjectCallback &callback) :
     m_callback(callback)
 {
@@ -149,7 +152,7 @@ bool ProjectDocument::reload(QString *errorString, Core::IDocument::ReloadFlag f
 class ProjectPrivate
 {
 public:
-    ProjectPrivate(const QString &mimeType, const Utils::FileName &fileName,
+    ProjectPrivate(const QString &mimeType, const Utils::FilePath &fileName,
                    const ProjectDocument::ProjectCallback &callback)
     {
         m_document = std::make_unique<ProjectDocument>(mimeType, fileName, callback);
@@ -177,6 +180,7 @@ public:
     Kit::Predicate m_preferredKitPredicate;
 
     Utils::MacroExpander m_macroExpander;
+    Utils::FilePath m_rootProjectDirectory;
     mutable QVector<const Node *> m_sortedNodeList;
 };
 
@@ -186,7 +190,7 @@ ProjectPrivate::~ProjectPrivate()
     std::unique_ptr<ProjectNode> oldNode = std::move(m_rootProjectNode);
 }
 
-Project::Project(const QString &mimeType, const Utils::FileName &fileName,
+Project::Project(const QString &mimeType, const Utils::FilePath &fileName,
                  const ProjectDocument::ProjectCallback &callback) :
     d(new ProjectPrivate(mimeType, fileName, callback))
 {
@@ -229,9 +233,9 @@ Core::IDocument *Project::document() const
     return d->m_document.get();
 }
 
-Utils::FileName Project::projectFilePath() const
+Utils::FilePath Project::projectFilePath() const
 {
-    QTC_ASSERT(document(), return Utils::FileName());
+    QTC_ASSERT(document(), return Utils::FilePath());
     return document()->filePath();
 }
 
@@ -327,9 +331,9 @@ Target *Project::target(Kit *k) const
     return Utils::findOrDefault(d->m_targets, Utils::equal(&Target::kit, k));
 }
 
-QList<Task> Project::projectIssues(const Kit *k) const
+Tasks Project::projectIssues(const Kit *k) const
 {
-    QList<Task> result;
+    Tasks result;
     if (!k->isValid())
         result.append(createProjectTask(Task::TaskType::Error, tr("Kit is not valid.")));
     return {};
@@ -580,19 +584,19 @@ Project::RestoreResult Project::restoreSettings(QString *errorMessage)
 /*!
  * Returns a sorted list of all files matching the predicate \a filter.
  */
-Utils::FileNameList Project::files(const Project::NodeMatcher &filter) const
+Utils::FilePathList Project::files(const Project::NodeMatcher &filter) const
 {
-    Utils::FileNameList result;
+    Utils::FilePathList result;
     if (d->m_sortedNodeList.empty() && filter(containerNode()))
         result.append(projectFilePath());
 
-    Utils::FileName lastAdded;
+    Utils::FilePath lastAdded;
     for (const Node *n : qAsConst(d->m_sortedNodeList)) {
         if (filter && !filter(n))
             continue;
 
         // Remove duplicates:
-        const Utils::FileName path = n->filePath();
+        const Utils::FilePath path = n->filePath();
         if (path == lastAdded)
             continue; // skip duplicates
         lastAdded = path;
@@ -635,7 +639,7 @@ QVariantMap Project::toMap() const
     This includes the absolute path.
 */
 
-Utils::FileName Project::projectDirectory() const
+Utils::FilePath Project::projectDirectory() const
 {
     return projectDirectory(projectFilePath());
 }
@@ -646,20 +650,37 @@ Utils::FileName Project::projectDirectory() const
     This includes the absolute path.
 */
 
-Utils::FileName Project::projectDirectory(const Utils::FileName &top)
+Utils::FilePath Project::projectDirectory(const Utils::FilePath &top)
 {
     if (top.isEmpty())
-        return Utils::FileName();
-    return Utils::FileName::fromString(top.toFileInfo().absoluteDir().path());
+        return Utils::FilePath();
+    return Utils::FilePath::fromString(top.toFileInfo().absoluteDir().path());
+}
+
+void Project::changeRootProjectDirectory()
+{
+    Utils::FilePath rootPath = Utils::FilePath::fromString(
+        QFileDialog::getExistingDirectory(Core::ICore::dialogParent(),
+                                          tr("Select the Root Directory"),
+                                          rootProjectDirectory().toString(),
+                                          QFileDialog::ShowDirsOnly
+                                              | QFileDialog::DontResolveSymlinks));
+    if (rootPath != d->m_rootProjectDirectory) {
+        d->m_rootProjectDirectory = rootPath;
+        setNamedSettings(Constants::PROJECT_ROOT_PATH_KEY, d->m_rootProjectDirectory.toString());
+        emit rootProjectDirectoryChanged();
+    }
 }
 
 /*!
-    Returns the common root directory that contains all files which belongs to a project.
+    Returns the common root directory that contains all files which belong to a project.
 */
-
-Utils::FileName Project::rootProjectDirectory() const
+Utils::FilePath Project::rootProjectDirectory() const
 {
-    return projectDirectory(); // TODO parse all files and find the common path
+    if (!d->m_rootProjectDirectory.isEmpty())
+        return d->m_rootProjectDirectory;
+
+    return projectDirectory();
 }
 
 ProjectNode *Project::rootProjectNode() const
@@ -701,6 +722,9 @@ Project::RestoreResult Project::fromMap(const QVariantMap &map, QString *errorMe
         createTargetFromMap(map, i);
     }
 
+    d->m_rootProjectDirectory = Utils::FilePath::fromString(
+        namedSettings(Constants::PROJECT_ROOT_PATH_KEY).toString());
+
     return RestoreResult::Ok;
 }
 
@@ -729,11 +753,11 @@ QStringList Project::filesGeneratedFrom(const QString &file) const
     return QStringList();
 }
 
-bool Project::isKnownFile(const Utils::FileName &filename) const
+bool Project::isKnownFile(const Utils::FilePath &filename) const
 {
     if (d->m_sortedNodeList.empty())
         return filename == projectFilePath();
-    const FileNode element(filename, FileType::Unknown, false);
+    const FileNode element(filename, FileType::Unknown);
     return std::binary_search(std::begin(d->m_sortedNodeList), std::end(d->m_sortedNodeList),
                               &element, nodeLessThan);
 }
@@ -778,7 +802,7 @@ void Project::projectLoaded()
 
 Task Project::createProjectTask(Task::TaskType type, const QString &description)
 {
-    return Task(type, description, Utils::FileName(), -1, Core::Id());
+    return Task(type, description, Utils::FilePath(), -1, Core::Id());
 }
 
 Core::Context Project::projectContext() const
@@ -822,6 +846,20 @@ void Project::configureAsExampleProject(const QSet<Core::Id> &platforms)
 bool Project::knowsAllBuildExecutables() const
 {
     return true;
+}
+
+MakeInstallCommand Project::makeInstallCommand(const Target *target, const QString &installRoot)
+{
+    QTC_ASSERT(hasMakeInstallEquivalent(), return MakeInstallCommand());
+    MakeInstallCommand cmd;
+    if (const BuildConfiguration * const bc = target->activeBuildConfiguration()) {
+        if (const auto makeStep = bc->stepList(ProjectExplorer::Constants::BUILDSTEPS_BUILD)
+                ->firstOfType<MakeStep>()) {
+            cmd.command = makeStep->effectiveMakeCommand();
+        }
+    }
+    cmd.arguments << "install" << ("INSTALL_ROOT=" + QDir::toNativeSeparators(installRoot));
+    return cmd;
 }
 
 void Project::setup(const QList<BuildInfo> &infoList)
@@ -921,18 +959,18 @@ void Project::setPreferredKitPredicate(const Kit::Predicate &predicate)
 
 namespace ProjectExplorer {
 
-static Utils::FileName constructTestPath(const char *basePath)
+static Utils::FilePath constructTestPath(const char *basePath)
 {
-    Utils::FileName drive;
+    Utils::FilePath drive;
     if (Utils::HostOsInfo::isWindowsHost())
-        drive = Utils::FileName::fromString("C:");
+        drive = Utils::FilePath::fromString("C:");
     return drive + QLatin1String(basePath);
 }
 
-const Utils::FileName TEST_PROJECT_PATH = constructTestPath("/tmp/foobar/baz.project");
-const Utils::FileName TEST_PROJECT_NONEXISTING_FILE = constructTestPath("/tmp/foobar/nothing.cpp");
-const Utils::FileName TEST_PROJECT_CPP_FILE = constructTestPath("/tmp/foobar/main.cpp");
-const Utils::FileName TEST_PROJECT_GENERATED_FILE = constructTestPath("/tmp/foobar/generated.foo");
+const Utils::FilePath TEST_PROJECT_PATH = constructTestPath("/tmp/foobar/baz.project");
+const Utils::FilePath TEST_PROJECT_NONEXISTING_FILE = constructTestPath("/tmp/foobar/nothing.cpp");
+const Utils::FilePath TEST_PROJECT_CPP_FILE = constructTestPath("/tmp/foobar/main.cpp");
+const Utils::FilePath TEST_PROJECT_GENERATED_FILE = constructTestPath("/tmp/foobar/generated.foo");
 const QString TEST_PROJECT_MIMETYPE = "application/vnd.test.qmakeprofile";
 const QString TEST_PROJECT_DISPLAYNAME = "testProjectFoo";
 const char TEST_PROJECT_ID[] = "Test.Project.Id";
@@ -956,12 +994,6 @@ public:
     }
 
     bool needsConfiguration() const final { return false; }
-};
-
-class TestProjectNode : public ProjectNode
-{
-public:
-    TestProjectNode(const Utils::FileName &dir) : ProjectNode(dir) { }
 };
 
 void ProjectExplorerPlugin::testProject_setup()
@@ -1060,11 +1092,12 @@ void ProjectExplorerPlugin::testProject_parsingFail()
 
 std::unique_ptr<ProjectNode> createFileTree(Project *project)
 {
-    std::unique_ptr<ProjectNode> root = std::make_unique<TestProjectNode>(project->projectDirectory());
+    std::unique_ptr<ProjectNode> root = std::make_unique<ProjectNode>(project->projectDirectory());
     std::vector<std::unique_ptr<FileNode>> nodes;
-    nodes.emplace_back(std::make_unique<FileNode>(TEST_PROJECT_PATH, FileType::Project, false));
-    nodes.emplace_back(std::make_unique<FileNode>(TEST_PROJECT_CPP_FILE, FileType::Source, false));
-    nodes.emplace_back(std::make_unique<FileNode>(TEST_PROJECT_GENERATED_FILE, FileType::Source, true));
+    nodes.emplace_back(std::make_unique<FileNode>(TEST_PROJECT_PATH, FileType::Project));
+    nodes.emplace_back(std::make_unique<FileNode>(TEST_PROJECT_CPP_FILE, FileType::Source));
+    nodes.emplace_back(std::make_unique<FileNode>(TEST_PROJECT_GENERATED_FILE, FileType::Source));
+    nodes.back()->setIsGenerated(true);
     root->addNestedNodes(std::move(nodes));
 
     return root;
@@ -1079,7 +1112,7 @@ void ProjectExplorerPlugin::testProject_projectTree()
     QCOMPARE(fileSpy.count(), 0);
     QVERIFY(!project.rootProjectNode());
 
-    project.setRootProjectNode(std::make_unique<TestProjectNode>(project.projectDirectory()));
+    project.setRootProjectNode(std::make_unique<ProjectNode>(project.projectDirectory()));
     QCOMPARE(fileSpy.count(), 0);
     QVERIFY(!project.rootProjectNode());
 
@@ -1095,14 +1128,14 @@ void ProjectExplorerPlugin::testProject_projectTree()
     QCOMPARE(project.isKnownFile(TEST_PROJECT_CPP_FILE), true);
     QCOMPARE(project.isKnownFile(TEST_PROJECT_GENERATED_FILE), true);
 
-    Utils::FileNameList allFiles = project.files(Project::AllFiles);
+    Utils::FilePathList allFiles = project.files(Project::AllFiles);
     QCOMPARE(allFiles.count(), 3);
     QVERIFY(allFiles.contains(TEST_PROJECT_PATH));
     QVERIFY(allFiles.contains(TEST_PROJECT_CPP_FILE));
     QVERIFY(allFiles.contains(TEST_PROJECT_GENERATED_FILE));
 
     QCOMPARE(project.files(Project::GeneratedFiles), {TEST_PROJECT_GENERATED_FILE});
-    Utils::FileNameList sourceFiles = project.files(Project::SourceFiles);
+    Utils::FilePathList sourceFiles = project.files(Project::SourceFiles);
     QCOMPARE(sourceFiles.count(), 2);
     QVERIFY(sourceFiles.contains(TEST_PROJECT_PATH));
     QVERIFY(sourceFiles.contains(TEST_PROJECT_CPP_FILE));

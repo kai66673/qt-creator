@@ -26,17 +26,23 @@
 #include "languageclientutils.h"
 
 #include "client.h"
+#include "languageclient_global.h"
+#include "languageclientmanager.h"
 
 #include <coreplugin/editormanager/documentmodel.h>
+#include <coreplugin/icore.h>
 
 #include <texteditor/codeassist/textdocumentmanipulatorinterface.h>
 #include <texteditor/refactoringchanges.h>
 #include <texteditor/textdocument.h>
 #include <texteditor/texteditor.h>
 #include <utils/textutils.h>
+#include <utils/utilsicons.h>
 
 #include <QFile>
 #include <QTextDocument>
+#include <QToolBar>
+#include <QToolButton>
 
 using namespace LanguageServerProtocol;
 using namespace Utils;
@@ -133,11 +139,9 @@ void updateCodeActionRefactoringMarker(Client *client,
     TextDocument* doc = TextDocument::textDocumentForFileName(uri.toFileName());
     if (!doc)
         return;
-    BaseTextEditor *editor = BaseTextEditor::textEditorForDocument(doc);
-    if (!editor)
+    const QVector<BaseTextEditor *> editors = BaseTextEditor::textEditorsForDocument(doc);
+    if (editors.isEmpty())
         return;
-
-    TextEditorWidget *editorWidget = editor->editorWidget();
 
     const QList<Diagnostic> &diagnostics = action.diagnostics().value_or(QList<Diagnostic>());
 
@@ -181,7 +185,90 @@ void updateCodeActionRefactoringMarker(Client *client,
         marker.cursor = endOfLineCursor(diagnostic.range().start().toTextCursor(doc->document()));
         markers << marker;
     }
-    editorWidget->setRefactorMarkers(markers + editorWidget->refactorMarkers());
+    for (BaseTextEditor *editor : editors) {
+        if (TextEditorWidget *editorWidget = editor->editorWidget())
+            editorWidget->setRefactorMarkers(markers + editorWidget->refactorMarkers());
+    }
+}
+
+void updateEditorToolBar(Core::IEditor *editor)
+{
+    auto *textEditor = qobject_cast<BaseTextEditor *>(editor);
+    if (!textEditor)
+        return;
+    TextEditorWidget *widget = textEditor->editorWidget();
+    if (!widget)
+        return;
+
+    const Core::IDocument *document = editor->document();
+    QStringList clientsWithDoc;
+    for (auto client : LanguageClientManager::clients()) {
+        if (client->documentOpen(document))
+            clientsWithDoc << client->name();
+    }
+
+    static QMap<QWidget *, QAction *> actions;
+
+    if (actions.contains(widget)) {
+        auto action = actions[widget];
+        if (clientsWithDoc.isEmpty()) {
+            widget->toolBar()->removeAction(action);
+            actions.remove(widget);
+        } else {
+            action->setText(clientsWithDoc.join(';'));
+        }
+    } else if (!clientsWithDoc.isEmpty()) {
+        const QIcon icon
+            = Utils::Icon({{":/languageclient/images/languageclient.png",
+                            Utils::Theme::IconsBaseColor}})
+                  .icon();
+        actions[widget] = widget->toolBar()->addAction(icon, clientsWithDoc.join(';'), []() {
+            Core::ICore::showOptionsDialog(Constants::LANGUAGECLIENT_SETTINGS_PAGE);
+        });
+        QObject::connect(widget, &QWidget::destroyed, [widget]() {
+            actions.remove(widget);
+        });
+    }
+}
+
+const QIcon symbolIcon(int type)
+{
+    using namespace Utils::CodeModelIcon;
+    static QMap<SymbolKind, QIcon> icons;
+    if (type < int(SymbolKind::FirstSymbolKind) || type > int(SymbolKind::LastSymbolKind))
+        return {};
+    auto kind = static_cast<SymbolKind>(type);
+    if (!icons.contains(kind)) {
+        switch (kind) {
+        case SymbolKind::File: icons[kind] = Utils::Icons::NEWFILE.icon(); break;
+        case SymbolKind::Module: icons[kind] = iconForType(Namespace); break;
+        case SymbolKind::Namespace: icons[kind] = iconForType(Namespace); break;
+        case SymbolKind::Package: icons[kind] = iconForType(Namespace); break;
+        case SymbolKind::Class: icons[kind] = iconForType(Class); break;
+        case SymbolKind::Method: icons[kind] = iconForType(FuncPublic); break;
+        case SymbolKind::Property: icons[kind] = iconForType(Property); break;
+        case SymbolKind::Field: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::Constructor: icons[kind] = iconForType(Class); break;
+        case SymbolKind::Enum: icons[kind] = iconForType(Enum); break;
+        case SymbolKind::Interface: icons[kind] = iconForType(Class); break;
+        case SymbolKind::Function: icons[kind] = iconForType(FuncPublic); break;
+        case SymbolKind::Variable: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::Constant: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::String: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::Number: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::Boolean: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::Array: icons[kind] = iconForType(VarPublic); break;
+        case SymbolKind::Object: icons[kind] = iconForType(Class); break;
+        case SymbolKind::Key: icons[kind] = iconForType(Keyword); break;
+        case SymbolKind::Null: icons[kind] = iconForType(Keyword); break;
+        case SymbolKind::EnumMember: icons[kind] = iconForType(Enumerator); break;
+        case SymbolKind::Struct: icons[kind] = iconForType(Struct); break;
+        case SymbolKind::Event: icons[kind] = iconForType(FuncPublic); break;
+        case SymbolKind::Operator: icons[kind] = iconForType(FuncPublic); break;
+        case SymbolKind::TypeParameter: icons[kind] = iconForType(VarPublic); break;
+        }
+    }
+    return icons[kind];
 }
 
 } // namespace LanguageClient

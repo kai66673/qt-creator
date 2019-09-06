@@ -341,7 +341,7 @@ void QtOptionsPageWidget::infoAnchorClicked(const QUrl &url)
     QDesktopServices::openUrl(url);
 }
 
-static QString formatAbiHtmlList(const QList<Abi> &abis)
+static QString formatAbiHtmlList(const Abis &abis)
 {
     QString result = QStringLiteral("<ul><li>");
     for (int i = 0, count = abis.size(); i < count; ++i) {
@@ -369,8 +369,8 @@ QtOptionsPageWidget::ValidityInfo QtOptionsPageWidget::validInformation(const Ba
     }
 
     // Do we have tool chain issues?
-    QList<Abi> missingToolChains;
-    const QList<Abi> qtAbis = version->qtAbis();
+    Abis missingToolChains;
+    const Abis qtAbis = version->qtAbis();
 
     for (const Abi &abi : qtAbis) {
         const auto abiCompatePred = [&abi] (const ToolChain *tc)
@@ -542,20 +542,20 @@ QtOptionsPageWidget::~QtOptionsPageWidget()
 
 void QtOptionsPageWidget::addQtDir()
 {
-    FileName qtVersion = FileName::fromString(
+    FilePath qtVersion = FilePath::fromString(
                 QFileDialog::getOpenFileName(this,
                                              tr("Select a qmake Executable"),
                                              QString(),
                                              BuildableHelperLibrary::filterForQmakeFileDialog(),
                                              0,
                                              QFileDialog::DontResolveSymlinks));
-    if (qtVersion.isNull())
+    if (qtVersion.isEmpty())
         return;
 
     QFileInfo fi = qtVersion.toFileInfo();
     // should add all qt versions here ?
     if (BuildableHelperLibrary::isQtChooser(fi))
-        qtVersion = FileName::fromString(BuildableHelperLibrary::qtChooserToQmakePath(fi.symLinkTarget()));
+        qtVersion = FilePath::fromString(BuildableHelperLibrary::qtChooserToQmakePath(fi.symLinkTarget()));
 
     auto checkAlreadyExists = [qtVersion](Utils::TreeItem *parent) {
         for (int i = 0; i < parent->childCount(); ++i) {
@@ -614,14 +614,14 @@ void QtOptionsPageWidget::editPath()
 {
     BaseQtVersion *current = currentVersion();
     QString dir = currentVersion()->qmakeCommand().toFileInfo().absolutePath();
-    FileName qtVersion = FileName::fromString(
+    FilePath qtVersion = FilePath::fromString(
                 QFileDialog::getOpenFileName(this,
                                              tr("Select a qmake Executable"),
                                              dir,
                                              BuildableHelperLibrary::filterForQmakeFileDialog(),
                                              0,
                                              QFileDialog::DontResolveSymlinks));
-    if (qtVersion.isNull())
+    if (qtVersion.isEmpty())
         return;
     BaseQtVersion *version = QtVersionFactory::createQtVersionFromQMakePath(qtVersion);
     if (!version)

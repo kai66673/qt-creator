@@ -36,6 +36,7 @@ namespace {
 template<typename ProjectInfo>
 using Builder = ClangBackEnd::CommandLineBuilder<ProjectInfo>;
 
+using ClangBackEnd::FilePath;
 using ClangBackEnd::IncludeSearchPathType;
 using ClangBackEnd::InputFileType;
 
@@ -48,27 +49,21 @@ template <>
 class CommandLineBuilder<ClangBackEnd::PchTask> : public testing::Test
 {
 public:
-    CommandLineBuilder()
-    {
-        cppProjectInfo.language = Utils::Language::Cxx;
-    }
+    CommandLineBuilder() { cppProjectInfo.language = Utils::Language::Cxx; }
 
 public:
-    ClangBackEnd::PchTask emptyProjectInfo{"empty", {}, {}, {}, {}, {}, {}, {}};
-    ClangBackEnd::PchTask cppProjectInfo{"project1", {}, {}, {}, {}, {}, {}, {}};
+    ClangBackEnd::PchTask emptyProjectInfo{0, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}};
+    ClangBackEnd::PchTask cppProjectInfo{1, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}};
 };
 
 template <>
 class CommandLineBuilder<ClangBackEnd::ProjectPartContainer> : public testing::Test
 {
 public:
-    CommandLineBuilder()
-    {
-        cppProjectInfo.language = Utils::Language::Cxx;
-    }
+    CommandLineBuilder() { cppProjectInfo.language = Utils::Language::Cxx; }
 
 public:
-    ClangBackEnd::ProjectPartContainer emptyProjectInfo{"empty",
+    ClangBackEnd::ProjectPartContainer emptyProjectInfo{0,
                                                         {},
                                                         {},
                                                         {},
@@ -78,7 +73,7 @@ public:
                                                         Utils::Language::Cxx,
                                                         Utils::LanguageVersion::CXX98,
                                                         Utils::LanguageExtension::None};
-    ClangBackEnd::ProjectPartContainer cppProjectInfo{"project1",
+    ClangBackEnd::ProjectPartContainer cppProjectInfo{1,
                                                       {},
                                                       {},
                                                       {},
@@ -94,10 +89,7 @@ template <>
 class CommandLineBuilder<ClangBackEnd::ProjectPartArtefact> : public testing::Test
 {
 public:
-    CommandLineBuilder()
-    {
-        cppProjectInfo.language = Utils::Language::Cxx;
-    }
+    CommandLineBuilder() { cppProjectInfo.language = Utils::Language::Cxx; }
 
 public:
     ClangBackEnd::ProjectPartArtefact emptyProjectInfo{{},
@@ -139,12 +131,13 @@ TYPED_TEST(CommandLineBuilder, CHeader)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c-header",
                             "-std=c11",
                             "-nostdinc",
-                            toNativePath("/source/file.c").path()));
+                            toNativePath("/source/file.c")));
 }
 
 TYPED_TEST(CommandLineBuilder, CSource)
@@ -155,7 +148,14 @@ TYPED_TEST(CommandLineBuilder, CSource)
     Builder<TypeParam> builder{this->emptyProjectInfo, {}, InputFileType::Source, "/source/file.c"};
 
     ASSERT_THAT(builder.commandLine,
-                ElementsAre("clang", "-DNOMINMAX", "-x", "c", "-std=c11", "-nostdinc", "/source/file.c"));
+                ElementsAre("clang",
+                            "-w",
+                            "-DNOMINMAX",
+                            "-x",
+                            "c",
+                            "-std=c11",
+                            "-nostdinc",
+                            toNativePath("/source/file.c")));
 }
 
 TYPED_TEST(CommandLineBuilder, ObjectiveCHeader)
@@ -168,12 +168,13 @@ TYPED_TEST(CommandLineBuilder, ObjectiveCHeader)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "objective-c-header",
                             "-std=c11",
                             "-nostdinc",
-                            toNativePath("/source/file.c").path()));
+                            toNativePath("/source/file.c")));
 }
 
 TYPED_TEST(CommandLineBuilder, ObjectiveCSource)
@@ -186,12 +187,13 @@ TYPED_TEST(CommandLineBuilder, ObjectiveCSource)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "objective-c",
                             "-std=c11",
                             "-nostdinc",
-                            "/source/file.c"));
+                            toNativePath("/source/file.c")));
 }
 
 TYPED_TEST(CommandLineBuilder, CppHeader)
@@ -203,13 +205,14 @@ TYPED_TEST(CommandLineBuilder, CppHeader)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
                             "-std=c++98",
                             "-nostdinc",
                             "-nostdinc++",
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, CppSource)
@@ -221,13 +224,14 @@ TYPED_TEST(CommandLineBuilder, CppSource)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++",
                             "-std=c++98",
                             "-nostdinc",
                             "-nostdinc++",
-                            "/source/file.cpp"));
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, ObjectiveCppHeader)
@@ -240,13 +244,14 @@ TYPED_TEST(CommandLineBuilder, ObjectiveCppHeader)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "objective-c++-header",
                             "-std=c++98",
                             "-nostdinc",
                             "-nostdinc++",
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, ObjectiveCppSource)
@@ -259,13 +264,14 @@ TYPED_TEST(CommandLineBuilder, ObjectiveCppSource)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "objective-c++",
                             "-std=c++98",
                             "-nostdinc",
                             "-nostdinc++",
-                            "/source/file.cpp"));
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, Cpp98)
@@ -488,29 +494,38 @@ TYPED_TEST(CommandLineBuilder, IncludesOrder)
                                           {"/system/foo", 3, IncludeSearchPathType::Framework},
                                           {"/builtin/bar", 2, IncludeSearchPathType::BuiltIn},
                                           {"/builtin/foo", 1, IncludeSearchPathType::BuiltIn}};
-    Builder<TypeParam> builder{this->emptyProjectInfo, {}, InputFileType::Header, "/source/file.cpp"};
+    Builder<TypeParam> builder{this->emptyProjectInfo,
+                               {},
+                               InputFileType::Header,
+                               "/source/file.cpp",
+                               {},
+                               {},
+                               ClangBackEnd::NativeFilePath{FilePath{"/resource/path"}}};
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
                             "-std=c++11",
                             "-nostdinc",
                             "-nostdinc++",
+                            "-isystem",
+                            toNativePath("/resource/path"),
                             "-I",
-                            toNativePath("/include/foo").path(),
+                            toNativePath("/include/foo"),
                             "-I",
-                            toNativePath("/include/bar").path(),
+                            toNativePath("/include/bar"),
                             "-F",
-                            toNativePath("/system/foo").path(),
+                            toNativePath("/system/foo"),
                             "-isystem",
-                            toNativePath("/system/bar").path(),
+                            toNativePath("/system/bar"),
                             "-isystem",
-                            toNativePath("/builtin/foo").path(),
+                            toNativePath("/builtin/foo"),
                             "-isystem",
-                            toNativePath("/builtin/bar").path(),
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/builtin/bar"),
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, EmptySourceFile)
@@ -519,6 +534,7 @@ TYPED_TEST(CommandLineBuilder, EmptySourceFile)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
@@ -533,13 +549,14 @@ TYPED_TEST(CommandLineBuilder, SourceFile)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
                             "-std=c++98",
                             "-nostdinc",
                             "-nostdinc++",
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/source/file.cpp")));
 }
 
 
@@ -549,13 +566,14 @@ TYPED_TEST(CommandLineBuilder, EmptyOutputFile)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
                             "-std=c++98",
                             "-nostdinc",
                             "-nostdinc++",
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, OutputFile)
@@ -568,6 +586,7 @@ TYPED_TEST(CommandLineBuilder, OutputFile)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
@@ -575,8 +594,21 @@ TYPED_TEST(CommandLineBuilder, OutputFile)
                             "-nostdinc",
                             "-nostdinc++",
                             "-o",
-                            toNativePath("/output/file.o").path(),
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/output/file.o"),
+                            toNativePath("/source/file.cpp")));
+}
+
+TYPED_TEST(CommandLineBuilder, PreIncludeSearchPath)
+{
+    Builder<TypeParam> builder{this->emptyProjectInfo,
+                               {},
+                               {},
+                               {},
+                               {},
+                               {},
+                               ClangBackEnd::NativeFilePath{FilePath{"/resource/path"}}};
+
+    ASSERT_THAT(builder.commandLine, Contains(toNativePath("/resource/path")));
 }
 
 TYPED_TEST(CommandLineBuilder, IncludePchPath)
@@ -590,6 +622,7 @@ TYPED_TEST(CommandLineBuilder, IncludePchPath)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",
@@ -599,10 +632,10 @@ TYPED_TEST(CommandLineBuilder, IncludePchPath)
                             "-Xclang",
                             "-include-pch",
                             "-Xclang",
-                            toNativePath("/pch/file.pch").path(),
+                            toNativePath("/pch/file.pch"),
                             "-o",
-                            toNativePath("/output/file.o").path(),
-                            toNativePath("/source/file.cpp").path()));
+                            toNativePath("/output/file.o"),
+                            toNativePath("/source/file.cpp")));
 }
 
 TYPED_TEST(CommandLineBuilder, CompilerMacros)
@@ -613,6 +646,7 @@ TYPED_TEST(CommandLineBuilder, CompilerMacros)
 
     ASSERT_THAT(builder.commandLine,
                 ElementsAre("clang++",
+                            "-w",
                             "-DNOMINMAX",
                             "-x",
                             "c++-header",

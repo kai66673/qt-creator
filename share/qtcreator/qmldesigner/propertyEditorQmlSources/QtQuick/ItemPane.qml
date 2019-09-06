@@ -33,9 +33,14 @@ Rectangle {
     width: 320
     height: 400
     color: Theme.qmlDesignerBackgroundColorDarkAlternate()
+    MouseArea {
+        anchors.fill: parent
+        onClicked: forceActiveFocus()
+    }
 
     ScrollView {
         anchors.fill: parent
+        horizontalScrollBarPolicy: Qt.ScrollBarAlwaysOff
 
         Column {
             y: -1
@@ -76,6 +81,7 @@ Rectangle {
                                     typeLineEdit.forceActiveFocus()
                                 }
                                 tooltip: qsTr("Change the type of this item.")
+                                enabled: !modelNodeBackend.multiSelection
                             }
 
                             ExpressionTextField {
@@ -116,17 +122,21 @@ Rectangle {
                             placeholderText: qsTr("id")
                             text: backendValues.id.value
                             Layout.fillWidth: true
+                            width: 240
                             showTranslateCheckBox: false
                             showExtendedFunctionButton: false
+                            enabled: !modelNodeBackend.multiSelection
                         }
                         // workaround: without this item the lineedit does not shrink to the
                         // right size after resizing to a wider width
 
                         Image {
+                            visible: !modelNodeBackend.multiSelection
                             Layout.preferredWidth: 16
                             Layout.preferredHeight: 16
                             source: hasAliasExport ? "image://icons/alias-export-checked" : "image://icons/alias-export-unchecked"
                             ToolTipArea {
+                                enabled: !modelNodeBackend.multiSelection
                                 anchors.fill: parent
                                 onClicked: toogleExportAlias()
                                 tooltip: qsTr("Toggles whether this item is exported as an alias property of the root item.")
@@ -179,6 +189,7 @@ Rectangle {
 
                     SecondColumnLayout {
                         SpinBox {
+                            sliderIndicatorVisible: true
                             backendValue: backendValues.opacity
                             decimals: 2
 
@@ -236,8 +247,11 @@ Rectangle {
                                 active = true
                             }
 
+                            property int loaderHeight: specificsOne.item.height + tabView.extraHeight
+                            onLoaderHeightChanged: tabView.specficsOneHeight = loaderHeight
+
                             onLoaded: {
-                                tabView.specficsTwoHeight = specificsTwo.item.height + tabView.extraHeight
+                                tabView.specficsTwoHeight = loaderHeight
                             }
                         }
 
@@ -248,8 +262,11 @@ Rectangle {
                             id: specificsOne;
                             source: specificsUrl;
 
+                            property int loaderHeight: specificsOne.item.height + tabView.extraHeight
+                            onLoaderHeightChanged: tabView.specficsOneHeight = loaderHeight
+
                             onLoaded: {
-                                tabView.specficsOneHeight = specificsOne.item.height + tabView.extraHeight
+                                tabView.specficsOneHeight = loaderHeight
                             }
                         }
                     }

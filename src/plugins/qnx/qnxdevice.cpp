@@ -34,6 +34,7 @@
 #include "qnxdevicewizard.h"
 
 #include <projectexplorer/devicesupport/sshdeviceprocess.h>
+#include <projectexplorer/runcontrol.h>
 
 #include <ssh/sshconnection.h>
 #include <utils/port.h>
@@ -148,11 +149,6 @@ QVariantMap QnxDevice::toMap() const
     QVariantMap map(RemoteLinux::LinuxDevice::toMap());
     map.insert(QLatin1String(QnxVersionKey), m_versionNumber);
     return map;
-}
-
-IDevice::Ptr QnxDevice::clone() const
-{
-    return Ptr(new QnxDevice(*this));
 }
 
 PortsGatheringMethod::Ptr QnxDevice::portsGatheringMethod() const

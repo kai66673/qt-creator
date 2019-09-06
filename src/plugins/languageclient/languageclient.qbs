@@ -16,10 +16,16 @@ QtcPlugin {
     files: [
         "client.cpp",
         "client.h",
+        "documentsymbolcache.cpp",
+        "documentsymbolcache.h",
         "dynamiccapabilities.cpp",
         "dynamiccapabilities.h",
         "languageclient.qrc",
         "languageclient_global.h",
+        "languageclienthoverhandler.cpp",
+        "languageclienthoverhandler.h",
+        "languageclientfunctionhint.cpp",
+        "languageclientfunctionhint.h",
         "languageclientinterface.cpp",
         "languageclientinterface.h",
         "languageclientcompletionassist.cpp",
@@ -36,5 +42,7 @@ QtcPlugin {
         "languageclientsettings.h",
         "languageclientutils.cpp",
         "languageclientutils.h",
+        "locatorfilter.cpp",
+        "locatorfilter.h",
     ]
 }

@@ -53,18 +53,13 @@ QmlProjectNode::QmlProjectNode(QmlProject *project) : ProjectNode(project->proje
     setIcon(qmlProjectIcon);
 }
 
-bool QmlProjectNode::showInSimpleTree() const
-{
-    return true;
-}
-
 bool QmlProjectNode::supportsAction(ProjectAction action, const Node *node) const
 {
     if (action == AddNewFile || action == EraseFile)
         return true;
     QTC_ASSERT(node, return false);
 
-    if (action == Rename && node->nodeType() == NodeType::File) {
+    if (action == Rename && node->asFileNode()) {
         const FileNode *fileNode = node->asFileNode();
         QTC_ASSERT(fileNode, return false);
         return fileNode->fileType() != FileType::Project;

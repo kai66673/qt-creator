@@ -654,7 +654,7 @@ void ExternalToolRunner::run()
     }
     m_process = new QtcProcess(this);
     connect(m_process, &QProcess::started, this, &ExternalToolRunner::started);
-    connect(m_process, static_cast<void (QProcess::*)(int,QProcess::ExitStatus)>(&QProcess::finished),
+    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ExternalToolRunner::finished);
     connect(m_process, &QProcess::errorOccurred, this, &ExternalToolRunner::error);
     connect(m_process, &QProcess::readyReadStandardOutput,
@@ -663,7 +663,7 @@ void ExternalToolRunner::run()
             this, &ExternalToolRunner::readStandardError);
     if (!m_resolvedWorkingDirectory.isEmpty())
         m_process->setWorkingDirectory(m_resolvedWorkingDirectory);
-    m_process->setCommand(m_resolvedExecutable.toString(), m_resolvedArguments);
+    m_process->setCommand(CommandLine(m_resolvedExecutable, m_resolvedArguments));
     m_process->setEnvironment(m_resolvedEnvironment);
     MessageManager::write(tr("Starting external tool \"%1\" %2")
                           .arg(m_resolvedExecutable.toUserOutput(), m_resolvedArguments),

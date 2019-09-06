@@ -37,17 +37,21 @@
 
 #include <aggregation/aggregate.h>
 #include <cpptools/cppmodelmanager.h>
+
+#include <coreplugin/find/basetextfind.h>
 #include <coreplugin/icore.h>
 #include <coreplugin/editormanager/editormanager.h>
+
+#include <utils/algorithm.h>
 #include <utils/checkablemessagebox.h>
 #include <utils/completingtextedit.h>
-#include <utils/synchronousprocess.h>
 #include <utils/fileutils.h>
 #include <utils/icon.h>
-#include <utils/theme/theme.h>
 #include <utils/qtcassert.h>
+#include <utils/synchronousprocess.h>
 #include <utils/temporarydirectory.h>
-#include <coreplugin/find/basetextfind.h>
+#include <utils/theme/theme.h>
+
 #include <texteditor/fontsettings.h>
 #include <texteditor/texteditorsettings.h>
 
@@ -459,7 +463,7 @@ void VcsBaseSubmitEditor::setFileModel(SubmitFileModel *model)
     // Populate completer with symbols
     if (!uniqueSymbols.isEmpty()) {
         QCompleter *completer = d->m_widget->descriptionEdit()->completer();
-        QStringList symbolsList = uniqueSymbols.toList();
+        QStringList symbolsList = Utils::toList(uniqueSymbols);
         symbolsList.sort();
         completer->setModel(new QStringListModel(symbolsList, completer));
     }
@@ -569,13 +573,13 @@ VcsBaseSubmitEditor::PromptSubmitResult
     const QString commitName = plugin->commitDisplayName();
     mb.setWindowTitle(tr("Close %1 %2 Editor")
                       .arg(plugin->versionControl()->displayName(), commitName));
-    mb.setIconPixmap(QMessageBox::standardIcon(QMessageBox::Question));
+    mb.setIcon(QMessageBox::Question);
     QString message;
     if (canCommit) {
         message = tr("What do you want to do with these changes?");
     } else {
         message = tr("Cannot %1%2.\nWhat do you want to do?",
-                     "%2 is an optional error message with ': ' prefix. Do not separate it from %1.")
+                     "%2 is an optional error message with ': ' prefix. Don't add space in front.")
                 .arg(commitName.toLower(),
                      errorMessage.isEmpty() ? errorMessage : ": " + errorMessage);
     }
@@ -741,7 +745,7 @@ void VcsBaseSubmitEditor::filterUntrackedFilesOfProject(const QString &repositor
     const QDir repoDir(repositoryDirectory);
     for (QStringList::iterator it = untrackedFiles->begin(); it != untrackedFiles->end(); ) {
         const QString path = repoDir.absoluteFilePath(*it);
-        if (ProjectExplorer::SessionManager::projectForFile(FileName::fromString(path)))
+        if (ProjectExplorer::SessionManager::projectForFile(FilePath::fromString(path)))
             ++it;
         else
             it = untrackedFiles->erase(it);

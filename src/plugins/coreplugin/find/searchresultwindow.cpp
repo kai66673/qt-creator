@@ -124,7 +124,7 @@ namespace Internal {
         m_recentSearchesBox->setProperty("drawleftborder", true);
         m_recentSearchesBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
         m_recentSearchesBox->addItem(tr("New Search"));
-        connect(m_recentSearchesBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated),
+        connect(m_recentSearchesBox, QOverload<int>::of(&QComboBox::activated),
                 this, &SearchResultWindowPrivate::setCurrentIndexWithFocus);
 
         m_widget->setWindowTitle(q->displayName());
@@ -135,7 +135,6 @@ namespace Internal {
         m_widget->addWidget(newSearchArea);
 
         m_expandCollapseButton = new QToolButton(m_widget);
-        m_expandCollapseButton->setAutoRaise(true);
 
         m_expandCollapseAction->setCheckable(true);
         m_expandCollapseAction->setIcon(Utils::Icons::EXPAND_ALL_TOOLBAR.icon());
@@ -167,11 +166,13 @@ namespace Internal {
             if (focus)
                 m_widget->currentWidget()->setFocus();
             m_expandCollapseAction->setEnabled(false);
+            m_newSearchButton->setEnabled(false);
         } else {
             if (focus)
                 m_searchResultWidgets.at(visibleSearchIndex())->setFocusInternally();
             m_searchResultWidgets.at(visibleSearchIndex())->notifyVisibilityChanged(true);
             m_expandCollapseAction->setEnabled(true);
+            m_newSearchButton->setEnabled(true);
         }
         q->navigateStateChanged();
     }

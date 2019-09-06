@@ -26,6 +26,7 @@
 #include "languageclientoutline.h"
 
 #include "languageclientmanager.h"
+#include "languageclientutils.h"
 
 #include <coreplugin/find/itemviewfind.h>
 #include <coreplugin/editormanager/ieditor.h>
@@ -42,46 +43,6 @@
 using namespace LanguageServerProtocol;
 
 namespace LanguageClient {
-
-static const QIcon symbolIcon(int type)
-{
-    using namespace Utils::CodeModelIcon;
-    static QMap<SymbolKind, QIcon> icons;
-    if (type < int(SymbolKind::FirstSymbolKind) || type > int(SymbolKind::LastSymbolKind))
-        return {};
-    auto kind = static_cast<SymbolKind>(type);
-    if (icons.contains(kind)) {
-        switch (kind) {
-        case SymbolKind::File: icons[kind] = Utils::Icons::NEWFILE.icon(); break;
-        case SymbolKind::Module: icons[kind] = iconForType(Namespace); break;
-        case SymbolKind::Namespace: icons[kind] = iconForType(Namespace); break;
-        case SymbolKind::Package: icons[kind] = iconForType(Namespace); break;
-        case SymbolKind::Class: icons[kind] = iconForType(Class); break;
-        case SymbolKind::Method: icons[kind] = iconForType(FuncPublic); break;
-        case SymbolKind::Property: icons[kind] = iconForType(Property); break;
-        case SymbolKind::Field: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::Constructor: icons[kind] = iconForType(Class); break;
-        case SymbolKind::Enum: icons[kind] = iconForType(Enum); break;
-        case SymbolKind::Interface: icons[kind] = iconForType(Class); break;
-        case SymbolKind::Function: icons[kind] = iconForType(FuncPublic); break;
-        case SymbolKind::Variable: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::Constant: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::String: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::Number: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::Boolean: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::Array: icons[kind] = iconForType(VarPublic); break;
-        case SymbolKind::Object: icons[kind] = iconForType(Class); break;
-        case SymbolKind::Key: icons[kind] = iconForType(Keyword); break;
-        case SymbolKind::Null: icons[kind] = iconForType(Keyword); break;
-        case SymbolKind::EnumMember: icons[kind] = iconForType(Enumerator); break;
-        case SymbolKind::Struct: icons[kind] = iconForType(Struct); break;
-        case SymbolKind::Event: icons[kind] = iconForType(FuncPublic); break;
-        case SymbolKind::Operator: icons[kind] = iconForType(FuncPublic); break;
-        case SymbolKind::TypeParameter: icons[kind] = iconForType(VarPublic); break;
-        }
-    }
-    return icons[kind];
-}
 
 class LanguageClientOutlineItem : public Utils::TypedTreeItem<LanguageClientOutlineItem>
 {
@@ -155,7 +116,7 @@ public:
     void setCursorSynchronization(bool syncWithCursor) override;
 
 private:
-    void handleResponse(const LanguageServerProtocol::DocumentSymbolsRequest::Response &response);
+    void handleResponse(const DocumentUri &uri, const DocumentSymbolsResult &response);
     void updateTextCursor(const QModelIndex &proxyIndex);
     void updateSelectionInTree(const QTextCursor &currentCursor);
     void onItemActivated(const QModelIndex &index);
@@ -164,6 +125,7 @@ private:
     QPointer<TextEditor::BaseTextEditor> m_editor;
     LanguageClientOutlineModel m_model;
     Utils::TreeView m_view;
+    DocumentUri m_uri;
     bool m_sync = false;
 };
 
@@ -172,23 +134,24 @@ LanguageClientOutlineWidget::LanguageClientOutlineWidget(Client *client,
     : m_client(client)
     , m_editor(editor)
     , m_view(this)
+    , m_uri(DocumentUri::fromFileName(editor->textDocument()->filePath()))
 {
-    const DocumentSymbolParams params(
-                TextDocumentIdentifier(
-                    DocumentUri::fromFileName(editor->textDocument()->filePath())));
-    DocumentSymbolsRequest request(params);
-    request.setResponseCallback([self = QPointer<LanguageClientOutlineWidget>(this)]
-                                (const DocumentSymbolsRequest::Response &response){
-                                    if (self)
-                                        self->handleResponse(response);
+    connect(client->documentSymbolCache(),
+            &DocumentSymbolCache::gotSymbols,
+            this,
+            &LanguageClientOutlineWidget::handleResponse);
+    connect(editor->textDocument(), &TextEditor::TextDocument::contentsChanged, this, [this]() {
+        if (m_client)
+            m_client->documentSymbolCache()->requestSymbols(m_uri);
     });
+
+    client->documentSymbolCache()->requestSymbols(m_uri);
 
     auto *layout = new QVBoxLayout;
     layout->setMargin(0);
     layout->setSpacing(0);
     layout->addWidget(Core::ItemViewFind::createSearchableWrapper(&m_view));
     setLayout(layout);
-    client->sendContent(request);
     m_view.setModel(&m_model);
     m_view.setHeaderHidden(true);
     connect(&m_view, &QAbstractItemView::activated,
@@ -212,20 +175,17 @@ void LanguageClientOutlineWidget::setCursorSynchronization(bool syncWithCursor)
         updateSelectionInTree(m_editor->textCursor());
 }
 
-void LanguageClientOutlineWidget::handleResponse(const DocumentSymbolsRequest::Response &response)
+void LanguageClientOutlineWidget::handleResponse(const DocumentUri &uri,
+                                                 const DocumentSymbolsResult &result)
 {
-    if (Utils::optional<DocumentSymbolsRequest::Response::Error> error = response.error()) {
-        if (m_client)
-            m_client->log(error.value());
-    }
-    if (Utils::optional<DocumentSymbolsResult> result = response.result()) {
-        if (Utils::holds_alternative<QList<SymbolInformation>>(result.value()))
-            m_model.setInfo(Utils::get<QList<SymbolInformation>>(result.value()));
-        else if (Utils::holds_alternative<QList<DocumentSymbol>>(result.value()))
-            m_model.setInfo(Utils::get<QList<DocumentSymbol>>(result.value()));
-        else
-            m_model.clear();
-    }
+    if (uri != m_uri)
+        return;
+    if (Utils::holds_alternative<QList<SymbolInformation>>(result))
+        m_model.setInfo(Utils::get<QList<SymbolInformation>>(result));
+    else if (Utils::holds_alternative<QList<DocumentSymbol>>(result))
+        m_model.setInfo(Utils::get<QList<DocumentSymbol>>(result));
+    else
+        m_model.clear();
 }
 
 void LanguageClientOutlineWidget::updateTextCursor(const QModelIndex &proxyIndex)
@@ -245,6 +205,8 @@ void LanguageClientOutlineWidget::updateSelectionInTree(const QTextCursor &curre
             selection.select(m_model.indexForItem(item), m_model.indexForItem(item));
     });
     m_view.selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect);
+    if (!selection.isEmpty())
+        m_view.scrollTo(selection.indexes().first());
 }
 
 void LanguageClientOutlineWidget::onItemActivated(const QModelIndex &index)

@@ -27,6 +27,7 @@
 
 #include "devicemanager.h"
 #include "deviceprocesslist.h"
+#include "idevicefactory.h"
 
 #include "../kit.h"
 #include "../kitinformation.h"
@@ -152,6 +153,7 @@ public:
     QList<Utils::Icon> deviceIcons;
     QList<IDevice::DeviceAction> deviceActions;
     QVariantMap extraData;
+    IDevice::OpenTerminal openTerminal;
 };
 } // namespace Internal
 
@@ -161,6 +163,11 @@ IDevice::IDevice() : d(new Internal::IDevicePrivate)
 {
 }
 
+void IDevice::setOpenTerminal(const IDevice::OpenTerminal &openTerminal)
+{
+    d->openTerminal = openTerminal;
+}
+
 void IDevice::setupId(Origin origin, Core::Id id)
 {
     d->origin = origin;
@@ -168,11 +175,15 @@ void IDevice::setupId(Origin origin, Core::Id id)
     d->id = id.isValid() ? id : newId();
 }
 
-IDevice::IDevice(const IDevice &other)
-    : QEnableSharedFromThis<IDevice>(other)
-    , d(std::make_unique<Internal::IDevicePrivate>())
+bool IDevice::canOpenTerminal() const
 {
-    *d = *other.d;
+    return bool(d->openTerminal);
+}
+
+void IDevice::openTerminal(const Utils::Environment &env, const QString &workingDir) const
+{
+    QTC_ASSERT(canOpenTerminal(), return);
+    d->openTerminal(env, workingDir);
 }
 
 IDevice::~IDevice() = default;
@@ -393,6 +404,19 @@ QVariantMap IDevice::toMap() const
     map.insert(ExtraDataKey, d->extraData);
 
     return map;
+}
+
+IDevice::Ptr IDevice::clone() const
+{
+    IDeviceFactory *factory = IDeviceFactory::find(d->type);
+    QTC_ASSERT(factory, return {});
+    IDevice::Ptr device = factory->construct();
+    QTC_ASSERT(device, return {});
+    device->d->deviceState = d->deviceState;
+    device->d->deviceActions = d->deviceActions;
+    device->d->deviceIcons = d->deviceIcons;
+    device->fromMap(toMap());
+    return device;
 }
 
 QString IDevice::deviceStateToString() const

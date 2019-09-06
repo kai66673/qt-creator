@@ -24,18 +24,22 @@
 ****************************************************************************/
 
 #include "kitmanagerconfigwidget.h"
-#include "projectexplorerconstants.h"
 
+#include "devicesupport/idevicefactory.h"
 #include "kit.h"
+#include "kitinformation.h"
 #include "kitmanager.h"
+#include "projectexplorerconstants.h"
 #include "task.h"
 
 #include <coreplugin/variablechooser.h>
 
 #include <utils/algorithm.h>
 #include <utils/detailswidget.h>
-#include <utils/qtcassert.h>
 #include <utils/macroexpander.h>
+#include <utils/pathchooser.h>
+#include <utils/qtcassert.h>
+#include <utils/utilsicons.h>
 
 #include <QAction>
 #include <QRegularExpression>
@@ -44,6 +48,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPainter>
 #include <QPushButton>
 #include <QToolButton>
@@ -93,11 +98,10 @@ KitManagerConfigWidget::KitManagerConfigWidget(Kit *k) :
     mainLayout->setMargin(1);
     mainLayout->addWidget(inner, 0, 0);
 
-    toolTip = tr("Kit name and icon.");
-    label = createLabel(tr("Name:"), toolTip);
+    label = createLabel(tr("Name:"), tr("Kit name and icon."));
     m_layout->addWidget(label, 0, LabelColumn, alignment);
-    m_iconButton->setToolTip(toolTip);
-    auto setIconAction = new QAction(tr("Select Icon File"), this);
+    m_iconButton->setToolTip(tr("Kit icon."));
+    auto setIconAction = new QAction(tr("Select Icon..."), this);
     m_iconButton->addAction(setIconAction);
     auto resetIconAction = new QAction(tr("Reset to Device Default Icon"), this);
     m_iconButton->addAction(resetIconAction);
@@ -152,28 +156,34 @@ QString KitManagerConfigWidget::displayName() const
     return m_cachedDisplayName;
 }
 
-QIcon KitManagerConfigWidget::icon() const
+QIcon KitManagerConfigWidget::displayIcon() const
 {
-    return m_modifiedKit->icon();
+    // Special case: Extra warning if there are no errors but name is not unique.
+    if (m_modifiedKit->isValid() && !m_hasUniqueName) {
+        static const QIcon warningIcon(Utils::Icons::WARNING.icon());
+        return warningIcon;
+    }
+
+    return m_modifiedKit->displayIcon();
 }
 
 void KitManagerConfigWidget::apply()
 {
-    bool mustSetDefault = m_isDefaultKit;
-    bool mustRegister = false;
-    auto toRegister = std::make_unique<Kit>();
-    if (!m_kit) {
-        mustRegister = true;
-        m_kit = toRegister.get();
+    // TODO: Rework the mechanism so this won't be necessary.
+    const bool wasDefaultKit = m_isDefaultKit;
+
+    const auto copyIntoKit = [this](Kit *k) { k->copyFrom(m_modifiedKit.get()); };
+    if (m_kit) {
+        copyIntoKit(m_kit);
+        KitManager::notifyAboutUpdate(m_kit);
+    } else {
+        m_isRegistering = true;
+        m_kit = KitManager::registerKit(copyIntoKit);
+        m_isRegistering = false;
     }
-    m_kit->copyFrom(m_modifiedKit.get()); //m_isDefaultKit is reset in discard() here.
-    if (mustRegister)
-        KitManager::registerKit(std::move(toRegister));
-
-    if (mustSetDefault)
+    m_isDefaultKit = wasDefaultKit;
+    if (m_isDefaultKit)
         KitManager::setDefaultKit(m_kit);
-
-    m_isDefaultKit = mustSetDefault;
     emit dirty();
 }
 
@@ -201,21 +211,11 @@ bool KitManagerConfigWidget::isDirty() const
             || m_isDefaultKit != (KitManager::defaultKit() == m_kit);
 }
 
-bool KitManagerConfigWidget::isValid() const
-{
-    return m_modifiedKit->isValid();
-}
-
-bool KitManagerConfigWidget::hasWarning() const
-{
-    return m_modifiedKit->hasWarning() || !m_hasUniqueName;
-}
-
 QString KitManagerConfigWidget::validityMessage() const
 {
-    QList<Task> tmp;
+    Tasks tmp;
     if (!m_hasUniqueName) {
-        tmp.append(Task(Task::Warning, tr("Display name is not unique."), Utils::FileName(), -1,
+        tmp.append(Task(Task::Warning, tr("Display name is not unique."), Utils::FilePath(), -1,
                         ProjectExplorer::Constants::TASK_CATEGORY_COMPILE));
     }
     return m_modifiedKit->toHtml(tmp);
@@ -317,24 +317,49 @@ void KitManagerConfigWidget::removeKit()
 
 void KitManagerConfigWidget::setIcon()
 {
-    const QString path = QFileDialog::getOpenFileName(this, tr("Select Icon"),
-                                                      m_modifiedKit->iconPath().toString(),
-                                                      tr("Images (*.png *.xpm *.jpg)"));
-    if (path.isEmpty())
-        return;
-
-    const QIcon icon(path);
-    if (icon.isNull())
-        return;
-
-    m_iconButton->setIcon(icon);
-    m_modifiedKit->setIconPath(Utils::FileName::fromString(path));
-    emit dirty();
+    const Core::Id deviceType = DeviceTypeKitAspect::deviceTypeId(m_modifiedKit.get());
+    QList<IDeviceFactory *> allDeviceFactories = IDeviceFactory::allDeviceFactories();
+    if (deviceType.isValid()) {
+        const auto less = [deviceType](const IDeviceFactory *f1, const IDeviceFactory *f2) {
+            if (f1->deviceType() == deviceType)
+                return true;
+            if (f2->deviceType() == deviceType)
+                return false;
+            return f1->displayName() < f2->displayName();
+        };
+        Utils::sort(allDeviceFactories, less);
+    }
+    QMenu iconMenu;
+    for (const IDeviceFactory * const factory : qAsConst(allDeviceFactories)) {
+        if (factory->icon().isNull())
+            continue;
+        iconMenu.addAction(factory->icon(), tr("Default for %1").arg(factory->displayName()),
+                           [this, factory] {
+            m_iconButton->setIcon(factory->icon());
+            m_modifiedKit->setDeviceTypeForIcon(factory->deviceType());
+            emit dirty();
+        });
+    }
+    iconMenu.addSeparator();
+    iconMenu.addAction(Utils::PathChooser::browseButtonLabel(), [this] {
+        const QString path = QFileDialog::getOpenFileName(this, tr("Select Icon"),
+                                                          m_modifiedKit->iconPath().toString(),
+                                                          tr("Images (*.png *.xpm *.jpg)"));
+        if (path.isEmpty())
+            return;
+        const QIcon icon(path);
+        if (icon.isNull())
+            return;
+        m_iconButton->setIcon(icon);
+        m_modifiedKit->setIconPath(Utils::FilePath::fromString(path));
+        emit dirty();
+    });
+    iconMenu.exec(mapToGlobal(m_iconButton->pos()));
 }
 
 void KitManagerConfigWidget::resetIcon()
 {
-    m_modifiedKit->setIconPath(Utils::FileName());
+    m_modifiedKit->setIconPath(Utils::FilePath());
     emit dirty();
 }
 

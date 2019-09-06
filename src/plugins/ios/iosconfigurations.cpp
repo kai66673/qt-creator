@@ -136,7 +136,7 @@ static ToolChainPair findToolChainForPlatform(const XcodePlatform &platform,
                                               const QList<ClangToolChain *> &toolChains)
 {
     ToolChainPair platformToolChains;
-    auto toolchainMatch = [](ClangToolChain *toolChain, const Utils::FileName &compilerPath, const QStringList &flags) {
+    auto toolchainMatch = [](ClangToolChain *toolChain, const Utils::FilePath &compilerPath, const QStringList &flags) {
         return compilerPath == toolChain->compilerCommand()
                 && flags == toolChain->platformCodeGenFlags()
                 && flags == toolChain->platformLinkerFlags();
@@ -167,11 +167,11 @@ static QHash<XcodePlatform::ToolchainTarget, ToolChainPair> findToolChains(const
 
 static QSet<Kit *> existingAutoDetectedIosKits()
 {
-    return Utils::filtered(KitManager::kits(), [](Kit *kit) -> bool {
+    return Utils::toSet(Utils::filtered(KitManager::kits(), [](Kit *kit) -> bool {
         Core::Id deviceKind = DeviceTypeKitAspect::deviceTypeId(kit);
         return kit->isAutoDetected() && (deviceKind == Constants::IOS_DEVICE_TYPE
                                          || deviceKind == Constants::IOS_SIMULATOR_TYPE);
-    }).toSet();
+    }));
 }
 
 static void printKits(const QSet<Kit *> &kits)
@@ -181,7 +181,7 @@ static void printKits(const QSet<Kit *> &kits)
 }
 
 static void setupKit(Kit *kit, Core::Id pDeviceType, const ToolChainPair& toolChains,
-                     const QVariant &debuggerId, const Utils::FileName &sdkPath, BaseQtVersion *qtVersion)
+                     const QVariant &debuggerId, const Utils::FilePath &sdkPath, BaseQtVersion *qtVersion)
 {
     DeviceTypeKitAspect::setDeviceTypeId(kit, pDeviceType);
     if (toolChains.first)
@@ -212,9 +212,9 @@ static void setupKit(Kit *kit, Core::Id pDeviceType, const ToolChainPair& toolCh
     SysRootKitAspect::setSysRoot(kit, sdkPath);
 }
 
-static QVersionNumber findXcodeVersion(const Utils::FileName &developerPath)
+static QVersionNumber findXcodeVersion(const Utils::FilePath &developerPath)
 {
-    FileName xcodeInfo = developerPath.parentDir().appendPath("Info.plist");
+    const FilePath xcodeInfo = developerPath.parentDir().pathAppended("Info.plist");
     if (xcodeInfo.exists()) {
         QSettings settings(xcodeInfo.toString(), QSettings::NativeFormat);
         return QVersionNumber::fromString(settings.value("CFBundleShortVersionString").toString());
@@ -249,9 +249,9 @@ void IosConfigurations::updateAutomaticKitList()
     // target -> tool chain
     const auto targetToolChainHash = findToolChains(platforms);
 
-    const auto qtVersions = QtVersionManager::versions([](const BaseQtVersion *v) {
+    const auto qtVersions = Utils::toSet(QtVersionManager::versions([](const BaseQtVersion *v) {
         return v->isValid() && v->type() == Constants::IOSQT;
-    }).toSet();
+    }));
 
     const DebuggerItem *possibleDebugger = DebuggerItemManager::findByEngineType(LldbEngineType);
     const QVariant debuggerId = (possibleDebugger ? possibleDebugger->id() : QVariant());
@@ -300,17 +300,15 @@ void IosConfigurations::updateAutomaticKitList()
                     kit->unblockNotification();
                 } else {
                     qCDebug(kitSetupLog) << "    - Setting up new kit";
-                    auto newKit = std::make_unique<Kit>();
-                    kit = newKit.get();
-                    kit->blockNotification();
-                    kit->setAutoDetected(true);
-                    const QString baseDisplayName = isSimulatorDeviceId(pDeviceType)
-                            ? tr("%1 Simulator").arg(qtVersion->unexpandedDisplayName())
-                            : qtVersion->unexpandedDisplayName();
-                    kit->setUnexpandedDisplayName(baseDisplayName);
-                    setupKit(kit, pDeviceType, platformToolchains, debuggerId, sdk.path, qtVersion);
-                    kit->unblockNotification();
-                    KitManager::registerKit(std::move(newKit));
+                    const auto init = [&](Kit *k) {
+                        k->setAutoDetected(true);
+                        const QString baseDisplayName = isSimulatorDeviceId(pDeviceType)
+                                ? tr("%1 Simulator").arg(qtVersion->unexpandedDisplayName())
+                                : qtVersion->unexpandedDisplayName();
+                        k->setUnexpandedDisplayName(baseDisplayName);
+                        setupKit(k, pDeviceType, platformToolchains, debuggerId, sdk.path, qtVersion);
+                    };
+                    kit = KitManager::registerKit(init);
                 }
                 resultingKits.insert(kit);
             }
@@ -359,7 +357,7 @@ void IosConfigurations::setIgnoreAllDevices(bool ignoreDevices)
     }
 }
 
-void IosConfigurations::setScreenshotDir(const FileName &path)
+void IosConfigurations::setScreenshotDir(const FilePath &path)
 {
     if (m_instance->m_screenshotDir != path) {
         m_instance->m_screenshotDir = path;
@@ -367,12 +365,12 @@ void IosConfigurations::setScreenshotDir(const FileName &path)
     }
 }
 
-FileName IosConfigurations::screenshotDir()
+FilePath IosConfigurations::screenshotDir()
 {
     return m_instance->m_screenshotDir;
 }
 
-FileName IosConfigurations::developerPath()
+FilePath IosConfigurations::developerPath()
 {
     return m_instance->m_developerPath;
 }
@@ -404,11 +402,11 @@ void IosConfigurations::load()
     QSettings *settings = Core::ICore::settings();
     settings->beginGroup(SettingsGroup);
     m_ignoreAllDevices = settings->value(ignoreAllDevicesKey, false).toBool();
-    m_screenshotDir = FileName::fromString(settings->value(screenshotDirPathKey).toString());
+    m_screenshotDir = FilePath::fromString(settings->value(screenshotDirPathKey).toString());
     if (!m_screenshotDir.exists()) {
         QString defaultDir =
                 QStandardPaths::standardLocations(QStandardPaths::PicturesLocation).constFirst();
-        m_screenshotDir = FileName::fromString(defaultDir);
+        m_screenshotDir = FilePath::fromString(defaultDir);
     }
 
     settings->endGroup();
@@ -427,7 +425,7 @@ void IosConfigurations::updateSimulators()
     SimulatorControl::updateAvailableSimulators();
 }
 
-void IosConfigurations::setDeveloperPath(const FileName &devPath)
+void IosConfigurations::setDeveloperPath(const FilePath &devPath)
 {
     static bool hasDevPath = false;
     if (devPath != m_instance->m_developerPath) {
@@ -588,7 +586,8 @@ static ClangToolChain *createToolChain(const XcodePlatform &platform,
             && l != Core::Id(ProjectExplorer::Constants::CXX_LANGUAGE_ID))
         return nullptr;
 
-    auto toolChain = new ClangToolChain(ToolChain::AutoDetection);
+    auto toolChain = new ClangToolChain;
+    toolChain->setDetection(ToolChain::AutoDetection);
     toolChain->setLanguage(l);
     toolChain->setDisplayName(target.name);
     toolChain->setPlatformCodeGenFlags(target.backendFlags);
@@ -599,12 +598,10 @@ static ClangToolChain *createToolChain(const XcodePlatform &platform,
     return toolChain;
 }
 
-QSet<Core::Id> IosToolChainFactory::supportedLanguages() const
+IosToolChainFactory::IosToolChainFactory()
 {
-    return {
-        ProjectExplorer::Constants::C_LANGUAGE_ID,
-        ProjectExplorer::Constants::CXX_LANGUAGE_ID
-    };
+    setSupportedLanguages({ProjectExplorer::Constants::C_LANGUAGE_ID,
+                           ProjectExplorer::Constants::CXX_LANGUAGE_ID});
 }
 
 QList<ToolChain *> IosToolChainFactory::autoDetect(const QList<ToolChain *> &existingToolChains)

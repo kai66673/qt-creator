@@ -24,7 +24,6 @@
 ****************************************************************************/
 
 #include "nimbuildconfiguration.h"
-#include "nimbuildconfigurationwidget.h"
 #include "nimcompilerbuildstep.h"
 #include "nimproject.h"
 #include "nimbuildconfiguration.h"
@@ -43,6 +42,7 @@
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/projectmacroexpander.h>
 #include <projectexplorer/target.h>
+#include <projectexplorer/projectconfigurationaspects.h>
 #include <utils/mimetypes/mimedatabase.h>
 #include <utils/qtcassert.h>
 
@@ -51,7 +51,7 @@ using namespace Utils;
 
 namespace Nim {
 
-static FileName defaultBuildDirectory(const Kit *k,
+static FilePath defaultBuildDirectory(const Kit *k,
                                       const QString &projectFilePath,
                                       const QString &bc,
                                       BuildConfiguration::BuildType buildType)
@@ -62,17 +62,18 @@ static FileName defaultBuildDirectory(const Kit *k,
     QString buildDirectory = expander.expand(ProjectExplorerPlugin::buildDirectoryTemplate());
 
     if (FileUtils::isAbsolutePath(buildDirectory))
-        return FileName::fromString(buildDirectory);
+        return FilePath::fromString(buildDirectory);
 
-    auto projectDir = FileName::fromString(projectFileInfo.absoluteDir().absolutePath());
-    auto result = projectDir.appendPath(buildDirectory);
-
-    return result;
+    auto projectDir = FilePath::fromString(projectFileInfo.absoluteDir().absolutePath());
+    return projectDir.pathAppended(buildDirectory);
 }
 
 NimBuildConfiguration::NimBuildConfiguration(Target *target, Core::Id id)
     : BuildConfiguration(target, id)
 {
+    setConfigWidgetDisplayName(tr("General"));
+    setConfigWidgetHasFrame(true);
+    setBuildDirectorySettingsKey("Nim.NimBuildConfiguration.BuildDirectory");
 }
 
 void NimBuildConfiguration::initialize(const BuildInfo &info)
@@ -105,7 +106,7 @@ void NimBuildConfiguration::initialize(const BuildInfo &info)
             break;
         }
         nimCompilerBuildStep->setDefaultCompilerOptions(defaultOption);
-        Utils::FileNameList nimFiles = project->nimFiles();
+        Utils::FilePathList nimFiles = project->nimFiles();
         if (!nimFiles.isEmpty())
             nimCompilerBuildStep->setTargetNimFile(nimFiles.first());
         buildSteps->appendStep(nimCompilerBuildStep);
@@ -118,48 +119,20 @@ void NimBuildConfiguration::initialize(const BuildInfo &info)
     }
 }
 
-
-NamedWidget *NimBuildConfiguration::createConfigWidget()
-{
-    return new NimBuildConfigurationWidget(this);
-}
-
 BuildConfiguration::BuildType NimBuildConfiguration::buildType() const
 {
     return BuildConfiguration::Unknown;
 }
 
-bool NimBuildConfiguration::fromMap(const QVariantMap &map)
+FilePath NimBuildConfiguration::cacheDirectory() const
 {
-    if (!BuildConfiguration::fromMap(map))
-        return false;
-
-    const QString displayName = map[Constants::C_NIMBUILDCONFIGURATION_DISPLAY_KEY].toString();
-    const QString buildDirectory = map[Constants::C_NIMBUILDCONFIGURATION_BUILDDIRECTORY_KEY].toString();
-
-    setDisplayName(displayName);
-    setBuildDirectory(FileName::fromString(buildDirectory));
-
-    return true;
+    return buildDirectory().pathAppended("nimcache");
 }
 
-QVariantMap NimBuildConfiguration::toMap() const
-{
-    QVariantMap result = BuildConfiguration::toMap();
-    result[Constants::C_NIMBUILDCONFIGURATION_DISPLAY_KEY] = displayName();
-    result[Constants::C_NIMBUILDCONFIGURATION_BUILDDIRECTORY_KEY] = buildDirectory().toString();
-    return result;
-}
-
-FileName NimBuildConfiguration::cacheDirectory() const
-{
-    return buildDirectory().appendPath(QStringLiteral("nimcache"));
-}
-
-FileName NimBuildConfiguration::outFilePath() const
+FilePath NimBuildConfiguration::outFilePath() const
 {
     const NimCompilerBuildStep *step = nimCompilerBuildStep();
-    QTC_ASSERT(step, return FileName());
+    QTC_ASSERT(step, return FilePath());
     return step->outFilePath();
 }
 

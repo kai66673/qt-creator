@@ -185,7 +185,7 @@ void tst_TestCore::initTestCase()
     QFutureInterface<void> result;
     QmlJS::PathsAndLanguages lPaths;
 
-    lPaths.maybeInsert(Utils::FileName::fromString(basePaths.first()), QmlJS::Dialect::Qml);
+    lPaths.maybeInsert(Utils::FilePath::fromString(basePaths.first()), QmlJS::Dialect::Qml);
     QmlJS::ModelManagerInterface::importScan(result, QmlJS::ModelManagerInterface::workingCopy(),
         lPaths, QmlJS::ModelManagerInterface::instance(), false);
 
@@ -611,6 +611,8 @@ void tst_TestCore::testRewriterDynamicProperties()
     const QString inThere = testRewriterView1->rootModelNode().variantProperty("vv").value().value<QString>();
     QCOMPARE(inThere, QString("Hello"));
 
+    rootModelNode.variantProperty("vv").setDynamicTypeNameAndValue("variant", "hallo2");
+
     // test model2text
 //    QPlainTextEdit textEdit2;
 //    textEdit2.setPlainText("import QtQuick 1.1; Item{}");
@@ -1015,6 +1017,44 @@ void tst_TestCore::testRewriterUnicodeChars()
     const QLatin1String unicodeChar("\nimport QtQuick 2.1\n\nText {\n    text: \"\\u2795\"}\n");
 
      QCOMPARE(textEdit.toPlainText(), unicodeChar);
+}
+
+void tst_TestCore::testRewriterTransactionAddingAfterReparenting()
+{
+    const QLatin1String qmlString("\n"
+                                  "import QtQuick 2.0\n"
+                                  "\n"
+                                  "Item {\n"
+                                  "}\n");
+
+    QPlainTextEdit textEdit;
+    textEdit.setPlainText(qmlString);
+    NotIndentingTextEditModifier modifier(&textEdit);
+
+    QScopedPointer<Model> model(Model::create("QtQuick.Rectangle"));
+
+    QScopedPointer<TestRewriterView> testRewriterView(new TestRewriterView(0, RewriterView::Amend));
+    testRewriterView->setTextModifier(&modifier);
+    model->attachView(testRewriterView.data());
+
+    QVERIFY(testRewriterView->errors().isEmpty());
+
+    ModelNode rootModelNode = testRewriterView->rootModelNode();
+    QVERIFY(rootModelNode.isValid());
+
+    {
+        /* Regression test
+         * If a node is not a direct child node of the root item we did get an exception when adding properties
+         * after the reparent */
+
+        RewriterTransaction transaction = testRewriterView->beginRewriterTransaction("TEST");
+        ModelNode rectangle = testRewriterView->createModelNode("QtQuick.Rectangle", 2, 0);
+        rootModelNode.nodeListProperty("data").reparentHere(rectangle);
+        ModelNode rectangle2 = testRewriterView->createModelNode("QtQuick.Rectangle", 2, 0);
+        rectangle.nodeListProperty("data").reparentHere(rectangle2);
+
+        rectangle2.variantProperty("width").setValue(100);
+    }
 }
 
 void tst_TestCore::testRewriterForGradientMagic()
@@ -4532,6 +4572,64 @@ void tst_TestCore::testImplicitComponents()
 
     QVERIFY(delegate.isComponent()); //The delegate is an implicit component
     QCOMPARE(delegate.nodeSourceType(), ModelNode::NodeWithComponentSource);
+}
+
+void tst_TestCore::testRevisionedProperties()
+{
+#if QT_VERSION > QT_VERSION_CHECK(5, 11, 0)
+    const char* qmlString
+            =   "import QtQuick 2.12\n"
+                "import QtQuick.Controls 2.0\n"
+                "import QtQuick.Layouts 1.0\n"
+                "\n"
+                "Item {\n"
+                     "width: 640\n"
+                     "height: 480\n"
+                     "Rectangle {\n"
+                       "gradient: Gradient {\n"
+                       "orientation: Qt.Vertical\n"
+                       "}\n"
+                     "}\n"
+                     "TextEdit {\n"
+                       "leftPadding: 10\n"
+                       "rightPadding: 10\n"
+                       "topPadding: 10\n"
+                       "bottomPadding: 10\n"
+                     "}\n"
+                "}\n";
+
+    QPlainTextEdit textEdit;
+    textEdit.setPlainText(QLatin1String(qmlString));
+    NotIndentingTextEditModifier modifier(&textEdit);
+
+    QScopedPointer<Model> model(Model::create("QtQuick.Item"));
+    QVERIFY(model.data());
+    QScopedPointer<TestView> view(new TestView(model.data()));
+    QVERIFY(view.data());
+    model->attachView(view.data());
+
+    TestRewriterView *testRewriterView = new TestRewriterView(model.data());
+    testRewriterView->setCheckSemanticErrors(true);
+    testRewriterView->setTextModifier(&modifier);
+    model->attachView(testRewriterView);
+
+    QVERIFY(testRewriterView->errors().isEmpty());
+
+    ModelNode rootModelNode(view->rootModelNode());
+
+    QVERIFY(rootModelNode.isValid());
+
+    NodeMetaInfo metaInfo12 = model->metaInfo("QtQuick.Gradient", 2, 12);
+    NodeMetaInfo metaInfo11 = model->metaInfo("QtQuick.Gradient", -1, -1);
+    NodeMetaInfo metaInfoU = model->metaInfo("QtQuick.Gradient", -1, -1);
+
+    QVERIFY(metaInfo12.isValid());
+    QVERIFY(metaInfoU.isValid());
+
+    QVERIFY(metaInfo12.hasProperty("orientation"));
+    QVERIFY(metaInfoU.hasProperty("orientation"));
+
+#endif
 }
 
 void tst_TestCore::testStatesRewriter()

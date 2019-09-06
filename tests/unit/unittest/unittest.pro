@@ -9,6 +9,8 @@ include(clang_dependency.pri)
 include(creator_dependency.pri)
 include(benchmark_dependency.pri)
 
+requires(isEmpty(QTC_CLANG_BUILDMODE_MISMATCH))
+
 OBJECTS_DIR = $$OUT_PWD/obj # workaround for qmake bug in object_parallel_to_source
 
 !msvc:force_debug_info:QMAKE_CXXFLAGS += -fno-omit-frame-pointer
@@ -26,6 +28,9 @@ msvc: QMAKE_CXXFLAGS_WARN_ON -= -w34100 # 'unreferenced formal parameter' in MAT
 win32:DEFINES += ECHOSERVER=\"R\\\"xxx($$OUT_PWD/../echo)xxx\\\"\"
 unix: DEFINES += ECHOSERVER=\"R\\\"xxx($$OUT_PWD/../echoserver/echo)xxx\\\"\"
 
+RELATIVE_DATA_PATH = ../../../share/qtcreator
+DEFINES += $$shell_quote(RELATIVE_DATA_PATH=\"$$RELATIVE_DATA_PATH\")
+
 linux {
 QMAKE_LFLAGS_RELEASE = #disable optimization
 QMAKE_LFLAGS += -fno-merge-debug-strings -fuse-ld=gold
@@ -33,7 +38,7 @@ CONFIG(release, debug|release):QMAKE_LFLAGS += -Wl,--strip-debug
 }
 
 gcc:!clang: QMAKE_CXXFLAGS += -Wno-noexcept-type
-msvc: QMAKE_CXXFLAGS += /bigobj
+msvc: QMAKE_CXXFLAGS += /bigobj /wd4267 /wd4141 /wd4146
 
 # create fake CppTools.json for the mime type definitions
 dependencyList = "\"Dependencies\" : []"
@@ -43,7 +48,7 @@ QMAKE_SUBSTITUTES += cpptoolsjson
 DEFINES += CPPTOOLS_JSON=\"R\\\"xxx($${cpptoolsjson.output})xxx\\\"\"
 
 SOURCES += \
-    changedfilepathcompressor-test.cpp \
+    directorypathcompressor-test.cpp \
     clangpathwatcher-test.cpp \
     clangqueryexamplehighlightmarker-test.cpp \
     clangqueryhighlightmarker-test.cpp \
@@ -65,7 +70,8 @@ SOURCES += \
     pchmanagerclient-test.cpp \
     pchmanagerserver-test.cpp \
     processevents-utilities.cpp \
-    projectparts-test.cpp \
+    projectpartsmanager-test.cpp \
+    projectpartsstorage-test.cpp \
     projectupdater-test.cpp \
     readandwritemessageblock-test.cpp \
     sizedarray-test.cpp \
@@ -91,10 +97,8 @@ SOURCES += \
     nativefilepath-test.cpp \
     nativefilepathview-test.cpp \
     mocktimer.cpp \
-    tokenprocessor-test.cpp \
     projectpartartefact-test.cpp \
     filestatuscache-test.cpp \
-    highlightingresultreporter-test.cpp \
     precompiledheaderstorage-test.cpp \
     generatedfiles-test.cpp \
     sourcesmanager-test.cpp \
@@ -157,6 +161,7 @@ SOURCES += \
     diagnosticset-test.cpp \
     diagnostic-test.cpp \
     fixit-test.cpp \
+    highlightingresultreporter-test.cpp \
     senddocumenttracker-test.cpp \
     skippedsourceranges-test.cpp \
     sourcelocation-test.cpp \
@@ -168,14 +173,16 @@ SOURCES += \
     sqlitetable-test.cpp \
     sqlstatementbuilder-test.cpp \
     token-test.cpp \
+    tokenprocessor-test.cpp \
     translationunitupdater-test.cpp \
     unsavedfiles-test.cpp \
     unsavedfile-test.cpp \
-    utf8positionfromlinecolumn-test.cpp \
+    utf8positionfromlinecolumn-test.cpp
 }
 
 !isEmpty(LIBTOOLING_LIBS) {
 SOURCES += \
+    gtest-llvm-printing.cpp \
     clangquerygatherer-test.cpp \
     clangqueryprojectfindfilter-test.cpp \
     clangquery-test.cpp \
@@ -189,7 +196,6 @@ SOURCES += \
     sourcerangeextractor-test.cpp \
     symbolindexing-test.cpp \
     symbolscollector-test.cpp \
-    symbolfinder-test.cpp \
     testclangtool.cpp \
     usedmacrocollector-test.cpp \
     builddependencycollector-test.cpp
@@ -199,7 +205,7 @@ SOURCES += \
     SOURCES += clangformat-test.cpp
 }
 
-exists($$GOOGLEBENCHMARK_DIR) {
+!isEmpty(GOOGLEBENCHMARK_DIR):exists($$GOOGLEBENCHMARK_DIR) {
 SOURCES += \
     smallstring-benchmark.cpp
 }
@@ -214,17 +220,20 @@ HEADERS += \
     filesystem-utilities.h \
     googletest.h \
     gtest-creator-printing.h \
+    gtest-llvm-printing.h \
     gtest-qt-printing.h \
     mimedatabase-utilities.h \
     mockclangcodemodelclient.h \
     mockclangcodemodelserver.h \
     mockclangpathwatcher.h \
     mockclangpathwatchernotifier.h \
+    mockfilesystem.h \
     mockpchcreator.h \
     mockpchmanagerclient.h \
     mockpchmanagernotifier.h \
     mockpchmanagerserver.h \
-    mockprojectparts.h \
+    mockprojectpartsmanager.h \
+    mockprojectpartsstorage.h \
     mockqfilesystemwatcher.h \
     mocksearch.h \
     mocksearchhandle.h \

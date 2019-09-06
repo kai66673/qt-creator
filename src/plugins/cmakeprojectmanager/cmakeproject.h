@@ -30,11 +30,11 @@
 #include "builddirmanager.h"
 #include "cmakebuildtarget.h"
 #include "cmakeprojectimporter.h"
-#include "treescanner.h"
 
 #include <projectexplorer/extracompiler.h>
-#include <projectexplorer/projectmacro.h>
 #include <projectexplorer/project.h>
+#include <projectexplorer/projectmacro.h>
+#include <projectexplorer/treescanner.h>
 
 #include <utils/fileutils.h>
 
@@ -60,14 +60,14 @@ class CMAKE_EXPORT CMakeProject : public ProjectExplorer::Project
     Q_OBJECT
 
 public:
-    explicit CMakeProject(const Utils::FileName &filename);
+    explicit CMakeProject(const Utils::FilePath &filename);
     ~CMakeProject() final;
 
     QStringList buildTargetTitles() const;
 
     bool knowsAllBuildExecutables() const final;
 
-    QList<ProjectExplorer::Task> projectIssues(const ProjectExplorer::Kit *k) const final;
+    ProjectExplorer::Tasks projectIssues(const ProjectExplorer::Kit *k) const final;
 
     void runCMake();
     void runCMakeAndScanProjectTree();
@@ -103,12 +103,17 @@ private:
     QList<ProjectExplorer::ExtraCompiler *> findExtraCompilers() const;
     QStringList filesGeneratedFrom(const QString &sourceFile) const final;
 
+    ProjectExplorer::DeploymentKnowledge deploymentKnowledge() const override;
+    bool hasMakeInstallEquivalent() const override { return true; }
+    ProjectExplorer::MakeInstallCommand makeInstallCommand(const ProjectExplorer::Target *target,
+                                                           const QString &installRoot) override;
+
     // TODO probably need a CMake specific node structure
     QList<CMakeBuildTarget> m_buildTargets;
     CppTools::CppProjectUpdater *m_cppCodeModelUpdater = nullptr;
     QList<ProjectExplorer::ExtraCompiler *> m_extraCompilers;
 
-    Internal::TreeScanner m_treeScanner;
+    ProjectExplorer::TreeScanner m_treeScanner;
     Internal::BuildDirManager m_buildDirManager;
 
     bool m_waitingForScan = false;

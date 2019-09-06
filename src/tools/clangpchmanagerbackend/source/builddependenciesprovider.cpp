@@ -55,19 +55,21 @@ OutputContainer setUnion(InputContainer1 &&input1,
 
 BuildDependency BuildDependenciesProvider::create(const ProjectPartContainer &projectPart)
 {
-    SourceEntries includes = createSourceEntriesFromStorage(projectPart.sourcePathIds,
-                                                            projectPart.projectPartId);
+    m_ensureAliveMessageIsSentCallback();
 
-    if (!m_modifiedTimeChecker.isUpToDate(includes)) {
+    auto sourcesAndProjectPart = createSourceEntriesFromStorage(projectPart.sourcePathIds,
+                                                                projectPart.projectPartId);
+
+    if (!m_modifiedTimeChecker.isUpToDate(sourcesAndProjectPart.first)) {
         BuildDependency buildDependency = m_generator.create(projectPart);
 
-        storeBuildDependency(buildDependency);
+        storeBuildDependency(buildDependency, sourcesAndProjectPart.second);
 
         return buildDependency;
     }
 
-    return createBuildDependencyFromStorage(std::move(includes));
-
+    return createBuildDependencyFromStorage(
+        std::move(sourcesAndProjectPart.first));
 }
 
 BuildDependency BuildDependenciesProvider::createBuildDependencyFromStorage(
@@ -76,7 +78,7 @@ BuildDependency BuildDependenciesProvider::createBuildDependencyFromStorage(
     BuildDependency buildDependency;
 
     buildDependency.usedMacros = createUsedMacrosFromStorage(includes);
-    buildDependency.includes = std::move(includes);
+    buildDependency.sources = std::move(includes);
 
     return buildDependency;
 }
@@ -101,16 +103,15 @@ UsedMacros BuildDependenciesProvider::createUsedMacrosFromStorage(const SourceEn
     return usedMacros;
 }
 
-SourceEntries BuildDependenciesProvider::createSourceEntriesFromStorage(
-        const FilePathIds &sourcePathIds, Utils::SmallStringView projectPartId) const
+std::pair<SourceEntries, ProjectPartId> BuildDependenciesProvider::createSourceEntriesFromStorage(
+    const FilePathIds &sourcePathIds, ProjectPartId projectPartId) const
 {
     SourceEntries includes;
 
     Sqlite::DeferredTransaction transaction(m_transactionBackend);
 
     for (FilePathId sourcePathId : sourcePathIds) {
-        SourceEntries entries = m_storage.fetchDependSources(sourcePathId,
-                                                                              projectPartId);
+        SourceEntries entries = m_storage.fetchDependSources(sourcePathId, projectPartId);
         SourceEntries mergedEntries = setUnion<SourceEntries>(includes, entries);
 
         includes = std::move(mergedEntries);
@@ -118,15 +119,15 @@ SourceEntries BuildDependenciesProvider::createSourceEntriesFromStorage(
 
     transaction.commit();
 
-    return includes;
+    return {includes, projectPartId};
 }
 
-void BuildDependenciesProvider::storeBuildDependency(const BuildDependency &buildDependency)
+void BuildDependenciesProvider::storeBuildDependency(const BuildDependency &buildDependency,
+                                                     ProjectPartId projectPartId)
 {
     Sqlite::ImmediateTransaction transaction(m_transactionBackend);
-
-    m_storage.updateSources(buildDependency.includes);
-    m_storage.insertFileStatuses(buildDependency.fileStatuses);
+    m_storage.insertOrUpdateSources(buildDependency.sources, projectPartId);
+    m_storage.insertOrUpdateFileStatuses(buildDependency.fileStatuses);
     m_storage.insertOrUpdateSourceDependencies(buildDependency.sourceDependencies);
     m_storage.insertOrUpdateUsedMacros(buildDependency.usedMacros);
 

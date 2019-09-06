@@ -51,8 +51,10 @@ qint64 ConsoleProcess::applicationMainThreadID() const
     return d->m_appMainThreadId;
 }
 
-bool ConsoleProcess::start(const QString &program, const QString &args)
+bool ConsoleProcess::start(const QString &program, const QString &args, MetaCharMode metaCharMode)
 {
+    Q_UNUSED(metaCharMode);
+
     if (isRunning())
         return false;
 
@@ -377,7 +379,8 @@ bool ConsoleProcess::startTerminalEmulator(QSettings *, const QString &workingDi
     // cmdLine is assumed to be detached -
     // https://blogs.msdn.microsoft.com/oldnewthing/20090601-00/?p=18083
 
-    QString totalEnvironment = env.toStringList().join('\0') + '\0';
+
+    QString totalEnvironment = env.toStringList().join(QChar(QChar::Null)) + QChar(QChar::Null);
     LPVOID envPtr = (env != Utils::Environment::systemEnvironment())
             ? (WCHAR *)(totalEnvironment.utf16()) : nullptr;
 

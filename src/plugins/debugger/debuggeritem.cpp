@@ -106,8 +106,8 @@ DebuggerItem::DebuggerItem(const QVariant &id)
 DebuggerItem::DebuggerItem(const QVariantMap &data)
 {
     m_id = data.value(DEBUGGER_INFORMATION_ID).toString();
-    m_command = FileName::fromUserInput(data.value(DEBUGGER_INFORMATION_COMMAND).toString());
-    m_workingDirectory = FileName::fromUserInput(data.value(DEBUGGER_INFORMATION_WORKINGDIRECTORY).toString());
+    m_command = FilePath::fromUserInput(data.value(DEBUGGER_INFORMATION_COMMAND).toString());
+    m_workingDirectory = FilePath::fromUserInput(data.value(DEBUGGER_INFORMATION_WORKINGDIRECTORY).toString());
     m_unexpandedDisplayName = data.value(DEBUGGER_INFORMATION_DISPLAYNAME).toString();
     m_isAutoDetected = data.value(DEBUGGER_INFORMATION_AUTODETECTED, false).toBool();
     m_version = data.value(DEBUGGER_INFORMATION_VERSION).toString();
@@ -323,7 +323,7 @@ void DebuggerItem::setEngineType(const DebuggerEngineType &engineType)
     m_engineType = engineType;
 }
 
-void DebuggerItem::setCommand(const FileName &command)
+void DebuggerItem::setCommand(const FilePath &command)
 {
     m_command = command;
 }
@@ -343,7 +343,7 @@ void DebuggerItem::setVersion(const QString &version)
     m_version = version;
 }
 
-void DebuggerItem::setAbis(const QList<Abi> &abis)
+void DebuggerItem::setAbis(const Abis &abis)
 {
     m_abis = abis;
 }

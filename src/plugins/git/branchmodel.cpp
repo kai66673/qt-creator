@@ -36,6 +36,8 @@
 #include <QDateTime>
 #include <QFont>
 
+#include <set>
+
 using namespace VcsBase;
 
 namespace Git {
@@ -199,16 +201,23 @@ public:
 class BranchModel::Private
 {
 public:
-    Private(GitClient *client) :
+    explicit Private(GitClient *client) :
         client(client),
         rootNode(new BranchNode)
     {
     }
 
+    Private(const Private &) = delete;
+    Private &operator=(const Private &) = delete;
+
     ~Private()
     {
         delete rootNode;
     }
+
+    bool hasTags() const { return rootNode->children.count() > Tags; }
+    void parseOutputLine(const QString &line, bool force = false);
+    void flushOldEntries();
 
     GitClient *client;
     QString workingDirectory;
@@ -220,6 +229,17 @@ public:
     QStringList obsoleteLocalBranches;
     Utils::FileSystemWatcher fsWatcher;
     bool oldBranchesIncluded = false;
+
+    struct OldEntry
+    {
+        QString line;
+        QDateTime dateTime;
+        bool operator<(const OldEntry &other) const { return dateTime < other.dateTime; }
+    };
+
+    BranchNode *currentRoot = nullptr;
+    QString currentRemote;
+    std::set<OldEntry> oldEntries;
 };
 
 // --------------------------------------------------------------------------
@@ -366,7 +386,7 @@ void BranchModel::clear()
         while (root->count())
             delete root->children.takeLast();
     }
-    if (hasTags())
+    if (d->hasTags())
         d->rootNode->children.takeLast();
 
     d->currentSha.clear();
@@ -403,7 +423,8 @@ bool BranchModel::refresh(const QString &workingDirectory, QString *errorMessage
     }
     const QStringList lines = output.split('\n');
     for (const QString &l : lines)
-        parseOutputLine(l);
+        d->parseOutputLine(l);
+    d->flushOldEntries();
 
     if (d->currentBranch) {
         if (d->currentBranch->isLocal())
@@ -516,10 +537,7 @@ QDateTime BranchModel::dateTime(const QModelIndex &idx) const
     return node->dateTime;
 }
 
-bool BranchModel::hasTags() const
-{
-    return d->rootNode->children.count() > Tags;
-}
+
 
 bool BranchModel::isHead(const QModelIndex &idx) const
 {
@@ -547,7 +565,7 @@ bool BranchModel::isLeaf(const QModelIndex &idx) const
 
 bool BranchModel::isTag(const QModelIndex &idx) const
 {
-    if (!idx.isValid() || !hasTags())
+    if (!idx.isValid() || !d->hasTags())
         return false;
     return indexToNode(idx)->isTag();
 }
@@ -584,15 +602,15 @@ void BranchModel::removeTag(const QModelIndex &idx)
     removeNode(idx);
 }
 
-void BranchModel::checkoutBranch(const QModelIndex &idx)
+VcsCommand *BranchModel::checkoutBranch(const QModelIndex &idx)
 {
     QString branch = fullName(idx, !isLocal(idx));
     if (branch.isEmpty())
-        return;
+        return nullptr;
 
     // No StashGuard since this function for now is only used with clean working dir.
     // If it is ever used from another place, please add StashGuard here
-    d->client->checkout(d->workingDirectory, branch, GitClient::StashMode::NoStash);
+    return d->client->checkout(d->workingDirectory, branch, GitClient::StashMode::NoStash);
 }
 
 bool BranchModel::branchIsMerged(const QModelIndex &idx)
@@ -648,8 +666,6 @@ QModelIndex BranchModel::addBranch(const QString &name, bool track, const QModel
         startSha = sha(startPoint);
         branchDateTime = dateTime(startPoint);
     } else {
-        QString output;
-        QString errorMessage;
         const QStringList arguments({"-n1", "--format=%H %ct"});
         if (d->client->synchronousLog(d->workingDirectory, arguments, &output, &errorMessage,
                                       VcsCommand::SuppressCommandLogging)) {
@@ -722,7 +738,7 @@ Utils::optional<QString> BranchModel::remoteName(const QModelIndex &idx) const
     return Utils::nullopt;
 }
 
-void BranchModel::parseOutputLine(const QString &line)
+void BranchModel::Private::parseOutputLine(const QString &line, bool force)
 {
     if (line.size() < 3)
         return;
@@ -734,7 +750,7 @@ void BranchModel::parseOutputLine(const QString &line)
     const QString fullName = lineParts.at(1);
     const QString upstream = lineParts.at(2);
     QDateTime dateTime;
-    const bool current = (sha == d->currentSha);
+    const bool current = (sha == currentSha);
     QString strDateTime = lineParts.at(5);
     if (strDateTime.isEmpty())
         strDateTime = lineParts.at(4);
@@ -743,34 +759,57 @@ void BranchModel::parseOutputLine(const QString &line)
         dateTime = QDateTime::fromSecsSinceEpoch(timeT);
     }
 
-    if (!d->oldBranchesIncluded && !current && dateTime.isValid()) {
+    bool isOld = false;
+    if (!oldBranchesIncluded && !force && !current && dateTime.isValid()) {
         const qint64 age = dateTime.daysTo(QDateTime::currentDateTime());
-        if (age > Constants::OBSOLETE_COMMIT_AGE_IN_DAYS) {
-            const QString heads = "refs/heads/";
-            if (fullName.startsWith(heads))
-                d->obsoleteLocalBranches.append(fullName.mid(heads.size()));
-            return;
-        }
+        isOld = age > Constants::OBSOLETE_COMMIT_AGE_IN_DAYS;
     }
-    bool showTags = d->client->settings().boolValue(GitSettings::showTagsKey);
+    bool showTags = client->settings().boolValue(GitSettings::showTagsKey);
 
     // insert node into tree:
     QStringList nameParts = fullName.split('/');
     nameParts.removeFirst(); // remove refs...
 
     BranchNode *root = nullptr;
+    BranchNode *oldEntriesRoot = nullptr;
+    RootNodes rootType;
     if (nameParts.first() == "heads") {
-        root = d->rootNode->children.at(LocalBranches);
+        rootType = LocalBranches;
+        if (isOld)
+            obsoleteLocalBranches.append(fullName.mid(sizeof("refs/heads/")-1));
     } else if (nameParts.first() == "remotes") {
-        root = d->rootNode->children.at(RemoteBranches);
+        rootType = RemoteBranches;
+        const QString remoteName = nameParts.at(1);
+        root = rootNode->children.at(rootType);
+        oldEntriesRoot = root->childOfName(remoteName);
+        if (!oldEntriesRoot)
+            oldEntriesRoot = root->append(new BranchNode(remoteName));
     } else if (showTags && nameParts.first() == "tags") {
         if (!hasTags()) // Tags is missing, add it
-            d->rootNode->append(new BranchNode(tr("Tags"), "refs/tags"));
-        root = d->rootNode->children.at(Tags);
+            rootNode->append(new BranchNode(tr("Tags"), "refs/tags"));
+        rootType = Tags;
     } else {
         return;
     }
 
+    root = rootNode->children.at(rootType);
+    if (!oldEntriesRoot)
+        oldEntriesRoot = root;
+    if (isOld) {
+        if (oldEntriesRoot->children.size() > Constants::MAX_OBSOLETE_COMMITS_TO_DISPLAY)
+            return;
+        if (currentRoot != oldEntriesRoot) {
+            flushOldEntries();
+            currentRoot = oldEntriesRoot;
+        }
+        const bool eraseOldestEntry = oldEntries.size() >= Constants::MAX_OBSOLETE_COMMITS_TO_DISPLAY;
+        if (!eraseOldestEntry || dateTime > oldEntries.begin()->dateTime) {
+            if (eraseOldestEntry)
+                oldEntries.erase(oldEntries.begin());
+            oldEntries.insert(Private::OldEntry{line, dateTime});
+        }
+        return;
+    }
     nameParts.removeFirst();
 
     // limit depth of list. Git basically only ever wants one / and considers the rest as part of
@@ -786,7 +825,19 @@ void BranchModel::parseOutputLine(const QString &line)
     auto newNode = new BranchNode(name, sha, upstream, dateTime);
     root->insert(nameParts, newNode);
     if (current)
-        d->currentBranch = newNode;
+        currentBranch = newNode;
+}
+
+void BranchModel::Private::flushOldEntries()
+{
+    if (!currentRoot)
+        return;
+    for (int size = currentRoot->children.size(); size > 0 && !oldEntries.empty(); --size)
+        oldEntries.erase(oldEntries.begin());
+    for (const Private::OldEntry &entry : oldEntries)
+        parseOutputLine(entry.line, true);
+    oldEntries.clear();
+    currentRoot = nullptr;
 }
 
 BranchNode *BranchModel::indexToNode(const QModelIndex &index) const

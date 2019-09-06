@@ -27,6 +27,7 @@
 
 #include "projectexplorer_export.h"
 
+#include "deploymentdata.h"
 #include "kit.h"
 #include "subscription.h"
 
@@ -63,7 +64,7 @@ class PROJECTEXPLORER_EXPORT ProjectDocument : public Core::IDocument
 public:
     using ProjectCallback = std::function<void()>;
 
-    ProjectDocument(const QString &mimeType, const Utils::FileName &fileName,
+    ProjectDocument(const QString &mimeType, const Utils::FilePath &fileName,
                     const ProjectCallback &callback = {});
 
     Core::IDocument::ReloadBehavior reloadBehavior(Core::IDocument::ChangeTrigger state,
@@ -90,7 +91,7 @@ public:
         isParsingRole
     };
 
-    Project(const QString &mimeType, const Utils::FileName &fileName,
+    Project(const QString &mimeType, const Utils::FilePath &fileName,
             const ProjectDocument::ProjectCallback &callback = {});
     ~Project() override;
 
@@ -100,10 +101,13 @@ public:
     QString mimeType() const;
 
     Core::IDocument *document() const;
-    Utils::FileName projectFilePath() const;
-    Utils::FileName projectDirectory() const;
-    Utils::FileName rootProjectDirectory() const;
-    static Utils::FileName projectDirectory(const Utils::FileName &top);
+    Utils::FilePath projectFilePath() const;
+    Utils::FilePath projectDirectory() const;
+    static Utils::FilePath projectDirectory(const Utils::FilePath &top);
+
+    // This does not affect nodes, only the root path.
+    void changeRootProjectDirectory();
+    Utils::FilePath rootProjectDirectory() const;
 
     virtual ProjectNode *rootProjectNode() const;
     ContainerNode *containerNode() const;
@@ -122,7 +126,7 @@ public:
     Target *activeTarget() const;
     Target *target(Core::Id id) const;
     Target *target(Kit *k) const;
-    virtual QList<Task> projectIssues(const Kit *k) const;
+    virtual Tasks projectIssues(const Kit *k) const;
 
     std::unique_ptr<Target> createTarget(Kit *k);
     static bool copySteps(Target *sourceTarget, Target *newTarget);
@@ -137,9 +141,9 @@ public:
     static const NodeMatcher SourceFiles;
     static const NodeMatcher GeneratedFiles;
 
-    Utils::FileNameList files(const NodeMatcher &matcher) const;
+    Utils::FilePathList files(const NodeMatcher &matcher) const;
     virtual QStringList filesGeneratedFrom(const QString &sourceFile) const;
-    bool isKnownFile(const Utils::FileName &filename) const;
+    bool isKnownFile(const Utils::FilePath &filename) const;
 
     virtual QVariantMap toMap() const;
 
@@ -161,6 +165,10 @@ public:
     // The build system is able to report all executables that can be built, independent
     // of configuration.
     virtual bool knowsAllBuildExecutables() const;
+
+    virtual DeploymentKnowledge deploymentKnowledge() const { return DeploymentKnowledge::Bad; }
+    virtual bool hasMakeInstallEquivalent() const { return false; }
+    virtual MakeInstallCommand makeInstallCommand(const Target *target, const QString &installRoot);
 
     void setup(const QList<BuildInfo> &infoList);
     Utils::MacroExpander *macroExpander() const;
@@ -220,6 +228,8 @@ signals:
 
     void parsingStarted();
     void parsingFinished(bool success);
+
+    void rootProjectDirectoryChanged();
 
 protected:
     virtual RestoreResult fromMap(const QVariantMap &map, QString *errorMessage);

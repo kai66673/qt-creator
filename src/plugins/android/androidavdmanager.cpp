@@ -124,10 +124,6 @@ static CreateAvdInfo createAvdCommand(const AndroidConfig config, const CreateAv
                                                  Utils::equal(&SystemImage::abiName, result.abi));
         if (image && image->isValid()) {
             arguments << "-k" << image->sdkStylePath();
-            // Google api system images requires explicit abi as
-            // google-apis/ABI or --tag "google-apis"
-            if (image->sdkStylePath().contains(googleApiTag))
-                arguments << "--tag" << googleApiTag;
         } else {
             QString name = result.sdkPlatform->displayText();
             qCDebug(avdManagerLog) << "AVD Create failed. Cannot find system image for the platform"
@@ -296,7 +292,7 @@ bool AndroidAvdManager::startAvdAsync(const QString &avdName) const
     auto avdProcess = new QProcess();
     avdProcess->setProcessChannelMode(QProcess::MergedChannels);
     QObject::connect(avdProcess,
-                     static_cast<void (QProcess::*)(int)>(&QProcess::finished),
+                     QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                      avdProcess,
                      std::bind(&avdProcessFinished, std::placeholders::_1, avdProcess));
 
@@ -433,12 +429,11 @@ bool AvdManagerOutputParser::parseAvd(const QStringList &deviceInfo, AndroidDevi
         } else if (valueForKey(avdInfoNameKey, line, &value)) {
             avd->avdname = value;
         } else if (valueForKey(avdInfoPathKey, line, &value)) {
-            const Utils::FileName avdPath = Utils::FileName::fromString(value);
+            const Utils::FilePath avdPath = Utils::FilePath::fromString(value);
             if (avdPath.exists())
             {
                 // Get ABI.
-                Utils::FileName configFile = avdPath;
-                configFile.appendPath("config.ini");
+                const Utils::FilePath configFile = avdPath.pathAppended("config.ini");
                 QSettings config(configFile.toString(), QSettings::IniFormat);
                 value = config.value(avdInfoAbiKey).toString();
                 if (!value.isEmpty())
@@ -447,9 +442,9 @@ bool AvdManagerOutputParser::parseAvd(const QStringList &deviceInfo, AndroidDevi
                    qCDebug(avdManagerLog) << "Avd Parsing: Cannot find ABI:" << configFile;
 
                 // Get Target
-                Utils::FileName avdInfoFile = avdPath.parentDir();
                 QString avdInfoFileName = avdPath.toFileInfo().baseName() + ".ini";
-                avdInfoFile.appendPath(avdInfoFileName);
+                const Utils::FilePath
+                        avdInfoFile = avdPath.parentDir().pathAppended(avdInfoFileName);
                 QSettings avdInfo(avdInfoFile.toString(), QSettings::IniFormat);
                 value = avdInfo.value(avdInfoTargetKey).toString();
                 if (!value.isEmpty())

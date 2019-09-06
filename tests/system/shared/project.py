@@ -53,17 +53,17 @@ def openQmakeProject(projectPath, targets=Targets.desktopTargetClasses(), fromWe
 
 def openCmakeProject(projectPath, buildDir):
     def additionalFunction():
-        pChooser = waitForObject("{leftWidget={text='Default' type='QCheckBox' unnamed='1' "
+        pChooser = waitForObject("{leftWidget={text='Debug' type='QCheckBox' unnamed='1' "
                                  "visible='1'} type='Utils::PathChooser' unnamed='1' visible='1'}")
         lineEdit = getChildByClass(pChooser, "Utils::FancyLineEdit")
         replaceEditorContent(lineEdit, buildDir)
-        # disable all build configurations except "Default"
-        configs = ['Debug', 'Release', 'Release with Debug Information', 'Minimum Size Release']
+        # disable all build configurations except "Debug"
+        configs = ['Release', 'Release with Debug Information', 'Minimum Size Release']
         for checkbox in configs:
             ensureChecked(waitForObject("{text='%s' type='QCheckBox' unnamed='1' visible='1' "
                                         "window=':Qt Creator_Core::Internal::MainWindow'}"
                                         % checkbox), False)
-        ensureChecked(waitForObject("{text='Default' type='QCheckBox' unnamed='1' visible='1' "
+        ensureChecked(waitForObject("{text='Debug' type='QCheckBox' unnamed='1' visible='1' "
                       "window=':Qt Creator_Core::Internal::MainWindow'}"), True)
 
     invokeMenuItem("File", "Open File or Project...")
@@ -88,16 +88,16 @@ def __createProjectOrFileSelectType__(category, template, fromWelcome = False, i
         invokeMenuItem("File", "New File or Project...")
     categoriesView = waitForObject(":New.templateCategoryView_QTreeView")
     if isProject:
-        clickItem(categoriesView, "Projects." + category, 5, 5, 0, Qt.LeftButton)
+        mouseClick(waitForObjectItem(categoriesView, "Projects." + category))
     else:
-        clickItem(categoriesView, "Files and Classes." + category, 5, 5, 0, Qt.LeftButton)
+        mouseClick(waitForObjectItem(categoriesView, "Files and Classes." + category))
     templatesView = waitForObject("{name='templatesView' type='QListView'}")
-    clickItem(templatesView, template, 5, 5, 0, Qt.LeftButton)
+    mouseClick(waitForObjectItem(templatesView, template))
     text = waitForObject("{type='QTextBrowser' name='templateDescription' visible='1'}").plainText
     clickButton(waitForObject("{text='Choose...' type='QPushButton' unnamed='1' visible='1'}"))
     return __getSupportedPlatforms__(str(text), template)[0]
 
-def __createProjectSetNameAndPath__(path, projectName = None, checks = True, libType = None):
+def __createProjectSetNameAndPath__(path, projectName = None, checks = True):
     directoryEdit = waitForObject("{type='Utils::FancyLineEdit' unnamed='1' visible='1' "
                                   "toolTip?='Full path: *'}")
     replaceEditorContent(directoryEdit, path)
@@ -113,10 +113,6 @@ def __createProjectSetNameAndPath__(path, projectName = None, checks = True, lib
         test.verify(labelCheck, "Project name and base directory without warning or error")
     # make sure this is not set as default location
     ensureChecked("{type='QCheckBox' name='projectsDirectoryCheckBox' visible='1'}", False)
-    if libType != None:
-        selectFromCombo(waitForObject("{leftWidget={text='Type' type='QLabel' unnamed='1' "
-                                      "visible='1'} type='QComboBox' unnamed='1' visible='1'}"),
-                        LibType.getStringForLib(libType))
     clickButton(waitForObject(":Next_QPushButton"))
     return str(projectName)
 
@@ -216,7 +212,7 @@ def createProject_Qt_GUI(path, projectName, checks = True, addToVersionControl =
     template = "Qt Widgets Application"
     available = __createProjectOrFileSelectType__("  Application", template)
     __createProjectSetNameAndPath__(path, projectName, checks)
-    __selectQtVersionDesktop__(checks, available, True)
+    __handleBuildSystem__(None)
 
     if checks:
         exp_filename = "mainwindow"
@@ -234,6 +230,7 @@ def createProject_Qt_GUI(path, projectName, checks = True, addToVersionControl =
         test.compare(findObject(":formFileLineEdit_Utils::FileNameValidatingLineEdit").text, ui_file)
 
     clickButton(waitForObject(":Next_QPushButton"))
+    __selectQtVersionDesktop__(checks, available, True)
 
     expectedFiles = []
     if checks:
@@ -273,23 +270,14 @@ def createProject_Qt_Console(path, projectName, checks = True, buildSystem = Non
     if checks:
         __verifyFileCreation__(path, expectedFiles)
 
-def createNewQtQuickApplication(workingDir, projectName = None,
+def createNewQtQuickApplication(workingDir, projectName=None,
                                 targets=Targets.desktopTargetClasses(), minimumQtVersion="5.6",
-                                withControls = False, fromWelcome = False, buildSystem = None):
-    if withControls:
-        template = "Qt Quick Application - Swipe"
-    else:
-        template = "Qt Quick Application - Empty"
+                                template="Qt Quick Application - Empty", fromWelcome=False,
+                                buildSystem=None):
     available = __createProjectOrFileSelectType__("  Application", template, fromWelcome)
     projectName = __createProjectSetNameAndPath__(workingDir, projectName)
     __handleBuildSystem__(buildSystem)
-    if withControls:
-        requiredQt = "5.7"
-        # TODO use parameter to define style to choose
-        test.log("Using default controls style")
-        clickButton(waitForObject(":Next_QPushButton"))
-    else:
-        requiredQt = __createProjectHandleQtQuickSelection__(minimumQtVersion)
+    requiredQt = __createProjectHandleQtQuickSelection__(minimumQtVersion)
     __modifyAvailableTargets__(available, requiredQt)
     checkedTargets = __chooseTargets__(targets, available)
     snooze(1)
@@ -303,15 +291,22 @@ def createNewQtQuickApplication(workingDir, projectName = None,
     return checkedTargets, projectName
 
 def createNewQtQuickUI(workingDir, qtVersion = "5.6"):
-    __createProjectOrFileSelectType__("  Other Project", 'Qt Quick UI Prototype')
+    available = __createProjectOrFileSelectType__("  Other Project", 'Qt Quick UI Prototype')
     if workingDir == None:
         workingDir = tempDir()
     projectName = __createProjectSetNameAndPath__(workingDir)
-    __createProjectHandleQtQuickSelection__(qtVersion)
-    __createProjectHandleLastPage__()
-    progressBarWait(10000)
+    requiredQt = __createProjectHandleQtQuickSelection__(qtVersion)
+    __modifyAvailableTargets__(available, requiredQt)
+    snooze(1)
+    checkedTargets = __chooseTargets__(available, available)
+    if len(checkedTargets):
+        clickButton(waitForObject(":Next_QPushButton"))
+        __createProjectHandleLastPage__()
+        progressBarWait(10000)
+    else:
+        clickButton(waitForObject("{type='QPushButton' text='Cancel' visible='1'}"))
 
-    return projectName
+    return checkedTargets, projectName
 
 def createNewQmlExtension(workingDir, targets=[Targets.DESKTOP_5_6_1_DEFAULT]):
     available = __createProjectOrFileSelectType__("  Library", "Qt Quick 2 Extension Plugin")
@@ -366,22 +361,28 @@ def createNewCPPLib(projectDir, projectName, className, target, isStatic):
         libType = LibType.SHARED
     if projectDir == None:
         projectDir = tempDir()
-    projectName = __createProjectSetNameAndPath__(projectDir, projectName, False, libType)
-    __chooseTargets__(target, available)
-    snooze(1)
-    clickButton(waitForObject(":Next_QPushButton"))
-    __createProjectHandleModuleSelection__(["QtCore"])
+    projectName = __createProjectSetNameAndPath__(projectDir, projectName, False)
+    __handleBuildSystem__(None)
+    selectFromCombo(waitForObject("{name='Type' type='QComboBox' visible='1' "
+                                  "window=':New_ProjectExplorer::JsonWizard'}"),
+                    LibType.getStringForLib(libType))
+    __createProjectHandleModuleSelection__("Core")
     className = __createProjectHandleClassInformation__(className)
+    __chooseTargets__(target, available)
+    clickButton(waitForObject(":Next_QPushButton"))
     __createProjectHandleLastPage__()
     return projectName, className
 
 def createNewQtPlugin(projectDir, projectName, className, target, baseClass="QGenericPlugin"):
     available = __createProjectOrFileSelectType__("  Library", "C++ Library", False, True)
-    projectName = __createProjectSetNameAndPath__(projectDir, projectName, False, LibType.QT_PLUGIN)
-    __chooseTargets__(target, available)
-    snooze(1)
-    clickButton(waitForObject(":Next_QPushButton"))
+    projectName = __createProjectSetNameAndPath__(projectDir, projectName, False)
+    __handleBuildSystem__(None)
+    selectFromCombo(waitForObject("{name='Type' type='QComboBox' visible='1' "
+                                  "window=':New_ProjectExplorer::JsonWizard'}"),
+                    LibType.getStringForLib(LibType.QT_PLUGIN))
     className = __createProjectHandleClassInformation__(className, baseClass)
+    __chooseTargets__(target, available)
+    clickButton(waitForObject(":Next_QPushButton"))
     __createProjectHandleLastPage__()
     return projectName, className
 
@@ -423,63 +424,44 @@ def __chooseTargets__(targets, availableTargets=None, additionalFunc=None):
                 test.warning("Target '%s' is not set up correctly." % Targets.getStringForTarget(current))
     return checkedTargets
 
-def __createProjectHandleModuleSelection__(modules):
-    modulesPage = waitForObject("{type='QmakeProjectManager::Internal::ModulesPage' unnamed='1' "
-                                "visible='1'}")
-    chckBoxes = filter(lambda x: className(x) == 'QCheckBox', object.children(modulesPage))
-    chckBoxLabels = set([str(cb.text) for cb in chckBoxes])
-    if not set(modules).issubset(chckBoxLabels):
-        test.fatal("You want to check module(s) not available at 'Module Selection' page.",
-                   "Not available: %s" % str(set(modules).difference(chckBoxLabels)))
-    for checkBox in chckBoxes:
-        test.log("(Un)Checking module checkbox '%s'" % str(checkBox.text))
-        ensureChecked(checkBox, str(checkBox.text) in modules, 3000)
-    clickButton(waitForObject(":Next_QPushButton"))
+def __createProjectHandleModuleSelection__(module):
+    selectFromCombo(waitForObject("{name='LibraryQtModule' type='QComboBox' visible='1' "
+                                  "window=':New_ProjectExplorer::JsonWizard'}"), module)
 
 def __createProjectHandleClassInformation__(className, baseClass=None):
     if baseClass:
-        selectFromCombo("{name='baseClassComboBox' type='QComboBox' visible='1'}", baseClass)
-    classLineEd = waitForObject("{name='classLineEdit' type='Utils::ClassNameValidatingLineEdit' "
-                                "visible='1'}")
-    result = str(classLineEd.text)
-    if className:
-        replaceEditorContent(classLineEd, className)
-    try:
-        waitForObject("{text='The class name contains invalid characters.' type='QLabel' "
-                     "unnamed='1' visible='1'}", 1000)
-        test.fatal("Class name contains invalid characters - using default.")
-        replaceEditorContent(classLineEd, result)
-    except:
-        result = className
+        selectFromCombo("{name='BaseClassInfo' type='QComboBox' visible='1' "
+                        "window=':New_ProjectExplorer::JsonWizard'}", baseClass)
+    replaceEditorContent(waitForObject("{name='Class' type='Utils::FancyLineEdit' visible='1' "
+                                       "window=':New_ProjectExplorer::JsonWizard'}"), className)
     clickButton(waitForObject(":Next_QPushButton"))
-    return result
+    return className
 
 def waitForProcessRunning(running=True):
     outputButton = waitForObject(":Qt Creator_AppOutput_Core::Internal::OutputPaneToggleButton")
-    if not waitFor("outputButton.checked", 10000):
+    if not waitFor("outputButton.checked", 5000):
         ensureChecked(outputButton)
     waitFor("object.exists(':Qt Creator.ReRun_QToolButton')", 20000)
     reRunButton = findObject(":Qt Creator.ReRun_QToolButton")
     waitFor("object.exists(':Qt Creator.Stop_QToolButton')", 20000)
     stopButton = findObject(":Qt Creator.Stop_QToolButton")
-    return waitFor("(reRunButton.enabled != running) and (stopButton.enabled == running)", 10000)
+    return waitFor("(reRunButton.enabled != running) and (stopButton.enabled == running)", 5000)
 
 # run and close an application
 # returns None if the build failed, False if the subprocess did not start, and True otherwise
-def runAndCloseApp(isQtQuickUI=False):
+def runAndCloseApp():
     runButton = waitForObject(":*Qt Creator.Run_Core::Internal::FancyToolButton")
     clickButton(runButton)
-    if not isQtQuickUI:
-        waitForCompile(300000)
-        buildSucceeded = checkLastBuild()
-        ensureChecked(waitForObject(":Qt Creator_AppOutput_Core::Internal::OutputPaneToggleButton"))
-        if not buildSucceeded:
-            test.fatal("Build inside run wasn't successful - leaving test")
-            return None
+    waitForCompile(300000)
+    buildSucceeded = checkLastBuild()
+    ensureChecked(waitForObject(":Qt Creator_AppOutput_Core::Internal::OutputPaneToggleButton"))
+    if not buildSucceeded:
+        test.fatal("Build inside run wasn't successful - leaving test")
+        return None
     if not waitForProcessRunning():
         test.fatal("Couldn't start application - leaving test")
         return False
-    __closeSubprocessByPushingStop__(isQtQuickUI)
+    __closeSubprocessByPushingStop__(False)
     return True
 
 def __closeSubprocessByPushingStop__(isQtQuickUI):

@@ -35,8 +35,10 @@
 #include <coreplugin/actionmanager/actionmanager.h>
 #include <coreplugin/actionmanager/actioncontainer.h>
 #include <coreplugin/actionmanager/command.h>
+#include <coreplugin/actionmanager/commandbutton.h>
 #include <coreplugin/editormanager/editormanager.h>
 #include <coreplugin/editormanager/ieditor.h>
+#include <coreplugin/find/optionspopup.h>
 
 #include <utils/algorithm.h>
 #include <utils/hostosinfo.h>
@@ -88,18 +90,152 @@ static bool g_managerConstructed = false; // For debugging reasons.
 // OutputPane
 
 IOutputPane::IOutputPane(QObject *parent)
-    : QObject(parent)
+    : QObject(parent),
+      m_zoomInButton(new Core::CommandButton),
+      m_zoomOutButton(new Core::CommandButton)
 {
     // We need all pages first. Ignore latecomers and shout.
     QTC_ASSERT(!g_managerConstructed, return);
     g_outputPanes.append(OutputPaneData(this));
+
+    m_zoomInButton->setIcon(Utils::Icons::PLUS_TOOLBAR.icon());
+    m_zoomInButton->setCommandId(Constants::ZOOM_IN);
+    connect(m_zoomInButton, &QToolButton::clicked, this, [this] { emit zoomIn(1); });
+
+    m_zoomOutButton->setIcon(Utils::Icons::MINUS.icon());
+    m_zoomOutButton->setCommandId(Constants::ZOOM_OUT);
+    connect(m_zoomOutButton, &QToolButton::clicked, this, [this] { emit zoomOut(1); });
 }
 
 IOutputPane::~IOutputPane()
 {
+    if (m_context)
+        ICore::removeContextObject(m_context);
+
     const int i = Utils::indexOf(g_outputPanes, Utils::equal(&OutputPaneData::pane, this));
     QTC_ASSERT(i >= 0, return);
     delete g_outputPanes.at(i).button;
+
+    delete m_zoomInButton;
+    delete m_zoomOutButton;
+}
+
+QList<QWidget *> IOutputPane::toolBarWidgets() const
+{
+    QList<QWidget *> widgets;
+    if (m_filterOutputLineEdit)
+        widgets << m_filterOutputLineEdit;
+    return widgets << m_zoomInButton << m_zoomOutButton;
+}
+
+void IOutputPane::setFont(const QFont &font)
+{
+    emit fontChanged(font);
+}
+
+void IOutputPane::setWheelZoomEnabled(bool enabled)
+{
+    emit wheelZoomEnabledChanged(enabled);
+}
+
+void IOutputPane::setupFilterUi(const QString &historyKey)
+{
+    m_filterOutputLineEdit = new FancyLineEdit;
+    m_filterActionRegexp = new QAction(this);
+    m_filterActionRegexp->setCheckable(true);
+    m_filterActionRegexp->setText(tr("Use Regular Expressions"));
+    connect(m_filterActionRegexp, &QAction::toggled, this, &IOutputPane::setRegularExpressions);
+    Core::ActionManager::registerAction(m_filterActionRegexp, filterRegexpActionId());
+
+    m_filterActionCaseSensitive = new QAction(this);
+    m_filterActionCaseSensitive->setCheckable(true);
+    m_filterActionCaseSensitive->setText(tr("Case Sensitive"));
+    connect(m_filterActionCaseSensitive, &QAction::toggled, this, &IOutputPane::setCaseSensitive);
+    Core::ActionManager::registerAction(m_filterActionCaseSensitive,
+                                        filterCaseSensitivityActionId());
+
+    m_filterOutputLineEdit->setPlaceholderText(tr("Filter output..."));
+    m_filterOutputLineEdit->setButtonVisible(FancyLineEdit::Left, true);
+    m_filterOutputLineEdit->setButtonIcon(FancyLineEdit::Left, Icons::MAGNIFIER.icon());
+    m_filterOutputLineEdit->setFiltering(true);
+    m_filterOutputLineEdit->setEnabled(false);
+    m_filterOutputLineEdit->setHistoryCompleter(historyKey);
+    connect(m_filterOutputLineEdit, &FancyLineEdit::textChanged,
+            this, &IOutputPane::updateFilter);
+    connect(m_filterOutputLineEdit, &FancyLineEdit::returnPressed,
+            this, &IOutputPane::updateFilter);
+    connect(m_filterOutputLineEdit, &FancyLineEdit::leftButtonClicked,
+            this, &IOutputPane::filterOutputButtonClicked);
+}
+
+QString IOutputPane::filterText() const
+{
+    return m_filterOutputLineEdit->text();
+}
+
+void IOutputPane::setFilteringEnabled(bool enable)
+{
+    m_filterOutputLineEdit->setEnabled(enable);
+}
+
+void IOutputPane::setupContext(const char *context, QWidget *widget)
+{
+    QTC_ASSERT(!m_context, return);
+    m_context = new IContext(this);
+    m_context->setContext(Context(context));
+    m_context->setWidget(widget);
+    ICore::addContextObject(m_context);
+
+    const auto zoomInAction = new QAction(this);
+    Core::ActionManager::registerAction(zoomInAction, Constants::ZOOM_IN, m_context->context());
+    connect(zoomInAction, &QAction::triggered, this, [this] { emit zoomIn(1); });
+    const auto zoomOutAction = new QAction(this);
+    Core::ActionManager::registerAction(zoomOutAction, Constants::ZOOM_OUT, m_context->context());
+    connect(zoomOutAction, &QAction::triggered, this, [this] { emit zoomOut(1); });
+    const auto resetZoomAction = new QAction(this);
+    Core::ActionManager::registerAction(resetZoomAction, Constants::ZOOM_RESET,
+                                        m_context->context());
+    connect(resetZoomAction, &QAction::triggered, this, &IOutputPane::resetZoom);
+}
+
+void IOutputPane::setZoomButtonsEnabled(bool enabled)
+{
+    m_zoomInButton->setEnabled(enabled);
+    m_zoomOutButton->setEnabled(enabled);
+}
+
+void IOutputPane::updateFilter()
+{
+    QTC_ASSERT(false, qDebug() << "updateFilter() needs to get re-implemented");
+}
+
+void IOutputPane::filterOutputButtonClicked()
+{
+    auto popup = new Core::OptionsPopup(m_filterOutputLineEdit,
+    {filterRegexpActionId(), filterCaseSensitivityActionId()});
+    popup->show();
+}
+
+void IOutputPane::setRegularExpressions(bool regularExpressions)
+{
+    m_filterRegexp = regularExpressions;
+    updateFilter();
+}
+
+Id IOutputPane::filterRegexpActionId() const
+{
+    return Id("OutputFilter.RegularExpressions").withSuffix(metaObject()->className());
+}
+
+Id IOutputPane::filterCaseSensitivityActionId() const
+{
+    return Id("OutputFilter.CaseSensitive").withSuffix(metaObject()->className());
+}
+
+void IOutputPane::setCaseSensitive(bool caseSensitive)
+{
+    m_filterCaseSensitivity = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
+    updateFilter();
 }
 
 namespace Internal {
@@ -507,7 +643,6 @@ void OutputPaneManager::showPage(int idx, int flags)
 
         ensurePageVisible(idx);
         IOutputPane *out = g_outputPanes.at(idx).pane;
-        out->visibilityChanged(true);
         if (flags & IOutputPane::WithFocus) {
             if (out->canFocus())
                 out->setFocus();
@@ -538,7 +673,10 @@ void OutputPaneManager::setCurrentIndex(int idx)
         m_outputWidgetPane->setCurrentIndex(idx);
         m_opToolBarWidgets->setCurrentIndex(idx);
 
-        IOutputPane *pane = g_outputPanes.at(idx).pane;
+        OutputPaneData &data = g_outputPanes[idx];
+        IOutputPane *pane = data.pane;
+        data.button->show();
+        data.buttonVisible = true;
         pane->visibilityChanged(true);
 
         bool canNavigate = pane->canNavigate();
@@ -574,8 +712,6 @@ void OutputPaneManager::popupMenu()
         data.button->hide();
         data.buttonVisible = false;
     } else {
-        data.button->show();
-        data.buttonVisible = true;
         showPage(idx, IOutputPane::ModeSwitch);
     }
 }
@@ -636,7 +772,7 @@ OutputPaneToggleButton::OutputPaneToggleButton(int number, const QString &text,
     m_flashTimer->setDirection(QTimeLine::Forward);
     m_flashTimer->setCurveShape(QTimeLine::SineCurve);
     m_flashTimer->setFrameRange(0, 92);
-    auto updateSlot = static_cast<void (QWidget::*)()>(&QWidget::update);
+    auto updateSlot = QOverload<>::of(&QWidget::update);
     connect(m_flashTimer, &QTimeLine::valueChanged, this, updateSlot);
     connect(m_flashTimer, &QTimeLine::finished, this, updateSlot);
     updateToolTip();

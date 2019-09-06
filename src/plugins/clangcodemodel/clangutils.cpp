@@ -34,12 +34,13 @@
 #include <coreplugin/idocument.h>
 #include <cpptools/baseeditordocumentparser.h>
 #include <cpptools/compileroptionsbuilder.h>
+#include <cpptools/cppcodemodelsettings.h>
 #include <cpptools/cppmodelmanager.h>
+#include <cpptools/cpptoolsreuse.h>
 #include <cpptools/editordocumenthandle.h>
 #include <cpptools/projectpart.h>
-#include <cpptools/cppcodemodelsettings.h>
-#include <cpptools/cpptoolsreuse.h>
 #include <projectexplorer/buildconfiguration.h>
+#include <projectexplorer/kitinformation.h>
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/target.h>
 
@@ -300,55 +301,113 @@ QString diagnosticCategoryPrefixRemoved(const QString &text)
     return text;
 }
 
-static ::Utils::FileName buildDirectory(const CppTools::ProjectPart &projectPart)
+static ::Utils::FilePath compilerPath(const CppTools::ProjectPart &projectPart)
 {
     ProjectExplorer::Target *target = projectPart.project->activeTarget();
     if (!target)
-        return ::Utils::FileName();
+        return ::Utils::FilePath();
+
+    ProjectExplorer::ToolChain *toolchain = ProjectExplorer::ToolChainKitAspect::toolChain(
+        target->kit(), ProjectExplorer::Constants::CXX_LANGUAGE_ID);
+
+    return toolchain->compilerCommand();
+}
+
+static ::Utils::FilePath buildDirectory(const ProjectExplorer::Project &project)
+{
+    ProjectExplorer::Target *target = project.activeTarget();
+    if (!target)
+        return ::Utils::FilePath();
 
     ProjectExplorer::BuildConfiguration *buildConfig = target->activeBuildConfiguration();
     if (!buildConfig)
-        return ::Utils::FileName();
+        return ::Utils::FilePath();
 
     return buildConfig->buildDirectory();
 }
 
-static QJsonObject createFileObject(CompilerOptionsBuilder &optionsBuilder,
-                                    const ProjectFile &projFile,
-                                    const ::Utils::FileName &buildDir)
+static QStringList projectPartArguments(const ProjectPart &projectPart)
 {
-    const ProjectFile::Kind kind = ProjectFile::classify(projFile.path);
-    optionsBuilder.updateFileLanguage(kind);
+    QStringList args;
+    args << compilerPath(projectPart).toString();
+    args << "-c";
+    if (projectPart.toolchainType != ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID) {
+        args << "--target=" + projectPart.toolChainTargetTriple;
+        args << (projectPart.toolChainWordWidth == ProjectPart::WordWidth64Bit
+                     ? QLatin1String("-m64")
+                     : QLatin1String("-m32"));
+    }
+    args << projectPart.compilerFlags;
+    for (const ProjectExplorer::HeaderPath &headerPath : projectPart.headerPaths) {
+        if (headerPath.type == ProjectExplorer::HeaderPathType::User) {
+            args << "-I" + headerPath.path;
+        } else if (headerPath.type == ProjectExplorer::HeaderPathType::System) {
+            args << (projectPart.toolchainType == ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID
+                         ? "-I"
+                         : "-isystem")
+                        + headerPath.path;
+        }
+    }
+    for (const ProjectExplorer::Macro &macro : projectPart.projectMacros) {
+        args.append(QString::fromUtf8(
+            macro.toKeyValue(macro.type == ProjectExplorer::MacroType::Define ? "-D" : "-U")));
+    }
 
+    return args;
+}
+
+static QJsonObject createFileObject(const ::Utils::FilePath &buildDir,
+                                    const QStringList &arguments,
+                                    const ProjectPart &projectPart,
+                                    const ProjectFile &projFile)
+{
     QJsonObject fileObject;
     fileObject["file"] = projFile.path;
-    QJsonArray args = QJsonArray::fromStringList(optionsBuilder.options());
-    args.prepend(kind == ProjectFile::CXXSource ? "clang++" : "clang");
+    QJsonArray args = QJsonArray::fromStringList(arguments);
+
+    const ProjectFile::Kind kind = ProjectFile::classify(projFile.path);
+    if (projectPart.toolchainType == ProjectExplorer::Constants::MSVC_TOOLCHAIN_TYPEID
+        || projectPart.toolchainType == ProjectExplorer::Constants::CLANG_CL_TOOLCHAIN_TYPEID) {
+        if (ProjectFile::isC(kind))
+            args.append("/TC");
+        else if (ProjectFile::isCxx(kind))
+            args.append("/TP");
+    } else {
+        QStringList langOption
+            = createLanguageOptionGcc(kind,
+                                      projectPart.languageExtensions
+                                          & ::Utils::LanguageExtension::ObjectiveC);
+        for (const QString &langOptionPart : langOption)
+            args.append(langOptionPart);
+    }
     args.append(QDir::toNativeSeparators(projFile.path));
     fileObject["arguments"] = args;
     fileObject["directory"] = buildDir.toString();
     return fileObject;
 }
 
-void generateCompilationDB(::Utils::FileName projectDir, CppTools::ProjectInfo projectInfo)
+GenerateCompilationDbResult generateCompilationDB(CppTools::ProjectInfo projectInfo)
 {
-    QFile compileCommandsFile(projectDir.toString() + "/compile_commands.json");
+    const ::Utils::FilePath buildDir = buildDirectory(*projectInfo.project());
+    QTC_ASSERT(!buildDir.isEmpty(), return GenerateCompilationDbResult(QString(),
+        QCoreApplication::translate("ClangUtils", "Could not retrieve build directory.")));
 
+    QDir dir(buildDir.toString());
+    if (!dir.exists())
+        dir.mkpath(dir.path());
+    QFile compileCommandsFile(buildDir.toString() + "/compile_commands.json");
     const bool fileOpened = compileCommandsFile.open(QIODevice::WriteOnly | QIODevice::Truncate);
-    if (!fileOpened)
-        return;
+    if (!fileOpened) {
+        return GenerateCompilationDbResult(QString(),
+                QCoreApplication::translate("ClangUtils", "Could not create \"%1\": %2")
+                    .arg(compileCommandsFile.fileName(), compileCommandsFile.errorString()));
+    }
     compileCommandsFile.write("[");
+
     for (ProjectPart::Ptr projectPart : projectInfo.projectParts()) {
-        const ::Utils::FileName buildDir = buildDirectory(*projectPart);
-
-        CompilerOptionsBuilder optionsBuilder(*projectPart,
-                                              UseSystemHeader::No,
-                                              UseTweakedHeaderPaths::No);
-        optionsBuilder.build(CppTools::ProjectFile::Unclassified,
-                             CppTools::UsePrecompiledHeaders::No);
-
+        const QStringList args = projectPartArguments(*projectPart);
         for (const ProjectFile &projFile : projectPart->files) {
-            const QJsonObject json = createFileObject(optionsBuilder, projFile, buildDir);
+            const QJsonObject json = createFileObject(buildDir, args, *projectPart, projFile);
             if (compileCommandsFile.size() > 1)
                 compileCommandsFile.write(",");
             compileCommandsFile.write('\n' + QJsonDocument(json).toJson().trimmed());
@@ -357,6 +416,7 @@ void generateCompilationDB(::Utils::FileName projectDir, CppTools::ProjectInfo p
 
     compileCommandsFile.write("\n]");
     compileCommandsFile.close();
+    return GenerateCompilationDbResult(compileCommandsFile.fileName(), QString());
 }
 
 QString currentCppEditorDocumentFilePath()

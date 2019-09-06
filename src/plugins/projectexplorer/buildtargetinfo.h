@@ -32,7 +32,6 @@
 #include <utils/fileutils.h>
 
 #include <QList>
-#include <QSet>
 
 namespace ProjectExplorer {
 
@@ -43,9 +42,9 @@ public:
     QString displayName;
     QString displayNameUniquifier;
 
-    Utils::FileName targetFilePath;
-    Utils::FileName projectFilePath;
-    Utils::FileName workingDirectory;
+    Utils::FilePath targetFilePath;
+    Utils::FilePath projectFilePath;
+    Utils::FilePath workingDirectory;
     bool isQtcRunnable = true;
     bool usesTerminal = false;
 
@@ -75,11 +74,5 @@ inline uint qHash(const BuildTargetInfo &ti)
 {
     return qHash(ti.displayName) ^ qHash(ti.buildKey);
 }
-
-class PROJECTEXPLORER_EXPORT BuildTargetInfoList
-{
-public:
-    QList<BuildTargetInfo> list;
-};
 
 } // namespace ProjectExplorer

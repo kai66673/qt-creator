@@ -86,8 +86,7 @@ ChooseProFilePage::ChooseProFilePage(CreateAndroidManifestWizard *wizard)
         currentBuildTarget = rc->buildKey();
 
     m_comboBox = new QComboBox(this);
-    const BuildTargetInfoList buildTargets = wizard->target()->applicationTargets();
-    for (const BuildTargetInfo &bti : buildTargets.list) {
+    for (const BuildTargetInfo &bti : wizard->target()->applicationTargets()) {
         const QString displayName = bti.buildKey;
         m_comboBox->addItem(displayName, QVariant(bti.buildKey)); // TODO something more?
         if (bti.buildKey == currentBuildTarget)
@@ -95,7 +94,7 @@ ChooseProFilePage::ChooseProFilePage(CreateAndroidManifestWizard *wizard)
     }
 
     nodeSelected(m_comboBox->currentIndex());
-    connect(m_comboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+    connect(m_comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ChooseProFilePage::nodeSelected);
 
     fl->addRow(tr(".pro file:"), m_comboBox);
@@ -214,15 +213,15 @@ CreateAndroidManifestWizard::CreateAndroidManifestWizard(ProjectExplorer::Target
 {
     setWindowTitle(tr("Create Android Template Files Wizard"));
 
-    const BuildTargetInfoList buildTargets = target->applicationTargets();
+    const QList<BuildTargetInfo> buildTargets = target->applicationTargets();
     QtSupport::BaseQtVersion *version = QtSupport::QtKitAspect::qtVersion(target->kit());
     m_copyGradle = version && version->qtVersion() >= QtSupport::QtVersionNumber(5, 4, 0);
 
-    if (buildTargets.list.isEmpty()) {
+    if (buildTargets.isEmpty()) {
         // oh uhm can't create anything
         addPage(new NoApplicationProFilePage(this));
-    } else if (buildTargets.list.size() == 1) {
-        setBuildKey(buildTargets.list.first().buildKey);
+    } else if (buildTargets.size() == 1) {
+        setBuildKey(buildTargets.first().buildKey);
         addPage(new ChooseDirectoryPage(this));
     } else {
         addPage(new ChooseProFilePage(this));
@@ -325,22 +324,22 @@ void CreateAndroidManifestWizard::createAndroidTemplateFiles()
     if (version->qtVersion() < QtSupport::QtVersionNumber(5, 4, 0)) {
         const QString src(version->qmakeProperty("QT_INSTALL_PREFIX")
                 .append(QLatin1String("/src/android/java/AndroidManifest.xml")));
-        FileUtils::copyRecursively(FileName::fromString(src),
-                                   FileName::fromString(m_directory + QLatin1String("/AndroidManifest.xml")),
+        FileUtils::copyRecursively(FilePath::fromString(src),
+                                   FilePath::fromString(m_directory + QLatin1String("/AndroidManifest.xml")),
                                    nullptr, [this, &addedFiles](QFileInfo src, QFileInfo dst, QString *){return copy(src, dst, &addedFiles);});
     } else {
         const QString src(version->qmakeProperty("QT_INSTALL_PREFIX")
                           .append(QLatin1String("/src/android/templates")));
 
-        FileUtils::copyRecursively(FileName::fromString(src),
-                                   FileName::fromString(m_directory),
+        FileUtils::copyRecursively(FilePath::fromString(src),
+                                   FilePath::fromString(m_directory),
                                    nullptr, [this, &addedFiles](QFileInfo src, QFileInfo dst, QString *){return copy(src, dst, &addedFiles);});
 
         if (m_copyGradle) {
-            FileName gradlePath = FileName::fromString(version->qmakeProperty("QT_INSTALL_PREFIX").append(QLatin1String("/src/3rdparty/gradle")));
+            FilePath gradlePath = FilePath::fromString(version->qmakeProperty("QT_INSTALL_PREFIX").append(QLatin1String("/src/3rdparty/gradle")));
             if (!gradlePath.exists())
-                gradlePath = AndroidConfigurations::currentConfig().sdkLocation().appendPath(QLatin1String("/tools/templates/gradle/wrapper"));
-            FileUtils::copyRecursively(gradlePath, FileName::fromString(m_directory),
+                gradlePath = AndroidConfigurations::currentConfig().sdkLocation().pathAppended("/tools/templates/gradle/wrapper");
+            FileUtils::copyRecursively(gradlePath, FilePath::fromString(m_directory),
                                        nullptr, [this, &addedFiles](QFileInfo src, QFileInfo dst, QString *){return copy(src, dst, &addedFiles);});
         }
 

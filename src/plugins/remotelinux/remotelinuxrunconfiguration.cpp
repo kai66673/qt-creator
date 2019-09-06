@@ -34,6 +34,7 @@
 #include <projectexplorer/kitinformation.h>
 #include <projectexplorer/project.h>
 #include <projectexplorer/runconfigurationaspects.h>
+#include <projectexplorer/runcontrol.h>
 #include <projectexplorer/target.h>
 
 #include <qtsupport/qtoutputformatter.h>
@@ -95,7 +96,7 @@ void RemoteLinuxRunConfiguration::updateTargetInformation()
     QString localExecutable = bti.targetFilePath.toString();
     DeployableFile depFile = target()->deploymentData().deployableForLocalFile(localExecutable);
 
-    aspect<ExecutableAspect>()->setExecutable(FileName::fromString(depFile.remoteFilePath()));
+    aspect<ExecutableAspect>()->setExecutable(FilePath::fromString(depFile.remoteFilePath()));
     aspect<SymbolFileAspect>()->setValue(localExecutable);
 
     emit enabledChanged();

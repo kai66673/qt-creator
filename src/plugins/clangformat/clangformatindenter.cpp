@@ -57,7 +57,7 @@ bool ClangFormatIndenter::formatWhileTyping() const
 
 Utils::optional<TabSettings> ClangFormatIndenter::tabSettings() const
 {
-    FormatStyle style = currentProjectStyle();
+    FormatStyle style = styleForFile();
     TabSettings tabSettings;
 
     switch (style.UseTab) {
@@ -84,7 +84,10 @@ Utils::optional<TabSettings> ClangFormatIndenter::tabSettings() const
 
 int ClangFormatIndenter::lastSaveRevision() const
 {
-    return qobject_cast<TextEditor::TextDocumentLayout *>(m_doc->documentLayout())->lastSaveRevision;
+    auto *layout = qobject_cast<TextEditor::TextDocumentLayout *>(m_doc->documentLayout());
+    if (!layout)
+        return 0;
+    return layout->lastSaveRevision;
 }
 
 bool ClangFormatIndenter::formatOnSave() const

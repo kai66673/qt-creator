@@ -66,11 +66,14 @@ QtcTool {
         name: "Utils"
         prefix: libsDir + "/utils/"
         files: [
+            "environment.cpp", "environment.h",
             "fileutils.cpp", "fileutils.h",
             "hostosinfo.cpp", "hostosinfo.h",
             "persistentsettings.cpp", "persistentsettings.h",
             "qtcassert.cpp", "qtcassert.h",
-            "savefile.cpp", "savefile.h"
+            "qtcprocess.cpp", "qtcprocess.h",
+            "savefile.cpp", "savefile.h",
+            "stringutils.cpp"
         ]
     }
     Group {

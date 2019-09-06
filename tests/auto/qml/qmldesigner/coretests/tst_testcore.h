@@ -62,6 +62,7 @@ private slots:
     void testQtQuick20BasicRectangle();
     void testQtQuickControls2();
     void testImplicitComponents();
+    void testRevisionedProperties();
 
     //
     // unit tests Model, ModelNode, NodeProperty, AbstractView
@@ -139,6 +140,7 @@ private slots:
     void testRewriterImports();
     void testRewriterChangeImports();
     void testRewriterUnicodeChars();
+    void testRewriterTransactionAddingAfterReparenting();
 
     //
     // unit tests QmlModelNodeFacade/QmlModelState

@@ -224,6 +224,9 @@
     branch is shown in bold and underlined in the list of branches in the
     \uicontrol {Git Branches} sidebar view.
 
+    If you checked out a specific commit, the list of branches displays a
+    \e {Detached HEAD} entry.
+
     For local and remote branches, the changes log can be shown by double
     clicking on the branch name.
 
@@ -260,7 +263,10 @@
             \li Show the changes in a branch.
         \row
             \li \uicontrol Reset
-            \li Hard reset the active branch to the selected branch.
+            \li Reset the active branch to the selected branch. You
+                can choose between a \uicontrol Hard, \uicontrol Mixed,
+                and \uicontrol Soft reset. For more information, see
+                \l{Resetting Local Repository}.
         \row
             \li \uicontrol Merge
             \li Join the development histories in two branches together.
@@ -281,6 +287,9 @@
         \row
             \li \uicontrol Track
             \li Set the current branch to track the selected one.
+        \row
+            \li \uicontrol Push
+            \li Push the committed changes to the selected remote branch.
     \endtable
 
     The following additional context-menu operations are available for

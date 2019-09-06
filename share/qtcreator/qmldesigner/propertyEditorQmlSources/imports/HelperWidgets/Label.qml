@@ -28,6 +28,7 @@ import QtQuick.Controls 1.1 as Controls
 import QtQuick.Layouts 1.0
 import QtQuick.Controls.Private 1.0
 import QtQuickDesignerTheme 1.0
+import StudioTheme 1.0 as StudioTheme
 
 Controls.Label {
     id: label
@@ -36,9 +37,11 @@ Controls.Label {
     // workaround because PictureSpecifics.qml still use this
     property alias toolTip: toolTipArea.tooltip
 
-    width: Math.max(Math.min(240, parent.width - 220), 80)
-    color: Theme.color(Theme.PanelTextColorLight)
+    width: Math.max(Math.min(240, parent.width - 280), 50)
+    color: StudioTheme.Values.themeTextColor
     elide: Text.ElideRight
+
+    font.pixelSize: StudioTheme.Values.myFontSize
 
     Layout.preferredWidth: width
     Layout.minimumWidth: width

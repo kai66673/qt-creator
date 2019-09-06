@@ -106,6 +106,7 @@
 #include <QScrollBar>
 #include <QShortcut>
 #include <QStyle>
+#include <QStyleFactory>
 #include <QTextBlock>
 #include <QTextCodec>
 #include <QTextCursor>
@@ -613,6 +614,7 @@ public:
     void reconfigure();
     void updateSyntaxInfoBar(const Highlighter::Definitions &definitions, const QString &fileName);
     void configureGenericHighlighter(const KSyntaxHighlighting::Definition &definition);
+    void rememberCurrentSyntaxDefinition();
 
 public:
     TextEditorWidget *q;
@@ -1009,8 +1011,8 @@ void TextEditorWidgetPrivate::ctor(const QSharedPointer<TextDocument> &doc)
     QObject::connect(q, &QPlainTextEdit::blockCountChanged,
                      this, &TextEditorWidgetPrivate::slotUpdateExtraAreaWidth);
 
-    QObject::connect(q, &QPlainTextEdit::modificationChanged, m_extraArea,
-                     static_cast<void (QWidget::*)()>(&QWidget::update));
+    QObject::connect(q, &QPlainTextEdit::modificationChanged,
+                     m_extraArea, QOverload<>::of(&QWidget::update));
 
     QObject::connect(q, &QPlainTextEdit::cursorPositionChanged,
                      q, &TextEditorWidget::slotCursorPositionChanged);
@@ -1046,8 +1048,8 @@ void TextEditorWidgetPrivate::ctor(const QSharedPointer<TextDocument> &doc)
     q->setFrameStyle(QFrame::NoFrame);
 
     m_delayedUpdateTimer.setSingleShot(true);
-    QObject::connect(&m_delayedUpdateTimer, &QTimer::timeout, q->viewport(),
-                     static_cast<void (QWidget::*)()>(&QWidget::update));
+    QObject::connect(&m_delayedUpdateTimer, &QTimer::timeout,
+                     q->viewport(), QOverload<>::of(&QWidget::update));
 
     m_moveLineUndoHack = false;
 
@@ -2010,17 +2012,20 @@ void TextEditorWidgetPrivate::moveLineUpDown(bool up)
 
     bool shouldReindent = true;
     if (m_commentDefinition.isValid()) {
-        QString trimmedText(text.trimmed());
-
-        if (m_commentDefinition.hasSingleLineStyle()) {
-            if (trimmedText.startsWith(m_commentDefinition.singleLine))
-                shouldReindent = false;
-        }
-        if (shouldReindent && m_commentDefinition.hasMultiLineStyle()) {
+        if (m_commentDefinition.hasMultiLineStyle()) {
             // Don't have any single line comments; try multi line.
-            if (trimmedText.startsWith(m_commentDefinition.multiLineStart)
-                && trimmedText.endsWith(m_commentDefinition.multiLineEnd)) {
+            if (text.startsWith(m_commentDefinition.multiLineStart)
+                && text.endsWith(m_commentDefinition.multiLineEnd)) {
                 shouldReindent = false;
+            }
+        }
+        if (shouldReindent && m_commentDefinition.hasSingleLineStyle()) {
+            shouldReindent = false;
+            QTextBlock block = move.block();
+            while (block.isValid() && block.position() < end) {
+                if (!block.text().startsWith(m_commentDefinition.singleLine))
+                    shouldReindent = true;
+                block = block.next();
             }
         }
     }
@@ -3306,6 +3311,11 @@ void TextEditorWidgetPrivate::updateSyntaxInfoBar(const Highlighter::Definitions
             this->configureGenericHighlighter(Highlighter::definitionForName(definition));
         });
 
+        info.setCustomButtonInfo(BaseTextEditor::tr("Remember My Choice"), [multiple, this]() {
+            m_document->infoBar()->removeInfo(multiple);
+            rememberCurrentSyntaxDefinition();
+        });
+
         infoBar->removeInfo(missing);
         infoBar->addInfo(info);
     } else {
@@ -3331,6 +3341,16 @@ void TextEditorWidgetPrivate::configureGenericHighlighter(
     }
 
     m_document->setFontSettings(TextEditorSettings::fontSettings());
+}
+
+void TextEditorWidgetPrivate::rememberCurrentSyntaxDefinition()
+{
+    auto highlighter = qobject_cast<Highlighter *>(m_document->syntaxHighlighter());
+    if (!highlighter)
+        return;
+    const Highlighter::Definition &definition = highlighter->definition();
+    if (definition.isValid())
+        Highlighter::rememberDefintionForDocument(definition, m_document.data());
 }
 
 bool TextEditorWidget::codeFoldingVisible() const
@@ -3454,7 +3474,7 @@ void TextEditorWidgetPrivate::setupDocumentSignals()
                      this, &TextEditorWidgetPrivate::slotUpdateBlockNotify);
 
     QObject::connect(documentLayout, &TextDocumentLayout::updateExtraArea,
-                     m_extraArea, static_cast<void (QWidget::*)()>(&QWidget::update));
+                     m_extraArea, QOverload<>::of(&QWidget::update));
 
     QObject::connect(q, &TextEditorWidget::requestBlockUpdate,
                      documentLayout, &QPlainTextDocumentLayout::updateBlock);
@@ -4701,13 +4721,13 @@ void TextEditorWidgetPrivate::paintReplacement(PaintEventData &data, QPainter &p
                 replacement.prepend(nextBlock.text().trimmed().at(0));
         }
 
-        QTextBlock nextVisibleBlock = TextEditor::nextVisibleBlock(data.block, data.doc);
-        if (!nextVisibleBlock.isValid())
-            nextVisibleBlock = data.doc->lastBlock();
+        QTextBlock lastInvisibleBlock = TextEditor::nextVisibleBlock(data.block, data.doc).previous();
+        if (!lastInvisibleBlock.isValid())
+            lastInvisibleBlock = data.doc->lastBlock();
 
-        if (TextBlockUserData *blockUserData = TextDocumentLayout::testUserData(nextVisibleBlock)) {
+        if (TextBlockUserData *blockUserData = TextDocumentLayout::testUserData(lastInvisibleBlock)) {
             if (blockUserData->foldingEndIncluded()) {
-                QString right = nextVisibleBlock.text().trimmed();
+                QString right = lastInvisibleBlock.text().trimmed();
                 if (right.endsWith(QLatin1Char(';'))) {
                     right.chop(1);
                     right = right.trimmed();
@@ -5344,7 +5364,19 @@ void TextEditorWidgetPrivate::drawFoldingMarker(QPainter *painter, const QPalett
     if (hovered)
         opt.palette.setBrush(QPalette::Window, pal.highlight());
 
-    const char* const className = s->metaObject()->className();
+    const char *className = s->metaObject()->className();
+
+    // Do not use the windows folding marker since we cannot style them and the default hover color
+    // is a blue which does not guarantee an high contrast on all themes.
+    static QPointer<QStyle> fusionStyleOverwrite = nullptr;
+    if (!qstrcmp(className, "QWindowsVistaStyle")) {
+        if (fusionStyleOverwrite.isNull())
+            fusionStyleOverwrite = QStyleFactory::create("fusion");
+        if (!fusionStyleOverwrite.isNull()) {
+            s = fusionStyleOverwrite.data();
+            className = s->metaObject()->className();
+        }
+    }
 
     if (!qstrcmp(className, "OxygenStyle")) {
         const QStyle::PrimitiveElement direction = expanded ? QStyle::PE_IndicatorArrowDown
@@ -5801,6 +5833,11 @@ void TextEditorWidget::showDefaultContextMenu(QContextMenuEvent *e, Id menuConte
 void TextEditorWidget::addHoverHandler(BaseHoverHandler *handler)
 {
     d->m_hoverHandlers.append(handler);
+}
+
+void TextEditorWidget::removeHoverHandler(BaseHoverHandler *handler)
+{
+    d->m_hoverHandlers.removeAll(handler);
 }
 
 void TextEditorWidget::extraAreaLeaveEvent(QEvent *)
@@ -7497,6 +7534,7 @@ void TextEditorWidget::setCompletionSettings(const CompletionSettings &completio
     d->m_autoCompleter->setSurroundWithBracketsEnabled(completionSettings.m_surroundingAutoBrackets);
     d->m_autoCompleter->setAutoInsertQuotesEnabled(completionSettings.m_autoInsertQuotes);
     d->m_autoCompleter->setSurroundWithQuotesEnabled(completionSettings.m_surroundingAutoQuotes);
+    d->m_autoCompleter->setOverwriteClosingCharsEnabled(completionSettings.m_overwriteClosingChars);
     d->m_animateAutoComplete = completionSettings.m_animateAutoComplete;
     d->m_highlightAutoComplete = completionSettings.m_highlightAutoComplete;
     d->m_skipAutoCompletedText = completionSettings.m_skipAutoCompletedText;
@@ -8492,13 +8530,14 @@ BaseTextEditor *BaseTextEditor::currentTextEditor()
     return qobject_cast<BaseTextEditor *>(EditorManager::currentEditor());
 }
 
-BaseTextEditor *BaseTextEditor::textEditorForDocument(TextDocument *textDocument)
+QVector<BaseTextEditor *> BaseTextEditor::textEditorsForDocument(TextDocument *textDocument)
 {
+    QVector<BaseTextEditor *> ret;
     for (IEditor *editor : Core::DocumentModel::editorsForDocument(textDocument)) {
         if (auto textEditor = qobject_cast<BaseTextEditor *>(editor))
-            return textEditor;
+            ret << textEditor;
     }
-    return nullptr;
+    return ret;
 }
 
 TextEditorWidget *BaseTextEditor::editorWidget() const
@@ -8539,7 +8578,7 @@ QString TextEditorWidget::textAt(int from, int to) const
 
 void TextEditorWidget::configureGenericHighlighter()
 {
-    const Highlighter::Definitions definitions = Highlighter::definitionsForDocument(textDocument());
+    Highlighter::Definitions definitions = Highlighter::definitionsForDocument(textDocument());
     d->configureGenericHighlighter(definitions.isEmpty() ? Highlighter::Definition()
                                                          : definitions.first());
     d->updateSyntaxInfoBar(definitions, textDocument()->filePath().fileName());

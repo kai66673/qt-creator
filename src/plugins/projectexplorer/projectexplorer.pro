@@ -18,6 +18,7 @@ HEADERS += projectexplorer.h \
     environmentaspect.h \
     environmentaspectwidget.h \
     extraabi.h \
+    fileinsessionfinder.h \
     filterkitaspectsdialog.h \
     gcctoolchain.h \
     importwidget.h \
@@ -76,6 +77,7 @@ HEADERS += projectexplorer.h \
     editorconfiguration.h \
     editorsettingspropertiespage.h \
     runconfiguration.h \
+    runcontrol.h \
     applicationlauncher.h \
     runsettingspropertiespage.h \
     projecttreewidget.h \
@@ -158,7 +160,9 @@ HEADERS += projectexplorer.h \
     customexecutablerunconfiguration.h \
     projectmacro.h \
     makestep.h \
-    projectconfigurationaspects.h
+    parseissuesdialog.h \
+    projectconfigurationaspects.h \
+    treescanner.h
 
 SOURCES += projectexplorer.cpp \
     abi.cpp \
@@ -171,6 +175,7 @@ SOURCES += projectexplorer.cpp \
     environmentaspect.cpp \
     environmentaspectwidget.cpp \
     extraabi.cpp \
+    fileinsessionfinder.cpp \
     filterkitaspectsdialog.cpp \
     gcctoolchain.cpp \
     importwidget.cpp \
@@ -224,6 +229,7 @@ SOURCES += projectexplorer.cpp \
     editorconfiguration.cpp \
     editorsettingspropertiespage.cpp \
     runconfiguration.cpp \
+    runcontrol.cpp \
     applicationlauncher.cpp \
     runsettingspropertiespage.cpp \
     projecttreewidget.cpp \
@@ -298,9 +304,11 @@ SOURCES += projectexplorer.cpp \
     customexecutablerunconfiguration.cpp \
     projectmacro.cpp \
     makestep.cpp \
-    projectconfigurationaspects.cpp
+    parseissuesdialog.cpp \
+    projectconfigurationaspects.cpp \
+    treescanner.cpp
 
-FORMS += processstep.ui \
+FORMS += \
     editorsettingspropertiespage.ui \
     sessiondialog.ui \
     projectwizardpage.ui \
@@ -344,3 +352,7 @@ journald {
 RESOURCES += projectexplorer.qrc
 
 DEFINES += PROJECTEXPLORER_LIBRARY
+
+!isEmpty(PROJECT_USER_FILE_EXTENSION) {
+    DEFINES += PROJECT_USER_FILE_EXTENSION=$${PROJECT_USER_FILE_EXTENSION}
+}

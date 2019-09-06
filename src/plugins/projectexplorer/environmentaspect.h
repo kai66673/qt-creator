@@ -41,22 +41,32 @@ class PROJECTEXPLORER_EXPORT EnvironmentAspect : public ProjectConfigurationAspe
     Q_OBJECT
 
 public:
-    // The environment the user chose as base for his modifications.
-    virtual Utils::Environment baseEnvironment() const = 0;
+    EnvironmentAspect();
+
     // The environment including the user's modifications.
     Utils::Environment environment() const;
-
-    QList<int> possibleBaseEnvironments() const;
-    QString baseEnvironmentDisplayName(int base) const;
 
     int baseEnvironmentBase() const;
     void setBaseEnvironmentBase(int base);
 
-    QList<Utils::EnvironmentItem> userEnvironmentChanges() const { return m_changes; }
+    QList<Utils::EnvironmentItem> userEnvironmentChanges() const { return m_userChanges; }
     void setUserEnvironmentChanges(const QList<Utils::EnvironmentItem> &diff);
 
-    void addSupportedBaseEnvironment(int base, const QString &displayName);
-    void addPreferredBaseEnvironment(int base, const QString &displayName);
+    void addSupportedBaseEnvironment(const QString &displayName,
+                                     const std::function<Utils::Environment()> &getter);
+    void addPreferredBaseEnvironment(const QString &displayName,
+                                     const std::function<Utils::Environment()> &getter);
+
+    // The environment the user chose as base for his modifications.
+    Utils::Environment currentUnmodifiedBaseEnvironment() const;
+    QString currentDisplayName() const;
+
+    const QStringList displayNames() const;
+
+    using EnvironmentModifier = std::function<void(Utils::Environment &)>;
+    void addModifier(const EnvironmentModifier &);
+
+    bool isLocal() const { return m_isLocal; }
 
 signals:
     void baseEnvironmentChanged();
@@ -64,14 +74,25 @@ signals:
     void environmentChanged();
 
 protected:
-    EnvironmentAspect();
     void fromMap(const QVariantMap &map) override;
     void toMap(QVariantMap &map) const override;
 
+    void setIsLocal(bool local) { m_isLocal = local; }
+
 private:
+    // One possible choice in the Environment aspect.
+    struct BaseEnvironment {
+        Utils::Environment unmodifiedBaseEnvironment() const;
+
+        std::function<Utils::Environment()> getter;
+        QString displayName;
+    };
+
+    QList<Utils::EnvironmentItem> m_userChanges;
+    QList<EnvironmentModifier> m_modifiers;
+    QList<BaseEnvironment> m_baseEnvironments;
     int m_base = -1;
-    QList<Utils::EnvironmentItem> m_changes;
-    QMap<int, QString> m_displayNames;
+    bool m_isLocal = false;
 };
 
 } // namespace ProjectExplorer

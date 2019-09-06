@@ -98,7 +98,7 @@ bool JsonWizardGenerator::formatFile(const JsonWizard *wizard, GeneratedFile *fi
     Indenter *indenter = nullptr;
     if (factory) {
         indenter = factory->createIndenter(&doc);
-        indenter->setFileName(Utils::FileName::fromString(file->path()));
+        indenter->setFileName(Utils::FilePath::fromString(file->path()));
     }
     if (!indenter)
         indenter = new NormalIndenter(&doc);
@@ -215,7 +215,7 @@ JsonWizardGenerator::OverwriteResult JsonWizardGenerator::promptForOverwrite(Jso
     if (overwriteDialog.exec() != QDialog::Accepted)
         return OverwriteCanceled;
 
-    const QSet<QString> existingFilesToKeep = QSet<QString>::fromList(overwriteDialog.uncheckedFiles());
+    const QSet<QString> existingFilesToKeep = Utils::toSet(overwriteDialog.uncheckedFiles());
     if (existingFilesToKeep.size() == files->size()) // All exist & all unchecked->Cancel.
         return OverwriteCanceled;
 

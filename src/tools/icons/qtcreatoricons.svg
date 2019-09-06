@@ -14,7 +14,7 @@
    height="600"
    id="svg2"
    version="1.1"
-   inkscape:version="0.92.1 r15371"
+   inkscape:version="0.92.4 5da689c313, 2019-01-14"
    sodipodi:docname="qtcreatoricons.svg">
   <defs
      id="defs4">
@@ -561,19 +561,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="4"
-     inkscape:cx="407.31417"
-     inkscape:cy="170.08332"
      inkscape:document-units="px"
-     inkscape:current-layer="g4718"
      showgrid="true"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:window-width="2880"
-     inkscape:window-height="1503"
-     inkscape:window-x="-13"
-     inkscape:window-y="527"
-     inkscape:window-maximized="1"
+     inkscape:window-maximized="0"
      inkscape:snap-grids="true">
     <inkscape:grid
        type="xygrid"
@@ -612,7 +604,7 @@
        inkscape:locked="false" />
     <sodipodi:guide
        orientation="0,1"
-       position="0,80"
+       position="232,80"
        id="guide4545"
        inkscape:locked="false" />
     <sodipodi:guide
@@ -3453,6 +3445,207 @@
          width="100%"
          height="100%" />
     </g>
+    <g
+       transform="translate(128)"
+       id="src/libs/utils/images/settings">
+      <use
+         transform="translate(1740,132)"
+         height="100%"
+         width="100%"
+         id="use4105"
+         xlink:href="#backgroundRect"
+         y="0"
+         x="0" />
+      <circle
+         style="fill:none;stroke:#000000;stroke-width:1.75"
+         id="path4133"
+         cx="1732"
+         cy="576"
+         r="3.5" />
+      <path
+         style="fill:#000000"
+         d="m 1733.25,579.5 -0.5,2.5 h -1.5 l -0.5,-2.5 z"
+         id="path4135"
+         inkscape:connector-curvature="0"
+         inkscape:transform-center-y="5.25"
+         sodipodi:nodetypes="ccccc" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         inkscape:transform-center-y="3.5355339"
+         id="use4137"
+         transform="rotate(45,1732,576)"
+         width="100%"
+         height="100%"
+         inkscape:transform-center-x="3.5355339" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         id="use4139"
+         transform="rotate(90,1732,576)"
+         width="100%"
+         height="100%"
+         inkscape:transform-center-x="5.25" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         inkscape:transform-center-y="-3.5355339"
+         id="use4141"
+         transform="rotate(135,1732,576)"
+         width="100%"
+         height="100%"
+         inkscape:transform-center-x="3.5355339" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         inkscape:transform-center-y="-5.25"
+         id="use4143"
+         transform="rotate(-180,1732,576)"
+         width="100%"
+         height="100%" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         inkscape:transform-center-y="-3.5355339"
+         id="use4145"
+         transform="rotate(-135,1732,576)"
+         width="100%"
+         height="100%"
+         inkscape:transform-center-x="-3.5355339" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         id="use4147"
+         transform="rotate(-90,1732,576)"
+         width="100%"
+         height="100%"
+         inkscape:transform-center-x="-5.25" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4135"
+         inkscape:transform-center-y="3.5355339"
+         id="use4149"
+         transform="rotate(-45,1732,576)"
+         width="100%"
+         height="100%"
+         inkscape:transform-center-x="-3.5355339" />
+    </g>
+    <g
+       style="display:inline"
+       transform="translate(144)"
+       id="src/plugins/languageclient/images/languageclient">
+      <use
+         transform="translate(1740,132)"
+         height="100%"
+         width="100%"
+         id="use4105-8"
+         xlink:href="#backgroundRect"
+         y="0"
+         x="0" />
+      <ellipse
+         style="fill:none;stroke:#000000"
+         id="path4643-3"
+         cx="1729"
+         cy="580.5"
+         rx="3.5"
+         ry="2" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4643-3"
+         id="use4684-9"
+         width="100%"
+         height="100%"
+         transform="translate(0,-5)" />
+      <rect
+         style="fill:#ffffff"
+         id="rect4670-9"
+         width="8"
+         height="2.5"
+         x="1725"
+         y="578" />
+      <path
+         style="fill:none;stroke:#000000"
+         d="m 1725.5,575.5 v 5"
+         id="path4672-0"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="cc" />
+      <use
+         x="0"
+         y="0"
+         xlink:href="#path4672-0"
+         id="use4686-9"
+         transform="translate(7)"
+         width="100%"
+         height="100%" />
+      <path
+         style="display:inline;fill:#000000"
+         d="m 1733,569 h 4 c 1,0 2,1 2,2 v 3 c 0,2.5 -1.5,2.5 -5.5,4 l 2,-2 h -2.5 c -1,0 -2,-1 -2,-2 v -3 c 0,-1 1,-2 2,-2 z"
+         id="path4639-0"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="cccccccccc" />
+      <path
+         style="display:inline;fill:none;stroke:#ffffff"
+         d="m 1734.25,570.75 -1.75,1.75 1.75,1.75"
+         id="path4676-1"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="ccc" />
+      <use
+         style="display:inline"
+         x="0"
+         y="0"
+         xlink:href="#path4676-1"
+         id="use4682-2"
+         transform="matrix(-1,0,0,1,3470,0)"
+         width="100%"
+         height="100%" />
+    </g>
+    <g
+       style="display:inline"
+       transform="translate(160)"
+       id="src/libs/utils/images/toggleprogressdetails">
+      <use
+         style="display:inline"
+         transform="translate(1740,132)"
+         height="100%"
+         width="100%"
+         id="use4105-8-8"
+         xlink:href="#backgroundRect"
+         y="0"
+         x="0" />
+      <rect
+         style="display:inline;fill:#707070"
+         id="rect2566"
+         width="8"
+         height="2"
+         x="1726"
+         y="577" />
+      <rect
+         style="display:inline;fill:none;stroke:#000000"
+         id="rect2564"
+         width="13"
+         height="3"
+         x="1725.5"
+         y="576.5"
+         ry="1"
+         rx="1" />
+      <use
+         transform="matrix(1,0,0,-1,1529,1167)"
+         style="display:inline"
+         x="0"
+         y="0"
+         xlink:href="#expandarrow"
+         id="use2507"
+         width="100%"
+         height="100%" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -4963,7 +5156,7 @@
     </g>
     <g
        style="display:inline"
-       id="src/plugins/autotest/images/sort"
+       id="src/libs/utils/images/sort_alphabetically"
        transform="translate(32,0)">
       <rect
          y="568"
@@ -6439,9 +6632,27 @@
       <path
          sodipodi:nodetypes="cccc"
          inkscape:connector-curvature="0"
-         id="path4784-17"
+         id="expandarrow"
          d="m 210,595 -2.5,2.5 -2.5,-2.5 z"
          style="fill:#000000;fill-opacity:1;stroke:none" />
+    </g>
+    <g
+       id="src/libs/utils/images/pinned">
+      <use
+         style="display:inline"
+         x="0"
+         y="0"
+         xlink:href="#backgroundRect"
+         id="use5933-0-2-3"
+         width="100%"
+         height="100%"
+         transform="translate(361,148)" />
+      <path
+         sodipodi:nodetypes="ccccccccccccccc"
+         inkscape:connector-curvature="0"
+         id="path6750"
+         d="m 347,597.33936 0.60019,0.60645 3.49128,-3.49127 3.09695,3.09695 c 0.29088,-0.96173 0.20375,-2.0863 -0.1875,-3.07155 l 3.68179,-3.68179 0.55968,0.52841 0.75761,-0.75762 -4.51473,-4.51475 -0.80193,0.80194 0.53076,0.51509 -3.60205,3.60206 c -1.04768,-0.37523 -2.22553,-0.48941 -3.20237,-0.15625 l 3.0615,3.0615 z"
+         style="fill:#000000" />
     </g>
   </g>
   <g
@@ -8912,6 +9123,30 @@
            cy="526.5"
            r="1.5" />
       </g>
+    </g>
+    <g
+       transform="translate(111)"
+       id="src/plugins/projectexplorer/images/fileoverlay_py">
+      <use
+         x="0"
+         y="0"
+         xlink:href="#transparentBackgroundRect"
+         id="use2479"
+         width="100%"
+         height="100%"
+         transform="translate(113,68)" />
+      <path
+         style="opacity:0.75;fill:#ffffff"
+         d="m 104,535.99991 c 0.5,-9e-5 1,-0.49991 1,-0.99991 v -1 c 1,0 1.58286,0 2.58286,0 -0.5,0.5 -0.2217,1 0.0332,1.22379 L 108.50001,536 h 0.74644 c 0.27171,0 0.55533,-0.30177 0.75356,-0.5 l 2.24999,-2.25 c 0.25054,-0.25054 0.75001,-0.85547 0.75001,-1.41406 V 530 c 0,-0.5 -0.5,-1 -1,-1 0,0 -8.49999,0 -9,0 -0.50001,0 -1,0.5 -1,1 v 5 c 0,0.5 0.49999,1 0.99999,1 0.5,0 0.5,0 1,-9e-5 z"
+         id="path5194-1"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="zsccscscssszzsszz" />
+      <path
+         sodipodi:nodetypes="cccccccccccc"
+         inkscape:connector-curvature="0"
+         d="m 103.49859,532.5 v -2 c 1.02427,-0.0193 2.92783,-0.45188 3,1 0.0722,1.45188 -2,1 -3,1 z M 111.5,530 v 1.73815 c -0.36757,0.7971 -1.47164,1.64275 -3,3.26185 m 0,-5 v 1.97707 c 0.22805,0.82162 1.35083,0.8693 2,1.52293 m -7,-3.5 v 5"
+         style="fill:none;stroke:#1986a0;stroke-opacity:1"
+         id="path5210-3" />
     </g>
     <g
        id="src/libs/utils/images/filesave">

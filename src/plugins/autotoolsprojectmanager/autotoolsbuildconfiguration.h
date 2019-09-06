@@ -29,7 +29,7 @@
 
 #include <projectexplorer/buildconfiguration.h>
 
-namespace Utils { class FileName; }
+namespace Utils { class FilePath; }
 
 namespace AutotoolsProjectManager {
 namespace Internal {
@@ -42,7 +42,6 @@ class AutotoolsBuildConfiguration : public ProjectExplorer::BuildConfiguration
     AutotoolsBuildConfiguration(ProjectExplorer::Target *parent, Core::Id id);
 
     void initialize(const ProjectExplorer::BuildInfo &info) override;
-    ProjectExplorer::NamedWidget *createConfigWidget() override;
     BuildType buildType() const override;
 };
 
@@ -58,7 +57,7 @@ private:
     QList<ProjectExplorer::BuildInfo> availableSetups(const ProjectExplorer::Kit *k,
                                                       const QString &projectPath) const override;
 
-    ProjectExplorer::BuildInfo createBuildInfo(const ProjectExplorer::Kit *k, const Utils::FileName &buildDir) const;
+    ProjectExplorer::BuildInfo createBuildInfo(const ProjectExplorer::Kit *k, const Utils::FilePath &buildDir) const;
 };
 
 } // namespace Internal

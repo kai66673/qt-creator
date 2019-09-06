@@ -2061,7 +2061,7 @@ public:
 
     void pasteText(bool afterCursor);
 
-    void cutSelectedText();
+    void cutSelectedText(int reg = 0);
 
     void joinLines(int count, bool preserveSpace = false);
 
@@ -2155,6 +2155,7 @@ public:
     bool handleExWriteCommand(const ExCommand &cmd);
     bool handleExEchoCommand(const ExCommand &cmd);
 
+    void setTabSize(int tabSize);
     void setupCharClass();
     int charClass(QChar c, bool simple) const;
     signed char m_charClass[256];
@@ -2686,17 +2687,22 @@ void FakeVimHandler::Private::ensureCursorVisible()
 
 void FakeVimHandler::Private::updateEditor()
 {
-    const int charWidth = QFontMetrics(EDITOR(font())).horizontalAdvance(' ');
-    EDITOR(setTabStopWidth(charWidth * config(ConfigTabStop).toInt()));
+    setTabSize(config(ConfigTabStop).toInt());
     setupCharClass();
+}
+
+void FakeVimHandler::Private::setTabSize(int tabSize)
+{
+    const int charWidth = QFontMetrics(EDITOR(font())).horizontalAdvance(' ');
+    const int width = charWidth * tabSize;
+    EDITOR(setTabStopDistance(width));
 }
 
 void FakeVimHandler::Private::restoreWidget(int tabSize)
 {
     //EDITOR(removeEventFilter(q));
     //EDITOR(setReadOnly(m_wasReadOnly));
-    const int charWidth = QFontMetrics(EDITOR(font())).horizontalAdvance(' ');
-    EDITOR(setTabStopWidth(charWidth * tabSize));
+    setTabSize(tabSize);
     g.visualMode = NoVisualMode;
     // Force "ordinary" cursor.
     setThinCursor();
@@ -4133,6 +4139,8 @@ EventResult FakeVimHandler::Private::handleCommandMode(const Input &input)
     // Process input for a sub-mode.
     if (input.isEscape()) {
         handled = handleEscape();
+    } else if (m_wasReadOnly) {
+        return EventUnhandled;
     } else if (g.subsubmode != NoSubSubMode) {
         handled = handleCommandSubSubMode(input);
     } else if (g.submode == NoSubMode) {
@@ -7231,7 +7239,7 @@ void FakeVimHandler::Private::pasteText(bool afterCursor)
     bool pasteAfter = isVisualMode() ? false : afterCursor;
 
     if (isVisualMode())
-        cutSelectedText();
+        cutSelectedText('"');
 
     switch (rangeMode) {
         case RangeCharMode: {
@@ -7312,7 +7320,7 @@ void FakeVimHandler::Private::pasteText(bool afterCursor)
     endEditBlock();
 }
 
-void FakeVimHandler::Private::cutSelectedText()
+void FakeVimHandler::Private::cutSelectedText(int reg)
 {
     pushUndoState();
 
@@ -7323,8 +7331,11 @@ void FakeVimHandler::Private::cutSelectedText()
     if (visualMode && g.rangemode == RangeCharMode)
         ++range.endPos;
 
+    if (!reg)
+        reg = m_register;
+
     g.submode = DeleteSubMode;
-    yankText(range, m_register);
+    yankText(range, reg);
     removeText(range);
     g.submode = NoSubMode;
 

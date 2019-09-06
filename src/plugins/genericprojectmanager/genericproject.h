@@ -38,7 +38,7 @@ class GenericProject : public ProjectExplorer::Project
     Q_OBJECT
 
 public:
-    explicit GenericProject(const Utils::FileName &filename);
+    explicit GenericProject(const Utils::FilePath &filename);
     ~GenericProject() override;
 
     bool addFiles(const QStringList &filePaths);
@@ -58,12 +58,15 @@ protected:
     RestoreResult fromMap(const QVariantMap &map, QString *errorMessage) override;
 
 private:
+    ProjectExplorer::DeploymentKnowledge deploymentKnowledge() const override;
+
     bool saveRawFileList(const QStringList &rawFileList);
     bool saveRawList(const QStringList &rawList, const QString &fileName);
     void parseProject(RefreshOptions options);
     QStringList processEntries(const QStringList &paths,
                                QHash<QString, QString> *map = nullptr) const;
 
+    Utils::FilePath findCommonSourceRoot();
     void refreshCppCodeModel();
     void updateDeploymentData();
     void activeTargetWasChanged();

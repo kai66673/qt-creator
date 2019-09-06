@@ -45,7 +45,7 @@ class Id;
 
 namespace Utils {
 class ProcessHandle;
-class FileName;
+class FilePath;
 }
 
 namespace ProjectExplorer {
@@ -56,7 +56,10 @@ class Node;
 class FolderNode;
 class FileNode;
 
-namespace Internal { class ProjectExplorerSettings; }
+namespace Internal {
+class AppOutputSettings;
+class ProjectExplorerSettings;
+}
 
 class PROJECTEXPLORER_EXPORT ProjectExplorerPlugin : public ExtensionSystem::IPlugin
 {
@@ -129,13 +132,16 @@ public:
     static void setProjectExplorerSettings(const Internal::ProjectExplorerSettings &pes);
     static const Internal::ProjectExplorerSettings &projectExplorerSettings();
 
+    static void setAppOutputSettings(const Internal::AppOutputSettings &settings);
+    static const Internal::AppOutputSettings &appOutputSettings();
+
     static void startRunControl(RunControl *runControl);
     static void showRunErrorMessage(const QString &errorMessage);
 
     // internal public for FlatModel
     static void renameFile(Node *node, const QString &newFilePath);
     static QStringList projectFilePatterns();
-    static bool isProjectFile(const Utils::FileName &filePath);
+    static bool isProjectFile(const Utils::FilePath &filePath);
     static QList<QPair<QString, QString> > recentProjects();
 
     static bool canRunStartupProject(Core::Id runMode, QString *whyNot = nullptr);
@@ -164,7 +170,6 @@ public:
     static void openOpenProjectDialog();
 
     static QString buildDirectoryTemplate();
-    static void setBuildDirectoryTemplate(const QString &dir);
     static QString defaultBuildDirectoryTemplate();
 
 signals:
@@ -252,6 +257,8 @@ private slots:
     void testProject_parsingSuccess();
     void testProject_parsingFail();
     void testProject_projectTree();
+
+    void testSessionSwitch();
 #endif // WITH_TESTS
 };
 

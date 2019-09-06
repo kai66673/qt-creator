@@ -106,11 +106,6 @@ Utils::OsType WinRtDevice::osType() const
     return Utils::OsTypeWindows;
 }
 
-IDevice::Ptr WinRtDevice::clone() const
-{
-    return IDevice::Ptr(new WinRtDevice(*this));
-}
-
 QString WinRtDevice::displayNameForType(Core::Id type)
 {
     if (type == Constants::WINRT_DEVICE_TYPE_LOCAL)
@@ -160,13 +155,12 @@ void WinRtDeviceFactory::autoDetect()
         qCDebug(winrtDeviceLog) << __FUNCTION__ << "Creating process";
         m_process = new Utils::QtcProcess(this);
         connect(m_process, &QProcess::errorOccurred, this, &WinRtDeviceFactory::onProcessError);
-        connect(m_process,
-                static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+        connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 this, &WinRtDeviceFactory::onProcessFinished);
     }
 
     const QString args = QStringLiteral("--list-devices");
-    m_process->setCommand(runnerFilePath, args);
+    m_process->setCommand(CommandLine(FilePath::fromString(runnerFilePath), args));
     qCDebug(winrtDeviceLog) << __FUNCTION__ << "Starting process" << runnerFilePath
                             << "with arguments" << args;
     MessageManager::write(runnerFilePath + QLatin1Char(' ') + args);

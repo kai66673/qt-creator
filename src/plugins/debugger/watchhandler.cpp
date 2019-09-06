@@ -56,6 +56,7 @@
 #include <utils/fancylineedit.h>
 #include <utils/qtcassert.h>
 #include <utils/savedaction.h>
+#include <utils/stringutils.h>
 #include <utils/theme/theme.h>
 
 #include <QApplication>
@@ -484,7 +485,7 @@ WatchModel::WatchModel(WatchHandler *handler, DebuggerEngine *engine)
 
     m_contentsValid = true;
 
-    setHeader({tr("Name"), tr("Value"), tr("Type")});
+    setHeader({tr("Name"), tr("Time"), tr("Value"), tr("Type")});
     m_localsRoot = new WatchItem;
     m_localsRoot->iname = "local";
     m_localsRoot->name = tr("Locals");
@@ -901,7 +902,7 @@ static QColor valueColor(const WatchItem *item, int column)
     if (const WatchModel *model = watchModel(item)) {
         if (!model->m_contentsValid && !item->isInspect()) {
             color = Theme::Debugger_WatchItem_ValueInvalid;
-        } else if (column == 1) {
+        } else if (column == WatchModel::ValueColumn) {
             if (!item->valueEnabled)
                 color = Theme::Debugger_WatchItem_ValueInvalid;
             else if (!model->m_contentsValid && !item->isInspect())
@@ -1011,11 +1012,13 @@ QVariant WatchModel::data(const QModelIndex &idx, int role) const
 
         case Qt::EditRole: {
             switch (column) {
-                case 0:
+                case TimeColumn:
+                    return item->time;
+                case NameColumn:
                     return item->expression();
-                case 1:
+                case ValueColumn:
                     return item->editValue();
-                case 2:
+                case TypeColumn:
                     return item->type;
             }
             break;
@@ -1023,11 +1026,13 @@ QVariant WatchModel::data(const QModelIndex &idx, int role) const
 
         case Qt::DisplayRole: {
             switch (column) {
-                case 0:
+                case TimeColumn:
+                    return int(1000 * item->time);
+                case NameColumn:
                     return displayName(item);
-                case 1:
+                case ValueColumn:
                     return displayValue(item);
-                case 2:
+                case TypeColumn:
                     return displayType(item);
             }
             break;
@@ -1129,14 +1134,14 @@ bool WatchModel::setData(const QModelIndex &idx, const QVariant &value, int role
     switch (role) {
         case Qt::EditRole:
             switch (idx.column()) {
-            case 0: {
+            case NameColumn: {
                 m_handler->updateWatchExpression(item, value.toString().trimmed());
                 break;
             }
-            case 1: // Change value
+            case ValueColumn: // Change value
                 m_engine->assignValueInDebugger(item, item->expression(), value);
                 break;
-            case 2: // TODO: Implement change type.
+            case TypeColumn: // TODO: Implement change type.
                 m_engine->assignValueInDebugger(item, item->expression(), value);
                 break;
             }
@@ -1206,20 +1211,20 @@ Qt::ItemFlags WatchModel::flags(const QModelIndex &idx) const
 
     if (item->isWatcher()) {
         if (state == InferiorUnrunnable)
-            return (column == 0 && item->iname.count('.') == 1) ? editable : notEditable;
+            return (column == NameColumn && item->iname.count('.') == 1) ? editable : notEditable;
 
         if (isRunning && !m_engine->hasCapability(AddWatcherWhileRunningCapability))
             return notEditable;
-        if (column == 0 && item->iname.count('.') == 1)
+        if (column == NameColumn && item->iname.count('.') == 1)
             return editable; // Watcher names are editable.
-        if (column == 1 && item->arrayIndex >= 0)
+        if (column == ValueColumn && item->arrayIndex >= 0)
             return editable;
 
         if (!item->name.isEmpty()) {
             // FIXME: Forcing types is not implemented yet.
             //if (idx.column() == 2)
             //    return editable; // Watcher types can be set by force.
-            if (column == 1 && item->valueEditable && !item->elided)
+            if (column == ValueColumn && item->valueEditable && !item->elided)
                 return editable; // Watcher values are sometimes editable.
         }
     } else if (item->isLocal()) {
@@ -1227,12 +1232,12 @@ Qt::ItemFlags WatchModel::flags(const QModelIndex &idx) const
             return notEditable;
         if (isRunning && !m_engine->hasCapability(AddWatcherWhileRunningCapability))
             return notEditable;
-        if (column == 1 && item->valueEditable && !item->elided)
+        if (column == ValueColumn && item->valueEditable && !item->elided)
             return editable; // Locals values are sometimes editable.
-        if (column == 1 && item->arrayIndex >= 0)
+        if (column == ValueColumn && item->arrayIndex >= 0)
             return editable;
     } else if (item->isInspect()) {
-        if (column == 1 && item->valueEditable)
+        if (column == ValueColumn && item->valueEditable)
             return editable; // Inspector values are sometimes editable.
     }
     return notEditable;
@@ -1587,8 +1592,7 @@ static QString removeWatchActionText(QString exp)
         exp.truncate(30);
         exp.append("...");
     }
-    return WatchModel::tr("Remove Expression Evaluator for \"%1\"")
-            .arg(exp.replace('&', "&&"));
+    return WatchModel::tr("Remove Expression Evaluator for \"%1\"").arg(Utils::quoteAmpersands(exp));
 }
 
 static void copyToClipboard(const QString &clipboardText)
@@ -1638,7 +1642,7 @@ void WatchModel::inputNewExpression()
 
 bool WatchModel::contextMenuEvent(const ItemViewEvent &ev)
 {
-    WatchItem *item = itemForIndex(ev.index());
+    WatchItem *item = itemForIndex(ev.sourceModelIndex());
 
     const QString exp = item ? item->expression() : QString();
     const QString name = item ? item->name : QString();

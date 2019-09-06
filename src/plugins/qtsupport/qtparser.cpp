@@ -58,7 +58,7 @@ void QtParser::stdError(const QString &line)
         if (level.compare(QLatin1String("Note"), Qt::CaseInsensitive) == 0)
             type = Task::Unknown;
         Task task(type, m_mocRegExp.cap(5).trimmed() /* description */,
-                  Utils::FileName::fromUserInput(m_mocRegExp.cap(1)) /* filename */,
+                  Utils::FilePath::fromUserInput(m_mocRegExp.cap(1)) /* filename */,
                   lineno,
                   ProjectExplorer::Constants::TASK_CATEGORY_COMPILE);
         emit addTask(task, 1);
@@ -69,7 +69,7 @@ void QtParser::stdError(const QString &line)
         if (m_translationRegExp.cap(1) == QLatin1String("Error"))
             type = Task::Error;
         Task task(type, m_translationRegExp.cap(2),
-                  Utils::FileName::fromUserInput(m_translationRegExp.cap(3)) /* filename */,
+                  Utils::FilePath::fromUserInput(m_translationRegExp.cap(3)) /* filename */,
                   -1,
                   ProjectExplorer::Constants::TASK_CATEGORY_COMPILE);
         emit addTask(task, 1);
@@ -96,19 +96,19 @@ void QtSupportPlugin::testQtOutputParser_data()
     QTest::addColumn<OutputParserTester::Channel>("inputChannel");
     QTest::addColumn<QString>("childStdOutLines");
     QTest::addColumn<QString>("childStdErrLines");
-    QTest::addColumn<QList<ProjectExplorer::Task> >("tasks");
+    QTest::addColumn<Tasks >("tasks");
     QTest::addColumn<QString>("outputLines");
 
 
     QTest::newRow("pass-through stdout")
             << QString::fromLatin1("Sometext") << OutputParserTester::STDOUT
             << QString::fromLatin1("Sometext\n") << QString()
-            << QList<ProjectExplorer::Task>()
+            << Tasks()
             << QString();
     QTest::newRow("pass-through stderr")
             << QString::fromLatin1("Sometext") << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("Sometext\n")
-            << QList<ProjectExplorer::Task>()
+            << Tasks()
             << QString();
     QTest::newRow("pass-through gcc infos")
             << QString::fromLatin1("/temp/test/untitled8/main.cpp: In function `int main(int, char**)':\n"
@@ -123,60 +123,60 @@ void QtSupportPlugin::testQtOutputParser_data()
                                    "../../scriptbug/main.cpp: In instantiation of void bar(i) [with i = double]:\n"
                                    "../../scriptbug/main.cpp:8: instantiated from void foo(i) [with i = double]\n"
                                    "../../scriptbug/main.cpp:22: instantiated from here\n")
-            << QList<ProjectExplorer::Task>()
+            << Tasks()
             << QString();
     QTest::newRow("qdoc warning")
             << QString::fromLatin1("/home/user/dev/qt5/qtscript/src/script/api/qscriptengine.cpp:295: warning: Can't create link to 'Object Trees & Ownership'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>() << Task(Task::Warning,
+            << (Tasks() << Task(Task::Warning,
                                                        QLatin1String("Can't create link to 'Object Trees & Ownership'"),
-                                                       Utils::FileName::fromUserInput(QLatin1String("/home/user/dev/qt5/qtscript/src/script/api/qscriptengine.cpp")), 295,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("/home/user/dev/qt5/qtscript/src/script/api/qscriptengine.cpp")), 295,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE))
             << QString();
     QTest::newRow("moc warning")
             << QString::fromLatin1("..\\untitled\\errorfile.h:0: Warning: No relevant classes found. No output generated.")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>() << Task(Task::Warning,
+            << (Tasks() << Task(Task::Warning,
                                                        QLatin1String("No relevant classes found. No output generated."),
-                                                       Utils::FileName::fromUserInput(QLatin1String("..\\untitled\\errorfile.h")), 0,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("..\\untitled\\errorfile.h")), 0,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE))
             << QString();
     QTest::newRow("moc warning 2")
             << QString::fromLatin1("c:\\code\\test.h(96): Warning: Property declaration ) has no READ accessor function. The property will be invalid.")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>() << Task(Task::Warning,
+            << (Tasks() << Task(Task::Warning,
                                                        QLatin1String("Property declaration ) has no READ accessor function. The property will be invalid."),
-                                                       Utils::FileName::fromUserInput(QLatin1String("c:\\code\\test.h")), 96,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("c:\\code\\test.h")), 96,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE))
             << QString();
     QTest::newRow("moc note")
             << QString::fromLatin1("/home/qtwebkithelpviewer.h:0: Note: No relevant classes found. No output generated.")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>() << Task(Task::Unknown,
+            << (Tasks() << Task(Task::Unknown,
                                                        QLatin1String("No relevant classes found. No output generated."),
-                                                       Utils::FileName::fromUserInput(QLatin1String("/home/qtwebkithelpviewer.h")), 0,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("/home/qtwebkithelpviewer.h")), 0,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE))
             << QString();
     QTest::newRow("ninja with moc")
             << QString::fromLatin1("E:/sandbox/creator/loaden/src/libs/utils/iwelcomepage.h(54): Error: Undefined interface")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>() << Task(Task::Error,
+            << (Tasks() << Task(Task::Error,
                                                        QLatin1String("Undefined interface"),
-                                                       Utils::FileName::fromUserInput(QLatin1String("E:/sandbox/creator/loaden/src/libs/utils/iwelcomepage.h")), 54,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("E:/sandbox/creator/loaden/src/libs/utils/iwelcomepage.h")), 54,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE))
             << QString();
     QTest::newRow("translation")
             << QString::fromLatin1("Warning: dropping duplicate messages in '/some/place/qtcreator_fr.qm'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>() << Task(Task::Warning,
+            << (Tasks() << Task(Task::Warning,
                                                        QLatin1String("dropping duplicate messages"),
-                                                       Utils::FileName::fromUserInput(QLatin1String("/some/place/qtcreator_fr.qm")), -1,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("/some/place/qtcreator_fr.qm")), -1,
                                                        ProjectExplorer::Constants::TASK_CATEGORY_COMPILE))
             << QString();
 }
@@ -187,7 +187,7 @@ void QtSupportPlugin::testQtOutputParser()
     testbench.appendOutputParser(new QtParser);
     QFETCH(QString, input);
     QFETCH(OutputParserTester::Channel, inputChannel);
-    QFETCH(QList<Task>, tasks);
+    QFETCH(Tasks, tasks);
     QFETCH(QString, childStdOutLines);
     QFETCH(QString, childStdErrLines);
     QFETCH(QString, outputLines);

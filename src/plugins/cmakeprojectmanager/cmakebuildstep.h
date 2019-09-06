@@ -35,7 +35,10 @@ class QListWidget;
 class QListWidgetItem;
 QT_END_NAMESPACE
 
-namespace Utils { class PathChooser; }
+namespace Utils {
+class CommandLine;
+class PathChooser;
+} // Utils
 
 namespace ProjectExplorer { class ToolChain; }
 
@@ -64,9 +67,7 @@ public:
     QString toolArguments() const;
     void setToolArguments(const QString &list);
 
-    QString allArguments(const CMakeRunConfiguration *rc) const;
-
-    QString cmakeCommand() const;
+    Utils::CommandLine cmakeCommand(CMakeRunConfiguration *rc) const;
 
     QVariantMap toMap() const override;
 
@@ -96,6 +97,8 @@ private:
     bool init() override;
     void doRun() override;
     ProjectExplorer::BuildStepConfigWidget *createConfigWidget() override;
+
+    QString defaultBuildTarget() const;
 
     void runImpl();
     void handleProjectWasParsed(bool success);

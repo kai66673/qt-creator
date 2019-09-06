@@ -121,12 +121,13 @@ public:
 
     explicit GitClient();
 
-    Utils::FileName vcsBinary() const override;
+    Utils::FilePath vcsBinary() const override;
     unsigned gitVersion(QString *errorMessage = nullptr) const;
 
     VcsBase::VcsCommand *vcsExecAbortable(const QString &workingDirectory,
                                           const QStringList &arguments,
-                                          bool isRebase = false);
+                                          bool isRebase = false,
+                                          QString abortCommand = QString());
 
     QString findRepositoryForDirectory(const QString &directory) const;
     QString findGitDirForRepository(const QString &repositoryDir) const;
@@ -174,8 +175,8 @@ public:
                                   QString revision = QString(), QString *errorMessage = nullptr,
                                   bool revertStaging = true);
     enum class StashMode { NoStash, TryStash };
-    void checkout(const QString &workingDirectory, const QString &ref,
-                  StashMode stashMode = StashMode::TryStash);
+    VcsBase::VcsCommand *checkout(const QString &workingDirectory, const QString &ref,
+                                  StashMode stashMode = StashMode::TryStash);
 
     QStringList setupCheckoutArguments(const QString &workingDirectory, const QString &ref);
     void updateSubmodulesIfNeeded(const QString &workingDirectory, bool prompt);
@@ -306,7 +307,7 @@ public:
     void launchGitK(const QString &workingDirectory, const QString &fileName);
     void launchGitK(const QString &workingDirectory) { launchGitK(workingDirectory, QString()); }
     bool launchGitGui(const QString &workingDirectory);
-    Utils::FileName gitBinDirectory();
+    Utils::FilePath gitBinDirectory();
 
     void launchRepositoryBrowser(const QString &workingDirectory);
 
@@ -369,7 +370,7 @@ private:
                                     QString msgBoxText, const QString &buttonName,
                                     const QString &gitCommand, ContinueCommandMode continueMode);
 
-    mutable Utils::FileName m_gitVersionForBinary;
+    mutable Utils::FilePath m_gitVersionForBinary;
     mutable unsigned m_cachedGitVersion;
 
     QString m_gitQtcEditor;

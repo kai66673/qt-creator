@@ -45,6 +45,7 @@
 
 #include <texteditor/texteditoractionhandler.h>
 #include <texteditor/texteditor.h>
+
 #include <utils/algorithm.h>
 #include <utils/utilsicons.h>
 
@@ -85,7 +86,7 @@ bool checkPackageName(const QString &packageName)
     return QRegExp(packageNameRegExp).exactMatch(packageName);
 }
 
-Project *androidProject(const Utils::FileName &fileName)
+Project *androidProject(const Utils::FilePath &fileName)
 {
     for (Project *project : SessionManager::projects()) {
         if (!project->activeTarget())
@@ -202,10 +203,10 @@ void AndroidManifestEditorWidget::initializePage()
         connect(m_versionNameLinedit, &QLineEdit::textEdited,
                 this, setDirtyFunc);
         connect(m_androidMinSdkVersion,
-                static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, setDirtyFunc);
         connect(m_androidTargetSdkVersion,
-                static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, setDirtyFunc);
 
     }
@@ -604,7 +605,7 @@ void AndroidManifestEditorWidget::preSave()
 
 void AndroidManifestEditorWidget::postSave()
 {
-    const Utils::FileName docPath = m_textEditorWidget->textDocument()->filePath();
+    const Utils::FilePath docPath = m_textEditorWidget->textDocument()->filePath();
     ProjectExplorer::Project *project = androidProject(docPath);
     if (project) {
         if (Target *target = project->activeTarget()) {
@@ -924,7 +925,7 @@ void AndroidManifestEditorWidget::parseManifest(QXmlStreamReader &reader, QXmlSt
     QXmlStreamAttributes result = modifyXmlStreamAttributes(attributes, keys, values);
     writer.writeAttributes(result);
 
-    QSet<QString> permissions = m_permissionsModel->permissions().toSet();
+    QSet<QString> permissions = Utils::toSet(m_permissionsModel->permissions());
 
     bool foundUsesSdk = false;
     bool foundPermissionComment = false;
@@ -1211,23 +1212,17 @@ void AndroidManifestEditorWidget::parseUnknownElement(QXmlStreamReader &reader, 
     }
 }
 
-QString AndroidManifestEditorWidget::iconPath(const QString &baseDir, IconDPI dpi)
+QString AndroidManifestEditorWidget::iconPath(IconDPI dpi)
 {
-    Utils::FileName fileName = Utils::FileName::fromString(baseDir);
     switch (dpi) {
     case HighDPI:
-        fileName.appendPath(QLatin1String("res/drawable-hdpi/icon.png"));
-        break;
+        return QString("/res/drawable-hdpi/icon.png");
     case MediumDPI:
-        fileName.appendPath(QLatin1String("res/drawable-mdpi/icon.png"));
-        break;
+        return QString("/res/drawable-mdpi/icon.png");
     case LowDPI:
-        fileName.appendPath(QLatin1String("res/drawable-ldpi/icon.png"));
-        break;
-    default:
-        return QString();
+        return QString("/res/drawable-ldpi/icon.png");
     }
-    return fileName.toString();
+    return {};
 }
 
 QIcon AndroidManifestEditorWidget::icon(const QString &baseDir, IconDPI dpi)
@@ -1242,7 +1237,7 @@ QIcon AndroidManifestEditorWidget::icon(const QString &baseDir, IconDPI dpi)
     if (dpi == LowDPI && !m_lIconPath.isEmpty())
         return QIcon(m_lIconPath);
 
-    QString fileName = iconPath(baseDir, dpi);
+    QString fileName = baseDir + iconPath(dpi);
     if (fileName.isEmpty())
         return QIcon();
     return QIcon(fileName);
@@ -1253,7 +1248,7 @@ void AndroidManifestEditorWidget::copyIcon(IconDPI dpi, const QString &baseDir, 
     if (!QFileInfo::exists(filePath))
         return;
 
-    const QString targetPath = iconPath(baseDir, dpi);
+    const QString targetPath = baseDir + iconPath(dpi);
     QFile::remove(targetPath);
     QDir dir;
     dir.mkpath(QFileInfo(targetPath).absolutePath());

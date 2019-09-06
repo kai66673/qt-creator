@@ -24,12 +24,13 @@
 **
 ****************************************************************************/
 
-#include "baremetaldevice.h"
-
 #include "baremetalconstants.h"
+#include "baremetaldevice.h"
 #include "baremetaldeviceconfigurationwidget.h"
 #include "baremetaldeviceconfigurationwizard.h"
+
 #include "defaultgdbserverprovider.h"
+
 #include "gdbserverprovidermanager.h"
 #include "gdbserverproviderprocess.h"
 
@@ -46,6 +47,8 @@ namespace BareMetal {
 namespace Internal {
 
 const char gdbServerProviderIdKeyC[] = "GdbServerProviderId";
+
+// BareMetalDevice
 
 BareMetalDevice::~BareMetalDevice()
 {
@@ -107,7 +110,7 @@ void BareMetalDevice::fromMap(const QVariantMap &map)
             gdbServerProvider = provider->id();
         } else {
             const QSsh::SshConnectionParameters sshParams = sshParameters();
-            auto newProvider = new DefaultGdbServerProvider;
+            const auto newProvider = new DefaultGdbServerProvider;
             newProvider->setDisplayName(name);
             newProvider->m_host = sshParams.host();
             newProvider->m_port = sshParams.port();
@@ -125,11 +128,6 @@ QVariantMap BareMetalDevice::toMap() const
     QVariantMap map = IDevice::toMap();
     map.insert(QLatin1String(gdbServerProviderIdKeyC), gdbServerProviderId());
     return map;
-}
-
-BareMetalDevice::IDevice::Ptr BareMetalDevice::clone() const
-{
-    return Ptr(new BareMetalDevice(*this));
 }
 
 DeviceProcessSignalOperation::Ptr BareMetalDevice::signalOperation() const
@@ -157,13 +155,6 @@ DeviceProcess *BareMetalDevice::createProcess(QObject *parent) const
     return new GdbServerProviderProcess(sharedFromThis(), parent);
 }
 
-BareMetalDevice::BareMetalDevice(const BareMetalDevice &other)
-    : IDevice(other)
-{
-    setGdbServerProviderId(other.gdbServerProviderId());
-}
-
-
 // Factory
 
 BareMetalDeviceFactory::BareMetalDeviceFactory()
@@ -180,7 +171,7 @@ IDevice::Ptr BareMetalDeviceFactory::create() const
 {
     BareMetalDeviceConfigurationWizard wizard;
     if (wizard.exec() != QDialog::Accepted)
-        return IDevice::Ptr();
+        return {};
     return wizard.device();
 }
 

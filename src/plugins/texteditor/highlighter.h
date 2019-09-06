@@ -38,6 +38,8 @@ class TextDocument;
 
 class Highlighter : public SyntaxHighlighter, public KSyntaxHighlighting::AbstractHighlighter
 {
+    Q_OBJECT
+    Q_INTERFACES(KSyntaxHighlighting::AbstractHighlighter)
 public:
     using Definition = KSyntaxHighlighting::Definition;
     using Definitions = QList<Definition>;
@@ -45,14 +47,18 @@ public:
 
     static Definition definitionForDocument(const TextDocument *document);
     static Definition definitionForMimeType(const QString &mimeType);
-    static Definition definitionForFileName(const QString &fileName);
+    static Definition definitionForFilePath(const Utils::FilePath &fileName);
     static Definition definitionForName(const QString &name);
 
     static Definitions definitionsForDocument(const TextDocument *document);
     static Definitions definitionsForMimeType(const QString &mimeType);
-    static Definitions definitionsForFileName(const QString &fileName);
+    static Definitions definitionsForFileName(const Utils::FilePath &fileName);
 
-    static void addCustomHighlighterPath(const Utils::FileName &path);
+    static void rememberDefintionForDocument(const Definition &definition,
+                                             const TextDocument *document);
+    static void clearDefintionForDocumentCache();
+
+    static void addCustomHighlighterPath(const Utils::FilePath &path);
     static void updateDefinitions(std::function<void()> callback = nullptr);
 
     static void handleShutdown();
@@ -60,6 +66,7 @@ public:
 protected:
     void highlightBlock(const QString &text) override;
     void applyFormat(int offset, int length, const KSyntaxHighlighting::Format &format) override;
+    void applyFolding(int offset, int length, KSyntaxHighlighting::FoldingRegion region) override;
 };
 
 } // namespace TextEditor

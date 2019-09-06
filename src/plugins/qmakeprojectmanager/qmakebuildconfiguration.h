@@ -83,7 +83,7 @@ public:
 
     enum MakefileState { MakefileMatches, MakefileForWrongProject, MakefileIncompatible, MakefileMissing };
     MakefileState compareToImportFrom(const QString &makefile, QString *errorString = nullptr);
-    static Utils::FileName extractSpecFromArguments(
+    static QString extractSpecFromArguments(
             QString *arguments, const QString &directory, const QtSupport::BaseQtVersion *version,
             QStringList *outArgs = nullptr);
 
@@ -100,6 +100,10 @@ public:
     static void setupBuildEnvironment(ProjectExplorer::Kit *k, Utils::Environment &env);
 
     void emitProFileEvaluateNeeded();
+
+    static QString unalignedBuildDirWarning();
+    static bool isBuildDirAtSafeLocation(const QString &sourceDir, const QString &buildDir);
+    bool isBuildDirAtSafeLocation() const;
 
 signals:
     /// emitted for setQMakeBuildConfig, not emitted for Qt version changes, even

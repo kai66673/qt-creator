@@ -42,9 +42,9 @@ class QTSUPPORT_EXPORT QtKitAspect : public ProjectExplorer::KitAspect
 public:
     QtKitAspect();
 
-    QVariant defaultValue(const ProjectExplorer::Kit *k) const override;
+    void setup(ProjectExplorer::Kit *k) override;
 
-    QList<ProjectExplorer::Task> validate(const ProjectExplorer::Kit *k) const override;
+    ProjectExplorer::Tasks validate(const ProjectExplorer::Kit *k) const override;
     void fix(ProjectExplorer::Kit *) override;
 
     ProjectExplorer::KitAspectWidget *createConfigWidget(ProjectExplorer::Kit *k) const override;
@@ -73,6 +73,8 @@ public:
     QSet<Core::Id> availableFeatures(const ProjectExplorer::Kit *k) const override;
 
 private:
+    int weight(const ProjectExplorer::Kit *k) const override;
+
     void qtVersionsChanged(const QList<int> &addedIds,
                            const QList<int> &removedIds,
                            const QList<int> &changedIds);

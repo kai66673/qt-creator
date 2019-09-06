@@ -89,6 +89,7 @@ public:
     void setHistoryCompleter(const QString &historyCompleterKey);
     void setExpectedKind(const Utils::PathChooser::Kind expectedKind);
     void setEnvironment(const Utils::Environment &env);
+    void setBaseFileName(const Utils::FilePath &baseFileName);
 
     bool isChecked() const;
     void makeCheckable(const QString &optionalLabel, const QString &optionalBaseKey);
@@ -104,8 +105,8 @@ public:
     void fromMap(const QVariantMap &map) override;
     void toMap(QVariantMap &map) const override;
 
-    Utils::FileName fileName() const;
-    void setFileName(const Utils::FileName &val);
+    Utils::FilePath fileName() const;
+    void setFileName(const Utils::FilePath &val);
 
 private:
     void update();
@@ -123,14 +124,15 @@ public:
 
     void addToConfigurationLayout(QFormLayout *layout) override;
 
-    int value() const;
-    void setValue(int val);
+    qint64 value() const;
+    void setValue(qint64 val);
 
-    void setRange(int min, int max);
+    void setRange(qint64 min, qint64 max);
     void setLabel(const QString &label);
     void setPrefix(const QString &prefix);
     void setSuffix(const QString &suffix);
     void setDisplayIntegerBase(int base);
+    void setDisplayScaleFactor(qint64 factor);
 
     void fromMap(const QVariantMap &map) override;
     void toMap(QVariantMap &map) const override;

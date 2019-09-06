@@ -27,20 +27,20 @@
 
 #include "projectexplorer_export.h"
 #include "projectconfiguration.h"
+#include "task.h"
 
 #include <utils/environment.h>
 #include <utils/fileutils.h>
 
 namespace ProjectExplorer {
 
+class BaseStringAspect;
 class BuildInfo;
-class NamedWidget;
 class BuildStepList;
-class Node;
 class Kit;
+class NamedWidget;
+class Node;
 class Target;
-class Task;
-class IOutputParser;
 
 class PROJECTEXPLORER_EXPORT BuildConfiguration : public ProjectConfiguration
 {
@@ -51,11 +51,11 @@ protected:
     explicit BuildConfiguration(Target *target, Core::Id id);
 
 public:
-    Utils::FileName buildDirectory() const;
-    Utils::FileName rawBuildDirectory() const;
-    void setBuildDirectory(const Utils::FileName &dir);
+    Utils::FilePath buildDirectory() const;
+    Utils::FilePath rawBuildDirectory() const;
+    void setBuildDirectory(const Utils::FilePath &dir);
 
-    virtual NamedWidget *createConfigWidget() = 0;
+    virtual NamedWidget *createConfigWidget();
     virtual QList<NamedWidget *> createSubConfigWidgets();
 
     // Maybe the BuildConfiguration is not the best place for the environment
@@ -95,9 +95,14 @@ public:
 
     bool isActive() const override;
 
-    void prependCompilerPathToEnvironment(Utils::Environment &env) const;
     static void prependCompilerPathToEnvironment(Kit *k, Utils::Environment &env);
     void updateCacheAndEmitEnvironmentChanged();
+
+    ProjectExplorer::BaseStringAspect *buildDirectoryAspect() const;
+    void setConfigWidgetDisplayName(const QString &display);
+    void setBuildDirectoryHistoryCompleter(const QString &history);
+    void setConfigWidgetHasFrame(bool configWidgetHasFrame);
+    void setBuildDirectorySettingsKey(const QString &key);
 
 signals:
     void environmentChanged();
@@ -114,9 +119,11 @@ private:
     bool m_clearSystemEnvironment = false;
     QList<Utils::EnvironmentItem> m_userEnvironmentChanges;
     QList<BuildStepList *> m_stepLists;
-    Utils::FileName m_buildDirectory;
-    Utils::FileName m_lastEmmitedBuildDirectory;
+    ProjectExplorer::BaseStringAspect *m_buildDirectoryAspect = nullptr;
+    Utils::FilePath m_lastEmmitedBuildDirectory;
     mutable Utils::Environment m_cachedEnvironment;
+    QString m_configWidgetDisplayName;
+    bool m_configWidgetHasFrame = false;
 };
 
 class PROJECTEXPLORER_EXPORT BuildConfigurationFactory : public QObject
@@ -143,10 +150,10 @@ public:
     static BuildConfigurationFactory *find(const Kit *k, const QString &projectPath);
     static BuildConfigurationFactory *find(Target *parent);
 
-    using IssueReporter = std::function<QList<ProjectExplorer::Task>(Kit *, const QString &, const QString &)>;
+    using IssueReporter = std::function<Tasks(Kit *, const QString &, const QString &)>;
     void setIssueReporter(const IssueReporter &issueReporter);
-    const QList<Task> reportIssues(ProjectExplorer::Kit *kit,
-                                   const QString &projectPath, const QString &buildDir) const;
+    const Tasks reportIssues(ProjectExplorer::Kit *kit,
+                             const QString &projectPath, const QString &buildDir) const;
 
 protected:
     virtual QList<BuildInfo> availableBuilds(const Target *parent) const = 0;

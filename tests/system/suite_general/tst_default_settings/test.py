@@ -50,8 +50,7 @@ def __createMinimumIni__(emptyParent):
     iniFile.close()
 
 def __checkKits__():
-    waitForObjectItem(":Options_QListView", "Kits")
-    clickItem(":Options_QListView", "Kits", 14, 15, 0, Qt.LeftButton)
+    mouseClick(waitForObjectItem(":Options_QListView", "Kits"))
     # check compilers
     expectedCompilers = __getExpectedCompilers__()
     foundCompilers = []
@@ -121,10 +120,9 @@ def __compFunc__(it, foundComp, foundCompNames):
         pathLineEdit = findObject(":Path.Utils_BaseValidatingLineEdit")
         foundComp.append(str(pathLineEdit.text))
     except:
-        label = findObject("{buddy={container=':qt_tabwidget_stackedwidget_QWidget' "
-                           "text='Initialization:' type='QLabel' unnamed='1' visible='1'} "
-                           "type='QLabel' unnamed='1' visible='1'}")
-        foundComp.append({it:str(label.text)})
+        varsBatCombo = waitForObjectExists("{name='varsBatCombo' type='QComboBox' visible='1'}")
+        foundComp.append({it:str(varsBatCombo.currentText)})
+
     foundCompNames.append(it)
 
 def __dbgFunc__(it, foundDbg):
@@ -212,6 +210,7 @@ def __getExpectedCompilers__():
     compilers = ["g++", "gcc"]
     if platform.system() in ('Linux', 'Darwin'):
         compilers.extend(["clang++", "clang", "afl-clang"])
+        compilers.extend(findAllFilesInPATH("clang-[0-9]"))
         compilers.extend(findAllFilesInPATH("clang-[0-9].[0-9]"))
         compilers.extend(findAllFilesInPATH("*g++*"))
         compilers.extend(findAllFilesInPATH("*gcc*"))

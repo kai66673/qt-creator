@@ -24,11 +24,10 @@
 ****************************************************************************/
 
 #include "baremetalcustomrunconfiguration.h"
-
 #include "baremetalconstants.h"
 
-#include <projectexplorer/target.h>
 #include <projectexplorer/runconfigurationaspects.h>
+#include <projectexplorer/target.h>
 
 #include <qtsupport/qtoutputformatter.h>
 
@@ -38,10 +37,12 @@ using namespace ProjectExplorer;
 namespace BareMetal {
 namespace Internal {
 
+// BareMetalCustomRunConfiguration
+
 BareMetalCustomRunConfiguration::BareMetalCustomRunConfiguration(Target *target, Core::Id id)
     : RunConfiguration(target, id)
 {
-    auto exeAspect = addAspect<ExecutableAspect>();
+    const auto exeAspect = addAspect<ExecutableAspect>();
     exeAspect->setSettingsKey("BareMetal.CustomRunConfig.Executable");
     exeAspect->setPlaceHolderText(tr("Unknown"));
     exeAspect->setDisplayStyle(BaseStringAspect::PathChooserDisplay);
@@ -49,7 +50,7 @@ BareMetalCustomRunConfiguration::BareMetalCustomRunConfiguration(Target *target,
     exeAspect->setExpectedKind(PathChooser::Any);
 
     addAspect<ArgumentsAspect>();
-    addAspect<WorkingDirectoryAspect>(nullptr);
+    addAspect<WorkingDirectoryAspect>();
 
     setDefaultDisplayName(RunConfigurationFactory::decoratedTargetName(tr("Custom Executable"), target));
 }

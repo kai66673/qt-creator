@@ -132,6 +132,7 @@ win32:SOURCES += $$PWD/consoleprocess_win.cpp
 else:SOURCES += $$PWD/consoleprocess_unix.cpp
 
 HEADERS += \
+    $$PWD/genericconstants.h \
     $$PWD/globalfilechangeblocker.h \
     $$PWD/benchmarker.h \
     $$PWD/environment.h \
@@ -213,7 +214,6 @@ HEADERS += \
     $$PWD/elidinglabel.h \
     $$PWD/tooltip/tooltip.h \
     $$PWD/tooltip/tips.h \
-    $$PWD/tooltip/reuse.h \
     $$PWD/tooltip/effects.h \
     $$PWD/unixutils.h \
     $$PWD/ansiescapecodehandler.h \
@@ -268,7 +268,8 @@ HEADERS += \
     $$PWD/removefiledialog.h \
     $$PWD/differ.h \
     $$PWD/cpplanguage_details.h \
-    $$PWD/jsontreeitem.h
+    $$PWD/jsontreeitem.h \
+    $$PWD/listmodel.h
 
 FORMS += $$PWD/filewizardpage.ui \
     $$PWD/newclasswidget.ui \

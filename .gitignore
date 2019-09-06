@@ -45,9 +45,12 @@ wrapper.sh
 *.pyqtc.user*
 *.qbs.user*
 *.qmlproject.user*
-/share/qtcreator/externaltools
+CMakeLists.txt.user*
+/share/qtcreator/examples/
+/share/qtcreator/externaltools/
 /share/qtcreator/fonts/
 /share/qtcreator/generic-highlighter/
+/share/qtcreator/qmldesigner/QtProject/
 /src/app/Info.plist
 /src/plugins/**/*.json
 /src/plugins/coreplugin/ide_version.h

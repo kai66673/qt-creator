@@ -84,7 +84,7 @@ public:
 
     void start() override
     {
-        QStringList args = m_reader.findTargetArguments(runControl()->runConfiguration());
+        QStringList args = m_reader.findTargetArguments(runControl());
         QUrl url = runControl()->property("PerfConnection").toUrl();
         if (url.isValid()) {
             args.append(QStringList{"--host", url.host(), "--port", QString::number(url.port())});
@@ -116,8 +116,7 @@ public:
     {
         setId("LocalPerfRecordWorker");
 
-        auto runConfig = runControl->runConfiguration();
-        auto perfAspect = static_cast<PerfRunConfigurationAspect *>(runConfig->aspect(Constants::PerfSettingsId));
+        auto perfAspect = static_cast<PerfRunConfigurationAspect *>(runControl->aspect(Constants::PerfSettingsId));
         QTC_ASSERT(perfAspect, return);
         PerfSettings *settings = static_cast<PerfSettings *>(perfAspect->currentSettings());
         QTC_ASSERT(settings, return);
@@ -138,10 +137,10 @@ public:
             // The terminate() below will frequently lead to QProcess::Crashed. We're not interested
             // in that. FailedToStart is the only actual failure.
             if (e == QProcess::FailedToStart) {
-                QString msg = tr("perf process failed to start");
+                QString msg = tr("Perf Process Failed to Start");
                 QMessageBox::warning(Core::ICore::mainWindow(),
-                                     msg, tr("Make sure you are running a recent Linux kernel and "
-                                             "that the 'perf' utility is available."));
+                                     msg, tr("Make sure that you are running a recent Linux kernel and "
+                                             "that the \"perf\" utility is available."));
                 reportFailure(msg);
             }
         });
@@ -227,7 +226,7 @@ void PerfProfilerRunner::start()
         });
         connect(recorder, &DeviceProcess::readyReadStandardOutput, this, [this, reader, recorder] {
             if (!reader->feedParser(recorder->readAllStandardOutput()))
-                reportFailure(tr("Failed to transfer perf data to perfparser"));
+                reportFailure(tr("Failed to transfer Perf data to perfparser."));
         });
     }
 

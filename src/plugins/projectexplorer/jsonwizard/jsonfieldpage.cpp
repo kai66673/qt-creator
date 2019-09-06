@@ -388,6 +388,7 @@ QWidget *LabelField::createWidget(const QString &displayName, JsonFieldPage *pag
     auto w = new QLabel;
     w->setWordWrap(m_wordWrap);
     w->setText(m_text);
+    w->setSizePolicy(QSizePolicy::Expanding, w->sizePolicy().verticalPolicy());
     return w;
 }
 
@@ -809,7 +810,7 @@ std::unique_ptr<QStandardItem> createStandardItemFromListItem(const QVariant &it
     if (item.type() == QVariant::Map) {
         QVariantMap tmp = item.toMap();
         const QString key = JsonWizardFactory::localizedString(consumeValue(tmp, "trKey", QString()).toString());
-        const QString value = consumeValue(tmp, "value", key).toString();
+        const QVariant value = consumeValue(tmp, "value", key);
 
         if (key.isNull() || key.isEmpty()) {
             *errorMessage  = QCoreApplication::translate("ProjectExplorer::JsonFieldPage",
@@ -919,7 +920,7 @@ void ListField::initializeData(MacroExpander *expander)
         if (item.get() == currentItem)
             currentItem = expandedValuesItem;
         expandedValuesItem->setText(expander->expand(item->text()));
-        expandedValuesItem->setData(expander->expand(item->data(ValueRole).toString()), ValueRole);
+        expandedValuesItem->setData(expander->expandVariant(item->data(ValueRole)), ValueRole);
         expandedValuesItem->setData(expander->expand(item->data(IconStringRole).toString()), IconStringRole);
         expandedValuesItem->setData(condition, ConditionRole);
 
@@ -1006,7 +1007,7 @@ void ComboBoxField::setup(JsonFieldPage *page, const QString &name)
     // the selectionModel does not behave like expected and wanted - so we block signals here
     // (for example there was some losing focus thing when hovering over items, ...)
     selectionModel()->blockSignals(true);
-    QObject::connect(w, static_cast<void(QComboBox::*)(int)>(&QComboBox::activated), [w, this](int index) {
+    QObject::connect(w, QOverload<int>::of(&QComboBox::activated), [w, this](int index) {
         w->blockSignals(true);
         selectionModel()->clearSelection();
 
@@ -1019,8 +1020,8 @@ void ComboBoxField::setup(JsonFieldPage *page, const QString &name)
     page->registerObjectAsFieldWithName<QItemSelectionModel>(name, selectionModel(), &QItemSelectionModel::selectionChanged, [this]() {
         const QModelIndex i = selectionModel()->currentIndex();
         if (i.isValid())
-            return i.data(ValueRole).toString();
-        return QString();
+            return i.data(ValueRole);
+        return QVariant();
     });
     QObject::connect(selectionModel(), &QItemSelectionModel::selectionChanged, page, [page]() {
         emit page->completeChanged();
@@ -1057,8 +1058,8 @@ void IconListField::setup(JsonFieldPage *page, const QString &name)
     page->registerObjectAsFieldWithName<QItemSelectionModel>(name, selectionModel(), &QItemSelectionModel::selectionChanged, [this]() {
         const QModelIndex i = selectionModel()->currentIndex();
         if (i.isValid())
-            return i.data(ValueRole).toString();
-        return QString();
+            return i.data(ValueRole);
+        return QVariant();
     });
     QObject::connect(selectionModel(), &QItemSelectionModel::selectionChanged, page, [page]() {
         emit page->completeChanged();

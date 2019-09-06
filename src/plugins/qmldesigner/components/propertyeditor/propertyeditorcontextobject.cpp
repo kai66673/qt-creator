@@ -35,6 +35,8 @@
 #include <utils/algorithm.h>
 #include <utils/qtcassert.h>
 
+#include <QApplication>
+#include <QCursor>
 #include <QQmlContext>
 
 static uchar fromHex(const uchar c, const uchar c2)
@@ -152,22 +154,14 @@ void PropertyEditorContextObject::toogleExportAlias()
         PropertyName modelNodeId = selectedNode.id().toUtf8();
         ModelNode rootModelNode = rewriterView->rootModelNode();
 
-        try {
-            RewriterTransaction transaction =
-                    rewriterView->beginRewriterTransaction(QByteArrayLiteral("PropertyEditorContextObject:toogleExportAlias"));
-
+        rewriterView->executeInTransaction("PropertyEditorContextObject:toogleExportAlias", [&objectNode, &rootModelNode, modelNodeId](){
             if (!objectNode.isAliasExported())
                 objectNode.ensureAliasExport();
             else
                 if (rootModelNode.hasProperty(modelNodeId))
                     rootModelNode.removeProperty(modelNodeId);
-
-            transaction.commit();
-        }  catch (RewritingException &exception) { //better safe than sorry! There always might be cases where we fail
-            exception.showException();
-        }
+        });
     }
-
 }
 
 void PropertyEditorContextObject::changeTypeName(const QString &typeName)
@@ -181,11 +175,8 @@ void PropertyEditorContextObject::changeTypeName(const QString &typeName)
 
     QTC_ASSERT(!rewriterView->selectedModelNodes().isEmpty(), return);
 
-    ModelNode selectedNode = rewriterView->selectedModelNodes().constFirst();
-
-    try {
-        RewriterTransaction transaction =
-                rewriterView->beginRewriterTransaction(QByteArrayLiteral("PropertyEditorContextObject:changeTypeName"));
+    rewriterView->executeInTransaction("PropertyEditorContextObject:changeTypeName", [this, rewriterView, typeName](){
+        ModelNode selectedNode = rewriterView->selectedModelNodes().constFirst();
 
         NodeMetaInfo metaInfo = m_model->metaInfo(typeName.toLatin1());
         if (!metaInfo.isValid()) {
@@ -193,16 +184,10 @@ void PropertyEditorContextObject::changeTypeName(const QString &typeName)
             return;
         }
         if (selectedNode.isRootNode())
-             rewriterView->changeRootNodeType(metaInfo.typeName(), metaInfo.majorVersion(), metaInfo.minorVersion());
+            rewriterView->changeRootNodeType(metaInfo.typeName(), metaInfo.majorVersion(), metaInfo.minorVersion());
         else
             selectedNode.changeType(metaInfo.typeName(), metaInfo.majorVersion(), metaInfo.minorVersion());
-
-        transaction.commit();
-    }  catch (RewritingException &exception) { //better safe than sorry! There always might be cases where we fail
-        exception.showException();
-    }
-
-
+    });
 }
 
 void PropertyEditorContextObject::insertKeyframe(const QString &propertyName)
@@ -401,6 +386,24 @@ void PropertyEditorContextObject::setHasAliasExport(bool hasAliasExport)
 
     m_aliasExport = hasAliasExport;
     emit hasAliasExportChanged();
+}
+
+void PropertyEditorContextObject::hideCursor()
+{
+    if (QApplication::overrideCursor())
+        return;
+
+    QApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
+    m_lastPos = QCursor::pos();
+}
+
+void PropertyEditorContextObject::restoreCursor()
+{
+    if (!QApplication::overrideCursor())
+        return;
+
+    QCursor::setPos(m_lastPos);
+    QApplication::restoreOverrideCursor();
 }
 
 } //QmlDesigner

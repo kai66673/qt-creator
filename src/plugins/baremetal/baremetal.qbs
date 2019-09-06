@@ -10,6 +10,7 @@ QtcPlugin {
     Depends { name: "Core" }
     Depends { name: "Debugger" }
     Depends { name: "ProjectExplorer" }
+    Depends { name: "TextEditor" }
 
     files: [
         "baremetal.qrc",
@@ -31,5 +32,11 @@ QtcPlugin {
         "openocdgdbserverprovider.cpp", "openocdgdbserverprovider.h",
         "defaultgdbserverprovider.cpp", "defaultgdbserverprovider.h",
         "stlinkutilgdbserverprovider.cpp", "stlinkutilgdbserverprovider.h",
+        "iarewtoolchain.cpp", "iarewtoolchain.h",
+        "keiltoolchain.cpp", "keiltoolchain.h",
+        "sdcctoolchain.cpp", "sdcctoolchain.h",
+        "iarewparser.cpp", "iarewparser.h",
+        "keilparser.cpp", "keilparser.h",
+        "sdccparser.cpp", "sdccparser.h",
     ]
 }

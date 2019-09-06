@@ -77,7 +77,7 @@ void GccParser::stdError(const QString &line)
         lne == QLatin1String("* cpp failed")) {
         newTask(Task(Task::Error,
                      lne /* description */,
-                     Utils::FileName() /* filename */,
+                     Utils::FilePath() /* filename */,
                      -1 /* linenumber */,
                      Constants::TASK_CATEGORY_COMPILE));
         return;
@@ -93,7 +93,7 @@ void GccParser::stdError(const QString &line)
         } else if (description.startsWith(QLatin1String("fatal: ")))  {
             description = description.mid(7);
         }
-        Task task(type, description, Utils::FileName(), /* filename */
+        Task task(type, description, Utils::FilePath(), /* filename */
                   -1, /* line */ Constants::TASK_CATEGORY_COMPILE);
         newTask(task);
         return;
@@ -101,7 +101,7 @@ void GccParser::stdError(const QString &line)
 
     match = m_regExp.match(lne);
     if (match.hasMatch()) {
-        Utils::FileName filename = Utils::FileName::fromUserInput(match.captured(1));
+        Utils::FilePath filename = Utils::FilePath::fromUserInput(match.captured(1));
         int lineno = match.captured(3).toInt();
         Task::TaskType type = Task::Unknown;
         QString description = match.captured(8);
@@ -125,7 +125,7 @@ void GccParser::stdError(const QString &line)
     if (match.hasMatch()) {
         newTask(Task(Task::Unknown,
                      lne.trimmed() /* description */,
-                     Utils::FileName::fromUserInput(match.captured(1)) /* filename */,
+                     Utils::FilePath::fromUserInput(match.captured(1)) /* filename */,
                      match.captured(3).toInt() /* linenumber */,
                      Constants::TASK_CATEGORY_COMPILE));
         return;
@@ -199,7 +199,7 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
     QTest::addColumn<OutputParserTester::Channel>("inputChannel");
     QTest::addColumn<QString>("childStdOutLines");
     QTest::addColumn<QString>("childStdErrLines");
-    QTest::addColumn<QList<Task> >("tasks");
+    QTest::addColumn<Tasks >("tasks");
     QTest::addColumn<QString>("outputLines");
 
     const Core::Id categoryCompile = Constants::TASK_CATEGORY_COMPILE;
@@ -207,18 +207,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
     QTest::newRow("pass-through stdout")
             << QString::fromLatin1("Sometext") << OutputParserTester::STDOUT
             << QString::fromLatin1("Sometext\n") << QString()
-            << QList<Task>()
+            << Tasks()
             << QString();
     QTest::newRow("pass-through stderr")
             << QString::fromLatin1("Sometext") << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("Sometext\n")
-            << QList<Task>()
+            << Tasks()
             << QString();
 
     QTest::newRow("ar output")
             << QString::fromLatin1("../../../../x86/i686-unknown-linux-gnu/bin/i686-unknown-linux-gnu-ar: creating lib/libSkyView.a") << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("../../../../x86/i686-unknown-linux-gnu/bin/i686-unknown-linux-gnu-ar: creating lib/libSkyView.a\n")
-            << QList<Task>()
+            << Tasks()
             << QString();
 
     QTest::newRow("GCCE error")
@@ -227,18 +227,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "/temp/test/untitled8/main.cpp:9: error: (Each undeclared identifier is reported only once for each function it appears in.)")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In function `int main(int, char**)':"),
-                        Utils::FileName::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("`sfasdf' undeclared (first use this function)"),
-                        Utils::FileName::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), 9,
+                        Utils::FilePath::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), 9,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("(Each undeclared identifier is reported only once for each function it appears in.)"),
-                        Utils::FileName::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), 9,
+                        Utils::FilePath::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), 9,
                         categoryCompile)
                 )
             << QString();
@@ -246,29 +246,29 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("/src/corelib/global/qglobal.h:1635: warning: inline function `QDebug qDebug()' used but never defined")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Warning,
                         QLatin1String("inline function `QDebug qDebug()' used but never defined"),
-                        Utils::FileName::fromUserInput(QLatin1String("/src/corelib/global/qglobal.h")), 1635,
+                        Utils::FilePath::fromUserInput(QLatin1String("/src/corelib/global/qglobal.h")), 1635,
                         categoryCompile))
             << QString();
     QTest::newRow("warning")
             << QString::fromLatin1("main.cpp:7:2: warning: Some warning")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>() << Task(Task::Warning,
+            << (Tasks() << Task(Task::Warning,
                                                        QLatin1String("Some warning"),
-                                                       Utils::FileName::fromUserInput(QLatin1String("main.cpp")), 7,
+                                                       Utils::FilePath::fromUserInput(QLatin1String("main.cpp")), 7,
                                                        categoryCompile))
             << QString();
     QTest::newRow("GCCE #error")
             << QString::fromLatin1("C:\\temp\\test\\untitled8\\main.cpp:7: #error Symbian error")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Error,
                         QLatin1String("#error Symbian error"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8\\main.cpp")), 7,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8\\main.cpp")), 7,
                         categoryCompile))
             << QString();
     // Symbian reports #warning(s) twice (using different syntax).
@@ -276,20 +276,20 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("C:\\temp\\test\\untitled8\\main.cpp:8: warning: #warning Symbian warning")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Warning,
                         QLatin1String("#warning Symbian warning"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8\\main.cpp")), 8,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8\\main.cpp")), 8,
                         categoryCompile))
             << QString();
     QTest::newRow("GCCE #warning2")
             << QString::fromLatin1("/temp/test/untitled8/main.cpp:8:2: warning: #warning Symbian warning")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Warning,
                         QLatin1String("#warning Symbian warning"),
-                        Utils::FileName::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), 8,
+                        Utils::FilePath::fromUserInput(QLatin1String("/temp/test/untitled8/main.cpp")), 8,
                         categoryCompile))
             << QString();
     QTest::newRow("Undefined reference (debug)")
@@ -298,18 +298,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "collect2: ld returned 1 exit status")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In function `main':"),
-                        Utils::FileName::fromUserInput(QLatin1String("main.o")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("main.o")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("undefined reference to `MainWindow::doSomething()'"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8/main.cpp")), 8,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8/main.cpp")), 8,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("collect2: ld returned 1 exit status"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile)
                 )
             << QString();
@@ -319,18 +319,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "collect2: ld returned 1 exit status")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In function `main':"),
-                        Utils::FileName::fromUserInput(QLatin1String("main.o")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("main.o")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("undefined reference to `MainWindow::doSomething()'"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8/main.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:\\temp\\test\\untitled8/main.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("collect2: ld returned 1 exit status"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile)
                 )
             << QString();
@@ -338,20 +338,20 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("c:\\Qt\\4.6\\lib/QtGuid4.dll: file not recognized: File format not recognized")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Error,
                         QLatin1String("file not recognized: File format not recognized"),
-                        Utils::FileName::fromUserInput(QLatin1String("c:\\Qt\\4.6\\lib/QtGuid4.dll")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("c:\\Qt\\4.6\\lib/QtGuid4.dll")), -1,
                         categoryCompile))
             << QString();
     QTest::newRow("Invalid rpath")
             << QString::fromLatin1("g++: /usr/local/lib: No such file or directory")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Error,
                         QLatin1String("/usr/local/lib: No such file or directory"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile))
             << QString();
 
@@ -361,18 +361,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "../../../../master/src/plugins/debugger/gdb/gdbengine.cpp:2115: warning: unused variable 'handler'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In member function 'void Debugger::Internal::GdbEngine::handleBreakInsert2(const Debugger::Internal::GdbResponse&)':"),
-                        Utils::FileName::fromUserInput(QLatin1String("../../../../master/src/plugins/debugger/gdb/gdbengine.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("../../../../master/src/plugins/debugger/gdb/gdbengine.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("unused variable 'index'"),
-                        Utils::FileName::fromUserInput(QLatin1String("../../../../master/src/plugins/debugger/gdb/gdbengine.cpp")), 2114,
+                        Utils::FilePath::fromUserInput(QLatin1String("../../../../master/src/plugins/debugger/gdb/gdbengine.cpp")), 2114,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("unused variable 'handler'"),
-                        Utils::FileName::fromUserInput(QLatin1String("../../../../master/src/plugins/debugger/gdb/gdbengine.cpp")), 2115,
+                        Utils::FilePath::fromUserInput(QLatin1String("../../../../master/src/plugins/debugger/gdb/gdbengine.cpp")), 2115,
                         categoryCompile))
             << QString();
     QTest::newRow("gnumakeparser.cpp errors")
@@ -381,18 +381,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp:264: error: expected ';' before ':' token")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In member function 'void ProjectExplorer::ProjectExplorerPlugin::testGnuMakeParserTaskMangling_data()':"),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("expected primary-expression before ':' token"),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp")), 264,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp")), 264,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("expected ';' before ':' token"),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp")), 264,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/code/src/creator/src/plugins/projectexplorer/gnumakeparser.cpp")), 264,
                         categoryCompile))
             << QString();
     QTest::newRow("distcc error(QTCREATORBUG-904)")
@@ -401,42 +401,42 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("distcc[73168] (dcc_get_hostlist) Warning: no hostlist is set; can't distribute work\n"
                                                 "distcc[73168] (dcc_build_somewhere) Warning: failed to distribute, running locally instead\n")
-            << QList<Task>()
+            << Tasks()
             << QString();
     QTest::newRow("ld warning (QTCREATORBUG-905)")
             << QString::fromLatin1("ld: warning: Core::IEditor* QVariant::value<Core::IEditor*>() const has different visibility (hidden) in .obj/debug-shared/openeditorsview.o and (default) in .obj/debug-shared/editormanager.o")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Warning,
                          QLatin1String("Core::IEditor* QVariant::value<Core::IEditor*>() const has different visibility (hidden) in .obj/debug-shared/openeditorsview.o and (default) in .obj/debug-shared/editormanager.o"),
-                         Utils::FileName(), -1,
+                         Utils::FilePath(), -1,
                          categoryCompile))
             << QString();
     QTest::newRow("ld fatal")
             << QString::fromLatin1("ld: fatal: Symbol referencing errors. No output written to testproject")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Error,
                          QLatin1String("Symbol referencing errors. No output written to testproject"),
-                         Utils::FileName(), -1,
+                         Utils::FilePath(), -1,
                          categoryCompile))
             << QString();
     QTest::newRow("Teambuilder issues")
             << QString::fromLatin1("TeamBuilder Client:: error: could not find Scheduler, running Job locally...")
             << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("TeamBuilder Client:: error: could not find Scheduler, running Job locally...\n")
-            << QList<Task>()
+            << Tasks()
             << QString();
     QTest::newRow("note")
             << QString::fromLatin1("/home/dev/creator/share/qtcreator/debugger/dumper.cpp:1079: note: initialized from here")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("initialized from here"),
-                         Utils::FileName::fromUserInput(QLatin1String("/home/dev/creator/share/qtcreator/debugger/dumper.cpp")), 1079,
+                         Utils::FilePath::fromUserInput(QLatin1String("/home/dev/creator/share/qtcreator/debugger/dumper.cpp")), 1079,
                          categoryCompile))
             << QString();
     QTest::newRow("static member function")
@@ -444,30 +444,30 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "/Qt/4.6.2-Symbian/s60sdk/epoc32/include/stdapis/stlport/stl/_tree.c:194: warning: suggest explicit braces to avoid ambiguous 'else'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("In static member function 'static std::_Rb_tree_node_base* std::_Rb_global<_Dummy>::_Rebalance_for_erase(std::_Rb_tree_node_base*, std::_Rb_tree_node_base*&, std::_Rb_tree_node_base*&, std::_Rb_tree_node_base*&)':"),
-                         Utils::FileName::fromUserInput(QLatin1String("/Qt/4.6.2-Symbian/s60sdk/epoc32/include/stdapis/stlport/stl/_tree.c")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("/Qt/4.6.2-Symbian/s60sdk/epoc32/include/stdapis/stlport/stl/_tree.c")), -1,
                          categoryCompile)
                  << Task(Task::Warning,
                          QLatin1String("suggest explicit braces to avoid ambiguous 'else'"),
-                         Utils::FileName::fromUserInput(QLatin1String("/Qt/4.6.2-Symbian/s60sdk/epoc32/include/stdapis/stlport/stl/_tree.c")), 194,
+                         Utils::FilePath::fromUserInput(QLatin1String("/Qt/4.6.2-Symbian/s60sdk/epoc32/include/stdapis/stlport/stl/_tree.c")), 194,
                          categoryCompile))
             << QString();
     QTest::newRow("rm false positive")
             << QString::fromLatin1("rm: cannot remove `release/moc_mainwindow.cpp': No such file or directory")
             << OutputParserTester::STDERR
             << QString() << QString::fromLatin1("rm: cannot remove `release/moc_mainwindow.cpp': No such file or directory\n")
-            << QList<Task>()
+            << Tasks()
             << QString();
     QTest::newRow("ld: missing library")
             << QString::fromLatin1("/usr/bin/ld: cannot find -ldoesnotexist")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Error,
                          QLatin1String("cannot find -ldoesnotexist"),
-                         Utils::FileName(), -1,
+                         Utils::FilePath(), -1,
                          categoryCompile))
             << QString();
     QTest::newRow("In function")
@@ -476,38 +476,38 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "../../scriptbug/main.cpp:8: warning: unused variable c")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("In function void foo(i) [with i = double]:"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), -1,
                          categoryCompile)
                  << Task(Task::Unknown,
                          QLatin1String("instantiated from here"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 22,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 22,
                          categoryCompile)
                  << Task(Task::Warning,
                          QLatin1String("unused variable c"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 8,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 8,
                          categoryCompile))
             << QString();
     QTest::newRow("instanciated from here")
             << QString::fromLatin1("main.cpp:10: instantiated from here  ")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("instantiated from here"),
-                         Utils::FileName::fromUserInput(QLatin1String("main.cpp")), 10,
+                         Utils::FilePath::fromUserInput(QLatin1String("main.cpp")), 10,
                          categoryCompile))
             << QString();
     QTest::newRow("In constructor")
             << QString::fromLatin1("/dev/creator/src/plugins/find/basetextfind.h: In constructor 'Find::BaseTextFind::BaseTextFind(QTextEdit*)':")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("In constructor 'Find::BaseTextFind::BaseTextFind(QTextEdit*)':"),
-                         Utils::FileName::fromUserInput(QLatin1String("/dev/creator/src/plugins/find/basetextfind.h")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("/dev/creator/src/plugins/find/basetextfind.h")), -1,
                          categoryCompile))
             << QString();
 
@@ -519,26 +519,26 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "../../scriptbug/main.cpp:5: warning: unused parameter v")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("At global scope:"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), -1,
                          categoryCompile)
                  << Task(Task::Unknown,
                          QLatin1String("In instantiation of void bar(i) [with i = double]:"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), -1,
                          categoryCompile)
                  << Task(Task::Unknown,
                          QLatin1String("instantiated from void foo(i) [with i = double]"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 8,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 8,
                          categoryCompile)
                  << Task(Task::Unknown,
                          QLatin1String("instantiated from here"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 22,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 22,
                          categoryCompile)
                  << Task(Task::Warning,
                          QLatin1String("unused parameter v"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 5,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../scriptbug/main.cpp")), 5,
                          categoryCompile))
             << QString();
 
@@ -546,10 +546,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("/home/code/test.cpp:54:38: fatal error: test.moc: No such file or directory")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Error,
                          QLatin1String("test.moc: No such file or directory"),
-                         Utils::FileName::fromUserInput(QLatin1String("/home/code/test.cpp")), 54,
+                         Utils::FilePath::fromUserInput(QLatin1String("/home/code/test.cpp")), 54,
                          categoryCompile))
             << QString();
 
@@ -560,22 +560,22 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "collect2: ld returned 1 exit status")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In function `QPlotAxis':"),
-                        Utils::FileName::fromUserInput(QLatin1String("debug/qplotaxis.o")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("debug/qplotaxis.o")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("undefined reference to `vtable for QPlotAxis'"),
-                        Utils::FileName::fromUserInput(QLatin1String("M:\\Development\\x64\\QtPlot/qplotaxis.cpp")), 26,
+                        Utils::FilePath::fromUserInput(QLatin1String("M:\\Development\\x64\\QtPlot/qplotaxis.cpp")), 26,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("undefined reference to `vtable for QPlotAxis'"),
-                        Utils::FileName::fromUserInput(QLatin1String("M:\\Development\\x64\\QtPlot/qplotaxis.cpp")), 26,
+                        Utils::FilePath::fromUserInput(QLatin1String("M:\\Development\\x64\\QtPlot/qplotaxis.cpp")), 26,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("collect2: ld returned 1 exit status"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile))
             << QString();
 
@@ -587,26 +587,26 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "../stl/main.cpp:31: warning: unused parameter index")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In member function typename _Vector_base<_Tp, _Alloc>::_Tp_alloc_type::const_reference Vector<_Tp, _Alloc>::at(int) [with _Tp = Point, _Alloc = Allocator<Point>]:"),
-                        Utils::FileName::fromUserInput(QLatin1String("../stl/main.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("../stl/main.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("instantiated from here"),
-                        Utils::FileName::fromUserInput(QLatin1String("../stl/main.cpp")), 38,
+                        Utils::FilePath::fromUserInput(QLatin1String("../stl/main.cpp")), 38,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("returning reference to temporary"),
-                        Utils::FileName::fromUserInput(QLatin1String("../stl/main.cpp")), 31,
+                        Utils::FilePath::fromUserInput(QLatin1String("../stl/main.cpp")), 31,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("At global scope:"),
-                        Utils::FileName::fromUserInput(QLatin1String("../stl/main.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("../stl/main.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("unused parameter index"),
-                        Utils::FileName::fromUserInput(QLatin1String("../stl/main.cpp")), 31,
+                        Utils::FilePath::fromUserInput(QLatin1String("../stl/main.cpp")), 31,
                         categoryCompile))
             << QString();
 
@@ -617,22 +617,22 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "C:/Symbian_SDK/epoc32/include/e32cmn.inl:7094: warning: returning reference to temporary")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In file included from C:/Symbian_SDK/epoc32/include/e32cmn.h:6792,"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32cmn.h")), 6792,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32cmn.h")), 6792,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("from C:/Symbian_SDK/epoc32/include/e32std.h:25,"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32std.h")), 25,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32std.h")), 25,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("In member function 'SSecureId::operator const TSecureId&() const':"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32cmn.inl")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32cmn.inl")), -1,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("returning reference to temporary"),
-                        Utils::FileName::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32cmn.inl")), 7094,
+                        Utils::FilePath::fromUserInput(QLatin1String("C:/Symbian_SDK/epoc32/include/e32cmn.inl")), 7094,
                         categoryCompile))
             << QString();
 
@@ -640,10 +640,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("../../../src/XmlUg/targetdelete.c: At top level:")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("At top level:"),
-                         Utils::FileName::fromUserInput(QLatin1String("../../../src/XmlUg/targetdelete.c")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("../../../src/XmlUg/targetdelete.c")), -1,
                          categoryCompile))
             << QString();
 
@@ -653,18 +653,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "/Symbian/SDK/epoc32/include/variant/Symbian_OS.hrh:1134:26: warning: no newline at end of file")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Unknown,
                          QLatin1String("In file included from /Symbian/SDK/EPOC32/INCLUDE/GCCE/GCCE.h:15,"),
-                         Utils::FileName::fromUserInput(QLatin1String("/Symbian/SDK/EPOC32/INCLUDE/GCCE/GCCE.h")), 15,
+                         Utils::FilePath::fromUserInput(QLatin1String("/Symbian/SDK/EPOC32/INCLUDE/GCCE/GCCE.h")), 15,
                          categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("from <command line>:26:"),
-                        Utils::FileName::fromUserInput(QLatin1String("<command line>")), 26,
+                        Utils::FilePath::fromUserInput(QLatin1String("<command line>")), 26,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("no newline at end of file"),
-                        Utils::FileName::fromUserInput(QLatin1String("/Symbian/SDK/epoc32/include/variant/Symbian_OS.hrh")), 1134,
+                        Utils::FilePath::fromUserInput(QLatin1String("/Symbian/SDK/epoc32/include/variant/Symbian_OS.hrh")), 1134,
                         categoryCompile))
             << QString();
 
@@ -672,10 +672,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("release/main.o:main.cpp:(.text+0x42): undefined reference to `MainWindow::doSomething()'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Error,
                         QLatin1String("undefined reference to `MainWindow::doSomething()'"),
-                        Utils::FileName::fromUserInput(QLatin1String("main.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("main.cpp")), -1,
                         categoryCompile))
             << QString();
 
@@ -684,14 +684,14 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "../../../src/shared/proparser/profileevaluator.cpp:2817:9: warning: case value '0' not in enumerated type 'ProFileEvaluator::Private::TestFunc'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In member function 'ProFileEvaluator::Private::VisitReturn ProFileEvaluator::Private::evaluateConditionalFunction(const ProString&, const ProStringList&)':"),
-                        Utils::FileName::fromUserInput(QLatin1String("../../../src/shared/proparser/profileevaluator.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("../../../src/shared/proparser/profileevaluator.cpp")), -1,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("case value '0' not in enumerated type 'ProFileEvaluator::Private::TestFunc'"),
-                        Utils::FileName::fromUserInput(QLatin1String("../../../src/shared/proparser/profileevaluator.cpp")), 2817,
+                        Utils::FilePath::fromUserInput(QLatin1String("../../../src/shared/proparser/profileevaluator.cpp")), 2817,
                         categoryCompile))
             << QString();
 
@@ -700,14 +700,14 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "./mw.h:4:0: warning: \"STUPID_DEFINE\" redefined")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In file included from <command-line>:0:0:"),
-                        Utils::FileName::fromUserInput(QLatin1String("<command-line>")), 0,
+                        Utils::FilePath::fromUserInput(QLatin1String("<command-line>")), 0,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("\"STUPID_DEFINE\" redefined"),
-                        Utils::FileName::fromUserInput(QLatin1String("./mw.h")), 4,
+                        Utils::FilePath::fromUserInput(QLatin1String("./mw.h")), 4,
                         categoryCompile))
             << QString();
     QTest::newRow("instanciation with line:column info")
@@ -716,28 +716,28 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "file.h:21:5: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In function 'void UnitTest::CheckEqual(UnitTest::TestResults&, const Expected&, const Actual&, const UnitTest::TestDetails&) [with Expected = unsigned int, Actual = int]':"),
-                        Utils::FileName::fromUserInput(QLatin1String("file.h")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("file.h")), -1,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("instantiated from here"),
-                        Utils::FileName::fromUserInput(QLatin1String("file.cpp")), 87,
+                        Utils::FilePath::fromUserInput(QLatin1String("file.cpp")), 87,
                         categoryCompile)
                 << Task(Task::Warning,
                         QLatin1String("comparison between signed and unsigned integer expressions [-Wsign-compare]"),
-                        Utils::FileName::fromUserInput(QLatin1String("file.h")), 21,
+                        Utils::FilePath::fromUserInput(QLatin1String("file.h")), 21,
                         categoryCompile))
             << QString();
     QTest::newRow("linker error") // QTCREATORBUG-3107
             << QString::fromLatin1("cns5k_ins_parser_tests.cpp:(.text._ZN20CNS5kINSParserEngine21DropBytesUntilStartedEP14CircularBufferIhE[CNS5kINSParserEngine::DropBytesUntilStarted(CircularBuffer<unsigned char>*)]+0x6d): undefined reference to `CNS5kINSPacket::SOH_BYTE'")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Error,
                         QLatin1String("undefined reference to `CNS5kINSPacket::SOH_BYTE'"),
-                        Utils::FileName::fromUserInput(QLatin1String("cns5k_ins_parser_tests.cpp")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("cns5k_ins_parser_tests.cpp")), -1,
                         categoryCompile))
             << QString();
 
@@ -745,10 +745,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("mainwindow.ui: Warning: The name 'pushButton' (QPushButton) is already in use, defaulting to 'pushButton1'.")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Warning,
                          QLatin1String("The name 'pushButton' (QPushButton) is already in use, defaulting to 'pushButton1'."),
-                         Utils::FileName::fromUserInput(QLatin1String("mainwindow.ui")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("mainwindow.ui")), -1,
                          Constants::TASK_CATEGORY_COMPILE))
             << QString();
 
@@ -756,10 +756,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("libimf.so: warning: warning: feupdateenv is not implemented and will always fail")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                  << Task(Task::Warning,
                          QLatin1String("warning: feupdateenv is not implemented and will always fail"),
-                         Utils::FileName::fromUserInput(QLatin1String("libimf.so")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("libimf.so")), -1,
                          Constants::TASK_CATEGORY_COMPILE))
             << QString();
 
@@ -770,16 +770,16 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "                         ^")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In file included from /home/code/src/creator/src/libs/extensionsystem/pluginerrorview.cpp:31:0:"),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/code/src/creator/src/libs/extensionsystem/pluginerrorview.cpp")), 31,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/code/src/creator/src/libs/extensionsystem/pluginerrorview.cpp")), 31,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("QtGui/QAction: No such file or directory\n"
                                       " #include <QtGui/QAction>\n"
                                       "                         ^"),
-                        Utils::FileName::fromUserInput(QLatin1String(".uic/ui_pluginerrorview.h")), 14,
+                        Utils::FilePath::fromUserInput(QLatin1String(".uic/ui_pluginerrorview.h")), 14,
                         categoryCompile))
             << QString();
 
@@ -791,26 +791,26 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "main.cpp:7:22: error: within this context")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << ( QList<Task>()
+            << ( Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In file included from /usr/include/qt4/QtCore/QString:1:0,"),
-                        Utils::FileName::fromUserInput(QLatin1String("/usr/include/qt4/QtCore/QString")), 1,
+                        Utils::FilePath::fromUserInput(QLatin1String("/usr/include/qt4/QtCore/QString")), 1,
                         categoryCompile)
                  << Task(Task::Unknown,
                          QLatin1String("from main.cpp:3:"),
-                         Utils::FileName::fromUserInput(QLatin1String("main.cpp")), 3,
+                         Utils::FilePath::fromUserInput(QLatin1String("main.cpp")), 3,
                          categoryCompile)
                  << Task(Task::Unknown,
                          QLatin1String("In function 'void foo()':"),
-                         Utils::FileName::fromUserInput(QLatin1String("/usr/include/qt4/QtCore/qstring.h")), -1,
+                         Utils::FilePath::fromUserInput(QLatin1String("/usr/include/qt4/QtCore/qstring.h")), -1,
                          categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("'QString::QString(const char*)' is private"),
-                        Utils::FileName::fromUserInput(QLatin1String("/usr/include/qt4/QtCore/qstring.h")), 597,
+                        Utils::FilePath::fromUserInput(QLatin1String("/usr/include/qt4/QtCore/qstring.h")), 597,
                         categoryCompile)
                  << Task(Task::Error,
                          QLatin1String("within this context"),
-                         Utils::FileName::fromUserInput(QLatin1String("main.cpp")), 7,
+                         Utils::FilePath::fromUserInput(QLatin1String("main.cpp")), 7,
                          categoryCompile))
             << QString();
 
@@ -821,22 +821,22 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "collect2: error: ld returned 1 exit status")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("In function `foo()':"),
-                        Utils::FileName::fromUserInput(QLatin1String("foo.o")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("foo.o")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("multiple definition of `foo()'"),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/user/test/foo.cpp")), 2,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/user/test/foo.cpp")), 2,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("first defined here"),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/user/test/bar.cpp")), 4,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/user/test/bar.cpp")), 4,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("collect2: error: ld returned 1 exit status"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile)
                 )
             << QString();
@@ -847,18 +847,18 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
                                    "collect2: error: ld returned 1 exit status")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Error,
                         QLatin1String("multiple definition of `foo'"),
-                        Utils::FileName::fromUserInput(QLatin1String("foo.o")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("foo.o")), -1,
                         categoryCompile)
                 << Task(Task::Unknown,
                         QLatin1String("first defined here"),
-                        Utils::FileName::fromUserInput(QLatin1String("bar.o")), -1,
+                        Utils::FilePath::fromUserInput(QLatin1String("bar.o")), -1,
                         categoryCompile)
                 << Task(Task::Error,
                         QLatin1String("collect2: error: ld returned 1 exit status"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile)
                 )
             << QString();
@@ -867,10 +867,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << "obj/gtest-clang-printing.o:gtest-clang-printing.cpp:llvm::VerifyDisableABIBreakingChecks: error: undefined reference to 'llvm::DisableABIBreakingChecks'"
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Error,
                         QLatin1String("error: undefined reference to 'llvm::DisableABIBreakingChecks'"),
-                        Utils::FileName::fromString("gtest-clang-printing.cpp"), -1,
+                        Utils::FilePath::fromString("gtest-clang-printing.cpp"), -1,
                         categoryCompile)
                 )
             << QString();
@@ -879,10 +879,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("ranlib: file: lib/libtest.a(Test0.cpp.o) has no symbols")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Warning,
                         QLatin1String("file: lib/libtest.a(Test0.cpp.o) has no symbols"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile)
                 )
             << QString();
@@ -890,10 +890,10 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("/path/to/XCode/and/ranlib: file: lib/libtest.a(Test0.cpp.o) has no symbols")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<Task>()
+            << (Tasks()
                 << Task(Task::Warning,
                         QLatin1String("file: lib/libtest.a(Test0.cpp.o) has no symbols"),
-                        Utils::FileName(), -1,
+                        Utils::FilePath(), -1,
                         categoryCompile)
                 )
             << QString();
@@ -901,12 +901,121 @@ void ProjectExplorerPlugin::testGccOutputParsers_data()
             << QString::fromLatin1("/home/qtwebkithelpviewer.h:0: Note: No relevant classes found. No output generated.")
             << OutputParserTester::STDERR
             << QString() << QString()
-            << (QList<ProjectExplorer::Task>()
+            << (Tasks()
                 << Task(Task::Unknown,
                         QLatin1String("Note: No relevant classes found. No output generated."),
-                        Utils::FileName::fromUserInput(QLatin1String("/home/qtwebkithelpviewer.h")), 0,
+                        Utils::FilePath::fromUserInput(QLatin1String("/home/qtwebkithelpviewer.h")), 0,
                         categoryCompile)
                 )
+            << QString();
+    QTest::newRow("GCC 9 output")
+            << QString("In file included from /usr/include/qt/QtCore/qlocale.h:43,\n"
+                       "                 from /usr/include/qt/QtCore/qtextstream.h:46,\n"
+                       "                 from /qtc/src/shared/proparser/proitems.cpp:31:\n"
+                       "/usr/include/qt/QtCore/qvariant.h: In constructor ‘QVariant::QVariant(QVariant&&)’:\n"
+                       "/usr/include/qt/QtCore/qvariant.h:273:25: warning: implicitly-declared ‘constexpr QVariant::Private& QVariant::Private::operator=(const QVariant::Private&)’ is deprecated [-Wdeprecated-copy]\n"
+                       "  273 |     { other.d = Private(); }\n"
+                       "      |                         ^\n"
+                       "/usr/include/qt/QtCore/qvariant.h:399:16: note: because ‘QVariant::Private’ has user-provided ‘QVariant::Private::Private(const QVariant::Private&)’\n"
+                       "  399 |         inline Private(const Private &other) Q_DECL_NOTHROW\n"
+                       "      |                      ^~~~~~~)\n"
+                       "t.cc: In function ‘int test(const shape&, const shape&)’:\n"
+                       "t.cc:15:4: error: no match for ‘operator+’ (operand types are ‘boxed_value<double>’ and ‘boxed_value<double>’)\n"
+                       "  14 |   return (width(s1) * height(s1)\n"
+                       "     |           ~~~~~~~~~~~~~~~~~~~~~~\n"
+                       "     |                     |\n"
+                       "     |                     boxed_value<[...]>\n"
+                       "  15 |    + width(s2) * height(s2));\n"
+                       "     |    ^ ~~~~~~~~~~~~~~~~~~~~~~\n"
+                       "     |                |\n"
+                       "     |                boxed_value<[...]>\n"
+                       "incomplete.c:1:6: error: ‘string’ in namespace ‘std’ does not name a type\n"
+                       "  1 | std::string test(void)\n"
+                       "    |      ^~~~~~\n"
+                       "incomplete.c:1:1: note: ‘std::string’ is defined in header ‘<string>’; did you forget to ‘#include <string>’?\n"
+                       " +++ |+#include <string>\n"
+                       "  1 | std::string test(void)\n"
+                       "param-type-mismatch.c: In function ‘caller’:\n"
+                       "param-type-mismatch.c:5:24: warning: passing argument 2 of ‘callee’ makes pointer from integer without a cast [-Wint-conversion]\n"
+                       "  5 |   return callee(first, second, third);\n"
+                       "    |                        ^~~~~~\n"
+                       "    |                        |\n"
+                       "    |                        int\n"
+                       "param-type-mismatch.c:1:40: note: expected ‘const char *’ but argument is of type ‘int’\n"
+                       "  1 | extern int callee(int one, const char *two, float three);\n"
+                       "    |                            ~~~~~~~~~~~~^~~"
+               )
+            << OutputParserTester::STDERR
+            << QString() << QString()
+            << Tasks{Task(Task::Unknown,
+                     "In file included from /usr/include/qt/QtCore/qlocale.h:43,",
+                     Utils::FilePath::fromUserInput("/usr/include/qt/QtCore/qlocale.h"), 43,
+                     categoryCompile),
+               Task(Task::Unknown,
+                    "from /usr/include/qt/QtCore/qtextstream.h:46,",
+                    Utils::FilePath::fromUserInput("/usr/include/qt/QtCore/qtextstream.h"), 46,
+                    categoryCompile),
+               Task(Task::Unknown,
+                    "from /qtc/src/shared/proparser/proitems.cpp:31:",
+                    Utils::FilePath::fromUserInput("/qtc/src/shared/proparser/proitems.cpp"), 31,
+                    categoryCompile),
+               Task(Task::Unknown,
+                    "In constructor ‘QVariant::QVariant(QVariant&&)’:",
+                    Utils::FilePath::fromUserInput("/usr/include/qt/QtCore/qvariant.h"), -1,
+                    categoryCompile),
+               Task(Task::Warning,
+                    "implicitly-declared ‘constexpr QVariant::Private& QVariant::Private::operator=(const QVariant::Private&)’ is deprecated [-Wdeprecated-copy]\n"
+                    "  273 |     { other.d = Private(); }\n"
+                    "      |                         ^",
+                    Utils::FilePath::fromUserInput("/usr/include/qt/QtCore/qvariant.h"), 273,
+                    categoryCompile),
+               Task(Task::Unknown,
+                    "because ‘QVariant::Private’ has user-provided ‘QVariant::Private::Private(const QVariant::Private&)’\n"
+                    "  399 |         inline Private(const Private &other) Q_DECL_NOTHROW\n"
+                    "      |                      ^~~~~~~)",
+                    Utils::FilePath::fromUserInput("/usr/include/qt/QtCore/qvariant.h"), 399,
+                    categoryCompile),
+               Task(Task::Unknown,
+                    "In function ‘int test(const shape&, const shape&)’:",
+                    Utils::FilePath::fromUserInput("t.cc"), -1,
+                    categoryCompile),
+               Task(Task::Error,
+                    "no match for ‘operator+’ (operand types are ‘boxed_value<double>’ and ‘boxed_value<double>’)\n"
+                    "  14 |   return (width(s1) * height(s1)\n"
+                    "     |           ~~~~~~~~~~~~~~~~~~~~~~\n"
+                    "     |                     |\n"
+                    "     |                     boxed_value<[...]>\n"
+                    "  15 |    + width(s2) * height(s2));\n"
+                    "     |    ^ ~~~~~~~~~~~~~~~~~~~~~~\n"
+                    "     |                |\n"
+                    "     |                boxed_value<[...]>",
+                    Utils::FilePath::fromUserInput("t.cc"), 15,
+                    categoryCompile),
+               Task(Task::Error,
+                    "‘string’ in namespace ‘std’ does not name a type\n"
+                    "  1 | std::string test(void)\n"
+                    "    |      ^~~~~~",
+                    Utils::FilePath::fromUserInput("incomplete.c"), 1, categoryCompile),
+               Task(Task::Unknown,
+                    "‘std::string’ is defined in header ‘<string>’; did you forget to ‘#include <string>’?\n"
+                    " +++ |+#include <string>\n"
+                    "  1 | std::string test(void)",
+                    Utils::FilePath::fromUserInput("incomplete.c"), 1, categoryCompile),
+               Task(Task::Unknown,
+                    "In function ‘caller’:",
+                    Utils::FilePath::fromUserInput("param-type-mismatch.c"), -1, categoryCompile),
+               Task(Task::Warning,
+                    "passing argument 2 of ‘callee’ makes pointer from integer without a cast [-Wint-conversion]\n"
+                    "  5 |   return callee(first, second, third);\n"
+                    "    |                        ^~~~~~\n"
+                    "    |                        |\n"
+                    "    |                        int",
+                    Utils::FilePath::fromUserInput("param-type-mismatch.c"), 5, categoryCompile),
+               Task(Task::Unknown,
+                    "expected ‘const char *’ but argument is of type ‘int’\n"
+                    "  1 | extern int callee(int one, const char *two, float three);\n"
+                    "    |                            ~~~~~~~~~~~~^~~",
+                    Utils::FilePath::fromUserInput("param-type-mismatch.c"), 1, categoryCompile)}
             << QString();
 }
 
@@ -916,7 +1025,7 @@ void ProjectExplorerPlugin::testGccOutputParsers()
     testbench.appendOutputParser(new GccParser);
     QFETCH(QString, input);
     QFETCH(OutputParserTester::Channel, inputChannel);
-    QFETCH(QList<Task>, tasks);
+    QFETCH(Tasks, tasks);
     QFETCH(QString, childStdOutLines);
     QFETCH(QString, childStdErrLines);
     QFETCH(QString, outputLines);

@@ -37,6 +37,7 @@
 
 #include <utils/environment.h>
 #include <utils/fileutils.h>
+#include <utils/hostosinfo.h>
 #include <utils/mimetypes/mimedatabase.h>
 
 #include <QSettings>
@@ -168,12 +169,14 @@ static bool keyWordReplacement(const QString &keyWord,
             const QChar ypsilon = QLatin1Char('y');
             if (format.count(ypsilon) == 2)
                 format.insert(format.indexOf(ypsilon), QString(2, ypsilon));
+            format.replace('/', "\\/");
         }
         *value = QString::fromLatin1("%{CurrentDate:") + format + QLatin1Char('}');
         return true;
     }
     if (keyWord == QLatin1String("%USER%")) {
-        *value = QLatin1String("%{Env:USER}");
+        *value = Utils::HostOsInfo::isWindowsHost() ? QLatin1String("%{Env:USERNAME}")
+                                                    : QLatin1String("%{Env:USER}");
         return true;
     }
     // Environment variables (for example '%$EMAIL%').
@@ -191,7 +194,6 @@ static void parseLicenseTemplatePlaceholders(QString *t)
 {
     int pos = 0;
     const QChar placeHolder = QLatin1Char('%');
-    bool isCompatibilityStyle = false;
     do {
         const int placeHolderPos = t->indexOf(placeHolder, pos);
         if (placeHolderPos == -1)
@@ -206,7 +208,6 @@ static void parseLicenseTemplatePlaceholders(QString *t)
             const QString keyWord = t->mid(placeHolderPos, endPlaceHolderPos + 1 - placeHolderPos);
             QString replacement;
             if (keyWordReplacement(keyWord, &replacement)) {
-                isCompatibilityStyle = true;
                 t->replace(placeHolderPos, keyWord.size(), replacement);
                 pos = placeHolderPos + replacement.size();
             } else {
@@ -216,8 +217,6 @@ static void parseLicenseTemplatePlaceholders(QString *t)
         }
     } while (pos < t->size());
 
-    if (isCompatibilityStyle)
-        t->replace(QLatin1Char('\\'), QLatin1String("\\\\"));
 }
 
 // Convenience that returns the formatted license template.

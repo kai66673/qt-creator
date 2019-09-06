@@ -72,11 +72,17 @@ public:
 
     }
 
+    void ensureAliveMessageIsSent()
+    {
+        if (m_aliveTimer.remainingTime() == 0)
+            sendAliveMessage();
+    }
+
 private:
     void connectToLocalServer(const QString &connectionName)
     {
         QObject::connect(&m_localSocket,
-                         static_cast<void (QLocalSocket::*)(QLocalSocket::LocalSocketError)>(&QLocalSocket::error),
+                         QOverload<QLocalSocket::LocalSocketError>::of(&QLocalSocket::error),
                          [&] (QLocalSocket::LocalSocketError) {
             qWarning() << "ConnectionServer error:" << m_localSocket.errorString() << connectionName;
         });

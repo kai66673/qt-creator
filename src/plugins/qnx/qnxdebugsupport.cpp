@@ -85,10 +85,8 @@ static QStringList searchPaths(Kit *kit)
         searchPaths << qtVersion->qmakeProperty("QT_INSTALL_PLUGINS") + '/' + dir;
 
     searchPaths << qtVersion->qmakeProperty("QT_INSTALL_LIBS");
-    searchPaths << qtVersion->qnxTarget().appendPath(qtVersion->cpuDir()).appendPath("lib")
-                   .toString();
-    searchPaths << qtVersion->qnxTarget().appendPath(qtVersion->cpuDir()).appendPath("usr/lib")
-                   .toString();
+    searchPaths << qtVersion->qnxTarget().pathAppended(qtVersion->cpuDir() + "/lib").toString();
+    searchPaths << qtVersion->qnxTarget().pathAppended(qtVersion->cpuDir() + "/usr/lib").toString();
 
     return searchPaths;
 }
@@ -148,10 +146,7 @@ QnxDebugSupport::QnxDebugSupport(RunControl *runControl)
 
     addStartDependency(debuggeeRunner);
 
-    auto runConfig = qobject_cast<QnxRunConfiguration *>(runControl->runConfiguration());
-    QTC_ASSERT(runConfig, return);
-    Target *target = runConfig->target();
-    Kit *k = target->kit();
+    Kit *k = runControl->kit();
 
     setStartMode(AttachToRemoteServer);
     setCloseMode(KillAtClose);
@@ -269,7 +264,8 @@ void QnxAttachDebugSupport::showProcessesDialog()
             localExecutable = aspect->fileName().toString();
     }
 
-    auto runControl = new RunControl(runConfig, ProjectExplorer::Constants::DEBUG_RUN_MODE);
+    auto runControl = new RunControl(ProjectExplorer::Constants::DEBUG_RUN_MODE);
+    runControl->setRunConfiguration(runConfig);
     auto debugger = new QnxAttachDebugSupport(runControl);
     debugger->setStartMode(AttachToRemoteServer);
     debugger->setCloseMode(DetachAtClose);

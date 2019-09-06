@@ -25,6 +25,7 @@
 
 #include "task.h"
 
+#include "fileinsessionfinder.h"
 #include "projectexplorerconstants.h"
 
 #include <app/app_version.h>
@@ -34,6 +35,7 @@
 #include <utils/utilsicons.h>
 #include <utils/qtcassert.h>
 
+#include <QFileInfo>
 #include <QTextStream>
 
 namespace ProjectExplorer
@@ -60,13 +62,14 @@ unsigned int Task::s_nextId = 1;
 */
 
 Task::Task(TaskType type_, const QString &description_,
-           const Utils::FileName &file_, int line_, Core::Id category_,
+           const Utils::FilePath &file_, int line_, Core::Id category_,
            const QIcon &icon, Options options) :
     taskId(s_nextId), type(type_), options(options), description(description_),
-    file(file_), line(line_), movedLine(line_), category(category_),
+    line(line_), movedLine(line_), category(category_),
     icon(icon.isNull() ? taskTypeIcon(type_) : icon)
 {
     ++s_nextId;
+    setFile(file_);
 }
 
 Task Task::compilerMissingTask()
@@ -76,7 +79,7 @@ Task Task::compilerMissingTask()
                                             "%1 needs a compiler set up to build. "
                                             "Configure a compiler in the kit options.")
                 .arg(Core::Constants::IDE_DISPLAY_NAME),
-                Utils::FileName(), -1,
+                Utils::FilePath(), -1,
                 Constants::TASK_CATEGORY_BUILDSYSTEM);
 }
 
@@ -87,7 +90,7 @@ Task Task::buildConfigurationMissingTask()
                                             "%1 needs a build configuration set up to build. "
                                             "Configure a build configuration in the project settings.")
                 .arg(Core::Constants::IDE_DISPLAY_NAME),
-                Utils::FileName(), -1,
+                Utils::FilePath(), -1,
                 Constants::TASK_CATEGORY_BUILDSYSTEM);
 }
 
@@ -108,13 +111,25 @@ void Task::clear()
     taskId = 0;
     type = Task::Unknown;
     description.clear();
-    file = Utils::FileName();
+    file = Utils::FilePath();
     line = -1;
     movedLine = -1;
     category = Core::Id();
     icon = QIcon();
     formats.clear();
     m_mark.clear();
+}
+
+void Task::setFile(const Utils::FilePath &file_)
+{
+    file = file_;
+    if (!file.isEmpty() && !file.toFileInfo().isAbsolute()) {
+        Utils::FilePathList possiblePaths = Internal::findFileInSession(file);
+        if (possiblePaths.length() == 1)
+            file = possiblePaths.first();
+        else
+            fileCandidates = possiblePaths;
+    }
 }
 
 //
@@ -153,7 +168,7 @@ uint qHash(const Task &task)
     return task.taskId;
 }
 
-QString toHtml(const QList<Task> &issues)
+QString toHtml(const Tasks &issues)
 {
     QString result;
     QTextStream str(&result);
@@ -176,7 +191,7 @@ QString toHtml(const QList<Task> &issues)
     return result;
 }
 
-bool containsType(const QList<Task> &issues, Task::TaskType type)
+bool containsType(const Tasks &issues, Task::TaskType type)
 {
     return Utils::contains(issues, [type](const Task &t) { return t.type == type; });
 }

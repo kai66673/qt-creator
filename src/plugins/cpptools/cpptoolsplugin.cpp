@@ -130,9 +130,9 @@ void CppToolsPlugin::clearHeaderSourceCache()
     m_headerSourceMapping.clear();
 }
 
-Utils::FileName CppToolsPlugin::licenseTemplatePath()
+Utils::FilePath CppToolsPlugin::licenseTemplatePath()
 {
-    return Utils::FileName::fromString(m_instance->m_fileSettings->licenseTemplatePath);
+    return Utils::FilePath::fromString(m_instance->m_fileSettings->licenseTemplatePath);
 }
 
 QString CppToolsPlugin::licenseTemplate()
@@ -172,7 +172,7 @@ bool CppToolsPlugin::initialize(const QStringList &arguments, QString *error)
 
     d = new CppToolsPluginPrivate;
 
-    JsExpander::registerQObjectForJs(QLatin1String("Cpp"), new CppToolsJsExtension);
+    JsExpander::registerGlobalObject<CppToolsJsExtension>("Cpp");
 
     // Menus
     ActionContainer *mtools = ActionManager::actionContainer(Core::Constants::M_TOOLS);
@@ -211,7 +211,7 @@ bool CppToolsPlugin::initialize(const QStringList &arguments, QString *error)
 
     expander->registerVariable(
                 "Cpp:PragmaOnce",
-                tr("Insert #pragma once instead of #ifndef include guards into header file"),
+                tr("Insert \"#pragma once\" instead of \"#ifndef\" include guards into header file"),
                 [] { return usePragmaOnce() ? QString("true") : QString(); });
 
     return true;
@@ -256,7 +256,7 @@ static QStringList findFilesInProject(const QString &name,
     QString pattern = QString(1, QLatin1Char('/'));
     pattern += name;
     const QStringList projectFiles
-            = Utils::transform(project->files(ProjectExplorer::Project::AllFiles), &Utils::FileName::toString);
+            = Utils::transform(project->files(ProjectExplorer::Project::AllFiles), &Utils::FilePath::toString);
     const QStringList::const_iterator pcend = projectFiles.constEnd();
     QStringList candidateList;
     for (QStringList::const_iterator it = projectFiles.constBegin(); it != pcend; ++it) {

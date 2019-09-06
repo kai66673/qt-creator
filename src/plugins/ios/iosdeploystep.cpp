@@ -23,7 +23,6 @@
 **
 ****************************************************************************/
 
-#include "iosdeploystepwidget.h"
 #include "iosdeploystep.h"
 #include "iosbuildstep.h"
 #include "iosconstants.h"
@@ -31,6 +30,7 @@
 #include "iostoolhandler.h"
 
 #include <coreplugin/messagemanager.h>
+
 #include <projectexplorer/buildconfiguration.h>
 #include <projectexplorer/projectexplorerconstants.h>
 #include <projectexplorer/target.h>
@@ -50,6 +50,7 @@
 #define ASSERT_STATE(state) ASSERT_STATE_GENERIC(State, state, m_state)
 
 using namespace ProjectExplorer;
+using namespace Utils;
 
 namespace Ios {
 namespace Internal {
@@ -86,7 +87,7 @@ bool IosDeployStep::init()
     auto runConfig = qobject_cast<const IosRunConfiguration *>(
         this->target()->activeRunConfiguration());
     QTC_ASSERT(runConfig, return false);
-    m_bundlePath = runConfig->bundleDirectory().toString();
+    m_bundlePath = runConfig->bundleDirectory();
 
     if (iosdevice()) {
         m_deviceType = IosDeviceType(IosDeviceType::IosDevice, deviceId());
@@ -122,7 +123,7 @@ void IosDeployStep::doRun()
     connect(m_toolHandler, &IosToolHandler::errorMsg,
             this, &IosDeployStep::handleErrorMsg);
     checkProvisioningProfile();
-    m_toolHandler->requestTransferApp(appBundle(), m_deviceType.identifier);
+    m_toolHandler->requestTransferApp(m_bundlePath.toString(), m_deviceType.identifier);
 }
 
 void IosDeployStep::doCancel()
@@ -197,7 +198,16 @@ void IosDeployStep::handleErrorMsg(IosToolHandler *handler, const QString &msg)
 
 BuildStepConfigWidget *IosDeployStep::createConfigWidget()
 {
-    return new IosDeployStepWidget(this);
+    auto widget = new BuildStepConfigWidget(this);
+
+    widget->setObjectName("IosDeployStepWidget");
+    widget->setDisplayName(QString("<b>%1</b>").arg(displayName()));
+    widget->setSummaryText(widget->displayName());
+
+    connect(this, &ProjectConfiguration::displayNameChanged,
+            widget, &BuildStepConfigWidget::updateSummary);
+
+    return widget;
 }
 
 bool IosDeployStep::fromMap(const QVariantMap &map)
@@ -218,14 +228,9 @@ QString IosDeployStep::deviceId() const
     return iosdevice()->uniqueDeviceID();
 }
 
-QString IosDeployStep::appBundle() const
-{
-    return m_bundlePath;
-}
-
 void IosDeployStep::raiseError(const QString &errorString)
 {
-    emit addTask(Task(Task::Error, errorString, Utils::FileName::fromString(QString()), -1,
+    emit addTask(Task(Task::Error, errorString, Utils::FilePath::fromString(QString()), -1,
         ProjectExplorer::Constants::TASK_CATEGORY_DEPLOYMENT));
 }
 
@@ -240,8 +245,7 @@ void IosDeployStep::checkProvisioningProfile()
     if (device.isNull())
         return;
 
-    Utils::FileName provisioningFilePath = Utils::FileName::fromString(appBundle());
-    provisioningFilePath.appendPath(QLatin1String("embedded.mobileprovision"));
+    const FilePath provisioningFilePath = m_bundlePath.pathAppended("embedded.mobileprovision");
 
     // the file is a signed plist stored in DER format
     // we simply search for start and end of the plist instead of decoding the DER payload
@@ -281,7 +285,7 @@ void IosDeployStep::checkProvisioningProfile()
                  "does not cover the device %3 (%4). Deployment to it will fail.")
               .arg(provisioningProfile, provisioningUid, device->displayName(),
                    targetId),
-              Utils::FileName(), /* filename */
+              Utils::FilePath(), /* filename */
               -1, /* line */
               ProjectExplorer::Constants::TASK_CATEGORY_COMPILE);
     emit addTask(task);

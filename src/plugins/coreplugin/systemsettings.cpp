@@ -68,13 +68,13 @@ QWidget *SystemSettings::widget()
         m_widget = new QWidget;
         m_page->setupUi(m_widget);
         m_page->terminalOpenArgs->setToolTip(
-            tr("Command line arguments used for \"%1\".").arg(FileUtils::msgTerminalAction()));
+            tr("Command line arguments used for \"%1\".").arg(FileUtils::msgTerminalHereAction()));
 
         m_page->reloadBehavior->setCurrentIndex(EditorManager::reloadSetting());
         if (HostOsInfo::isAnyUnixHost()) {
             const QVector<TerminalCommand> availableTerminals = ConsoleProcess::availableTerminalEmulators();
             for (const TerminalCommand &term : availableTerminals)
-                m_page->terminalComboBox->addItem(term.command, qVariantFromValue(term));
+                m_page->terminalComboBox->addItem(term.command, QVariant::fromValue(term));
             updateTerminalUi(ConsoleProcess::terminalEmulator(ICore::settings()));
             connect(m_page->terminalComboBox,
                     QOverload<int>::of(&QComboBox::currentIndexChanged),

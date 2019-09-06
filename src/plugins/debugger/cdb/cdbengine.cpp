@@ -203,7 +203,7 @@ CdbEngine::CdbEngine() :
 
     connect(action(CreateFullBacktrace), &QAction::triggered,
             this, &CdbEngine::createFullBacktrace);
-    connect(&m_process, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+    connect(&m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &CdbEngine::processFinished);
     connect(&m_process, &QProcess::errorOccurred, this, &CdbEngine::processError);
     connect(&m_process, &QProcess::readyReadStandardOutput,
@@ -256,7 +256,7 @@ void CdbEngine::init()
     if (!sourcePathMap.isEmpty()) {
         for (auto it = sourcePathMap.constBegin(), cend = sourcePathMap.constEnd(); it != cend; ++it) {
             m_sourcePathMappings.push_back({QDir::toNativeSeparators(it.key()),
-                                            QDir::toNativeSeparators(it.value())});
+                                            QDir::toNativeSeparators(expand(it.value()))});
         }
     }
     // update source path maps from debugger start params
@@ -324,12 +324,9 @@ static QStringList mergeEnvironment(QStringList runConfigEnvironment,
     return runConfigEnvironment;
 }
 
-int CdbEngine::elapsedLogTime() const
+int CdbEngine::elapsedLogTime()
 {
-    const int elapsed = m_logTime.elapsed();
-    const int delta = elapsed - m_elapsedLogTime;
-    m_elapsedLogTime = elapsed;
-    return delta;
+    return m_logTimer.restart();
 }
 
 void CdbEngine::createFullBacktrace()
@@ -352,8 +349,8 @@ void CdbEngine::setupEngine()
         qDebug(">setupEngine");
 
     init();
-    if (!m_logTime.elapsed())
-        m_logTime.start();
+    if (!m_logTimer.elapsed())
+        m_logTimer.start();
 
     // Console: Launch the stub with the suspended application and attach to it
     // CDB in theory has a command line option '-2' that launches a
@@ -524,14 +521,17 @@ void CdbEngine::handleInitialSessionIdle()
     // QmlCppEngine expects the QML engine to be connected before any breakpoints are hit
     // (attemptBreakpointSynchronization() will be directly called then)
     if (rp.breakOnMain) {
-        // FIXME:
-//        const BreakpointParameters bp(BreakpointAtMain);
-//        BreakpointModelId id(quint16(-1));
-//        QString function = cdbAddBreakpointCommand(bp, m_sourcePathMappings, id, true);
-//        runCommand({function, BuiltinCommand,
-//                    [this, id](const DebuggerResponse &r) { handleBreakInsert(r, id); }});
+        BreakpointParameters bp(BreakpointAtMain);
+        if (rp.startMode == StartInternal || rp.startMode == StartExternal) {
+            const QString &moduleFileName = Utils::FilePath::fromString(rp.inferior.executable)
+                                                .fileName();
+            bp.module = moduleFileName.left(moduleFileName.indexOf('.'));
+        }
+        QString function = cdbAddBreakpointCommand(bp, m_sourcePathMappings);
+        runCommand({function, BuiltinCommand, [this](const DebuggerResponse &r) {
+                        handleBreakInsert(r, Breakpoint());
+                    }});
     }
-
     // Take ownership of the breakpoint. Requests insertion. TODO: Cpp only?
     BreakpointManager::claimBreakpointsForEngine(this);
     runCommand({".symopt+0x8000"}); // disable searching public symbol table - improving the symbol lookup speed
@@ -866,6 +866,7 @@ void CdbEngine::executeRunToLine(const ContextData &data)
 {
     // Add one-shot breakpoint
     BreakpointParameters bp;
+    bp.oneShot = true;
     if (data.address) {
         bp.type =BreakpointByAddress;
         bp.address = data.address;
@@ -875,7 +876,7 @@ void CdbEngine::executeRunToLine(const ContextData &data)
         bp.lineNumber = data.lineNumber;
     }
 
-    runCommand({cdbAddBreakpointCommand(bp, m_sourcePathMappings, {}, true), BuiltinCommand,
+    runCommand({cdbAddBreakpointCommand(bp, m_sourcePathMappings), BuiltinCommand,
                [this](const DebuggerResponse &r) { handleBreakInsert(r, Breakpoint()); }});
     continueInferior();
 }
@@ -885,7 +886,8 @@ void CdbEngine::executeRunToFunction(const QString &functionName)
     // Add one-shot breakpoint
     BreakpointParameters bp(BreakpointByFunction);
     bp.functionName = functionName;
-    runCommand({cdbAddBreakpointCommand(bp, m_sourcePathMappings, {}, true), BuiltinCommand,
+    bp.oneShot = true;
+    runCommand({cdbAddBreakpointCommand(bp, m_sourcePathMappings), BuiltinCommand,
                [this](const DebuggerResponse &r) { handleBreakInsert(r, Breakpoint()); }});
     continueInferior();
 }
@@ -1114,6 +1116,7 @@ void CdbEngine::doUpdateLocals(const UpdateParameters &updateParameters)
         cmd.arg("dyntype", boolSetting(UseDynamicType));
         cmd.arg("partialvar", updateParameters.partialVariable);
         cmd.arg("qobjectnames", boolSetting(ShowQObjectNames));
+        cmd.arg("timestamps", boolSetting(LogTimeStamps));
 
         StackFrame frame = stackHandler()->currentFrame();
         cmd.arg("context", frame.context);
@@ -1946,7 +1949,7 @@ void CdbEngine::handleBreakInsert(const DebuggerResponse &response, const Breakp
             functionName = functionName.mid(functionStart);
         sub->params.functionName = functionName;
         sub->displayName = bp->displayName() + '.' + QString::number(subBreakPointID);
-        runCommand({cdbAddBreakpointCommand(sub->params, m_sourcePathMappings, sub->responseId, false), NoFlags});
+        runCommand({cdbAddBreakpointCommand(sub->params, m_sourcePathMappings, sub->responseId), NoFlags});
     }
 }
 
@@ -2199,7 +2202,7 @@ void CdbEngine::handleExtensionMessage(char t, int token, const QString &what, c
         if (!isDebuggerWinException(exception.exceptionCode)) {
             const Task::TaskType type =
                     isFatalWinException(exception.exceptionCode) ? Task::Error : Task::Warning;
-            const FileName fileName = FileName::fromUserInput(exception.file);
+            const FilePath fileName = FilePath::fromUserInput(exception.file);
             const QString taskEntry = tr("Debugger encountered an exception: %1").arg(
                         exception.toString(false).trimmed());
             TaskHub::addTask(type, taskEntry,
@@ -2505,10 +2508,10 @@ void CdbEngine::insertBreakpoint(const Breakpoint &bp)
             && boolSetting(CdbBreakPointCorrection)) {
         response.lineNumber = int(lineCorrection->fixLineNumber(
                                       parameters.fileName, unsigned(parameters.lineNumber)));
-        QString cmd = cdbAddBreakpointCommand(response, m_sourcePathMappings, responseId, false);
+        QString cmd = cdbAddBreakpointCommand(response, m_sourcePathMappings, responseId);
         runCommand({cmd, BuiltinCommand, handleBreakInsertCB});
     } else {
-        QString cmd = cdbAddBreakpointCommand(parameters, m_sourcePathMappings, responseId, false);
+        QString cmd = cdbAddBreakpointCommand(parameters, m_sourcePathMappings, responseId);
         runCommand({cmd, BuiltinCommand, handleBreakInsertCB});
     }
     if (!parameters.enabled)
@@ -2563,7 +2566,7 @@ void CdbEngine::updateBreakpoint(const Breakpoint &bp)
     } else {
         // Delete and re-add, triggering update
         runCommand({cdbClearBreakpointCommand(bp), NoFlags});
-        QString cmd = cdbAddBreakpointCommand(parameters, m_sourcePathMappings, responseId, false);
+        QString cmd = cdbAddBreakpointCommand(parameters, m_sourcePathMappings, responseId);
         runCommand({cmd, BuiltinCommand, handleBreakInsertCB});
         m_pendingBreakpointMap.insert(bp);
         listBreakpoints();
@@ -2763,10 +2766,6 @@ void CdbEngine::setupScripting(const DebuggerResponse &response)
     runCommand({"from cdbbridge import Dumper", ScriptCommand});
     runCommand({"print(dir())", ScriptCommand});
     runCommand({"theDumper = Dumper()", ScriptCommand});
-    runCommand({"theDumper.loadDumpers(None)", ScriptCommand,
-                [this](const DebuggerResponse &response) {
-                    watchHandler()->addDumpers(response.data["result"]["dumpers"]);
-    }});
 
     const QString path = stringSetting(ExtraDumperFile);
     if (!path.isEmpty() && QFileInfo(path).isReadable()) {
@@ -2779,6 +2778,11 @@ void CdbEngine::setupScripting(const DebuggerResponse &response)
         for (const auto &command : commands.split('\n', QString::SkipEmptyParts))
             runCommand({command, ScriptCommand});
     }
+
+    runCommand({"theDumper.loadDumpers(None)", ScriptCommand,
+                [this](const DebuggerResponse &response) {
+                    watchHandler()->addDumpers(response.data["result"]["dumpers"]);
+    }});
 }
 
 void CdbEngine::mergeStartParametersSourcePathMap()

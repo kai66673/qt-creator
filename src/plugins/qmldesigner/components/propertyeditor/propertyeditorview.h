@@ -105,10 +105,14 @@ private: //functions
     void updateSize();
     void setupPanes();
 
-    void select(const ModelNode& node);
+    void select();
+    void setSelelectedModelNode();
 
     void delayedResetView();
     void setupQmlBackend();
+
+    void commitVariantValueToModel(const PropertyName &propertyName, const QVariant &value);
+    void removePropertyFromModel(const PropertyName &propertyName);
 
 private: //variables
     ModelNode m_selectedNode;

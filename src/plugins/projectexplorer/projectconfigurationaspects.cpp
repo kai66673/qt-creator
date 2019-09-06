@@ -79,15 +79,17 @@ public:
     QPointer<PathChooser> m_pathChooserDisplay;
     QPointer<QTextEdit> m_textEditDisplay;
     QPixmap m_labelPixmap;
+    Utils::FilePath m_baseFileName;
 };
 
 class BaseIntegerAspectPrivate
 {
 public:
-    QVariant m_value;
+    qint64 m_value = 0;
     QVariant m_minimumValue;
     QVariant m_maximumValue;
     int m_displayIntegerBase = 10;
+    qint64 m_displayScaleFactor = 1;
     QString m_label;
     QString m_prefix;
     QString m_suffix;
@@ -136,9 +138,14 @@ void BaseStringAspect::toMap(QVariantMap &map) const
         d->m_checker->toMap(map);
 }
 
-FileName BaseStringAspect::fileName() const
+FilePath BaseStringAspect::fileName() const
 {
-    return FileName::fromString(d->m_value);
+    return FilePath::fromString(d->m_value);
+}
+
+void BaseStringAspect::setFileName(const FilePath &val)
+{
+    setValue(val.toString());
 }
 
 void BaseStringAspect::setLabelText(const QString &labelText)
@@ -207,6 +214,13 @@ void BaseStringAspect::setEnvironment(const Environment &env)
         d->m_pathChooserDisplay->setEnvironment(env);
 }
 
+void BaseStringAspect::setBaseFileName(const FilePath &baseFileName)
+{
+    d->m_baseFileName = baseFileName;
+    if (d->m_pathChooserDisplay)
+        d->m_pathChooserDisplay->setBaseFileName(baseFileName);
+}
+
 void BaseStringAspect::addToConfigurationLayout(QFormLayout *layout)
 {
     QTC_CHECK(!d->m_label);
@@ -225,6 +239,7 @@ void BaseStringAspect::addToConfigurationLayout(QFormLayout *layout)
         if (!d->m_historyCompleterKey.isEmpty())
             d->m_pathChooserDisplay->setHistoryCompleter(d->m_historyCompleterKey);
         d->m_pathChooserDisplay->setEnvironment(d->m_environment);
+        d->m_pathChooserDisplay->setBaseFileName(d->m_baseFileName);
         connect(d->m_pathChooserDisplay, &PathChooser::pathChanged,
                 this, &BaseStringAspect::setValue);
         hbox->addWidget(d->m_pathChooserDisplay);
@@ -277,7 +292,7 @@ void BaseStringAspect::update()
     const bool enabled = !d->m_checker || d->m_checker->value();
 
     if (d->m_pathChooserDisplay) {
-        d->m_pathChooserDisplay->setFileName(FileName::fromString(displayedString));
+        d->m_pathChooserDisplay->setFileName(FilePath::fromString(displayedString));
         d->m_pathChooserDisplay->setEnabled(enabled);
     }
 
@@ -357,6 +372,7 @@ bool BaseBoolAspect::defaultValue() const
 void BaseBoolAspect::setDefaultValue(bool defaultValue)
 {
     d->m_defaultValue = defaultValue;
+    d->m_value = defaultValue;
 }
 
 bool BaseBoolAspect::value() const
@@ -397,23 +413,24 @@ void BaseIntegerAspect::addToConfigurationLayout(QFormLayout *layout)
 {
     QTC_CHECK(!d->m_spinBox);
     d->m_spinBox = new QSpinBox(layout->parentWidget());
-    d->m_spinBox->setValue(d->m_value.toInt());
+    d->m_spinBox->setValue(int(d->m_value / d->m_displayScaleFactor));
     d->m_spinBox->setDisplayIntegerBase(d->m_displayIntegerBase);
     d->m_spinBox->setPrefix(d->m_prefix);
     d->m_spinBox->setSuffix(d->m_suffix);
     if (d->m_maximumValue.isValid() && d->m_maximumValue.isValid())
-        d->m_spinBox->setRange(d->m_minimumValue.toInt(), d->m_maximumValue.toInt());
+        d->m_spinBox->setRange(int(d->m_minimumValue.toLongLong() / d->m_displayScaleFactor),
+                               int(d->m_maximumValue.toLongLong() / d->m_displayScaleFactor));
     layout->addRow(d->m_label, d->m_spinBox);
-    connect(d->m_spinBox.data(), static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+    connect(d->m_spinBox.data(), QOverload<int>::of(&QSpinBox::valueChanged),
             this, [this](int value) {
-        d->m_value = value;
+        d->m_value = value * d->m_displayScaleFactor;
         emit changed();
     });
 }
 
 void BaseIntegerAspect::fromMap(const QVariantMap &map)
 {
-    d->m_value = map.value(settingsKey());
+    d->m_value = map.value(settingsKey()).toLongLong();
 }
 
 void BaseIntegerAspect::toMap(QVariantMap &data) const
@@ -421,19 +438,19 @@ void BaseIntegerAspect::toMap(QVariantMap &data) const
     data.insert(settingsKey(), d->m_value);
 }
 
-int BaseIntegerAspect::value() const
+qint64 BaseIntegerAspect::value() const
 {
-    return d->m_value.toInt();
+    return d->m_value;
 }
 
-void BaseIntegerAspect::setValue(int value)
+void BaseIntegerAspect::setValue(qint64 value)
 {
     d->m_value = value;
     if (d->m_spinBox)
-        d->m_spinBox->setValue(d->m_value.toInt());
+        d->m_spinBox->setValue(int(d->m_value / d->m_displayScaleFactor));
 }
 
-void BaseIntegerAspect::setRange(int min, int max)
+void BaseIntegerAspect::setRange(qint64 min, qint64 max)
 {
     d->m_minimumValue = min;
     d->m_maximumValue = max;
@@ -457,6 +474,11 @@ void BaseIntegerAspect::setSuffix(const QString &suffix)
 void BaseIntegerAspect::setDisplayIntegerBase(int base)
 {
     d->m_displayIntegerBase = base;
+}
+
+void BaseIntegerAspect::setDisplayScaleFactor(qint64 factor)
+{
+    d->m_displayScaleFactor = factor;
 }
 
 } // namespace ProjectExplorer

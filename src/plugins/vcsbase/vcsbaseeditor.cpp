@@ -157,7 +157,8 @@ VcsBaseEditor::VcsBaseEditor()
 
 void VcsBaseEditor::finalizeInitialization()
 {
-    QTC_CHECK(qobject_cast<VcsBaseEditorWidget *>(editorWidget()));
+    QTC_ASSERT(qobject_cast<VcsBaseEditorWidget *>(editorWidget()), return);
+    editorWidget()->setReadOnly(true);
 }
 
 // ----------- VcsBaseEditorPrivate
@@ -724,7 +725,7 @@ void VcsBaseEditorWidget::init()
     case OtherContent:
         break;
     case LogOutput:
-        connect(d->entriesComboBox(), static_cast<void (QComboBox::*)(int)>(&QComboBox::activated),
+        connect(d->entriesComboBox(), QOverload<int>::of(&QComboBox::activated),
                 this, &VcsBaseEditorWidget::slotJumpToEntry);
         connect(this, &QPlainTextEdit::textChanged,
                 this, &VcsBaseEditorWidget::slotPopulateLogBrowser);
@@ -737,7 +738,7 @@ void VcsBaseEditorWidget::init()
         break;
     case DiffOutput:
         // Diff: set up diff file browsing
-        connect(d->entriesComboBox(), static_cast<void (QComboBox::*)(int)>(&QComboBox::activated),
+        connect(d->entriesComboBox(), QOverload<int>::of(&QComboBox::activated),
                 this, &VcsBaseEditorWidget::slotJumpToEntry);
         connect(this, &QPlainTextEdit::textChanged,
                 this, &VcsBaseEditorWidget::slotPopulateDiffBrowser);
@@ -868,7 +869,7 @@ void VcsBaseEditorWidget::slotPopulateDiffBrowser()
                 lastFileName = file;
                 // ignore any headers
                 d->m_entrySections.push_back(d->m_entrySections.empty() ? 0 : lineNumber);
-                entriesComboBox->addItem(FileName::fromString(file).fileName());
+                entriesComboBox->addItem(FilePath::fromString(file).fileName());
             }
         }
     }
@@ -979,11 +980,11 @@ void VcsBaseEditorWidget::contextMenuEvent(QContextMenuEvent *e)
         // the user has "Open With" and choose the right diff editor so that
         // fileNameFromDiffSpecification() works.
         QAction *applyAction = menu->addAction(tr("Apply Chunk..."));
-        applyAction->setData(qVariantFromValue(Internal::DiffChunkAction(chunk, false)));
+        applyAction->setData(QVariant::fromValue(Internal::DiffChunkAction(chunk, false)));
         connect(applyAction, &QAction::triggered, this, &VcsBaseEditorWidget::slotApplyDiffChunk);
         // Revert a chunk from a VCS diff, which might be linked to reloading the diff.
         QAction *revertAction = menu->addAction(tr("Revert Chunk..."));
-        revertAction->setData(qVariantFromValue(Internal::DiffChunkAction(chunk, true)));
+        revertAction->setData(QVariant::fromValue(Internal::DiffChunkAction(chunk, true)));
         connect(revertAction, &QAction::triggered, this, &VcsBaseEditorWidget::slotApplyDiffChunk);
         // Custom diff actions
         addDiffActions(menu, chunk);

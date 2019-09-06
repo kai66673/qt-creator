@@ -76,7 +76,7 @@ signals:
 static QByteArray defaultFileLoader(const QString &filename, bool *success)
 {
     if (Core::DocumentModel::Entry *entry
-            = Core::DocumentModel::entryForFilePath(Utils::FileName::fromString(filename))) {
+            = Core::DocumentModel::entryForFilePath(Utils::FilePath::fromString(filename))) {
         if (!entry->isSuspended) {
             *success = true;
             return entry->document->contents();
@@ -143,7 +143,7 @@ bool QmlPreviewPlugin::initialize(const QStringList &arguments, QString *errorSt
                     Constants::G_FILE_OTHER);
     action->setVisible(false);
     connect(ProjectTree::instance(), &ProjectTree::currentNodeChanged, action, [action]() {
-        const Node *node = ProjectTree::findCurrentNode();
+        const Node *node = ProjectTree::currentNode();
         const FileNode *fileNode = node ? node->asFileNode() : nullptr;
         action->setVisible(fileNode ? fileNode->fileType() == FileType::QML : false);
     });
@@ -196,9 +196,9 @@ ExtensionSystem::IPlugin::ShutdownFlag QmlPreviewPlugin::aboutToShutdown()
     return SynchronousShutdown;
 }
 
-QList<QObject *> QmlPreviewPlugin::createTestObjects() const
+QVector<QObject *> QmlPreviewPlugin::createTestObjects() const
 {
-    QList<QObject *> tests;
+    QVector<QObject *> tests;
 #ifdef WITH_TESTS
     tests.append(new QmlPreviewClientTest);
     tests.append(new QmlPreviewPluginTest);
@@ -297,8 +297,8 @@ void QmlPreviewPlugin::setFileLoader(QmlPreviewFileLoader fileLoader)
 
 void QmlPreviewPlugin::previewCurrentFile()
 {
-    const Node *currentNode = ProjectTree::findCurrentNode();
-    if (!currentNode || currentNode->nodeType() != NodeType::File
+    const Node *currentNode = ProjectTree::currentNode();
+    if (!currentNode || !currentNode->asFileNode()
             || currentNode->asFileNode()->fileType() != FileType::QML)
         return;
 

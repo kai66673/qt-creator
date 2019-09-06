@@ -61,7 +61,6 @@
 #include <app/app_version.h>
 #include <utils/algorithm.h>
 #include <utils/hostosinfo.h>
-#include <utils/macroexpander.h>
 #include <utils/qtcassert.h>
 #include <utils/qtcprocess.h>
 #include <utils/savedaction.h>
@@ -133,7 +132,7 @@ GdbEngine::GdbEngine()
 
     connect(&m_gdbProc, &QProcess::errorOccurred,
             this, &GdbEngine::handleGdbError);
-    connect(&m_gdbProc,  static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+    connect(&m_gdbProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &GdbEngine::handleGdbFinished);
     connect(&m_gdbProc, &QtcProcess::readyReadStandardOutput,
             this, &GdbEngine::readGdbStandardOutput);
@@ -356,7 +355,7 @@ void GdbEngine::handleResponse(const QString &buff)
                     Task task(Task::Warning,
                         tr("Missing debug information for %1\nTry: %2")
                             .arg(m_lastMissingDebugInfo).arg(cmd),
-                        FileName(), 0, Debugger::Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
+                        FilePath(), 0, Debugger::Constants::TASK_CATEGORY_DEBUGGER_DEBUGINFO);
 
                     TaskHub::addTask(task);
                     Internal::addDebugInfoTask(task.taskId, cmd);
@@ -1630,7 +1629,7 @@ QString GdbEngine::cleanupFullName(const QString &fileName)
     }
 
     cleanFilePath.clear();
-    const QString base = FileName::fromString(fileName).fileName();
+    const QString base = FilePath::fromString(fileName).fileName();
 
     QMap<QString, QString>::const_iterator jt = m_baseNameToFullName.constFind(base);
     while (jt != m_baseNameToFullName.constEnd() && jt.key() == base) {
@@ -1701,7 +1700,7 @@ void GdbEngine::setLinuxOsAbi()
     const DebuggerRunParameters &rp = runParameters();
     bool isElf = (rp.toolChainAbi.binaryFormat() == Abi::ElfFormat);
     if (!isElf && !rp.inferior.executable.isEmpty()) {
-        isElf = Utils::anyOf(Abi::abisOfBinary(FileName::fromString(rp.inferior.executable)),
+        isElf = Utils::anyOf(Abi::abisOfBinary(FilePath::fromString(rp.inferior.executable)),
                              [](const Abi &abi) {
             return abi.binaryFormat() == Abi::ElfFormat;
         });
@@ -2078,7 +2077,7 @@ QString GdbEngine::breakLocation(const QString &file) const
 {
     QString where = m_fullToShortName.value(file);
     if (where.isEmpty())
-        return FileName::fromString(file).fileName();
+        return FilePath::fromString(file).fileName();
     return where;
 }
 
@@ -2953,7 +2952,7 @@ void GdbEngine::handleThreadInfo(const DebuggerResponse &response)
     if (response.resultClass == ResultDone) {
         ThreadsHandler *handler = threadsHandler();
         handler->setThreads(response.data);
-        updateState(false); // Adjust Threads combobox.
+        updateState(); // Adjust Threads combobox.
         if (boolSetting(ShowThreadNames)) {
             runCommand({"threadnames " + action(MaximalStackDepth)->value().toString(),
                 Discardable, CB(handleThreadNames)});
@@ -2993,7 +2992,7 @@ void GdbEngine::handleThreadNames(const DebuggerResponse &response)
             thread.name = decodeData(name["value"].data(), name["valueencoded"].data());
             handler->updateThread(thread);
         }
-        updateState(false);
+        updateState();
     }
 }
 
@@ -3524,14 +3523,16 @@ void GdbEngine::setupEngine()
     if (isRemoteEngine() && HostOsInfo::isWindowsHost())
         m_gdbProc.setUseCtrlCStub(runParameters().useCtrlCStub); // This is only set for QNX
 
-    QStringList gdbArgs;
+    const DebuggerRunParameters &rp = runParameters();
+    CommandLine gdbCommand{FilePath::fromString(rp.debugger.executable), {}};
+
     if (isPlainEngine()) {
         if (!m_outputCollector.listen()) {
             handleAdapterStartFailed(tr("Cannot set up communication with child process: %1")
                                      .arg(m_outputCollector.errorString()));
             return;
         }
-        gdbArgs.append("--tty=" + m_outputCollector.serverName());
+        gdbCommand.addArg("--tty=" + m_outputCollector.serverName());
     }
 
     const QString tests = QString::fromLocal8Bit(qgetenv("QTC_DEBUGGER_TESTS"));
@@ -3542,7 +3543,6 @@ void GdbEngine::setupEngine()
 
     m_expectTerminalTrap = terminal();
 
-    const DebuggerRunParameters &rp = runParameters();
     if (rp.debugger.executable.isEmpty()) {
         handleGdbStartFailed();
         handleAdapterStartFailed(
@@ -3551,13 +3551,12 @@ void GdbEngine::setupEngine()
         return;
     }
 
-    gdbArgs << "-i";
-    gdbArgs << "mi";
+    gdbCommand.addArgs("-i mi");
     if (!boolSetting(LoadGdbInit))
-        gdbArgs << "-n";
+        gdbCommand.addArg("-n");
 
-    showMessage("STARTING " + rp.debugger.executable + " " + gdbArgs.join(' '));
-    m_gdbProc.setCommand(rp.debugger.executable, QtcProcess::joinArgs(gdbArgs));
+    showMessage("STARTING " + gdbCommand.toUserOutput());
+    m_gdbProc.setCommand(gdbCommand);
     if (QFileInfo(rp.debugger.workingDirectory).isDir())
         m_gdbProc.setWorkingDirectory(rp.debugger.workingDirectory);
     m_gdbProc.setEnvironment(rp.debugger.environment);
@@ -3651,7 +3650,7 @@ void GdbEngine::setupEngine()
     for (auto it = completeSourcePathMap.constBegin(), cend = completeSourcePathMap.constEnd();
          it != cend;
          ++it) {
-        runCommand({"set substitute-path " + it.key() + " " + it.value()});
+        runCommand({"set substitute-path " + it.key() + " " + expand(it.value())});
     }
 
     // Spaces just will not work.
@@ -4258,6 +4257,8 @@ void GdbEngine::handleAttach(const DebuggerResponse &response)
                 notifyEngineRunAndInferiorStopOk();
                 if (runParameters().continueAfterAttach)
                     continueInferiorInternal();
+                else
+                    updateAll();
             }
             break;
         case ResultError:
@@ -4742,6 +4743,7 @@ void GdbEngine::doUpdateLocals(const UpdateParameters &params)
     cmd.arg("autoderef", boolSetting(AutoDerefPointers));
     cmd.arg("dyntype", boolSetting(UseDynamicType));
     cmd.arg("qobjectnames", boolSetting(ShowQObjectNames));
+    cmd.arg("timestamps", boolSetting(LogTimeStamps));
 
     StackFrame frame = stackHandler()->currentFrame();
     cmd.arg("context", frame.context);
