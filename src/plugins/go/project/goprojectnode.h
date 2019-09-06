@@ -27,7 +27,7 @@
 
 #include <projectexplorer/projectnodes.h>
 
-namespace Utils { class FileName; }
+namespace Utils { class FilePath; }
 
 namespace GoLang {
 
@@ -36,7 +36,7 @@ class GoProject;
 class GoProjectNode : public ProjectExplorer::ProjectNode
 {
 public:
-    GoProjectNode(GoProject &project, const Utils::FileName &projectFilePath);
+    GoProjectNode(GoProject &project, const Utils::FilePath &projectFilePath);
 
     bool supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const override;
     bool addFiles(const QStringList &filePaths, QStringList *) override;

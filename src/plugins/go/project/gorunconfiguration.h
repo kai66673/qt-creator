@@ -45,18 +45,10 @@ class GoRunConfiguration : public ProjectExplorer::RunConfiguration
 public:
     GoRunConfiguration(ProjectExplorer::Target *parent, Core::Id id);
 
-    QWidget *createConfigurationWidget() override;
-    QVariantMap toMap() const override;
-    bool fromMap(const QVariantMap &map) override;
-
-signals:
-    void executableChanged(const QString &args);
-
 private:
     void updateConfiguration();
     void setActiveBuildConfiguration(GoBuildConfiguration *activeBuildConfiguration);
 
-    QString m_executable;
     GoBuildConfiguration *m_buildConfiguration;
 };
 

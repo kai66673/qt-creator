@@ -34,15 +34,15 @@ namespace GoLang {
 class GoToolChain : public ProjectExplorer::ToolChain
 {
 public:
-    GoToolChain(Core::Id typeId, Detection d);
-    GoToolChain(Detection d);
+    GoToolChain();
+    explicit GoToolChain(Core::Id typeId);
 
     QString version() const;
-    QList<ProjectExplorer::Abi> supportedAbis () const override;
-    void setSupportedAbis(const QList<ProjectExplorer::Abi> &abis);
+    QVector<ProjectExplorer::Abi> supportedAbis () const override;
+    void setSupportedAbis(const QVector<ProjectExplorer::Abi> &abis);
     void setTargetAbi(const ProjectExplorer::Abi &abi);
     void setOriginalTargetTriple(const QString &targetTriple);
-    void setCompilerCommand(const Utils::FileName &path, const Utils::FileName &goRoot);
+    void setCompilerCommand(const Utils::FilePath &path, const Utils::FilePath &goRoot);
     virtual QString defaultDisplayName() const;
 
     virtual Utils::FileName goRoot() const;
@@ -60,30 +60,28 @@ public:
     ProjectExplorer::HeaderPaths builtInHeaderPaths(const QStringList &flags,
                                                     const Utils::FileName &sysRoot) const final;
     void addToEnvironment(Utils::Environment &env) const override;
-    QString makeCommand(const Utils::Environment &) const override;
-    virtual Utils::FileName compilerCommand() const override;
+    Utils::FilePath makeCommand(const Utils::Environment &) const override;
+    Utils::FilePath compilerCommand() const override;
     ProjectExplorer::IOutputParser *outputParser() const override;
     std::unique_ptr<ProjectExplorer::ToolChainConfigWidget> createConfigurationWidget() final;
-    bool canClone() const override;
-    ToolChain *clone() const override final;
     QVariantMap toMap() const override;
     bool fromMap(const QVariantMap &data) override;
-    QList<ProjectExplorer::Task> validateKit(const ProjectExplorer::Kit *k) const override;
+    QVector<ProjectExplorer::Task> validateKit(const ProjectExplorer::Kit *k) const override;
 
     static void addCommandPathToEnvironment(const Utils::FileName &command, Utils::Environment &env);
     static QString toString(ProjectExplorer::Abi::Architecture arch, int width);
-    static QList<ProjectExplorer::Abi> detectGoAbi(const QString &goRoot);
+    static QVector<ProjectExplorer::Abi> detectGoAbi(const QString &goRoot);
 
     class DetectedAbisResult {
     public:
         DetectedAbisResult() = default;
-        DetectedAbisResult(const QList<ProjectExplorer::Abi> &supportedAbis,
+        DetectedAbisResult(const QVector<ProjectExplorer::Abi> &supportedAbis,
                            const QString &originalTargetTriple = QString()) :
             supportedAbis(supportedAbis),
             originalTargetTriple(originalTargetTriple)
         { }
 
-        QList<ProjectExplorer::Abi> supportedAbis;
+        QVector<ProjectExplorer::Abi> supportedAbis;
         QString originalTargetTriple;
     };
 
@@ -94,11 +92,11 @@ protected:
     static QString detectVersionForPath(const Utils::FileName &goPath);
 
 private:
-    Utils::FileName m_compilerCommand;
-    Utils::FileName m_goRoot;
+    Utils::FilePath m_compilerCommand;
+    Utils::FilePath m_goRoot;
 
     ProjectExplorer::Abi m_targetAbi;
-    mutable QList<ProjectExplorer::Abi> m_supportedAbis;
+    mutable QVector<ProjectExplorer::Abi> m_supportedAbis;
     mutable QString m_originalTargetTriple;
     mutable QString m_version;
 
@@ -113,18 +111,7 @@ public:
     GoToolChainFactory ();
 
     virtual QList<ProjectExplorer::ToolChain *> autoDetect(const QList<ProjectExplorer::ToolChain *> &alreadyKnown) override;
-    virtual QList<ProjectExplorer::ToolChain *> autoDetect(const Utils::FileName &compilerPath, const Core::Id &language) override final;
-
-    virtual bool canCreate() override final;
-    virtual ProjectExplorer::ToolChain *create(Core::Id l) override final;
-
-    virtual bool canRestore(const QVariantMap &data) override final;
-    virtual ProjectExplorer::ToolChain *restore(const QVariantMap &data) override final;
-
-    virtual QSet<Core::Id> supportedLanguages() const override final;
-
-protected:
-    virtual GoToolChain *createToolChain(Core::Id l, bool autoDetect);
+    virtual QList<ProjectExplorer::ToolChain *> autoDetect(const Utils::FilePath &compilerPath, const Core::Id &language) override final;
 };
 
 

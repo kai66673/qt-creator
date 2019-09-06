@@ -138,8 +138,9 @@ void GoProject::collectProjectFiles()
     QTC_ASSERT(!m_futureWatcher.future().isRunning(), return);
     Utils::FileName prjDir = projectDirectory();
     QFuture<QList<ProjectExplorer::FileNode *>> future = Utils::runAsync([prjDir] {
-        return ProjectExplorer::FileNode::scanForFiles(prjDir, [](const Utils::FileName &fn) {
-            return new ProjectExplorer::FileNode(fn, ProjectExplorer::FileType::Source, false);
+        return ProjectExplorer::FileNode::scanForFiles(
+                    prjDir, [](const Utils::FilePath &fn) -> ProjectExplorer::FileNode * {
+            return new ProjectExplorer::FileNode(fn, ProjectExplorer::FileType::Source);
         });
     });
 

@@ -103,7 +103,7 @@ void BaseGoCompilerStep::doRun()
 
     env.set(QStringLiteral("GOPATH"), goPath);
     parameters->setEnvironment(env);
-    AbstractProcessStep::run();
+    AbstractProcessStep::doRun();
 }
 
 bool BaseGoCompilerStep::fromMap(const QVariantMap &map)
@@ -168,14 +168,14 @@ void BaseGoCompilerStep::updateProcessParameters()
 
 void BaseGoCompilerStep::updateCommand()
 {
-    processParameters()->setCommand(QStringLiteral("go"));
+    processParameters()->setCommand(FilePath::fromString(QStringLiteral("go")));
 }
 
 void BaseGoCompilerStep::updateWorkingDirectory()
 {
     auto bc = qobject_cast<GoBuildConfiguration *>(buildConfiguration());
     QTC_ASSERT(bc, return);
-    processParameters()->setWorkingDirectory(bc->buildDirectory().toString());
+    processParameters()->setWorkingDirectory(bc->buildDirectory());
 }
 
 void BaseGoCompilerStep::updateArguments()

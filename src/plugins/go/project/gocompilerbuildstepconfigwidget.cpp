@@ -42,7 +42,7 @@ namespace GoLang {
 
 GoCompilerBuildStepConfigWidget::GoCompilerBuildStepConfigWidget(BaseGoCompilerStep *buildStep)
     : BuildStepConfigWidget(buildStep)
-    , m_buildStep()
+    , m_buildStep(buildStep)
     , m_ui(new Ui::GoCompilerBuildStepConfigWidget())
 {
     m_ui->setupUi(this);
@@ -92,7 +92,7 @@ void GoCompilerBuildStepConfigWidget::updateCommandLineText()
     ProcessParameters *parameters = m_buildStep->processParameters();
 
     QStringList command;
-    command << parameters->command();
+    command << parameters->command().toString();
     command << parameters->arguments();
 
     // Remove empty args

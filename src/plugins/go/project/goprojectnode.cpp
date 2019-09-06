@@ -28,25 +28,23 @@
 
 namespace GoLang {
 
-GoProjectNode::GoProjectNode(GoProject &project, const Utils::FileName &projectFilePath)
+GoProjectNode::GoProjectNode(GoProject &project, const Utils::FilePath &projectFilePath)
     : ProjectExplorer::ProjectNode(projectFilePath)
     , m_project(project)
 { }
 
 bool GoProjectNode::supportsAction(ProjectExplorer::ProjectAction action, const Node *node) const
 {
-    switch (node->nodeType()) {
-    case ProjectExplorer::NodeType::File:
+    if (node->asFileNode()) {
         return action == ProjectExplorer::ProjectAction::Rename
             || action == ProjectExplorer::ProjectAction::RemoveFile;
-    case ProjectExplorer::NodeType::Folder:
-    case ProjectExplorer::NodeType::Project:
+    }
+    if (node->isFolderNodeType() || node->isProjectNodeType()) {
         return action == ProjectExplorer::ProjectAction::AddNewFile
             || action == ProjectExplorer::ProjectAction::RemoveFile
             || action == ProjectExplorer::ProjectAction::AddExistingFile;
-    default:
-        return ProjectNode::supportsAction(action, node);
     }
+    return ProjectNode::supportsAction(action, node);
 }
 
 bool GoProjectNode::addFiles(const QStringList &filePaths, QStringList *)

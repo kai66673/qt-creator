@@ -104,7 +104,7 @@ FileName GoBuildConfiguration::outFilePath() const
 
 FileName GoBuildConfiguration::cacheDirectory() const
 {
-    return buildDirectory().appendPath(QStringLiteral("gocache"));
+    return buildDirectory().pathAppended(QStringLiteral("gocache"));
 }
 
 const GoCompilerBuildStep *GoBuildConfiguration::goCompilerBuildStep() const

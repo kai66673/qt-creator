@@ -32,6 +32,7 @@
 #include <utils/fileutils.h>
 #include <utils/environment.h>
 #include <utils/synchronousprocess.h>
+#include <utils/algorithm.h>
 
 #include <QProcess>
 #include <QRegularExpression>
@@ -48,7 +49,7 @@ static const char goRootKeyC[] = "GoLang.GoToolChain.GoRoot";
 static const char targetAbiKeyC[] = "GoLang.GoToolChain.TargetAbi";
 static const char supportedAbisKeyC[] = "GoLang.GoToolChain.SupportedAbis";
 
-static QByteArray runGo(const FileName &goGc, const QStringList &arguments, const QStringList &env)
+static QByteArray runGo(const FilePath &goGc, const QStringList &arguments, const QStringList &env)
 {
     if (goGc.isEmpty() || !goGc.toFileInfo().isExecutable())
         return QByteArray();
@@ -92,10 +93,10 @@ static QByteArray runGo(const FileName &goGc, const QStringList &arguments, cons
     return data;
 }
 
-static QMap<QString, QString> getGoEnv (const FileName &goGc, const QStringList &env)
+static QMap<QString, QString> getGoEnv (const FilePath &goGc, const QStringList &env)
 {
     QStringList arguments = QStringList()<<QStringLiteral("env");
-    QByteArray output = runGo(goGc,arguments,env);
+    QByteArray output = runGo(goGc, arguments,env);
 
     QMap<QString, QString> goEnv;
     if(output.isEmpty())
@@ -120,13 +121,13 @@ static QMap<QString, QString> getGoEnv (const FileName &goGc, const QStringList 
     return goEnv;
 }
 
-static QList<Abi> guessGoAbi (const QString &goRoot)
+static QVector<Abi> guessGoAbi (const QString &goRoot)
 {
-    QList<Abi> result;
+    QVector<Abi> result;
 
     QDir pkgDir(goRoot+QStringLiteral("/pkg"));
     if(!pkgDir.exists())
-        return QList<Abi>();
+        return result;
 
     QStringList abis = pkgDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
     foreach(const QString &abi,abis) {
@@ -139,7 +140,7 @@ static QList<Abi> guessGoAbi (const QString &goRoot)
         Abi::OS os = Abi::UnknownOS;
         Abi::OSFlavor flavor = Abi::UnknownFlavor;
         Abi::BinaryFormat format = Abi::UnknownFormat;
-        int width = 0;
+        unsigned char width = 0;
         int unknownCount = 0;
 
         //copied from gcc code, need to check how all the architectures are named in go
@@ -195,13 +196,13 @@ static QList<Abi> guessGoAbi (const QString &goRoot)
     return result;
 }
 
-static QList<Abi> guessGoAbi (const FileName &goGc, const QStringList &env)
+static QVector<Abi> guessGoAbi (const FileName &goGc, const QStringList &env)
 {
     QMap<QString, QString> goEnv = getGoEnv(goGc, env);
 
     QString rootDirKey = QStringLiteral("GOROOT");
     if(goEnv.isEmpty() || !goEnv.contains(rootDirKey))
-        return QList<Abi>();
+        return QVector<Abi>();
 
     return guessGoAbi(goEnv[rootDirKey]);
 }
@@ -212,16 +213,19 @@ static QString goVersion(const FileName &path, const QStringList &env)
     return QString::fromLocal8Bit(runGo(path, arguments, env)).trimmed();
 }
 
-GoToolChain::GoToolChain(Core::Id typeId, Detection d)
-    : ToolChain(typeId, d)
+GoToolChain::GoToolChain()
+    : GoToolChain(Constants::GO_TOOLCHAIN_ID)
 { }
 
-GoToolChain::GoToolChain(ToolChain::Detection d)
-    : ToolChain(Core::Id(Constants::GO_TOOLCHAIN_ID), d)
-{ }
+GoToolChain::GoToolChain(Core::Id typeId)
+    : ToolChain(typeId)
+    , m_compilerCommand(FilePath())
+{
+    setLanguage(Constants::C_GOLANGUAGE_ID);
+}
 
 GoToolChain::GoToolChain(const GoToolChain &other)
-    : ToolChain(other)
+    : ToolChain(other.typeId())
     , m_compilerCommand(other.m_compilerCommand)
     , m_goRoot(other.m_goRoot)
     , m_targetAbi(other.m_targetAbi)
@@ -249,12 +253,12 @@ QString GoToolChain::version() const
     return m_version;
 }
 
-QList<Abi> GoToolChain::supportedAbis() const
+QVector<Abi> GoToolChain::supportedAbis() const
 {
     return m_supportedAbis;
 }
 
-void GoToolChain::setSupportedAbis(const QList<Abi> &abis)
+void GoToolChain::setSupportedAbis(const QVector<Abi> &abis)
 {
     m_supportedAbis = abis;
 }
@@ -273,7 +277,7 @@ void GoToolChain::setOriginalTargetTriple(const QString &targetTriple)
     m_originalTargetTriple = targetTriple;
 }
 
-void GoToolChain::setCompilerCommand(const FileName &path, const FileName &goRoot)
+void GoToolChain::setCompilerCommand(const FilePath &path, const FilePath &goRoot)
 {
     if (path == m_compilerCommand && goRoot == m_goRoot)
         return;
@@ -321,7 +325,7 @@ QString GoToolChain::typeDisplayName() const
 
 bool GoToolChain::isValid() const
 {
-    if (m_compilerCommand.isNull() || m_goRoot.isNull())
+    if (m_compilerCommand.isEmpty() || m_goRoot.isEmpty())
         return false;
 
     QFileInfo fi = compilerCommand().toFileInfo();
@@ -355,10 +359,10 @@ void GoToolChain::addToEnvironment(Environment &env) const
         env.set(QStringLiteral("GOARCH"), toString(m_targetAbi.architecture(), m_targetAbi.wordWidth()));
 }
 
-QString GoToolChain::makeCommand(const Environment &) const
-{ return QString(); }
+FilePath GoToolChain::makeCommand(const Environment &) const
+{ return FilePath(); }
 
-FileName GoToolChain::compilerCommand() const
+FilePath GoToolChain::compilerCommand() const
 { return m_compilerCommand; }
 
 IOutputParser *GoToolChain::outputParser() const
@@ -366,12 +370,6 @@ IOutputParser *GoToolChain::outputParser() const
 
 std::unique_ptr<ProjectExplorer::ToolChainConfigWidget> GoToolChain::createConfigurationWidget()
 { return std::make_unique<GoToolChainConfigWidget>(this); }
-
-bool GoToolChain::canClone() const
-{ return true; }
-
-ToolChain *GoToolChain::clone() const
-{ return new GoToolChain(*this); }
 
 QVariantMap GoToolChain::toMap() const
 {
@@ -405,9 +403,9 @@ bool GoToolChain::fromMap(const QVariantMap &data)
     return true;
 }
 
-QList<Task> GoToolChain::validateKit(const Kit *k) const
+QVector<Task> GoToolChain::validateKit(const Kit *k) const
 {
-    QList<Task> result;
+    QVector<Task> result;
 
     ToolChain *tc = ToolChainKitAspect::toolChain(k, Constants::C_GOLANGUAGE_ID);
     if(tc) {
@@ -454,7 +452,7 @@ QString GoToolChain::toString(Abi::Architecture arch, int width)
     }
 }
 
-QList<Abi> GoToolChain::detectGoAbi(const QString &goRoot)
+QVector<Abi> GoToolChain::detectGoAbi(const QString &goRoot)
 {
     return guessGoAbi(goRoot);
 }
@@ -483,10 +481,33 @@ GoToolChainFactory::GoToolChainFactory()
     setDisplayName(QStringLiteral("Go Toolchain"));
 }
 
+static QList<ToolChain *> getGoToolChains(const FilePath &compilerPath,
+                                          const Core::Id &language,
+                                          ToolChain::Detection d)
+{
+    QList<ToolChain *> result;
+    if (language == Constants::C_GOLANGUAGE_ID) {
+        Environment systemEnvironment = Environment::systemEnvironment();
+        QMap<QString, QString> goEnv = getGoEnv(compilerPath,systemEnvironment.toStringList());
+        QString rootKey = QStringLiteral("GOROOT");
+        if(!goEnv.contains(rootKey))
+            return result;
+
+        QVector<Abi> abiList = guessGoAbi(goEnv[rootKey]);
+        foreach (const Abi &abi, abiList) {
+            auto tc = new GoToolChain();
+            tc->setCompilerCommand(compilerPath, FileName::fromString(goEnv[rootKey]));
+            tc->setTargetAbi(abi);
+            tc->setDetection(d);
+            tc->setDisplayName(tc->defaultDisplayName()); // reset displayname
+            result.append(tc);
+        }
+    }
+    return result;
+}
+
 QList<ToolChain *> GoToolChainFactory::autoDetect(const QList<ToolChain *> &alreadyKnown)
 {
-    Q_UNUSED(alreadyKnown)
-
     QList<ToolChain *> result;
 
     QString compiler = QStringLiteral("go");
@@ -495,77 +516,22 @@ QList<ToolChain *> GoToolChainFactory::autoDetect(const QList<ToolChain *> &alre
     if (compilerPath.isEmpty())
         return result;
 
-    GoToolChain::addCommandPathToEnvironment(compilerPath, systemEnvironment);
+    result = Utils::filtered(alreadyKnown, [compilerPath](ToolChain *tc) {
+        return tc->typeId() == Constants::GO_TOOLCHAIN_ID
+                && tc->compilerCommand() == compilerPath;
+    });
 
-    QString rootKey = QStringLiteral("GOROOT");
-    QMap<QString, QString> goEnv = getGoEnv(compilerPath,systemEnvironment.toStringList());
-    if(!goEnv.contains(rootKey))
+    if (!result.empty())
         return result;
 
-    QList<Abi> abiList = guessGoAbi(goEnv[rootKey]);
-    foreach (const Abi &abi, abiList) {
-        QScopedPointer<GoToolChain> tc(createToolChain(Constants::C_GOLANGUAGE_ID, true));
-        if (tc.isNull())
-            return result;
+    GoToolChain::addCommandPathToEnvironment(compilerPath, systemEnvironment);
 
-        tc->setCompilerCommand(compilerPath, FileName::fromString(goEnv[rootKey]));
-        tc->setTargetAbi(abi);
-        tc->setDisplayName(tc->defaultDisplayName()); // reset displayname
-
-        result.append(tc.take());
-    }
-    return result;
+    return getGoToolChains(compilerPath, Constants::C_GOLANGUAGE_ID, ToolChain::AutoDetection);
 }
 
-QList<ToolChain *> GoToolChainFactory::autoDetect(const FileName &compilerPath, const Core::Id &language)
+QList<ToolChain *> GoToolChainFactory::autoDetect(const FilePath &compilerPath, const Core::Id &language)
 {
-    QList<ToolChain *> result;
-    if (language == Constants::C_GOLANGUAGE_ID) {
-        auto tc = new GoToolChain(ToolChain::ManualDetection);
-        QString rootKey = QStringLiteral("GOROOT");
-        Environment systemEnvironment = Environment::systemEnvironment();
-        QMap<QString, QString> goEnv = getGoEnv(compilerPath,systemEnvironment.toStringList());
-        if(!goEnv.contains(rootKey))
-            return result;
-        tc->setCompilerCommand(compilerPath, FileName::fromString(goEnv[rootKey]));
-        result.append(tc);
-    }
-    return result;
-}
-
-bool GoToolChainFactory::canCreate()
-{
-    return true;
-}
-
-ToolChain *GoToolChainFactory::create(Core::Id l)
-{
-    return createToolChain(l, false);
-}
-
-bool GoToolChainFactory::canRestore(const QVariantMap &data)
-{
-    return typeIdFromMap(data) == Constants::GO_TOOLCHAIN_ID;
-}
-
-ToolChain *GoToolChainFactory::restore(const QVariantMap &data)
-{
-    GoToolChain *tc = new GoToolChain(ToolChain::AutoDetection);
-    if (tc->fromMap(data))
-        return tc;
-
-    delete tc;
-    return 0;
-}
-
-QSet<Core::Id> GoToolChainFactory::supportedLanguages() const
-{ return {Constants::C_GOLANGUAGE_ID}; }
-
-GoToolChain *GoToolChainFactory::createToolChain(Core::Id l, bool autoDetect)
-{
-    GoToolChain *tc = new GoToolChain(autoDetect ? ToolChain::AutoDetection : ToolChain::ManualDetection);
-    tc->setLanguage(l);
-    return tc;
+    return getGoToolChains(compilerPath, language, ToolChain::ManualDetection);
 }
 
 }   // namespace GoLang

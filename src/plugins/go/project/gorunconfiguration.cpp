@@ -26,7 +26,6 @@
 #include "gorunconfiguration.h"
 #include "gobuildconfiguration.h"
 #include "golangconstants.h"
-#include "gorunconfigurationwidget.h"
 
 #include <projectexplorer/localenvironmentaspect.h>
 #include <projectexplorer/runconfigurationaspects.h>
@@ -44,10 +43,10 @@ GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *target, Core::Id
     : RunConfiguration(target, id)
     , m_buildConfiguration(nullptr)
 {
+    addAspect<LocalEnvironmentAspect>(target);
     addAspect<ExecutableAspect>();
     addAspect<ArgumentsAspect>();
-    auto envAspect = addAspect<LocalEnvironmentAspect>(target, LocalEnvironmentAspect::BaseEnvironmentModifier());
-    addAspect<WorkingDirectoryAspect>(envAspect);
+    addAspect<WorkingDirectoryAspect>();
     addAspect<TerminalAspect>();
 
     // Connect target signals
@@ -55,27 +54,6 @@ GoRunConfiguration::GoRunConfiguration(ProjectExplorer::Target *target, Core::Id
             this, &GoRunConfiguration::updateConfiguration);
 
     updateConfiguration();
-}
-
-QWidget *GoRunConfiguration::createConfigurationWidget()
-{
-    return new GoRunConfigurationWidget(this);
-}
-
-QVariantMap GoRunConfiguration::toMap() const
-{
-    auto result = RunConfiguration::toMap();
-    result[Constants::C_GORUNCONFIGURATION_EXECUTABLE_KEY] = m_executable;
-    return result;
-}
-
-bool GoRunConfiguration::fromMap(const QVariantMap &map)
-{
-    bool result = RunConfiguration::fromMap(map);
-    if (!result)
-        return result;
-    m_executable = map[Constants::C_GORUNCONFIGURATION_EXECUTABLE_KEY].toString();
-    return true;
 }
 
 void GoRunConfiguration::updateConfiguration()

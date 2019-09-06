@@ -42,7 +42,6 @@ HEADERS += \
     project/goprojectnode.h \
     project/gorunconfiguration.h \
     project/gorunconfigurationfactory.h \
-    project/gorunconfigurationwidget.h \
     project/gotoolchain.h \
     project/gotoolchainconfigwidget.h \
     settings/gogeneralsettings.h \
@@ -94,8 +93,7 @@ HEADERS += \
     tools/gofindreferences.h \
     tools/findreferences.h \
     tools/goworkingcopy.h \
-    tools/resolvedtype.h \
-    settings/goconfigurations.h
+    tools/resolvedtype.h
 
 SOURCES += \
     goplugin.cpp \
@@ -125,7 +123,6 @@ SOURCES += \
     project/goprojectnode.cpp \
     project/gorunconfiguration.cpp \
     project/gorunconfigurationfactory.cpp \
-    project/gorunconfigurationwidget.cpp \
     project/gotoolchain.cpp \
     project/gotoolchainconfigwidget.cpp \
     settings/gogeneralsettings.cpp \
@@ -174,8 +171,7 @@ SOURCES += \
     tools/gofindreferences.cpp \
     tools/findreferences.cpp \
     tools/goworkingcopy.cpp \
-    tools/resolvedtype.cpp \
-    settings/goconfigurations.cpp
+    tools/resolvedtype.cpp
 
 FORMS += \
     project/gocompilerbuildstepconfigwidget.ui \

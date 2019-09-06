@@ -45,7 +45,7 @@ GoToolChainConfigWidget::GoToolChainConfigWidget(GoToolChain *tc)
     : ToolChainConfigWidget(tc)
     , m_compilerCommand(new PathChooser)
     , m_abiWidget(new AbiWidget)
-    , m_goVersion(0)
+    , m_goVersion(nullptr)
     , m_toolChain(tc)
 {
     QTC_CHECK(tc);
@@ -76,7 +76,8 @@ void GoToolChainConfigWidget::applyImpl()
     QFileInfo goFileInfo(m_compilerCommand->fileName().toString());
     QDir goRoot(goFileInfo.absoluteDir());
     goRoot.cd("..");    // remove bin from path
-    m_toolChain->setCompilerCommand(m_compilerCommand->fileName(), FileName(QFileInfo(goRoot.absolutePath())));
+    m_toolChain->setCompilerCommand(m_compilerCommand->fileName(),
+                                    FilePath::fromString(goRoot.absolutePath()));
     m_toolChain->setSupportedAbis(m_abiWidget->supportedAbis());
     m_toolChain->setTargetAbi(m_abiWidget->currentAbi());
     m_toolChain->setOriginalTargetTriple(m_toolChain->detectSupportedAbis().originalTargetTriple);
@@ -119,7 +120,7 @@ void GoToolChainConfigWidget::handleCompilerCommandChange()
     Abi currentAbi = m_abiWidget->currentAbi();
     bool customAbi = m_abiWidget->isCustomAbi();
     FileName path = m_compilerCommand->fileName();
-    QList<Abi> abiList;
+    QVector<Abi> abiList;
 
     if (!path.isEmpty()) {
         QFileInfo fi(path.toFileInfo());
